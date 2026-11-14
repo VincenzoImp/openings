@@ -18,6 +18,10 @@ class PasswordInput(Input):
     password: str = Field(min_length=1, max_length=1024)
 
 
+class PasswordChange(PasswordInput):
+    current_password: str = Field(min_length=1, max_length=1024)
+
+
 class TokenInput(Input):
     name: str = Field(min_length=1, max_length=100)
     kind: Literal["owner", "agent"] = Field(
@@ -62,12 +66,12 @@ def workspace_export(ws: WS) -> OperationGrant:
 
 
 @operation("POST /auth/password", access=OWNER, tags=["owner"])
-def owner_password_update(ws: WS, body: PasswordInput, response: Response) -> PasswordChanged:
-    """Change the owner password.
+def owner_password_update(ws: WS, body: PasswordChange, response: Response) -> PasswordChanged:
+    """Change the owner password, giving the current one.
 
     Signs out every browser session; API and MCP tokens stay valid.
     """
-    result = ws.auth.change_password(body.password)
+    result = ws.auth.change_password(body.current_password, body.password)
     response.delete_cookie(COOKIE, path="/")
     return result
 
@@ -94,7 +98,7 @@ def tokens_create(ws: WS, body: TokenInput) -> Token:
 def tokens_revoke(ws: WS, token_id: str) -> Deleted:
     """Revoke an API token.
 
-    Including the token making the request.
+    Including the token making the request; an unknown id is 404.
     """
     return ws.auth.revoke_token(token_id)
 

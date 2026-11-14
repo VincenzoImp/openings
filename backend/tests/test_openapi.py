@@ -2,14 +2,12 @@
 
 import inspect
 import json
-import re
 
 from openapi_spec_validator import validate
 from pydantic import BaseModel
 
 from openings.interfaces import OPERATIONS
 from openings.openapi import EXAMPLES, main
-from openings.removed import ROUTES
 
 
 def test_the_printed_schema_validates_and_documents_every_operation(capsys):
@@ -46,17 +44,26 @@ def test_the_printed_schema_validates_and_documents_every_operation(capsys):
     assert {"code", "status", "message", "details"} <= set(
         schema["components"]["schemas"]["ErrorBody"]["properties"]
     )
-    assert "conflict" in error["description"] and "removed" in error["description"]
+    assert "conflict" in error["description"] and "transfer_used" in error["description"]
+    # A create whose body names a parent documents its 404, as does a transport route.
+    for operation_id in ("documents_create", "highlights_create", "notes_create", "files_upload"):
+        assert "404" in by_id[operation_id]["responses"], operation_id
+    skill_file = by_id["skills_file"]["responses"]["404"]["content"]["application/json"]
+    assert skill_file["schema"] == {"$ref": "#/components/schemas/Error"}
+    # Transport routes have readable operation ids too.
+    assert {"auth_session", "transfers_upload", "transfers_download", "health"} <= set(by_id)
+    assert not [
+        name for name in by_id if name.endswith(("_get", "_post", "_put")) and "api_v1" in name
+    ]
 
 
-def test_every_removed_route_is_gone_with_its_replacement(client):
-    for item in ROUTES:
-        for route in item.routes:
-            method, path = route.split(" ", 1)
-            response = client.request(method, "/api/v1" + re.sub(r"\{[^}]+\}", "x", path))
-            assert response.status_code == 410, route
-            error = response.json()["error"]
-            assert error["code"] == "removed" and error["details"]["use"] == item.use, route
+def test_a_documented_404_is_what_a_missing_parent_answers(client):
+    missing = client.post(
+        "/api/v1/career/highlights", json={"career_id": "missing", "text": "Synthetic."}
+    )
+    assert missing.status_code == 404 and missing.json()["error"]["code"] == "not_found"
+    skill = client.get("/api/v1/skills/openings/files/references/missing.md")
+    assert skill.status_code == 404 and skill.json()["error"]["code"] == "not_found"
 
 
 def test_request_examples_are_valid_requests():

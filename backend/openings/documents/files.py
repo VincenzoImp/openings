@@ -13,8 +13,7 @@ from fastapi import Request
 
 from .. import events
 from ..actors import current_actor, from_columns
-from ..career.records import _get, _page
-from ..common import check_version, encode, new_id, now
+from ..common import check_page, check_version, encode, get_row, new_id, now
 from ..errors import DomainError, conflict, missing
 from ..snapshots import SnapshotResponse
 from .models import OWNER_COLUMNS, OWNER_TABLES, SOURCE_KINDS, OwnerType, UploadReservation
@@ -34,13 +33,19 @@ from .text import is_tex_source
 FILE_VERSION = 1
 
 
+def drop_grants(conn, **match):
+    """Delete the transfer grants whose payload has every ``key=value`` of ``match``."""
+    where = " AND ".join(f"json_extract(payload,'$.{key}')=?" for key in match)
+    conn.execute(f"DELETE FROM transfer_grants WHERE {where}", tuple(match.values()))
+
+
 class FileOperations:
     """Reading, uploading, downloading and deleting files."""
 
     def _owner(self, conn, owner_type, owner_id, *, writable=False):
         if owner_type not in OWNER_COLUMNS:
             raise DomainError(422, "owner_type", "Unsupported file owner type.")
-        row = _get(conn, OWNER_TABLES[owner_type], owner_id, "File owner")
+        row = get_row(conn, OWNER_TABLES[owner_type], owner_id, "File owner")
         if (
             writable
             and owner_type == "document"
@@ -56,7 +61,7 @@ class FileOperations:
         if owner_type == "job":
             return row, row["id"]
         if owner_type == "document":
-            application = _get(conn, "applications", row["application_id"], "Application")
+            application = get_row(conn, "applications", row["application_id"], "Application")
             return row, application["job_id"]
         return row, None
 
@@ -94,7 +99,7 @@ class FileOperations:
         application_id: str = "",
     ) -> dict:
         """List file metadata by owner, name/media type or application revisions. Metadata is always compact, including with summary=true; fetch bytes through a scoped HTTP transfer."""
-        _page(limit, offset)
+        check_page(limit, offset)
         if owner_id and not owner_type:
             raise DomainError(422, "file_owner", "Provide owner_type when filtering by owner_id.")
         where, params = [], []
@@ -180,7 +185,7 @@ class FileOperations:
     def reserve_download(self, file_id: str) -> dict:
         """Obtain a short-lived GET transfer for one existing file; resolve its URL against this workspace origin."""
         with self.db.transaction() as conn:
-            row = _get(conn, "files", file_id, "File")
+            row = get_row(conn, "files", file_id, "File")
             descriptor = self._file_record(row)
             _, job_id = self._owner(conn, descriptor["owner_type"], descriptor["owner_id"])
             return self._new_grant(
@@ -191,19 +196,9 @@ class FileOperations:
         if not token:
             raise DomainError(401, "transfer_token", "A valid transfer token is required.")
         token_hash = hashlib.sha256(token.encode()).hexdigest()
-        row = (
-            (
-                dict(raw)
-                if (
-                    raw := conn.execute(
-                        "SELECT * FROM transfer_grants WHERE token_hash=?", (token_hash,)
-                    ).fetchone()
-                )
-                else None
-            )
-            if conn is not None
-            else self.db.one("SELECT * FROM transfer_grants WHERE token_hash=?", (token_hash,))
-        )
+        query = ("SELECT * FROM transfer_grants WHERE token_hash=?", (token_hash,))
+        row = conn.execute(*query).fetchone() if conn is not None else self.db.one(*query)
+        row = dict(row) if row else None
         if not row or row["expires_at"] <= now():
             raise DomainError(401, "transfer_token", "This transfer token is invalid or expired.")
         if row["method"] != method:
@@ -229,9 +224,7 @@ class FileOperations:
         actual_sha = hashlib.sha256(data).hexdigest()
         if scope.get("sha256") and actual_sha != scope["sha256"]:
             raise DomainError(422, "file_hash", "Uploaded bytes do not match the declared SHA-256.")
-        if scope["media_type"].split(";", 1)[0] == "application/pdf" and not data.startswith(
-            b"%PDF-"
-        ):
+        if media(scope["media_type"]) == PDF and not data.startswith(b"%PDF-"):
             raise DomainError(422, "pdf_header", "The uploaded file is not a PDF.")
         document = scope["owner_type"] == "document"
         source = document and is_tex_source(scope["name"], scope["media_type"])
@@ -247,10 +240,12 @@ class FileOperations:
             self._owner(conn, current["owner_type"], current["owner_id"], writable=False)
             if grant["used"]:
                 file_id = current.get("file_id")
-                existing = _get(conn, "files", file_id, "Completed upload") if file_id else None
+                existing = get_row(conn, "files", file_id, "Completed upload") if file_id else None
                 if existing and existing["sha256"] == actual_sha:
                     return self._file_record(existing)
-                conflict("This upload grant was already used.")
+                raise DomainError(
+                    401, "transfer_used", "This upload grant was already used. Reserve another."
+                )
             owner, _ = self._owner(conn, current["owner_type"], current["owner_id"], writable=True)
             column = OWNER_COLUMNS[current["owner_type"]]
             old = conn.execute(
@@ -323,13 +318,13 @@ class FileOperations:
                 "UPDATE transfer_grants SET used=1,payload=? WHERE token_hash=?",
                 (encode(current), grant["token_hash"]),
             )
-            result = _get(conn, "files", file_id, "File")
+            result = get_row(conn, "files", file_id, "File")
         return self._file_record(result)
 
     def _file_event(self, conn, kind, file_id, owner_type, owner_id, job_id, actor=None):
         application_id = None
         if owner_type == "document":
-            application_id = _get(conn, "documents", owner_id, "Document revision")[
+            application_id = get_row(conn, "documents", owner_id, "Document revision")[
                 "application_id"
             ]
         events.record(
@@ -380,13 +375,23 @@ class FileOperations:
         )
 
     def download(self, request: Request):
-        _, payload = self._grant(request.headers.get("X-Transfer-Token", ""), "GET")
+        """Stream a file under a download grant; like every grant, it works once."""
+        token = request.headers.get("X-Transfer-Token", "")
+        with self.db.transaction() as conn:
+            grant, payload = self._grant(token, "GET", conn)
+            if grant["used"]:
+                raise DomainError(
+                    401, "transfer_used", "This download grant was already used. Reserve another."
+                )
+            conn.execute(
+                "UPDATE transfer_grants SET used=1 WHERE token_hash=?", (grant["token_hash"],)
+            )
         return self.file_response(payload["file_id"], inline=False)
 
     def delete_file(self, file_id: str, expected_version: int) -> dict:
         """Permanently delete a live Career entry, template or job asset, with its expected_version (a file's version is always 1). Revision files are immutable: delete the revision instead."""
         with self.db.transaction() as conn:
-            row = _get(conn, "files", file_id, "File")
+            row = get_row(conn, "files", file_id, "File")
             descriptor = self._file_record(row)
             check_version(descriptor, expected_version)
             if descriptor["owner_type"] == "document":
@@ -407,10 +412,6 @@ class FileOperations:
                     f"UPDATE {OWNER_TABLES[descriptor['owner_type']]} SET version=version+1,updated_at=? WHERE id=?",
                     (now(), descriptor["owner_id"]),
                 )
-            for grant in conn.execute("SELECT token_hash,payload FROM transfer_grants").fetchall():
-                if json.loads(grant["payload"]).get("file_id") == file_id:
-                    conn.execute(
-                        "DELETE FROM transfer_grants WHERE token_hash=?", (grant["token_hash"],)
-                    )
+            drop_grants(conn, file_id=file_id)
         self.db.collect_blobs()
         return {"deleted": True, "id": file_id}

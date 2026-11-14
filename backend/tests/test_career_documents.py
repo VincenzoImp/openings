@@ -7,10 +7,10 @@ import pytest
 from pydantic import ValidationError
 
 from openings.career import (
-    ClaimCreate,
-    ClaimUpdate,
-    KnowledgeCreate,
-    KnowledgeUpdate,
+    EntryCreate,
+    EntryUpdate,
+    HighlightCreate,
+    HighlightUpdate,
     ProfileUpdate,
     TemplateCreate,
     TemplateUpdate,
@@ -35,15 +35,15 @@ def seeded(app, client):
             summary="Built Python APIs.",
         )
     )
-    evidence = career.create_knowledge(
-        KnowledgeCreate(
+    evidence = career.create_entry(
+        EntryCreate(
             kind="project",
             title="Example API",
             narrative="Built Python APIs and reduced latency by 20%.",
         )
     )
-    claim = career.create_claim(
-        ClaimCreate(career_id=evidence["id"], text="Reduced latency by 20%.", approved=True)
+    claim = career.create_highlight(
+        HighlightCreate(career_id=evidence["id"], text="Reduced latency by 20%.", approved=True)
     )
     template = career.create_template(
         TemplateCreate(
@@ -93,6 +93,7 @@ def test_document_revisions_validate_evidence_and_never_inherit_old_pdf(seeded):
             highlight_ids=[claim["id"], claim["id"]],
             career_ids=[evidence["id"]],
             note="Leads with the latency work.",
+            pdf={"name": "cv.pdf", "size": 1},
         )
     )
     assert (first["highlight_ids"], first["career_ids"]) == ([claim["id"]], [evidence["id"]])
@@ -127,7 +128,11 @@ def test_document_revisions_validate_evidence_and_never_inherit_old_pdf(seeded):
             )
         )
     second = documents.create_document(
-        DocumentCreate(application_id=application["id"], previous_id=first["id"])
+        DocumentCreate(
+            application_id=application["id"],
+            previous_id=first["id"],
+            pdf={"name": "cv.pdf", "size": 1},
+        )
     )
     assert second["revision_number"] == 2
     assert second["files"] == [] and "context_id" not in second
@@ -138,7 +143,11 @@ def test_document_revisions_validate_evidence_and_never_inherit_old_pdf(seeded):
         ({"content": {"text": "Free-form wording."}}, "content_not_accepted"),
     ):
         with pytest.raises(DomainError) as error:
-            documents.create_document(DocumentCreate(application_id=application["id"], **invented))
+            documents.create_document(
+                DocumentCreate(
+                    application_id=application["id"], **invented, pdf={"name": "cv.pdf", "size": 1}
+                )
+            )
         assert error.value.code == code
 
 
@@ -151,7 +160,9 @@ def test_transfer_scope_integrity_and_forget_prevent_late_resurrection(seeded):
     assert asset["sha256"] == hashlib.sha256(b"notes").hexdigest()
     assert client.get(asset["url"]).content == b"notes"
 
-    document = documents.create_document(DocumentCreate(application_id=application["id"]))
+    document = documents.create_document(
+        DocumentCreate(application_id=application["id"], pdf={"name": "cv.pdf", "size": 1})
+    )
     data = b"filled source"
     grant = documents.reserve_upload(
         UploadReservation(
@@ -187,9 +198,9 @@ def test_transfer_scope_integrity_and_forget_prevent_late_resurrection(seeded):
 
 def test_filtered_summary_pages_keep_large_content_in_detail_and_batch_revision_reads(seeded):
     _, career, documents, client, evidence, claim, template, application = seeded
-    evidence = career.update_knowledge(
+    evidence = career.update_entry(
         evidence["id"],
-        KnowledgeUpdate(
+        EntryUpdate(
             expected_version=evidence["version"],
             narrative="evidence " * 10000,
             metadata={"long": "metadata " * 1000},
@@ -199,6 +210,7 @@ def test_filtered_summary_pages_keep_large_content_in_detail_and_batch_revision_
         DocumentCreate(
             application_id=application["id"],
             title="Candidate CV",
+            pdf={"name": "cv.pdf", "size": 1},
         )
     )
     source = b"document " * 10000
@@ -222,6 +234,7 @@ def test_filtered_summary_pages_keep_large_content_in_detail_and_batch_revision_
                 application_id=application["id"],
                 previous_id=previous["id"],
                 title=f"Candidate CV {number}",
+                pdf={"name": "cv.pdf", "size": 1},
             )
         )
     with (
@@ -250,20 +263,21 @@ def test_filtered_summary_pages_keep_large_content_in_detail_and_batch_revision_
     detail = client.get(f"/api/v1/documents/{first['id']}").json()
     assert detail["text"] == " ".join(["document"] * 10000) and "content" not in detail
     compact = client.get(
-        "/api/v1/career/knowledge", params={"summary": "true", "q": "evidence", "limit": 1}
+        "/api/v1/career/entries", params={"summary": "true", "q": "evidence", "limit": 1}
     ).json()
     assert compact["total"] == 1
     assert len(compact["items"][0]["narrative_preview"]) == 240
     assert compact["items"][0]["highlight_count"] == 1
     assert "metadata" not in compact["items"][0] and "narrative" not in compact["items"][0]
     # Lists return summaries by default; summary=false gives the full records.
-    assert "narrative" not in career.list_knowledge()["items"][0]
-    assert career.list_knowledge(summary=False)["items"][0]["narrative"] == evidence["narrative"]
-    full = client.get("/api/v1/career/knowledge", params={"summary": "false"}).json()
+    assert "narrative" not in career.list_entries()["items"][0]
+    assert career.list_entries(summary=False)["items"][0]["narrative"] == evidence["narrative"]
+    full = client.get("/api/v1/career/entries", params={"summary": "false"}).json()
     assert full["items"][0]["narrative"] == evidence["narrative"]
     assert (full["limit"], full["offset"]) == (100, 0)
     claim_summary = client.get(
-        "/api/v1/career/claims", params={"summary": "true", "q": "Example API", "approved": "true"}
+        "/api/v1/career/highlights",
+        params={"summary": "true", "q": "Example API", "approved": "true"},
     ).json()
     assert claim_summary["items"][0]["id"] == claim["id"]
     assert "text" not in claim_summary["items"][0] and "metadata" not in claim_summary["items"][0]
@@ -290,8 +304,8 @@ def test_career_patch_omissions_clear_values_and_finite_metadata_are_explicit(se
     assert stale.value.status == 409
     for model, fields in [
         (ProfileUpdate, {"name": None}),
-        (KnowledgeUpdate, {"metadata": None}),
-        (ClaimUpdate, {"approved": None}),
+        (EntryUpdate, {"metadata": None}),
+        (HighlightUpdate, {"approved": None}),
         (TemplateUpdate, {"rules": None}),
     ]:
         with pytest.raises(ValidationError):
@@ -299,15 +313,15 @@ def test_career_patch_omissions_clear_values_and_finite_metadata_are_explicit(se
         with pytest.raises(ValidationError):
             model(expected_version=True)
     with pytest.raises(ValidationError):
-        KnowledgeUpdate(expected_version=1, metadata={"metric": float("inf")})
-    changed = career.update_knowledge(
+        EntryUpdate(expected_version=1, metadata={"metric": float("inf")})
+    changed = career.update_entry(
         evidence["id"],
-        KnowledgeUpdate(
+        EntryUpdate(
             expected_version=evidence["version"],
             narrative="",
             metadata={},
         ),
     )
     assert changed["narrative"] == "" and changed["metadata"] == {}
-    assert career.get_claim(claim["id"])["approved"] is True
+    assert career.get_highlight(claim["id"])["approved"] is True
     assert career.get_template(template["id"])["rules"] == {"max_bullet_chars": 100}

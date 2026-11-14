@@ -15,11 +15,7 @@ export interface paths {
      */
     get: operations["applications_list"];
     put?: never;
-    /**
-     * Start one application in stage Shortlisted; shortlists its job.
-     * @description Start one application in stage Shortlisted; shortlists its job.
-     */
-    post: operations["applications_start"];
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -49,7 +45,7 @@ export interface paths {
     head?: never;
     /**
      * Update one application, with its version.
-     * @description Stage (status), reply, outcome, priority, deadline, documents, requirements, answers.
+     * @description Stage, reply, outcome, priority, deadline, documents, requirements, answers.
      */
     patch: operations["applications_change"];
     trace?: never;
@@ -97,7 +93,7 @@ export interface paths {
     head?: never;
     /**
      * Update up to 200 applications: stage, outcome, reply, fields.
-     * @description A reply moves the stage. Set stage applied only when the owner says they applied. Ready is computed. Each item has its own result.
+     * @description A reply moves the stage. Set stage applied only when the owner says they applied. Other fields need expected_version. Each item has its own result.
      */
     patch: operations["applications_update"];
     trace?: never;
@@ -135,7 +131,7 @@ export interface paths {
      * Login
      * @description Sign the browser in with the owner password.
      */
-    post: operations["login_api_v1_auth_login_post"];
+    post: operations["auth_login"];
     delete?: never;
     options?: never;
     head?: never;
@@ -155,7 +151,7 @@ export interface paths {
      * Logout
      * @description Sign out every browser session; API and MCP tokens stay valid.
      */
-    post: operations["logout_api_v1_auth_logout_post"];
+    post: operations["auth_logout"];
     delete?: never;
     options?: never;
     head?: never;
@@ -172,7 +168,7 @@ export interface paths {
     get?: never;
     put?: never;
     /**
-     * Change the owner password.
+     * Change the owner password, giving the current one.
      * @description Signs out every browser session; API and MCP tokens stay valid.
      *
      *     Owner only: an agent token is refused with 403 forbidden; not an MCP tool.
@@ -195,7 +191,7 @@ export interface paths {
      * Session
      * @description Read the browser session state and its CSRF token.
      */
-    get: operations["session_api_v1_auth_session_get"];
+    get: operations["auth_session"];
     put?: never;
     post?: never;
     delete?: never;
@@ -217,7 +213,7 @@ export interface paths {
      * Setup
      * @description Set the owner password once and sign the browser in.
      */
-    post: operations["setup_api_v1_auth_setup_post"];
+    post: operations["auth_setup"];
     delete?: never;
     options?: never;
     head?: never;
@@ -238,7 +234,7 @@ export interface paths {
      *     With an agent token or its grant, the owner password hash, session secret and
      *     tokens are left out.
      */
-    get: operations["backup_api_v1_backup_get"];
+    get: operations["backup_download"];
     put?: never;
     post?: never;
     delete?: never;
@@ -284,7 +280,7 @@ export interface paths {
      *
      *     Owner only: an agent token is refused with 403 forbidden; not an MCP tool.
      */
-    post: operations["restore_api_v1_backup_restore_post"];
+    post: operations["backup_restore"];
     delete?: never;
     options?: never;
     head?: never;
@@ -326,7 +322,7 @@ export interface paths {
      *
      *     Owner only: an agent token is refused with 403 forbidden; not an MCP tool.
      */
-    get: operations["backup_file_api_v1_backups__name__get"];
+    get: operations["backups_download"];
     put?: never;
     post?: never;
     /**
@@ -352,7 +348,7 @@ export interface paths {
      * Capabilities
      * @description Read the version, schema, this token's kind and each operation's route and access.
      */
-    get: operations["capabilities_api_v1_capabilities_get"];
+    get: operations["capabilities_get"];
     put?: never;
     post?: never;
     delete?: never;
@@ -385,7 +381,55 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/api/v1/career/claims": {
+  "/api/v1/career/entries": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Search career entries by q and kind; summary=false returns full records.
+     * @description Search career entries by q and kind; summary=false returns full records.
+     */
+    get: operations["career_list"];
+    put?: never;
+    /**
+     * Add a career entry.
+     * @description Add a career entry.
+     */
+    post: operations["career_create"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/career/entries/{career_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /**
+     * Delete a career entry permanently, with its highlights and files.
+     * @description Only on the owner's explicit request; document revisions are unchanged.
+     */
+    delete: operations["career_delete"];
+    options?: never;
+    head?: never;
+    /**
+     * Edit a career entry, with its version; dates=null clears the dates.
+     * @description Edit a career entry, with its version; dates=null clears the dates.
+     */
+    patch: operations["career_update"];
+    trace?: never;
+  };
+  "/api/v1/career/highlights": {
     parameters: {
       query?: never;
       header?: never;
@@ -409,18 +453,14 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/api/v1/career/claims/{highlight_id}": {
+  "/api/v1/career/highlights/{highlight_id}": {
     parameters: {
       query?: never;
       header?: never;
       path?: never;
       cookie?: never;
     };
-    /**
-     * Read a highlight and its entry id.
-     * @description Read a highlight and its entry id.
-     */
-    get: operations["highlights_read"];
+    get?: never;
     put?: never;
     post?: never;
     /**
@@ -437,7 +477,7 @@ export interface paths {
     patch: operations["highlights_update"];
     trace?: never;
   };
-  "/api/v1/career/highlights": {
+  "/api/v1/career/highlights/batch": {
     parameters: {
       query?: never;
       header?: never;
@@ -499,58 +539,6 @@ export interface paths {
     options?: never;
     head?: never;
     patch?: never;
-    trace?: never;
-  };
-  "/api/v1/career/knowledge": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * Search career entries by q and kind; summary=false returns full records.
-     * @description Search career entries by q and kind; summary=false returns full records.
-     */
-    get: operations["career_list"];
-    put?: never;
-    /**
-     * Add a career entry.
-     * @description Add a career entry.
-     */
-    post: operations["career_create"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/v1/career/knowledge/{career_id}": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * Read a career entry with its full narrative and metadata.
-     * @description Read a career entry with its full narrative and metadata.
-     */
-    get: operations["career_read"];
-    put?: never;
-    post?: never;
-    /**
-     * Delete a career entry permanently, with its highlights and files.
-     * @description Only on the owner's explicit request; document revisions are unchanged.
-     */
-    delete: operations["career_delete"];
-    options?: never;
-    head?: never;
-    /**
-     * Edit a career entry, with its version; dates=null clears the dates.
-     * @description Edit a career entry, with its version; dates=null clears the dates.
-     */
-    patch: operations["career_update"];
     trace?: never;
   };
   "/api/v1/career/profile": {
@@ -633,26 +621,6 @@ export interface paths {
      * @description List collection runs by source or state.
      */
     get: operations["collection_runs_list"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/v1/collection/runs/{run_id}": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * Read a collection run with its frozen settings and fetches.
-     * @description Read a collection run with its frozen settings and fetches.
-     */
-    get: operations["collection_runs_get"];
     put?: never;
     post?: never;
     delete?: never;
@@ -760,7 +728,7 @@ export interface paths {
      * Examples
      * @description List the shipped example files.
      */
-    get: operations["examples_api_v1_examples_get"];
+    get: operations["examples_list"];
     put?: never;
     post?: never;
     delete?: never;
@@ -780,7 +748,7 @@ export interface paths {
      * Example File
      * @description Download a shipped example file.
      */
-    get: operations["example_file_api_v1_examples__name__get"];
+    get: operations["examples_get"];
     put?: never;
     post?: never;
     delete?: never;
@@ -802,7 +770,7 @@ export interface paths {
      *
      *     Owner only: an agent token is refused with 403 forbidden; not an MCP tool.
      */
-    get: operations["export_api_v1_export_get"];
+    get: operations["export_download"];
     put?: never;
     post?: never;
     delete?: never;
@@ -860,11 +828,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /**
-     * Read file metadata and its content URL.
-     * @description Read file metadata and its content URL.
-     */
-    get: operations["files_get"];
+    get?: never;
     put?: never;
     post?: never;
     /**
@@ -888,7 +852,7 @@ export interface paths {
      * File Content
      * @description Read a file's bytes; inline=false downloads it.
      */
-    get: operations["file_content_api_v1_files__file_id__content_get"];
+    get: operations["files_content"];
     put?: never;
     post?: never;
     delete?: never;
@@ -946,13 +910,13 @@ export interface paths {
     };
     /**
      * Search job summaries.
-     * @description Filter by triage, q, url, signal, requires, posting_language, hide_unspoken_required, dismissed_by, batch_id; include_counts adds totals. jobs_get has the posting.
+     * @description Filter by triage, q, url, signal, requires, posting_language, hide_unspoken_required, dismissed_by, dismissed_since, batch_id; include_counts adds totals. jobs_get has the posting.
      */
     get: operations["jobs_list"];
     put?: never;
     /**
      * Add a job from a URL, pasted text or fields.
-     * @description A URL is read through the provider gate. A known job is returned (created false); a retry with the same idempotency_key returns the same job.
+     * @description A URL is read through the provider gate; needs_text means paste the posting with jobs_update. A known job is returned (created false).
      */
     post: operations["jobs_create"];
     delete?: never;
@@ -1056,11 +1020,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /**
-     * List the notes of a job and its applications.
-     * @description List the notes of a job and its applications.
-     */
-    get: operations["notes_list"];
+    get?: never;
     put?: never;
     /**
      * Add a note to a job, or to its application (application_id).
@@ -1087,26 +1047,6 @@ export interface paths {
     get: operations["timeline_get"];
     put?: never;
     post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/v1/jobs/{job_id}/triage": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /**
-     * Shortlist, dismiss or return one job to review, with its version.
-     * @description Shortlist, dismiss or return one job to review, with its version.
-     */
-    post: operations["jobs_triage_one"];
     delete?: never;
     options?: never;
     head?: never;
@@ -1220,11 +1160,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /**
-     * Read a note and its version.
-     * @description Read a note and its version.
-     */
-    get: operations["notes_get"];
+    get?: never;
     put?: never;
     post?: never;
     /**
@@ -1239,26 +1175,6 @@ export interface paths {
      * @description Edit a note's body, pin or unpin it, with its version.
      */
     patch: operations["notes_update"];
-    trace?: never;
-  };
-  "/api/v1/notes/{note_id}/pin": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /**
-     * Pin or unpin a note, with its version.
-     * @description Pin or unpin a note, with its version.
-     */
-    post: operations["notes_pin"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
     trace?: never;
   };
   "/api/v1/preferences": {
@@ -1370,7 +1286,7 @@ export interface paths {
     };
     /**
      * Read a skill, or without name the list of skills.
-     * @description A skill is the method for one kind of work; path reads one of its reference files.
+     * @description A skill is the method for one kind of work; path reads one of its files (or ../<skill>/<file>).
      */
     get: operations["skills_get"];
     put?: never;
@@ -1390,7 +1306,7 @@ export interface paths {
     };
     /**
      * Read a skill, or without name the list of skills.
-     * @description A skill is the method for one kind of work; path reads one of its reference files.
+     * @description A skill is the method for one kind of work; path reads one of its files (or ../<skill>/<file>).
      */
     get: operations["skills_get_1"];
     put?: never;
@@ -1412,7 +1328,7 @@ export interface paths {
      * Skill File
      * @description Read a skill's reference file by path, as skills_get with path.
      */
-    get: operations["skill_file_api_v1_skills__name__files__path__get"];
+    get: operations["skills_file"];
     put?: never;
     post?: never;
     delete?: never;
@@ -1613,66 +1529,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/api/v1/tasks": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * List collection fetches (tasks) by state, kind, source or job.
-     * @description List collection fetches (tasks) by state, kind, source or job.
-     */
-    get: operations["tasks_list"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/v1/tasks/{task_id}": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * Read a fetch: inputs, result, HTTP diagnostics and next run time.
-     * @description Read a fetch: inputs, result, HTTP diagnostics and next run time.
-     */
-    get: operations["tasks_get"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/v1/tasks/{task_id}/cancel": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /**
-     * Cancel a queued or running fetch.
-     * @description Cancel a queued or running fetch.
-     */
-    post: operations["tasks_cancel"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   "/api/v1/tasks/{task_id}/retry": {
     parameters: {
       query?: never;
@@ -1805,7 +1661,7 @@ export interface paths {
     post?: never;
     /**
      * Revoke an API token.
-     * @description Including the token making the request.
+     * @description Including the token making the request; an unknown id is 404.
      *
      *     Owner only: an agent token is refused with 403 forbidden; not an MCP tool.
      */
@@ -1826,7 +1682,7 @@ export interface paths {
      * Download
      * @description Download raw file bytes with a grant (X-Transfer-Token).
      */
-    get: operations["download_api_v1_transfers_get"];
+    get: operations["transfers_download"];
     /**
      * Upload
      * @description Upload raw file bytes with a grant.
@@ -1834,7 +1690,7 @@ export interface paths {
      *     The second step of files_upload or of a revision's uploads: PUT the exact bytes to
      *     the grant's url with its headers (X-Transfer-Token). Returns the file.
      */
-    put: operations["upload_api_v1_transfers_put"];
+    put: operations["transfers_upload"];
     post?: never;
     delete?: never;
     options?: never;
@@ -1893,7 +1749,7 @@ export interface paths {
      * Health
      * @description Report liveness, the last backup and the worker heartbeat.
      */
-    get: operations["health_health_get"];
+    get: operations["health"];
     put?: never;
     post?: never;
     delete?: never;
@@ -1968,9 +1824,7 @@ export interface components {
        * Questions
        * @default []
        */
-      questions: {
-        [key: string]: unknown;
-      }[];
+      questions: components["schemas"]["FormQuestion"][];
       /** Ready */
       ready: boolean;
       /**
@@ -1985,8 +1839,8 @@ export interface components {
        * @default []
        */
       requirements: components["schemas"]["EmployerRequirement"][];
-      /** Status */
-      status: string;
+      /** Stage */
+      stage: string;
       /** Updated At */
       updated_at: string;
       /** Version */
@@ -2016,11 +1870,17 @@ export interface components {
       action: "close" | "reopen" | "delete";
       /** Items */
       items: components["schemas"]["BulkItem"][];
-      /** Outcome */
+      /**
+       * Outcome
+       * @description With close: how it ended.
+       */
       outcome?:
         ("accepted" | "rejected" | "not_pursued" | "no_response") | null;
-      /** Status */
-      status?: ("shortlisted" | "applied" | "interview" | "offer") | null;
+      /**
+       * Stage
+       * @description With reopen: the stage to return to.
+       */
+      stage?: ("shortlisted" | "applied" | "interview" | "offer") | null;
     };
     /**
      * ApplicationChange
@@ -2084,9 +1944,7 @@ export interface components {
        * Questions
        * @default []
        */
-      questions: {
-        [key: string]: unknown;
-      }[];
+      questions: components["schemas"]["FormQuestion"][];
       /** Ready */
       ready: boolean;
       /**
@@ -2101,8 +1959,8 @@ export interface components {
        * @default []
        */
       requirements: components["schemas"]["EmployerRequirement"][];
-      /** Status */
-      status: string;
+      /** Stage */
+      stage: string;
       /** Updated At */
       updated_at: string;
       /** Version */
@@ -2154,6 +2012,11 @@ export interface components {
       concluded_on?: string | null;
       /** Deadline */
       deadline?: string | null;
+      /**
+       * Expected Version
+       * @description The version read; required to change priority, deadline, documents, requirements, questions or answers.
+       */
+      expected_version?: number | null;
       /** Outcome */
       outcome?:
         ("accepted" | "rejected" | "not_pursued" | "no_response") | null;
@@ -2243,10 +2106,10 @@ export interface components {
        */
       requirements?: components["schemas"]["Requirement"][] | null;
       /**
-       * Status
+       * Stage
        * @description applied is Mark applied (applied_at defaults to now); shortlisted again undoes it while the application has no reply, clearing applied_at. Record an employer reply with reply, which sets the stage itself.
        */
-      status?:
+      stage?:
         ("shortlisted" | "applied" | "interview" | "offer" | "closed") | null;
     };
     /** ApplicationRef */
@@ -2255,8 +2118,8 @@ export interface components {
       id: string;
       /** Outcome */
       outcome?: string | null;
-      /** Status */
-      status: string;
+      /** Stage */
+      stage: string;
       /** Version */
       version: number;
     } & {
@@ -2313,8 +2176,8 @@ export interface components {
       ready: boolean;
       /** Required Documents */
       required_documents: string[];
-      /** Status */
-      status: string;
+      /** Stage */
+      stage: string;
       /** Updated At */
       updated_at: string;
       /** Version */
@@ -2332,18 +2195,45 @@ export interface components {
       /** Items */
       items: components["schemas"]["ApplicationItem"][];
     };
+    /** BackupAttempt */
+    BackupAttempt: {
+      /** Attempted At */
+      attempted_at: string;
+      /** Error */
+      error?: string | null;
+      /**
+       * Outcome
+       * @description ok, failed or skipped.
+       */
+      outcome: string;
+    } & {
+      [key: string]: unknown;
+    };
     /** BackupList */
     BackupList: {
       /** Items */
-      items: {
-        [key: string]: unknown;
-      }[];
-      /** Schedule */
-      schedule: {
-        [key: string]: unknown;
-      };
+      items: components["schemas"]["KeptBackup"][];
+      schedule: components["schemas"]["BackupSchedule"];
       /** Total */
       total: number;
+    } & {
+      [key: string]: unknown;
+    };
+    /** BackupSchedule */
+    BackupSchedule: {
+      /** Age Hours */
+      age_hours?: number | null;
+      /** Enabled */
+      enabled: boolean;
+      /** Interval Hours */
+      interval_hours: number;
+      /** Keep */
+      keep: number;
+      /** Last At */
+      last_at?: string | null;
+      last_attempt?: components["schemas"]["BackupAttempt"] | null;
+      /** Ok */
+      ok: boolean;
     } & {
       [key: string]: unknown;
     };
@@ -2487,7 +2377,7 @@ export interface components {
     /** CareerImport */
     CareerImport: {
       /** Entries */
-      entries?: components["schemas"]["KnowledgeCreate"][];
+      entries?: components["schemas"]["EntryCreate"][];
       /** Expected Profile Version */
       expected_profile_version?: number | null;
       /** Profile */
@@ -2557,60 +2447,6 @@ export interface components {
     CareerSave: {
       /** Items */
       items: components["schemas"]["CareerItem"][];
-    };
-    /** ClaimCreate */
-    ClaimCreate: {
-      /**
-       * Always Include
-       * @description Always include in the CV unless the job gives a reason to leave it out (★ in the dashboard).
-       * @default false
-       */
-      always_include: boolean;
-      /**
-       * Approved
-       * @default false
-       */
-      approved: boolean;
-      /**
-       * Career Id
-       * @description The career entry it belongs to.
-       */
-      career_id: string;
-      /**
-       * Idempotency Key
-       * @description A retry with the same key returns the first result.
-       */
-      idempotency_key?: string | null;
-      /**
-       * Metadata
-       * @description Free-form values the product does not act on, such as an agent's own selection hints.
-       */
-      metadata?: {
-        [key: string]: unknown;
-      };
-      /** Position */
-      position?: number | null;
-      /** Text */
-      text: string;
-    };
-    /** ClaimUpdate */
-    ClaimUpdate: {
-      /** Always Include */
-      always_include?: boolean | null;
-      /** Approved */
-      approved?: boolean | null;
-      /** Career Id */
-      career_id?: string | null;
-      /** Expected Version */
-      expected_version: number;
-      /** Metadata */
-      metadata?: {
-        [key: string]: unknown;
-      } | null;
-      /** Position */
-      position?: number | null;
-      /** Text */
-      text?: string | null;
     };
     /** Collection */
     Collection: {
@@ -2689,9 +2525,7 @@ export interface components {
        * Tasks
        * @default []
        */
-      tasks: {
-        [key: string]: unknown;
-      }[];
+      tasks: components["schemas"]["RunTask"][];
     } & {
       [key: string]: unknown;
     };
@@ -2912,7 +2746,7 @@ export interface components {
        * @default
        */
       note: string;
-      /** @description cv or letter: the PDF to PUT with uploads.pdf; complete and immutable once stored. */
+      /** @description cv or letter, required: the PDF to PUT with uploads.pdf; complete and immutable once stored. */
       pdf?: components["schemas"]["FileSpec"] | null;
       /**
        * Previous Id
@@ -2924,7 +2758,7 @@ export interface components {
        * @description cv or letter, optional: the TeX source inline (at most 256 KB); the PDF must be built from it.
        */
       source?: string | null;
-      /** @description Instead of source: a .tex file to PUT with uploads.source, before the PDF. */
+      /** @description Instead of source: a .tex file (name, size, sha256) to PUT with uploads.source, before the PDF. */
       source_file?: components["schemas"]["FileSpec"] | null;
       /**
        * Title
@@ -3087,9 +2921,89 @@ export interface components {
     } & {
       [key: string]: unknown;
     };
+    /** EntryCreate */
+    EntryCreate: {
+      dates?: components["schemas"]["CareerDates"] | null;
+      /**
+       * Idempotency Key
+       * @description A retry with the same key returns the first result.
+       */
+      idempotency_key?: string | null;
+      /**
+       * Kind
+       * @default experience
+       * @enum {string}
+       */
+      kind:
+        | "experience"
+        | "project"
+        | "course"
+        | "education"
+        | "award"
+        | "publication"
+        | "fact"
+        | "skill"
+        | "language"
+        | "other";
+      /** Metadata */
+      metadata?: {
+        [key: string]: unknown;
+      };
+      /**
+       * Narrative
+       * @default
+       */
+      narrative: string;
+      /**
+       * Organization
+       * @default
+       */
+      organization: string;
+      /** Position */
+      position?: number | null;
+      /** Skills */
+      skills?: string[];
+      /** Title */
+      title: string;
+    };
+    /** EntryUpdate */
+    EntryUpdate: {
+      dates?: components["schemas"]["CareerDates"] | null;
+      /** Expected Version */
+      expected_version: number;
+      /** Kind */
+      kind?:
+        | (
+            | "experience"
+            | "project"
+            | "course"
+            | "education"
+            | "award"
+            | "publication"
+            | "fact"
+            | "skill"
+            | "language"
+            | "other"
+          )
+        | null;
+      /** Metadata */
+      metadata?: {
+        [key: string]: unknown;
+      } | null;
+      /** Narrative */
+      narrative?: string | null;
+      /** Organization */
+      organization?: string | null;
+      /** Position */
+      position?: number | null;
+      /** Skills */
+      skills?: string[] | null;
+      /** Title */
+      title?: string | null;
+    };
     /**
      * Error
-     * @description Every error response. Codes by status: 401 unauthorized: sign in or send a valid bearer token (also transfer_token, transfer_expired). 403 forbidden: an agent token on an owner-only operation; csrf: a browser write without its X-CSRF-Token header. 404 not_found: the record or route does not exist. 409 conflict: the record changed (details.current_version and details.id); also constraint, application_has_work and similar rule conflicts. 410 removed: a route removed in 0.24; details.use names its replacement. 413 request_size or file_size: the body or file is over its limit. 422 validation: details lists {field, message, type} per invalid field; other codes name a rule. 429 rate_limited: the shared provider gate is waiting; details.retry_after_seconds and the Retry-After header give the wait.
+     * @description Every error response. Codes by status: 401 unauthorized: sign in or send a valid bearer token (also transfer_token, transfer_expired, transfer_used: a grant works once). 403 forbidden: an agent token on an owner-only operation; csrf: a browser write without its X-CSRF-Token header. 404 not_found: the record or route does not exist, including a record the body names (application_id, career_id...). 409 conflict: the record changed (details.current_version and details.id); also constraint, application_has_work and similar rule conflicts. 413 request_size or file_size: the body or file is over its limit. 422 validation: details lists {field, message, type} per invalid field; other codes name a rule. 429 rate_limited: the shared provider gate is waiting; details.retry_after_seconds and the Retry-After header give the wait.
      */
     Error: {
       error: components["schemas"]["ErrorBody"];
@@ -3103,7 +3017,7 @@ export interface components {
       code: string;
       /**
        * Details
-       * @description Structured details: field errors for validation, current_version and id for a version conflict, use for a removed route.
+       * @description Structured details: field errors for validation, current_version and id for a version conflict.
        */
       details?: unknown;
       /**
@@ -3219,6 +3133,35 @@ export interface components {
       /** Titles */
       titles?: string[];
     };
+    /**
+     * FormQuestion
+     * @description A question of the employer's application form.
+     */
+    FormQuestion: {
+      /** Id */
+      id: string;
+      /** Label */
+      label: string;
+      /** Max Length */
+      max_length?: number | null;
+      /**
+       * Options
+       * @default []
+       */
+      options: string[];
+      /**
+       * Required
+       * @default false
+       */
+      required: boolean;
+      /**
+       * Type
+       * @default text
+       */
+      type: string;
+    } & {
+      [key: string]: unknown;
+    };
     /** Highlight */
     Highlight: {
       /** Always Include */
@@ -3251,6 +3194,41 @@ export interface components {
       version: number;
     } & {
       [key: string]: unknown;
+    };
+    /** HighlightCreate */
+    HighlightCreate: {
+      /**
+       * Always Include
+       * @description Always include in the CV unless the job gives a reason to leave it out (★ in the dashboard).
+       * @default false
+       */
+      always_include: boolean;
+      /**
+       * Approved
+       * @default false
+       */
+      approved: boolean;
+      /**
+       * Career Id
+       * @description The career entry it belongs to.
+       */
+      career_id: string;
+      /**
+       * Idempotency Key
+       * @description A retry with the same key returns the first result.
+       */
+      idempotency_key?: string | null;
+      /**
+       * Metadata
+       * @description Free-form values the product does not act on, such as an agent's own selection hints.
+       */
+      metadata?: {
+        [key: string]: unknown;
+      };
+      /** Position */
+      position?: number | null;
+      /** Text */
+      text: string;
     };
     /** HighlightItem */
     HighlightItem: {
@@ -3304,6 +3282,25 @@ export interface components {
     HighlightsSave: {
       /** Items */
       items: components["schemas"]["HighlightItem"][];
+    };
+    /** HighlightUpdate */
+    HighlightUpdate: {
+      /** Always Include */
+      always_include?: boolean | null;
+      /** Approved */
+      approved?: boolean | null;
+      /** Career Id */
+      career_id?: string | null;
+      /** Expected Version */
+      expected_version: number;
+      /** Metadata */
+      metadata?: {
+        [key: string]: unknown;
+      } | null;
+      /** Position */
+      position?: number | null;
+      /** Text */
+      text?: string | null;
     };
     /** ImportPreview */
     ImportPreview: {
@@ -3391,6 +3388,11 @@ export interface components {
       metadata: {
         [key: string]: unknown;
       };
+      /**
+       * Needs Text
+       * @description On jobs_create: the posting text could not be read; add it with jobs_update.
+       */
+      needs_text?: boolean | null;
       /**
        * Overrides
        * @default {}
@@ -3607,85 +3609,21 @@ export interface components {
       /** Items */
       items: components["schemas"]["TriageItem"][];
     };
-    /** KnowledgeCreate */
-    KnowledgeCreate: {
-      dates?: components["schemas"]["CareerDates"] | null;
-      /**
-       * Idempotency Key
-       * @description A retry with the same key returns the first result.
-       */
-      idempotency_key?: string | null;
+    /** KeptBackup */
+    KeptBackup: {
+      /** Created At */
+      created_at: string;
       /**
        * Kind
-       * @default experience
-       * @enum {string}
+       * @description scheduled or pre_upgrade.
        */
-      kind:
-        | "experience"
-        | "project"
-        | "course"
-        | "education"
-        | "award"
-        | "publication"
-        | "fact"
-        | "skill"
-        | "language"
-        | "other";
-      /** Metadata */
-      metadata?: {
-        [key: string]: unknown;
-      };
-      /**
-       * Narrative
-       * @default
-       */
-      narrative: string;
-      /**
-       * Organization
-       * @default
-       */
-      organization: string;
-      /** Position */
-      position?: number | null;
-      /** Skills */
-      skills?: string[];
-      /** Title */
-      title: string;
-    };
-    /** KnowledgeUpdate */
-    KnowledgeUpdate: {
-      dates?: components["schemas"]["CareerDates"] | null;
-      /** Expected Version */
-      expected_version: number;
-      /** Kind */
-      kind?:
-        | (
-            | "experience"
-            | "project"
-            | "course"
-            | "education"
-            | "award"
-            | "publication"
-            | "fact"
-            | "skill"
-            | "language"
-            | "other"
-          )
-        | null;
-      /** Metadata */
-      metadata?: {
-        [key: string]: unknown;
-      } | null;
-      /** Narrative */
-      narrative?: string | null;
-      /** Organization */
-      organization?: string | null;
-      /** Position */
-      position?: number | null;
-      /** Skills */
-      skills?: string[] | null;
-      /** Title */
-      title?: string | null;
+      kind: string;
+      /** Name */
+      name: string;
+      /** Size Bytes */
+      size_bytes: number;
+    } & {
+      [key: string]: unknown;
     };
     /** LinkInput */
     LinkInput: {
@@ -3859,15 +3797,6 @@ export interface components {
        */
       pinned: boolean;
     };
-    /** NoteList */
-    NoteList: {
-      /** Items */
-      items: components["schemas"]["Note"][];
-      /** Total */
-      total: number;
-    } & {
-      [key: string]: unknown;
-    };
     /** NotePatch */
     NotePatch: {
       /** Body */
@@ -3879,17 +3808,6 @@ export interface components {
        * @description true pins it (unpinning the other note of its job or application); false unpins it.
        */
       pinned?: boolean | null;
-    };
-    /** NotePin */
-    NotePin: {
-      /** Expected Version */
-      expected_version: number;
-      /**
-       * Pinned
-       * @description True pins the note (unpinning the note pinned in the same scope); false unpins it.
-       * @default true
-       */
-      pinned: boolean;
     };
     /** Observation */
     Observation: {
@@ -3936,6 +3854,13 @@ export interface components {
       url: string;
     } & {
       [key: string]: unknown;
+    };
+    /** PasswordChange */
+    PasswordChange: {
+      /** Current Password */
+      current_password: string;
+      /** Password */
+      password: string;
     };
     /** PasswordChanged */
     PasswordChanged: {
@@ -4079,22 +4004,13 @@ export interface components {
     };
     /** Provider */
     Provider: {
-      /** Capability */
-      capability: {
-        [key: string]: unknown;
-      };
+      capability: components["schemas"]["ProviderCapability"];
       /** Id */
       id: string;
       /** Name */
       name: string;
-      /** Policy */
-      policy: {
-        [key: string]: unknown;
-      };
-      /** Runtime */
-      runtime: {
-        [key: string]: unknown;
-      };
+      policy: components["schemas"]["ProviderPolicy"];
+      runtime: components["schemas"]["ProviderRuntime"];
       /** Updated At */
       updated_at?: string | null;
       /** Version */
@@ -4102,8 +4018,29 @@ export interface components {
     } & {
       [key: string]: unknown;
     };
+    /** ProviderCapability */
+    ProviderCapability: {
+      /** Credentials Required */
+      credentials_required: boolean;
+      /** Description */
+      description: string;
+      /** Kind */
+      kind: string;
+      /** Supported */
+      supported: boolean;
+      /** Transport Version */
+      transport_version: string;
+    } & {
+      [key: string]: unknown;
+    };
     /** ProviderChange */
     ProviderChange: {
+      /**
+       * Clear Cooldown
+       * @description true lifts a pause the provider asked for (Retry-After) now.
+       * @default false
+       */
+      clear_cooldown: boolean;
       /** Enabled */
       enabled?: boolean | null;
       /** Expected Version */
@@ -4122,8 +4059,50 @@ export interface components {
     } & {
       [key: string]: unknown;
     };
-    /** ProviderPatch */
-    ProviderPatch: {
+    /** ProviderPolicy */
+    ProviderPolicy: {
+      /** Enabled */
+      enabled: boolean;
+      /**
+       * Min Interval Seconds
+       * @description Seconds between two requests.
+       */
+      min_interval_seconds: number;
+    } & {
+      [key: string]: unknown;
+    };
+    /**
+     * ProviderRuntime
+     * @description The shared window: when the next request may go and what the last one answered.
+     */
+    ProviderRuntime: {
+      /** Cooldown Until */
+      cooldown_until?: string | null;
+      /** Last Error */
+      last_error?: string | null;
+      /** Last Request At */
+      last_request_at?: string | null;
+      /** Last Status */
+      last_status?: number | null;
+      /** Next Allowed At */
+      next_allowed_at?: string | null;
+      /** Requests Day */
+      requests_day: number;
+      /** Requests Hour */
+      requests_hour: number;
+      /** Total Requests */
+      total_requests: number;
+    } & {
+      [key: string]: unknown;
+    };
+    /** ProviderUpdate */
+    ProviderUpdate: {
+      /**
+       * Clear Cooldown
+       * @description true lifts a pause the provider asked for (Retry-After) now.
+       * @default false
+       */
+      clear_cooldown: boolean;
       /** Enabled */
       enabled?: boolean | null;
       /** Expected Version */
@@ -4358,6 +4337,30 @@ export interface components {
       max_results?: number | null;
       /** Results Wanted */
       results_wanted?: number | null;
+    };
+    /**
+     * RunTask
+     * @description One fetch of a run, without its inputs and result.
+     */
+    RunTask: {
+      /** Attempts */
+      attempts: number;
+      /** Error */
+      error?: string | null;
+      /** Id */
+      id: string;
+      /** Kind */
+      kind: string;
+      /** Next Run At */
+      next_run_at?: string | null;
+      /** Provider */
+      provider?: string | null;
+      /** State */
+      state: string;
+      /** Updated At */
+      updated_at: string;
+    } & {
+      [key: string]: unknown;
     };
     /** Settings */
     Settings: {
@@ -5017,19 +5020,6 @@ export interface components {
     } & {
       [key: string]: unknown;
     };
-    /** TaskPage */
-    TaskPage: {
-      /** Items */
-      items: components["schemas"]["Task"][];
-      /** Limit */
-      limit?: number | null;
-      /** Offset */
-      offset?: number | null;
-      /** Total */
-      total: number;
-    } & {
-      [key: string]: unknown;
-    };
     /** Template */
     Template: {
       /** Created At */
@@ -5267,29 +5257,26 @@ export interface components {
     /** TokenList */
     TokenList: {
       /** Items */
-      items: {
-        [key: string]: unknown;
-      }[];
+      items: components["schemas"]["TokenRow"][];
       /** Total */
       total: number;
     } & {
       [key: string]: unknown;
     };
-    /** TriageInput */
-    TriageInput: {
-      /** Expected Version */
-      expected_version: number;
-      /**
-       * Reason
-       * @description With dismissed: why, in a short sentence, shown in the Dismissed list (for example 'Junior role; I look for senior roles').
-       */
-      reason?: string | null;
-      /**
-       * Triage
-       * @description new (to review), shortlisted (starts an application in stage Shortlisted when the job has no open one) or dismissed. Moving a shortlisted job back to new or dismissed removes the application its shortlist started while it is still empty; otherwise 409 application_has_work.
-       * @enum {string}
-       */
-      triage: "new" | "shortlisted" | "dismissed";
+    /** TokenRow */
+    TokenRow: {
+      /** Created At */
+      created_at: string;
+      /** Id */
+      id: string;
+      /** Kind */
+      kind: string;
+      /** Last Used At */
+      last_used_at?: string | null;
+      /** Name */
+      name: string;
+    } & {
+      [key: string]: unknown;
     };
     /** TriageItem */
     TriageItem: {
@@ -5514,75 +5501,6 @@ export interface operations {
       };
       /** @description forbidden */
       403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description validation */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-    };
-  };
-  applications_start: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["ApplicationInput"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["ApplicationChange"];
-        };
-      };
-      /** @description unauthorized */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description forbidden */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description conflict */
-      409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description request_size or file_size */
-      413: {
         headers: {
           [name: string]: unknown;
         };
@@ -6136,7 +6054,7 @@ export interface operations {
       };
     };
   };
-  login_api_v1_auth_login_post: {
+  auth_login: {
     parameters: {
       query?: never;
       header?: never;
@@ -6169,7 +6087,7 @@ export interface operations {
       };
     };
   };
-  logout_api_v1_auth_logout_post: {
+  auth_logout: {
     parameters: {
       query?: never;
       header?: never;
@@ -6198,7 +6116,7 @@ export interface operations {
     };
     requestBody: {
       content: {
-        "application/json": components["schemas"]["PasswordInput"];
+        "application/json": components["schemas"]["PasswordChange"];
       };
     };
     responses: {
@@ -6258,7 +6176,7 @@ export interface operations {
       };
     };
   };
-  session_api_v1_auth_session_get: {
+  auth_session: {
     parameters: {
       query?: never;
       header?: never;
@@ -6278,7 +6196,7 @@ export interface operations {
       };
     };
   };
-  setup_api_v1_auth_setup_post: {
+  auth_setup: {
     parameters: {
       query?: never;
       header?: never;
@@ -6311,7 +6229,7 @@ export interface operations {
       };
     };
   };
-  backup_api_v1_backup_get: {
+  backup_download: {
     parameters: {
       query?: never;
       header?: never;
@@ -6385,7 +6303,7 @@ export interface operations {
       };
     };
   };
-  restore_api_v1_backup_restore_post: {
+  backup_restore: {
     parameters: {
       query?: never;
       header?: never;
@@ -6461,7 +6379,7 @@ export interface operations {
       };
     };
   };
-  backup_file_api_v1_backups__name__get: {
+  backups_download: {
     parameters: {
       query?: never;
       header?: never;
@@ -6557,7 +6475,7 @@ export interface operations {
       };
     };
   };
-  capabilities_api_v1_capabilities_get: {
+  capabilities_get: {
     parameters: {
       query?: never;
       header?: never;
@@ -6698,6 +6616,277 @@ export interface operations {
       };
     };
   };
+  career_list: {
+    parameters: {
+      query?: {
+        kind?: string;
+        limit?: number;
+        offset?: number;
+        q?: string;
+        summary?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CareerPage"];
+        };
+      };
+      /** @description unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description validation */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+    };
+  };
+  career_create: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["EntryCreate"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CareerEntry"];
+        };
+      };
+      /** @description unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description request_size or file_size */
+      413: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description validation */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+    };
+  };
+  career_delete: {
+    parameters: {
+      query: {
+        expected_version: number;
+      };
+      header?: never;
+      path: {
+        career_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Deleted"];
+        };
+      };
+      /** @description unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description not_found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description validation */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+    };
+  };
+  career_update: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        career_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["EntryUpdate"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CareerEntry"];
+        };
+      };
+      /** @description unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description not_found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description request_size or file_size */
+      413: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description validation */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+    };
+  };
   highlights_list: {
     parameters: {
       query?: {
@@ -6761,7 +6950,7 @@ export interface operations {
     };
     requestBody: {
       content: {
-        "application/json": components["schemas"]["ClaimCreate"];
+        "application/json": components["schemas"]["HighlightCreate"];
       };
     };
     responses: {
@@ -6792,6 +6981,15 @@ export interface operations {
           "application/json": components["schemas"]["Error"];
         };
       };
+      /** @description not_found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
       /** @description conflict */
       409: {
         headers: {
@@ -6803,64 +7001,6 @@ export interface operations {
       };
       /** @description request_size or file_size */
       413: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description validation */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-    };
-  };
-  highlights_read: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        highlight_id: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Highlight"];
-        };
-      };
-      /** @description unauthorized */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description forbidden */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description not_found */
-      404: {
         headers: {
           [name: string]: unknown;
         };
@@ -6959,7 +7099,7 @@ export interface operations {
     };
     requestBody: {
       content: {
-        "application/json": components["schemas"]["ClaimUpdate"];
+        "application/json": components["schemas"]["HighlightUpdate"];
       };
     };
     responses: {
@@ -7199,335 +7339,6 @@ export interface operations {
       };
       /** @description forbidden */
       403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description conflict */
-      409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description request_size or file_size */
-      413: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description validation */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-    };
-  };
-  career_list: {
-    parameters: {
-      query?: {
-        kind?: string;
-        limit?: number;
-        offset?: number;
-        q?: string;
-        summary?: boolean;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["CareerPage"];
-        };
-      };
-      /** @description unauthorized */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description forbidden */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description validation */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-    };
-  };
-  career_create: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["KnowledgeCreate"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["CareerEntry"];
-        };
-      };
-      /** @description unauthorized */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description forbidden */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description conflict */
-      409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description request_size or file_size */
-      413: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description validation */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-    };
-  };
-  career_read: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        career_id: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["CareerEntry"];
-        };
-      };
-      /** @description unauthorized */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description forbidden */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description not_found */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description validation */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-    };
-  };
-  career_delete: {
-    parameters: {
-      query: {
-        expected_version: number;
-      };
-      header?: never;
-      path: {
-        career_id: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Deleted"];
-        };
-      };
-      /** @description unauthorized */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description forbidden */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description not_found */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description conflict */
-      409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description validation */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-    };
-  };
-  career_update: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        career_id: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["KnowledgeUpdate"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["CareerEntry"];
-        };
-      };
-      /** @description unauthorized */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description forbidden */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description not_found */
-      404: {
         headers: {
           [name: string]: unknown;
         };
@@ -7926,64 +7737,6 @@ export interface operations {
       };
     };
   };
-  collection_runs_get: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        run_id: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["CollectionRun"];
-        };
-      };
-      /** @description unauthorized */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description forbidden */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description not_found */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description validation */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-    };
-  };
   collection_runs_cancel: {
     parameters: {
       query?: never;
@@ -8147,6 +7900,15 @@ export interface operations {
       };
       /** @description forbidden */
       403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description not_found */
+      404: {
         headers: {
           [name: string]: unknown;
         };
@@ -8372,7 +8134,7 @@ export interface operations {
       };
     };
   };
-  examples_api_v1_examples_get: {
+  examples_list: {
     parameters: {
       query?: never;
       header?: never;
@@ -8392,7 +8154,7 @@ export interface operations {
       };
     };
   };
-  example_file_api_v1_examples__name__get: {
+  examples_get: {
     parameters: {
       query?: never;
       header?: never;
@@ -8410,6 +8172,15 @@ export interface operations {
         };
         content?: never;
       };
+      /** @description not_found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
       /** @description Validation Error */
       422: {
         headers: {
@@ -8421,7 +8192,7 @@ export interface operations {
       };
     };
   };
-  export_api_v1_export_get: {
+  export_download: {
     parameters: {
       query?: never;
       header?: never;
@@ -8562,64 +8333,6 @@ export interface operations {
       };
     };
   };
-  files_get: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        file_id: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["WorkspaceFile"];
-        };
-      };
-      /** @description unauthorized */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description forbidden */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description not_found */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description validation */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-    };
-  };
   files_delete: {
     parameters: {
       query: {
@@ -8689,7 +8402,7 @@ export interface operations {
       };
     };
   };
-  file_content_api_v1_files__file_id__content_get: {
+  files_content: {
     parameters: {
       query?: {
         inline?: boolean;
@@ -8709,6 +8422,15 @@ export interface operations {
         };
         content: {
           "application/json": unknown;
+        };
+      };
+      /** @description not_found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
         };
       };
       /** @description Validation Error */
@@ -8829,6 +8551,15 @@ export interface operations {
           "application/json": components["schemas"]["Error"];
         };
       };
+      /** @description not_found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
       /** @description conflict */
       409: {
         headers: {
@@ -8863,20 +8594,28 @@ export interface operations {
       query?: {
         /** @description Jobs changed by one call (its batch_id in changes_list). */
         batch_id?: string | null;
+        /** @description Exactly this company name. */
         company?: string | null;
+        /** @description true: the posting text is complete; false: it still needs text (needs_text). */
         complete?: boolean | null;
+        /** @description Added at or after this time. */
         created_since?: string | null;
+        /** @description Added at or before this time. */
         created_until?: string | null;
         /** @description Dismissed by owner, agent, agent:<token name> or system. */
         dismissed_by?: string | null;
+        /** @description Dismissed at or after this time. */
+        dismissed_since?: string | null;
         /** @description true hides jobs requiring a language outside spoken_languages; unspoken_required counts them. */
         hide_unspoken_required?: boolean | null;
         /** @description Also totals by triage and by who dismissed. */
         include_counts?: boolean;
         /** @description Also distinct companies, locations, sources and job types. */
         include_facets?: boolean;
+        /** @description Such as fulltime or internship. */
         job_type?: string | null;
         limit?: number;
+        /** @description Exactly this location text. */
         location?: string | null;
         offset?: number;
         /** @description Written in this language (ISO 639-1 code or name). */
@@ -8884,6 +8623,7 @@ export interface operations {
         /** @description Written in another known language. */
         posting_language_not?: string | null;
         q?: string;
+        /** @description Remote (true) or on site (false). */
         remote?: boolean | null;
         /** @description Postings that require this language. */
         requires?: string | null;
@@ -8896,10 +8636,9 @@ export interface operations {
               | "pending"
             )
           | null;
-        /** @description Dismissed at or after this time. */
-        since?: string | null;
         /** @description dismissed: latest dismissal first. */
         sort?: "newest" | "oldest" | "company" | "title" | "dismissed";
+        /** @description The source a job summary names: a board or ATS (such as greenhouse), or manual. */
         source?: string | null;
         /** @description new, shortlisted, dismissed or active (not dismissed). */
         triage?: ("new" | "shortlisted" | "dismissed" | "active") | null;
@@ -8983,6 +8722,15 @@ export interface operations {
       };
       /** @description forbidden */
       403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description not_found */
+      404: {
         headers: {
           [name: string]: unknown;
         };
@@ -9475,64 +9223,6 @@ export interface operations {
       };
     };
   };
-  notes_list: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        job_id: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["NoteList"];
-        };
-      };
-      /** @description unauthorized */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description forbidden */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description not_found */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description validation */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-    };
-  };
   notes_create: {
     parameters: {
       query?: never;
@@ -9666,86 +9356,6 @@ export interface operations {
       };
       /** @description not_found */
       404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description validation */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-    };
-  };
-  jobs_triage_one: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        job_id: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["TriageInput"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["JobSummary"];
-        };
-      };
-      /** @description unauthorized */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description forbidden */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description not_found */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description conflict */
-      409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description request_size or file_size */
-      413: {
         headers: {
           [name: string]: unknown;
         };
@@ -10057,64 +9667,6 @@ export interface operations {
       };
     };
   };
-  notes_get: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        note_id: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Note"];
-        };
-      };
-      /** @description unauthorized */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description forbidden */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description not_found */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description validation */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-    };
-  };
   notes_delete: {
     parameters: {
       query: {
@@ -10196,86 +9748,6 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": components["schemas"]["NotePatch"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Note"];
-        };
-      };
-      /** @description unauthorized */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description forbidden */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description not_found */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description conflict */
-      409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description request_size or file_size */
-      413: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description validation */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-    };
-  };
-  notes_pin: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        note_id: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["NotePin"];
       };
     };
     responses: {
@@ -10530,7 +10002,7 @@ export interface operations {
     };
     requestBody: {
       content: {
-        "application/json": components["schemas"]["ProviderPatch"];
+        "application/json": components["schemas"]["ProviderUpdate"];
       };
     };
     responses: {
@@ -10780,7 +10252,7 @@ export interface operations {
       };
     };
   };
-  skill_file_api_v1_skills__name__files__path__get: {
+  skills_file: {
     parameters: {
       query?: never;
       header?: never;
@@ -10799,6 +10271,15 @@ export interface operations {
         };
         content: {
           "application/json": unknown;
+        };
+      };
+      /** @description not_found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
         };
       };
       /** @description Validation Error */
@@ -11513,6 +10994,15 @@ export interface operations {
           "application/json": components["schemas"]["Error"];
         };
       };
+      /** @description not_found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
       /** @description conflict */
       409: {
         headers: {
@@ -11630,194 +11120,6 @@ export interface operations {
       };
       /** @description forbidden */
       403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description validation */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-    };
-  };
-  tasks_list: {
-    parameters: {
-      query?: {
-        job_id?: string | null;
-        kind?: string | null;
-        limit?: number;
-        offset?: number;
-        source_id?: string | null;
-        state?: string | null;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["TaskPage"];
-        };
-      };
-      /** @description unauthorized */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description forbidden */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description validation */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-    };
-  };
-  tasks_get: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        task_id: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Task"];
-        };
-      };
-      /** @description unauthorized */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description forbidden */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description not_found */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description validation */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-    };
-  };
-  tasks_cancel: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        task_id: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Task"];
-        };
-      };
-      /** @description unauthorized */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description forbidden */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description not_found */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description conflict */
-      409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description request_size or file_size */
-      413: {
         headers: {
           [name: string]: unknown;
         };
@@ -12290,6 +11592,15 @@ export interface operations {
           "application/json": components["schemas"]["Error"];
         };
       };
+      /** @description not_found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
       /** @description conflict */
       409: {
         headers: {
@@ -12511,7 +11822,7 @@ export interface operations {
       };
     };
   };
-  download_api_v1_transfers_get: {
+  transfers_download: {
     parameters: {
       query?: never;
       header?: never;
@@ -12531,7 +11842,7 @@ export interface operations {
       };
     };
   };
-  upload_api_v1_transfers_put: {
+  transfers_upload: {
     parameters: {
       query?: never;
       header?: never;
@@ -12650,7 +11961,7 @@ export interface operations {
       };
     };
   };
-  health_health_get: {
+  health: {
     parameters: {
       query?: never;
       header?: never;

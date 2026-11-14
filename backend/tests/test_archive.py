@@ -91,21 +91,21 @@ def test_attempts_and_recorded_funnel_are_separate_from_job_triage(workspace):
     stats = StatsService(workspace)
     assert stats.stats(StatsQuery(period="all"))["applied"] == 0
     first = workspace.update_application(
-        first["id"], {"expected_version": first["version"], "status": "applied"}
+        first["id"], {"expected_version": first["version"], "stage": "applied"}
     )
     first = workspace.update_application(
-        first["id"], {"expected_version": first["version"], "status": "interview"}
+        first["id"], {"expected_version": first["version"], "stage": "interview"}
     )
     assert stats.stats(StatsQuery(period="all"))["interviews"] == 1
     workspace.update_application(
         first["id"],
-        {"expected_version": first["version"], "status": "closed", "outcome": "rejected"},
+        {"expected_version": first["version"], "stage": "closed", "outcome": "rejected"},
     )
     second = workspace.create_application({"job_id": original["id"]})
     assert second["id"] != first["id"]
     assert workspace.list_applications()["total"] == 2
     workspace.update_application(
-        second["id"], {"expected_version": second["version"], "status": "offer"}
+        second["id"], {"expected_version": second["version"], "stage": "offer"}
     )
     counted = stats.stats(StatsQuery(period="all"))
     assert (counted["applied"], counted["interviews"]) == (2, 2)
@@ -211,7 +211,7 @@ def test_compact_filters_bulk_conflicts_and_attempt_delete(workspace):
     attempt = workspace.get_application(workspace.get_job(first["id"])["application"]["id"])
     attempt = workspace.update_application(
         attempt["id"],
-        {"expected_version": attempt["version"], "status": "closed", "outcome": "not_pursued"},
+        {"expected_version": attempt["version"], "stage": "closed", "outcome": "not_pursued"},
     )
     retained = workspace.create_application({"job_id": first["id"]})
     note = workspace.add_note(first["id"], {"body": "Original", "application_id": retained["id"]})
@@ -226,13 +226,12 @@ def test_compact_filters_bulk_conflicts_and_attempt_delete(workspace):
 def test_http_validates_answers_dates_and_rotation_preserves_tokens(app, client):
     token = client.post("/api/v1/tokens", json={"name": "automation", "kind": "owner"}).json()
     created = client.post("/api/v1/jobs", json={"posting": "Role details"}).json()
-    attempt = client.post(
-        "/api/v1/applications",
-        json={
-            "job_id": created["id"],
-            "questions": [{"id": "years", "label": "Years", "type": "number"}],
-        },
-    ).json()
+    item = {
+        "job_id": created["id"],
+        "questions": [{"id": "years", "label": "Years", "type": "number"}],
+    }
+    started = client.post("/api/v1/applications/batch", json={"items": [item]}).json()
+    attempt = started["items"][0]["result"]
     for patch in (
         {"questions": None},
         {"answers": None},
@@ -254,7 +253,10 @@ def test_http_validates_answers_dates_and_rotation_preserves_tokens(app, client)
     )
     assert client.get("/api/v1/jobs?created_since=not-a-date").status_code == 422
     assert (
-        client.post("/api/v1/auth/password", json={"password": "replacement-password"}).status_code
+        client.post(
+            "/api/v1/auth/password",
+            json={"current_password": "synthetic-password", "password": "replacement-password"},
+        ).status_code
         == 200
     )
     assert client.get("/api/v1/jobs").status_code == 401

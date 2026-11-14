@@ -37,7 +37,7 @@ const visible = (page: Page, name: string) =>
 
 interface Options {
   ready?: boolean;
-  status?: string;
+  stage?: string;
   deadline?: string;
   requirements?: unknown[];
   appliedDaysAgo?: number;
@@ -50,27 +50,33 @@ async function make(page: Page, title: string, options: Options = {}) {
     location: "Zurich, Switzerland",
     posting: `${title} at Example Labs.\n\nBuild reliable services with a small team.`,
   });
-  let application = await call(page, "/applications", "POST", {
-    job_id: job.id,
-    deadline: options.deadline,
-    requirements: options.requirements ?? [],
+  const started = await call(page, "/applications/batch", "POST", {
+    items: [
+      {
+        job_id: job.id,
+        deadline: options.deadline,
+        requirements: options.requirements ?? [],
+      },
+    ],
   });
+  let application = started.items[0].result;
   if (options.ready)
     for (const kind of ["cv", "letter"]) {
       const document = await call(page, "/documents", "POST", {
         application_id: application.id,
         kind,
         title: kind === "cv" ? "CV" : "Letter",
+        pdf: { name: `${kind}.pdf`, size: 1 },
       });
       await attachSource(page, document.id, "Synthetic text.", kind);
     }
   application = await call(page, `/applications/${application.id}`);
-  if (options.status) {
+  if (options.stage) {
     const day = new Date();
     day.setDate(day.getDate() - (options.appliedDaysAgo ?? 0));
     application = await call(page, `/applications/${application.id}`, "PATCH", {
       expected_version: application.version,
-      status: options.status,
+      stage: options.stage,
       ...(options.appliedDaysAgo !== undefined
         ? { applied_at: day.toISOString() }
         : {}),
@@ -126,7 +132,7 @@ test("five Ready applications are sent from Today with five Mark applied and no 
   await expect(page.getByRole("link", { name: "Back to Today" })).toBeVisible();
   for (const app of queue) {
     const sent = await read(page, app.id);
-    expect([sent.status, !!sent.applied_at]).toEqual(["applied", true]);
+    expect([sent.stage, !!sent.applied_at]).toEqual(["applied", true]);
   }
   // Undo brings the last one back, Ready and never sent.
   await toast(page).getByRole("button", { name: /Undo/ }).click();
@@ -135,7 +141,7 @@ test("five Ready applications are sent from Today with five Mark applied and no 
   await expect
     .poll(async () => {
       const back = await read(page, queue[4].id);
-      return [back.status, back.applied_at, back.ready];
+      return [back.stage, back.applied_at, back.ready];
     })
     .toEqual(["shortlisted", null, true]);
   // The keyboard: ⇧↵ marks it applied again.
@@ -143,7 +149,7 @@ test("five Ready applications are sent from Today with five Mark applied and no 
   await expect(
     page.getByRole("heading", { name: /^All sent —/ }),
   ).toBeVisible();
-  expect((await read(page, queue[4].id)).status).toBe("applied");
+  expect((await read(page, queue[4].id)).stage).toBe("applied");
 });
 
 test("an error on Mark applied leaves the page in place", async ({ page }) => {
@@ -168,7 +174,7 @@ test("an error on Mark applied leaves the page in place", async ({ page }) => {
     "Not marked applied",
   );
   await expect(page).toHaveURL(new RegExp(`#applications/${app.id}$`));
-  expect((await read(page, app.id)).status).toBe("shortlisted");
+  expect((await read(page, app.id)).stage).toBe("shortlisted");
 });
 
 test("without LaTeX: a PDF CV and letter uploaded on the page make it Ready", async ({
@@ -253,7 +259,7 @@ test("Record reply records the reply and moves the stage by its kind", async ({
     ["offer", "Offer", "offer", null],
     ["rejection", "Rejection", "closed", "rejected"],
   ] as const) {
-    const app = await make(page, `${prefix} ${kind}`, { status: "applied" });
+    const app = await make(page, `${prefix} ${kind}`, { stage: "applied" });
     await go(page, `applications/${app.id}`);
     // Status line and Record reply above the fold, never an empty slot.
     const line = page.locator(".apg-statusline");
@@ -273,7 +279,7 @@ test("Record reply records the reply and moves the stage by its kind", async ({
     await expect
       .poll(async () => {
         const after = await read(page, app.id);
-        return [after.status, after.outcome ?? null, after.replies.length];
+        return [after.stage, after.outcome ?? null, after.replies.length];
       })
       .toEqual([status, outcome, 1]);
   }
@@ -285,7 +291,7 @@ test("close as no reply from the page with Undo, and in bulk from the list", asy
   test.skip(isPhone(page), "Bulk selection is a desktop pattern.");
   const prefix = unique("No reply");
   const single = await make(page, `${prefix} single`, {
-    status: "applied",
+    stage: "applied",
     appliedDaysAgo: 60,
   });
   await go(page, `applications/${single.id}`);
@@ -300,15 +306,15 @@ test("close as no reply from the page with Undo, and in bulk from the list", asy
     .toBe("no_response");
   await toast(page).getByRole("button", { name: /Undo/ }).click();
   await expect
-    .poll(async () => (await read(page, single.id)).status)
+    .poll(async () => (await read(page, single.id)).stage)
     .toBe("applied");
 
   const first = await make(page, `${prefix} one`, {
-    status: "applied",
+    stage: "applied",
     appliedDaysAgo: 50,
   });
   const second = await make(page, `${prefix} two`, {
-    status: "applied",
+    stage: "applied",
     appliedDaysAgo: 55,
   });
   await go(page, `applications?stage=applied&q=${encodeURIComponent(prefix)}`);

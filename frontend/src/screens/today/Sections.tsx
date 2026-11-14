@@ -247,7 +247,7 @@ export function Waiting({ rows, days }: { rows: Application[]; days: number }) {
           void bulk
             .mutateAsync({
               action: "reopen",
-              status: "applied",
+              stage: "applied",
               items: closed.map((item) => ({
                 id: String(item.id),
                 expected_version: item.version ?? 0,

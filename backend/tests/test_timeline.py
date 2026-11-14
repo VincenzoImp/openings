@@ -24,7 +24,7 @@ def seeded(workspace):
         older = workspace.create_application({"job_id": first_job["id"]})
         older = workspace.update_application(
             older["id"],
-            {"expected_version": older["version"], "status": "closed", "outcome": "not_pursued"},
+            {"expected_version": older["version"], "stage": "closed", "outcome": "not_pursued"},
         )
         current = guided_application(workspace, first_job["id"], "Lead with the platform work.")
         on_job = workspace.add_note(first_job["id"], {"body": "Recruiter is Synthetic Person."})
@@ -36,7 +36,7 @@ def seeded(workspace):
             first_job["id"], {"body": "Agent observation.", "application_id": current["id"]}
         )
         applied = workspace.update_application(
-            current["id"], {"expected_version": current["version"], "status": "applied"}
+            current["id"], {"expected_version": current["version"], "stage": "applied"}
         )
         applied = workspace.update_application(
             current["id"], {"expected_version": applied["version"], "reply": {"kind": "interview"}}
@@ -172,18 +172,19 @@ def test_notes_record_their_author_and_one_pinned_note_per_scope(tmp_path):
     )
     # Each scope has its own pin.
     assert workspace.get_note(first["id"])["pinned"] and on_application["pinned"]
-    pinned = workspace.pin_note(second["id"], {"expected_version": 1})
+    pinned = workspace.update_note(second["id"], {"expected_version": 1, "pinned": True})
     assert pinned["pinned"] and pinned["version"] == 2
     replaced = workspace.get_note(first["id"])
     assert (replaced["pinned"], replaced["version"]) == (False, 2)
     with pytest.raises(DomainError) as stale:
-        workspace.pin_note(first["id"], {"expected_version": 1})
+        workspace.update_note(first["id"], {"expected_version": 1, "pinned": True})
     assert stale.value.details == {"current_version": 2, "id": first["id"]}
     # Unpinning keeps the note; doing it twice is no change.
-    unpinned = workspace.pin_note(second["id"], {"expected_version": 2, "pinned": False})
+    unpinned = workspace.update_note(second["id"], {"expected_version": 2, "pinned": False})
     assert (unpinned["pinned"], unpinned["version"]) == (False, 3)
     assert (
-        workspace.pin_note(second["id"], {"expected_version": 3, "pinned": False})["version"] == 3
+        workspace.update_note(second["id"], {"expected_version": 3, "pinned": False})["version"]
+        == 3
     )
     events = workspace.db.all(
         "SELECT kind,payload,subject_id FROM events WHERE subject_type='note' ORDER BY rowid"
@@ -210,7 +211,7 @@ def test_the_pinned_note_holds_an_applications_guidance(tmp_path):
     # Searching applications finds the pinned note's text.
     workspace.update_note(pinned["id"], {"expected_version": 1, "body": "Revised guidance"})
     assert workspace.list_applications(q="Revised guid")["total"] == 1
-    workspace.pin_note(pinned["id"], {"expected_version": 2, "pinned": False})
+    workspace.update_note(pinned["id"], {"expected_version": 2, "pinned": False})
     assert workspace.get_application(application["id"])["pinned_note"] is None
     assert workspace.list_applications(q="Revised guid")["total"] == 0
 

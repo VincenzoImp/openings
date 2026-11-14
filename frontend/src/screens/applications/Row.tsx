@@ -65,13 +65,13 @@ export function StatusText({
 
 /** The `…` entries of an application, by its stage. */
 export function rowMenu(
-  app: Pick<ApplicationRow, "status">,
+  app: Pick<ApplicationRow, "stage">,
   open: (kind: DialogKind) => void,
   reopen: () => void,
 ): MenuEntry[] {
   return [
     { id: "stage", label: "Change stage…", onSelect: () => open("stage") },
-    app.status === "closed"
+    app.stage === "closed"
       ? { id: "reopen", label: "Reopen", onSelect: reopen }
       : { id: "close", label: "Close…", onSelect: () => open("close") },
     "separator",
@@ -117,7 +117,7 @@ export function ApplicationRowView({
       icon: Send,
       onClick: () => navigate(pageHref(app.id)),
     });
-  if (isSent(app.status))
+  if (isSent(app.stage))
     actions.push({
       label: "Record reply",
       icon: Reply,

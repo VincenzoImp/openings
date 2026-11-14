@@ -68,7 +68,7 @@ class Shortlist:
                 "Close the application (or delete it deliberately) first.",
                 {
                     "application_id": application["id"],
-                    "status": application["status"],
+                    "stage": application["status"],
                     "work": work,
                 },
             )

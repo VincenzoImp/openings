@@ -1,10 +1,10 @@
 """Batch reads and writes of jobs and applications, as an agent works: many records per call.
 
 Reads take up to 20 ids and report the ids they did not find. Writes take items
-that each succeed or fail on their own (``common.run_items``) and need no version:
-triage, stage and replies are reversible and guarded by the same rules as one
+that each succeed or fail on their own (``common.run_items``). Triage, stage and
+replies need no version: they are reversible and guarded by the same rules as one
 change (one non-Closed application per job, a reply sets the stage, no
-Shortlisted after a reply). A write's result per item is small: the record's id,
+Shortlisted after a reply); an application's other fields need the version read. A write's result per item is small: the record's id,
 version and the fields the server derived.
 """
 
@@ -13,6 +13,7 @@ from ..errors import DomainError
 from ..models import (
     ApplicationFields,
     ApplicationIds,
+    ApplicationPatch,
     ApplicationsCreate,
     ApplicationsUpdate,
     JobIds,
@@ -36,7 +37,7 @@ def _found(read, ids):
 
 
 def _application_echo(application, **extra):
-    keys = ("id", "version", "job_id", "status", "outcome", "ready", "missing")
+    keys = ("id", "version", "job_id", "stage", "outcome", "ready", "missing")
     return {key: application.get(key) for key in keys} | extra
 
 
@@ -119,9 +120,9 @@ class BatchOperations:
             except DomainError as error:
                 if error.code != "application_in_progress":
                     raise
-                existing, status = error.details["application_id"], error.details["status"]
+                existing, stage = error.details["application_id"], error.details["stage"]
             given = item.model_dump(exclude_unset=True, include=fields)
-            if given and status == "shortlisted":
+            if given and stage == "shortlisted":
                 application = self.update_application(existing, ApplicationFields(**given))
             else:
                 application = self.get_application(existing, compact_job=True)
@@ -137,10 +138,8 @@ class BatchOperations:
                 )
             changes = item.model_dump(
                 exclude_unset=True,
-                exclude={"application_id", "stage", "applied_on", "reply", "reply_fix"},
+                exclude={"application_id", "applied_on", "reply", "reply_fix"},
             )
-            if item.stage is not None:
-                changes["status"] = item.stage
             if item.applied_on is not None:
                 changes["applied_at"] = item.applied_on
             if item.reply is not None:
@@ -150,7 +149,9 @@ class BatchOperations:
                 changes["reply"] = ReplyChange(
                     id=item.reply_fix.reply_id, remove=item.reply_fix.delete, **fix
                 )
-            application = self.update_application(item.application_id, ApplicationFields(**changes))
+            # Field changes carry the version read; stage and replies are guarded by rules.
+            change = ApplicationPatch if item.expected_version else ApplicationFields
+            application = self.update_application(item.application_id, change(**changes))
             last = application.get("last_reply") or {}
             return _application_echo(application, last_reply=last.get("kind"))
 

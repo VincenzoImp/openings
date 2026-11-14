@@ -54,7 +54,7 @@ const MOST = 1000;
  * out the Ready ones (the server counts them in Shortlisted).
  */
 export function useApplicationList(params: ListParams) {
-  const server: Schema<"ApplicationRow">["status"] | undefined =
+  const server: Schema<"ApplicationRow">["stage"] | undefined =
     params.stage === "all" ? undefined : params.stage;
   const sort =
     params.sort === "needs" || params.sort === "deadline"
@@ -441,7 +441,7 @@ export function useUpload() {
             note: "",
             previous_id: previous?.id ?? null,
             pdf: await spec(pdf),
-            ...(sourceSpec ? { source_file: sourceSpec } : {}),
+            ...(sourceSpec?.sha256 ? { source_file: sourceSpec } : {}),
           },
         }),
       );

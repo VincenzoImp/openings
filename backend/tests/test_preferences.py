@@ -164,7 +164,7 @@ def test_the_no_reply_period_comes_from_the_settings(services):
             application["id"],
             {
                 "expected_version": application["version"],
-                "status": status,
+                "stage": status,
                 "applied_at": stamp_ago(days),
             },
         )

@@ -61,7 +61,9 @@ def source_revision(
     """A CV or letter revision with its source and its PDF (unless pdf=False)."""
     pdf = options.pop("pdf", True)
     document = documents.create_document(
-        DocumentCreate(application_id=application_id, kind=kind, **options)
+        DocumentCreate(
+            application_id=application_id, kind=kind, **options, pdf={"name": "cv.pdf", "size": 1}
+        )
     )
     return attach(documents, put, document["id"], text, pdf)
 

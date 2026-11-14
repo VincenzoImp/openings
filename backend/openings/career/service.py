@@ -1,10 +1,10 @@
-"""CareerService: default settings and change records, composed with each Career area."""
+"""CareerService: default settings and change records, composed with each career area."""
 
 from __future__ import annotations
 
 from .batches import CareerBatches
-from .claims import ClaimOperations
 from .entries import EntryOperations
+from .highlights import HighlightOperations
 from .imports import ImportOperations
 from .models import DEFAULT_PROFILE
 from .profile import ProfileOperations
@@ -15,7 +15,7 @@ from .templates import TemplateOperations
 class CareerService(
     ProfileOperations,
     EntryOperations,
-    ClaimOperations,
+    HighlightOperations,
     TemplateOperations,
     ImportOperations,
     CareerBatches,

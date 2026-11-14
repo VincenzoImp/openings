@@ -39,7 +39,7 @@ def test_resolve_matches_identities_without_ingesting_and_reports_conflicts(work
     assert match["applications"] == [
         {
             "id": attempt["id"],
-            "status": "shortlisted",
+            "stage": "shortlisted",
             "outcome": None,
             "version": attempt["version"],
             "applied_at": None,
@@ -134,7 +134,7 @@ def test_duplicate_groups_are_annotated_filtered_and_read_only(workspace):
         "conflicts": [],
     }
     assert by_id[other_city["id"]]["similarity"] is None
-    assert by_id[ats["id"]]["applications"][0]["status"] == "shortlisted"
+    assert by_id[ats["id"]]["applications"][0]["stage"] == "shortlisted"
     assert by_id[linkedin["id"]]["source"] == "linkedin"
 
     by_location = workspace.duplicate_jobs({"match_location": True, "min_confidence": 0})
@@ -175,7 +175,7 @@ def test_bulk_applications_close_reopen_delete_and_validate_their_input(workspac
     )
     assert (closed["succeeded"], closed["failed"], closed["total"]) == (1, 2, 3)
     first = closed["items"][0]["result"]
-    assert first["status"] == "closed" and first["outcome"] == "not_pursued"
+    assert first["stage"] == "closed" and first["outcome"] == "not_pursued"
     conflict = closed["items"][1]["error"]
     assert conflict["status"] == 409 and conflict["details"]["current_version"] == 1
     assert closed["items"][2]["error"]["code"] == "not_found"
@@ -185,7 +185,7 @@ def test_bulk_applications_close_reopen_delete_and_validate_their_input(workspac
     blocked = workspace.bulk_applications(
         {
             "action": "reopen",
-            "status": "applied",
+            "stage": "applied",
             "items": [
                 {"id": attempts[0]["id"], "expected_version": first["version"]},
                 {"id": attempts[2]["id"], "expected_version": attempts[2]["version"]},
@@ -199,11 +199,11 @@ def test_bulk_applications_close_reopen_delete_and_validate_their_input(workspac
     reopened = workspace.bulk_applications(
         {
             "action": "reopen",
-            "status": "applied",
+            "stage": "applied",
             "items": [{"id": attempts[0]["id"], "expected_version": first["version"]}],
         }
     )["items"][0]["result"]
-    assert reopened["status"] == "applied" and reopened["outcome"] is None
+    assert reopened["stage"] == "applied" and reopened["outcome"] is None
     assert workspace.get_application(attempts[0]["id"])["applied_at"]
 
     deleted = workspace.bulk_applications(
@@ -224,12 +224,20 @@ def test_bulk_applications_close_reopen_delete_and_validate_their_input(workspac
         {"action": "close", "items": [item]},
         {"action": "reopen", "items": [item]},
         {"action": "delete", "outcome": "rejected", "items": [item]},
-        {"action": "close", "status": "shortlisted", "outcome": "rejected", "items": [item]},
+        {"action": "close", "stage": "shortlisted", "outcome": "rejected", "items": [item]},
         {"action": "delete", "items": [item] * 2},
         {"action": "delete", "items": []},
     ):
         with pytest.raises(ValidationError):
             workspace.bulk_applications(invalid)
+    # The message names what is missing.
+    for invalid, message in (
+        ({"action": "close", "items": [item]}, "Close needs an outcome."),
+        ({"action": "reopen", "items": [item]}, "Reopen needs a stage"),
+    ):
+        with pytest.raises(ValidationError) as error:
+            workspace.bulk_applications(invalid)
+        assert message in str(error.value)
 
 
 def store_blob(workspace, job_id, content):
@@ -295,7 +303,8 @@ def test_resolve_duplicates_and_bulk_routes_are_not_read_as_ids(client):
     assert [item["id"] for item in resolved.json()["items"]] == [first["id"]]
     groups = client.get("/api/v1/jobs/duplicates", params={"job_id": second["id"]}).json()
     assert set(groups["items"][0]["job_ids"]) == {first["id"], second["id"]}
-    attempt = client.post("/api/v1/applications", json={"job_id": first["id"]}).json()
+    started = client.post("/api/v1/applications/batch", json={"items": [{"job_id": first["id"]}]})
+    attempt = started.json()["items"][0]["result"]
     bulk = client.post(
         "/api/v1/applications/bulk",
         json={

@@ -199,7 +199,7 @@ async function caughtUp(page: Page) {
 async function emptyWorkspace(page: Page) {
   const empty = { items: [], total: 0, limit: 1, offset: 0, stage_counts: {} };
   await page.route(
-    /\/api\/v1\/(applications|jobs|sources|templates|career\/(knowledge|claims))\?/,
+    /\/api\/v1\/(applications|jobs|sources|templates|career\/(entries|highlights))\?/,
     (route) => route.fulfill({ json: empty }),
   );
   const change: Record<string, (body: any) => unknown> = {
@@ -432,7 +432,7 @@ const SCREENS: Screen[] = [
     route: "profile",
     before: async (page) => {
       const empty = { items: [], total: 0, limit: 200, offset: 0 };
-      await page.route(/\/api\/v1\/career\/(knowledge|claims)\?/, (route) =>
+      await page.route(/\/api\/v1\/career\/(entries|highlights)\?/, (route) =>
         route.fulfill({ json: empty }),
       );
       await page.route(/\/api\/v1\/career\/profile$/, async (route) => {

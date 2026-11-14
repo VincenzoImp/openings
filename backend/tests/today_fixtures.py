@@ -88,7 +88,7 @@ def seed_today(app, client, before_agent):
             application["id"],
             {
                 "expected_version": application["version"],
-                "status": "applied",
+                "stage": "applied",
                 "applied_at": ago(days=days),
             },
         )
@@ -126,7 +126,7 @@ def seed_today(app, client, before_agent):
                 57,
                 [
                     {
-                        "status": "closed",
+                        "stage": "closed",
                         "outcome": "no_response",
                         "concluded_on": (today - timedelta(days=12)),
                     }
@@ -137,7 +137,7 @@ def seed_today(app, client, before_agent):
                 "Orbit Works",
                 "Remote, Europe",
                 None,
-                [{"status": "closed", "outcome": "not_pursued"}],
+                [{"stage": "closed", "outcome": "not_pursued"}],
             ),
         ):
             application = start(title, company, location)
@@ -146,7 +146,7 @@ def seed_today(app, client, before_agent):
                     application["id"],
                     {
                         "expected_version": application["version"],
-                        "status": "applied",
+                        "stage": "applied",
                         "applied_at": ago(days=sent),
                     },
                 )

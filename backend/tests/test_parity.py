@@ -29,7 +29,7 @@ async def test_routes_and_tools_follow_the_operations(app):
     for op in OPERATIONS:
         if op.covered_by:
             # A REST-only route's work is an MCP tool's; owner-only work is never one.
-            assert op.access != "owner" and op.covered_by in tools, op.name
+            assert op.access != "owner" and set(op.covered_by) <= tools, op.name
     assert len({op.name for op in OPERATIONS}) == len(OPERATIONS)
     assert all(re.fullmatch(r"[a-z]+(_[a-z]+)*", op.name) for op in OPERATIONS)
 
@@ -45,7 +45,7 @@ def test_a_read_and_a_write_answer_alike_over_rest_and_mcp(owner_token, mcp):
     over_rest = client.post(f"/api/v1/jobs/{job['id']}/notes", json={"body": "Second."}).json()
     assert error is None and set(over_mcp) - {"pinned_at"} == set(without_empty(over_rest))
     read, _ = mcp.call("jobs_get", {"ids": [job["id"]]})
-    notes = client.get(f"/api/v1/jobs/{job['id']}/notes").json()["items"]
+    notes = client.get("/api/v1/jobs/batch", params={"ids": job["id"]}).json()["items"][0]["notes"]
     assert read["items"][0]["notes"] == without_empty(notes)
     listed, _ = mcp.call("jobs_list", {"q": "Engineer", "include_counts": True})
     rest = client.get("/api/v1/jobs?q=Engineer&include_counts=true").json()

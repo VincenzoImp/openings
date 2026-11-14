@@ -33,12 +33,12 @@ const save = (page: Page) =>
 async function entryByTitle(page: Page, title: string) {
   const { items } = await call(
     page,
-    `/career/knowledge?summary=false&q=${encodeURIComponent(title)}`,
+    `/career/entries?summary=false&q=${encodeURIComponent(title)}`,
   );
   return items.find((item: { title: string }) => item.title === title);
 }
 const highlightsOf = async (page: Page, id: string) =>
-  (await call(page, `/career/claims?summary=false&career_id=${id}`)).items;
+  (await call(page, `/career/highlights?summary=false&career_id=${id}`)).items;
 
 test("the profile reads as a CV and approves a highlight in place", async ({
   page,
@@ -259,7 +259,7 @@ test("CV text is imported only after its preview is confirmed", async ({
   page,
 }) => {
   await go(page, "profile");
-  const before = (await call(page, "/career/knowledge?limit=1")).total;
+  const before = (await call(page, "/career/entries?limit=1")).total;
   if (isPhone(page))
     await page.getByRole("button", { name: "Import CV text" }).last().click();
   else await page.getByRole("button", { name: "Import CV text" }).click();
@@ -280,7 +280,7 @@ test("CV text is imported only after its preview is confirmed", async ({
   await expect(preview).toContainText("1 entry and 2 highlights");
   await expect(preview).toContainText("Example Retail · 2016 – 2019 · Porto");
   await expect(preview).toContainText("Cleaned ten years of store data.");
-  expect((await call(page, "/career/knowledge?limit=1")).total).toBe(before);
+  expect((await call(page, "/career/entries?limit=1")).total).toBe(before);
   await preview.getByRole("button", { name: "Add 1 entry" }).click();
   await toast(page, "Imported 1 entry");
   const stored = await entryByTitle(page, "Data analyst");

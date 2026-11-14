@@ -219,7 +219,7 @@ INSERT INTO preference_sections(section) VALUES ('looking_for'),('ruled_out'),('
 -- A new workspace starts with the one writing rule every document follows.
 INSERT INTO preference_sections(section,items) VALUES ('writing',json_array(json_object('text',
  'Use only the supplied career evidence. Never invent qualifications, dates or metrics. '
- || 'Select relevant approved claims or write accurate new wording from detailed evidence. '
+ || 'Select relevant approved highlights or write accurate new wording from detailed evidence. '
  || 'Respect the template and answer limits; make missing facts visible.','scope','all')));
 -- Employer replies to sent applications (outcomes.py).
 CREATE TABLE replies (

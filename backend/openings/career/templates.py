@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 from .. import events
-from ..common import check_version, decode_record, encode, new_id, now
+from ..common import check_page, check_version, decode_record, encode, get_row, new_id, now
 from ..errors import missing
 from ..idempotency import fingerprint, remember, replay
 from .models import TemplateCreate, TemplateUpdate
-from .records import _get, _page, values
+from .records import values
 
 
 class TemplateOperations:
@@ -22,7 +22,7 @@ class TemplateOperations:
         q: str = "",
     ) -> dict:
         """List template packages and defaults by kind or q. summary=true (the default) omits TeX, guidance and rules; summary=false includes them. Read the template before editing or compiling externally."""
-        _page(limit, offset)
+        check_page(limit, offset)
         where, params = [], []
         if kind:
             where.append("kind=?")
@@ -107,7 +107,7 @@ class TemplateOperations:
         data = values(value)
         expected = data.pop("expected_version")
         with self.db.transaction() as conn:
-            row = _get(conn, "templates", template_id, "Template")
+            row = get_row(conn, "templates", template_id, "Template")
             check_version(row, expected)
             previous = decode_record(row, ["rules"])
             previous["is_default"] = bool(previous["is_default"])
@@ -147,7 +147,7 @@ class TemplateOperations:
     def delete_template(self, template_id: str, expected_version: int) -> dict:
         """Delete a live template and its assets; document revisions are unchanged."""
         with self.db.transaction() as conn:
-            row = _get(conn, "templates", template_id, "Template")
+            row = get_row(conn, "templates", template_id, "Template")
             check_version(row, expected_version)
             conn.execute("DELETE FROM templates WHERE id=?", (template_id,))
             events.record(conn, "template_deleted", ("template", template_id))

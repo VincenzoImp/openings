@@ -9,7 +9,7 @@ export type Profile = Schema<"Profile">;
 export type Entry = Schema<"CareerEntry">;
 export type Highlight = Schema<"Highlight">;
 export type EntryFile = Schema<"WorkspaceFile">;
-export type EntryInput = Schema<"KnowledgeCreate">;
+export type EntryInput = Schema<"EntryCreate">;
 export type ProfileLink = { label: string; url: string };
 
 export const keys = {
@@ -48,7 +48,7 @@ export function useEntries() {
     queryFn: ({ signal }) =>
       everything((offset) =>
         call(
-          api.GET("/api/v1/career/knowledge", {
+          api.GET("/api/v1/career/entries", {
             params: { query: { summary: false, limit: PAGE, offset } },
             signal,
           }),
@@ -64,7 +64,7 @@ export function useHighlights() {
     queryFn: ({ signal }) =>
       everything((offset) =>
         call(
-          api.GET("/api/v1/career/claims", {
+          api.GET("/api/v1/career/highlights", {
             params: { query: { summary: false, limit: PAGE, offset } },
             signal,
           }),
@@ -105,35 +105,35 @@ export const writes = {
   profile: (body: Schema<"ProfileUpdate">) =>
     call(api.PATCH("/api/v1/career/profile", { body })),
   createEntry: (body: EntryInput) =>
-    call(api.POST("/api/v1/career/knowledge", { body })),
-  updateEntry: (id: string, body: Schema<"KnowledgeUpdate">) =>
+    call(api.POST("/api/v1/career/entries", { body })),
+  updateEntry: (id: string, body: Schema<"EntryUpdate">) =>
     call(
-      api.PATCH("/api/v1/career/knowledge/{career_id}", {
+      api.PATCH("/api/v1/career/entries/{career_id}", {
         params: { path: { career_id: id } },
         body,
       }),
     ),
   deleteEntry: (id: string, version: number) =>
     call(
-      api.DELETE("/api/v1/career/knowledge/{career_id}", {
+      api.DELETE("/api/v1/career/entries/{career_id}", {
         params: {
           path: { career_id: id },
           query: { expected_version: version },
         },
       }),
     ),
-  createHighlight: (body: Schema<"ClaimCreate">) =>
-    call(api.POST("/api/v1/career/claims", { body })),
-  updateHighlight: (id: string, body: Schema<"ClaimUpdate">) =>
+  createHighlight: (body: Schema<"HighlightCreate">) =>
+    call(api.POST("/api/v1/career/highlights", { body })),
+  updateHighlight: (id: string, body: Schema<"HighlightUpdate">) =>
     call(
-      api.PATCH("/api/v1/career/claims/{highlight_id}", {
+      api.PATCH("/api/v1/career/highlights/{highlight_id}", {
         params: { path: { highlight_id: id } },
         body,
       }),
     ),
   deleteHighlight: (id: string, version: number) =>
     call(
-      api.DELETE("/api/v1/career/claims/{highlight_id}", {
+      api.DELETE("/api/v1/career/highlights/{highlight_id}", {
         params: {
           path: { highlight_id: id },
           query: { expected_version: version },

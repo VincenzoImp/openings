@@ -124,8 +124,8 @@ export function useDeleteBackup() {
 export function useChangePassword() {
   return useApiMutation({
     touches: [],
-    mutationFn: (password: string) =>
-      call(api.POST("/api/v1/auth/password", { body: { password } })),
+    mutationFn: (body: Schema<"PasswordChange">) =>
+      call(api.POST("/api/v1/auth/password", { body })),
   });
 }
 
@@ -143,11 +143,14 @@ export function useProviders(enabled = true) {
 export function useUpdateProvider() {
   return useApiMutation({
     touches: ["providers"],
-    mutationFn: ({ id, ...body }: Schema<"ProviderPatch"> & { id: string }) =>
+    mutationFn: ({
+      id,
+      ...body
+    }: Omit<Schema<"ProviderUpdate">, "clear_cooldown"> & { id: string }) =>
       call(
         api.PATCH("/api/v1/providers/{provider_id}", {
           params: { path: { provider_id: id } },
-          body,
+          body: { clear_cooldown: false, ...body },
         }),
       ),
   });

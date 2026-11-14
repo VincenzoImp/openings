@@ -16,18 +16,18 @@ def test_summaries_filtering_and_merge_preserve_application_intent(workspace):
     previous = workspace.create_application({"job_id": first["id"], "idempotency_key": "first"})
     previous = workspace.update_application(
         previous["id"],
-        {"expected_version": previous["version"], "status": "closed", "outcome": "rejected"},
+        {"expected_version": previous["version"], "stage": "closed", "outcome": "rejected"},
     )
     current = workspace.create_application({"job_id": first["id"]})
     # A closed application cannot reopen while another one is open.
     with pytest.raises(DomainError) as reopening:
         workspace.update_application(
-            previous["id"], {"expected_version": previous["version"], "status": "shortlisted"}
+            previous["id"], {"expected_version": previous["version"], "stage": "shortlisted"}
         )
     assert reopening.value.code == "application_in_progress"
     assert reopening.value.details["application_id"] == current["id"]
     workspace.create_application({"job_id": second["id"]})
-    expected = {key: current[key] for key in ("id", "status", "outcome", "version")}
+    expected = {key: current[key] for key in ("id", "stage", "outcome", "version")}
     summary = next(row for row in workspace.list_jobs()["items"] if row["id"] == first["id"])
     assert summary["application"] == workspace.get_job(first["id"])["application"] == expected
     assert summary["application_count"] == 2
@@ -70,10 +70,15 @@ def test_interface_workflow_requires_explicit_outcomes_and_versioned_deletion(cl
             "/api/v1/jobs", json={"title": "Engineer", "company": "Example", "posting": "Build."}
         )
     )
-    start = {"job_id": job["id"], "priority": 2, "idempotency_key": "start"}
-    attempt = ok(client.post("/api/v1/applications", json=start))
-    assert ok(client.post("/api/v1/applications", json=start))["id"] == attempt["id"]
-    assert status(client.post("/api/v1/applications", json={"job_id": job["id"]})) == 409
+
+    def start(item):
+        return ok(client.post("/api/v1/applications/batch", json={"items": [item]}))["items"][0]
+
+    first = {"job_id": job["id"], "priority": 2, "idempotency_key": "start"}
+    attempt = start(first)["result"]
+    assert start(first)["id"] == attempt["id"]
+    # The job's open application is returned, not doubled.
+    assert start({"job_id": job["id"]})["result"]["created"] is False
     assert ok(client.get(f"/api/v1/applications/{attempt['id']}"))["priority"] == 2
     listed = ok(client.get("/api/v1/applications", params={"job_id": job["id"]}))
     assert listed["total"] == 1 and listed["stage_counts"]["shortlisted"] == 1
@@ -83,13 +88,13 @@ def test_interface_workflow_requires_explicit_outcomes_and_versioned_deletion(cl
     def patch(**fields):
         return client.patch(path, json={"expected_version": attempt["version"], **fields})
 
-    attempt = ok(patch(status="applied"))
+    attempt = ok(patch(stage="applied"))
     assert attempt["applied_at"]
     attempt = ok(patch(applied_at=None))
     assert attempt["applied_at"] is None
     # Closing names its outcome.
-    assert status(patch(status="closed")) == 422
-    attempt = ok(patch(status="closed", outcome="rejected"))
+    assert status(patch(stage="closed")) == 422
+    attempt = ok(patch(stage="closed", outcome="rejected"))
     attempt = ok(patch(priority=1))
     assert attempt["outcome"] == "rejected"
 

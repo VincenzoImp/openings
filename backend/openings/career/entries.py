@@ -3,17 +3,17 @@
 from __future__ import annotations
 
 from .. import events
-from ..common import check_version, decode_record, encode, new_id, now
+from ..common import check_page, check_version, decode_record, encode, get_row, new_id, now
 from ..errors import missing
 from ..idempotency import fingerprint, remember, replay
-from .models import KnowledgeCreate, KnowledgeUpdate
-from .records import _get, _page, values
+from .models import EntryCreate, EntryUpdate
+from .records import values
 
 
 class EntryOperations:
-    """Listing, reading and writing Career entries."""
+    """Listing, reading and writing career entries."""
 
-    def list_knowledge(
+    def list_entries(
         self,
         q: str = "",
         kind: str = "",
@@ -21,8 +21,8 @@ class EntryOperations:
         offset: int = 0,
         summary: bool = True,
     ) -> dict:
-        """Search Career entries by q (title, organization, narrative) and kind. summary=true (the default) returns bounded previews and counts; summary=false returns full records. Read career_get for one entry's full narrative and metadata."""
-        _page(limit, offset)
+        """Search career entries by q (title, organization, narrative) and kind. summary=true (the default) returns bounded previews and counts; summary=false returns full records. Read career_get for one entry's full narrative and metadata."""
+        check_page(limit, offset)
         where, params = [], []
         if q:
             where.append("(title LIKE ? OR organization LIKE ? OR narrative LIKE ?)")
@@ -54,30 +54,30 @@ class EntryOperations:
             "offset": offset,
         }
 
-    def get_knowledge(self, knowledge_id: str) -> dict:
+    def get_entry(self, entry_id: str) -> dict:
         """Read one career evidence record with its full narrative and metadata."""
-        row = self.db.one("SELECT * FROM knowledge WHERE id=?", (knowledge_id,))
+        row = self.db.one("SELECT * FROM knowledge WHERE id=?", (entry_id,))
         if not row:
             missing("Career entry")
         return decode_record(row, ["metadata", "dates", "skills"])
 
-    def create_knowledge(self, value: KnowledgeCreate) -> dict:
+    def create_entry(self, value: EntryCreate) -> dict:
         """Add detailed career evidence. Facts should come from the user, not a job posting."""
         with self.db.transaction() as conn:
-            record_id = self._insert_knowledge(conn, value, now())
-        return self.get_knowledge(record_id)
+            record_id = self._insert_entry(conn, value, now())
+        return self.get_entry(record_id)
 
     @staticmethod
-    def _next_position(conn, table, knowledge_id=None):
+    def _next_position(conn, table, entry_id=None):
         if table == "claims":
             row = conn.execute(
-                "SELECT MAX(position) FROM claims WHERE knowledge_id=?", (knowledge_id,)
+                "SELECT MAX(position) FROM claims WHERE knowledge_id=?", (entry_id,)
             ).fetchone()
         else:
             row = conn.execute("SELECT MAX(position) FROM knowledge").fetchone()
         return (row[0] + 1) if row[0] is not None else 0
 
-    def _insert_knowledge(self, conn, value, timestamp):
+    def _insert_entry(self, conn, value, timestamp):
         """Add one entry and return its id, or the id an earlier request with its key created."""
         digest = fingerprint(value)
         replayed = replay(conn, "knowledge", value.idempotency_key, digest)
@@ -107,12 +107,12 @@ class EntryOperations:
         remember(conn, "knowledge", value.idempotency_key, digest, record_id)
         return record_id
 
-    def update_knowledge(self, knowledge_id: str, value: KnowledgeUpdate) -> dict:
+    def update_entry(self, entry_id: str, value: EntryUpdate) -> dict:
         """Revise entry fields with version protection; dates=null clears dates; document revisions keep the ids they cite."""
         data = values(value)
         expected = data.pop("expected_version")
         with self.db.transaction() as conn:
-            row = _get(conn, "knowledge", knowledge_id, "Career entry")
+            row = get_row(conn, "knowledge", entry_id, "Career entry")
             check_version(row, expected)
             previous = decode_record(row, ["metadata", "dates", "skills"])
             merged = {**previous, **data}
@@ -139,25 +139,25 @@ class EntryOperations:
                         merged["narrative"],
                         encode(merged["metadata"]),
                         now(),
-                        knowledge_id,
+                        entry_id,
                     ),
                 )
                 events.record(
                     conn,
                     "career_updated",
-                    ("career", knowledge_id),
+                    ("career", entry_id),
                     {
                         "fields": [key for key in fields if previous[key] != merged[key]],
                         "version": row["version"] + 1,
                     },
                 )
-        return self.get_knowledge(knowledge_id)
+        return self.get_entry(entry_id)
 
-    def delete_knowledge(self, knowledge_id: str, expected_version: int) -> dict:
-        """Permanently delete a career record and its reusable claims/live assets; document revisions are unchanged."""
+    def delete_entry(self, entry_id: str, expected_version: int) -> dict:
+        """Permanently delete a career entry and its highlights and files; document revisions are unchanged."""
         with self.db.transaction() as conn:
-            check_version(_get(conn, "knowledge", knowledge_id, "Career entry"), expected_version)
-            conn.execute("DELETE FROM knowledge WHERE id=?", (knowledge_id,))
-            events.record(conn, "career_deleted", ("career", knowledge_id))
+            check_version(get_row(conn, "knowledge", entry_id, "Career entry"), expected_version)
+            conn.execute("DELETE FROM knowledge WHERE id=?", (entry_id,))
+            events.record(conn, "career_deleted", ("career", entry_id))
         self.db.collect_blobs()
-        return {"deleted": True, "id": knowledge_id}
+        return {"deleted": True, "id": entry_id}

@@ -162,7 +162,7 @@ class Skill(Out):
 
 class ApplicationRef(Out):
     id: str
-    status: str
+    stage: str
     outcome: str | None = None
     version: int
 
@@ -228,6 +228,10 @@ class Job(JobSummary):
     overrides: Json = {}
     postings: list[Observation] = []
     created: bool | None = Field(default=None, description="On jobs_create: a new job.")
+    needs_text: bool | None = Field(
+        default=None,
+        description="On jobs_create: the posting text could not be read; add it with jobs_update.",
+    )
 
 
 class JobCounts(Out):
@@ -351,7 +355,7 @@ class ApplicationRow(Record):
     """An application as lists show it; ready and missing are computed."""
 
     job_id: str
-    status: str
+    stage: str
     outcome: str | None = None
     priority: int | None = None
     deadline: str | None = None
@@ -370,11 +374,22 @@ class ApplicationRow(Record):
     job: Json
 
 
+class FormQuestion(Out):
+    """A question of the employer's application form."""
+
+    id: str
+    label: str
+    type: str = "text"
+    required: bool = False
+    options: list[str] = []
+    max_length: int | None = None
+
+
 class Application(ApplicationRow):
     """An application in full, with its job, form, requirements and replies."""
 
     job: Job | JobSummary
-    questions: list[Json] = []
+    questions: list[FormQuestion] = []
     answers: Json = {}
     requirements: list[EmployerRequirement] = []
     replies: list[Reply] = []
@@ -617,11 +632,37 @@ class Collection(Out):
     next_run_at: str | None = None
 
 
+class ProviderCapability(Out):
+    supported: bool
+    kind: str
+    description: str
+    transport_version: str
+    credentials_required: bool
+
+
+class ProviderPolicy(Out):
+    enabled: bool
+    min_interval_seconds: Number = Field(description="Seconds between two requests.")
+
+
+class ProviderRuntime(Out):
+    """The shared window: when the next request may go and what the last one answered."""
+
+    next_allowed_at: str | None = None
+    cooldown_until: str | None = None
+    last_request_at: str | None = None
+    last_status: int | None = None
+    last_error: str | None = None
+    requests_hour: int
+    requests_day: int
+    total_requests: int
+
+
 class Provider(Record):
     name: str
-    capability: Json
-    policy: Json
-    runtime: Json
+    capability: ProviderCapability
+    policy: ProviderPolicy
+    runtime: ProviderRuntime
     updated_at: str | None = None
 
 
@@ -652,6 +693,19 @@ class TaskPage(Page):
     items: list[Task]
 
 
+class RunTask(Out):
+    """One fetch of a run, without its inputs and result."""
+
+    id: str
+    kind: str
+    provider: str | None = None
+    state: str
+    attempts: int
+    error: str | None = None
+    next_run_at: str | None = None
+    updated_at: str
+
+
 class CollectionRun(Out):
     id: str
     state: str
@@ -662,7 +716,7 @@ class CollectionRun(Out):
     http_requests: int | None = None
     partial: bool | None = None
     task_ids: list[str] = []
-    tasks: list[Json] = []
+    tasks: list[RunTask] = []
     created_at: str
     started_at: str | None = None
     finished_at: str | None = None
@@ -731,12 +785,43 @@ class Token(Out):
     token: str | None = Field(default=None, description="The secret, shown only once.")
 
 
+class TokenRow(Out):
+    id: str
+    name: str
+    kind: str
+    created_at: str
+    last_used_at: str | None = None
+
+
 class TokenList(Out):
-    items: list[Json]
+    items: list[TokenRow]
     total: int
+
+
+class KeptBackup(Out):
+    name: str
+    kind: str = Field(description="scheduled or pre_upgrade.")
+    size_bytes: int
+    created_at: str
+
+
+class BackupAttempt(Out):
+    outcome: str = Field(description="ok, failed or skipped.")
+    attempted_at: str
+    error: str | None = None
+
+
+class BackupSchedule(Out):
+    enabled: bool
+    keep: int
+    interval_hours: int
+    last_at: str | None = None
+    age_hours: Number | None = None
+    ok: bool
+    last_attempt: BackupAttempt | None = None
 
 
 class BackupList(Out):
-    items: list[Json]
+    items: list[KeptBackup]
     total: int
-    schedule: Json
+    schedule: BackupSchedule

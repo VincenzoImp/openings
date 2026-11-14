@@ -112,7 +112,11 @@ def test_missing_documents_follow_current_revisions_and_sorts_by_plan(app, clien
     assert ids(sort="deadline") == [soon["id"], urgent["id"], late["id"], loose["id"]]
     assert ids(sort="priority") == [urgent["id"], late["id"], soon["id"], loose["id"]]
 
-    cv = documents.create_document(DocumentCreate(application_id=soon["id"], kind="cv", title="CV"))
+    cv = documents.create_document(
+        DocumentCreate(
+            application_id=soon["id"], kind="cv", title="CV", pdf={"name": "cv.pdf", "size": 1}
+        )
+    )
     documents.create_document(
         DocumentCreate(
             application_id=soon["id"], kind="answers", title="Form", content={"text": "B"}
@@ -126,7 +130,13 @@ def test_missing_documents_follow_current_revisions_and_sorts_by_plan(app, clien
     assert missing(soon) == [] and ids(stage="ready") == [soon["id"]]
     # A new revision replaces the complete leaf; its parent's PDF does not count.
     documents.create_document(
-        DocumentCreate(application_id=soon["id"], kind="cv", title="CV v2", previous_id=cv["id"])
+        DocumentCreate(
+            application_id=soon["id"],
+            kind="cv",
+            title="CV v2",
+            previous_id=cv["id"],
+            pdf={"name": "cv.pdf", "size": 1},
+        )
     )
     assert missing(soon) == ["cv"]
     updated = workspace.update_application(
@@ -156,7 +166,7 @@ def test_applications_filter_by_the_time_they_were_applied(app, client):
     def applied(title, when):
         job = workspace.ingest_job({"title": title, "company": "Example", "posting": "Build."})
         created = workspace.create_application({"job_id": job["id"]})
-        fields = {"status": "applied", "applied_at": when} if when else {}
+        fields = {"stage": "applied", "applied_at": when} if when else {}
         return workspace.update_application(
             created["id"], {"expected_version": created["version"], **fields}
         )["id"]
