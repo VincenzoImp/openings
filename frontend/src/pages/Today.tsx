@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import type { Application, ListResult } from "../api";
 import { Pipeline } from "../design";
 import { PageHead } from "../library/common";
@@ -9,18 +10,12 @@ import { todaySummary } from "./today/summary";
 import { Waiting } from "./today/Waiting";
 
 const NONE = { items: [], total: 0 };
-const APPLICATIONS = [
-  "applications",
-  "jobs",
-  "documents",
-  "files",
-  "responses",
-];
+const APPLICATIONS = ["applications", "jobs", "documents", "files"];
 
 /** The first screen: what is ready to apply, where applications stand and what waits for a reply. */
 export default function TodayPage() {
   const ready = useFresh<ListResult<Application>>(
-    "/applications?readiness=ready&sort=deadline&limit=5",
+    "/applications?stage=ready&sort=deadline&limit=5",
     NONE,
     APPLICATIONS,
   );
@@ -29,15 +24,25 @@ export default function TodayPage() {
     NONE,
     APPLICATIONS,
   );
-  const blocked = useFresh<ListResult<Application>>(
-    "/applications?readiness=blocked&status=draft&limit=1",
+  // Shortlisted applications held by a blocking requirement.
+  const shortlisted = useFresh<ListResult<Application>>(
+    "/applications?stage=shortlisted&sort=deadline&limit=200",
     NONE,
     APPLICATIONS,
   );
-  // Applied applications past the no-reply period: the owner's setting
-  // (Preferences, Facts about me), or 30, as the server reads it.
+  const blocked = useMemo(() => {
+    const items = shortlisted.data.items.filter(
+      (item) => (item.blocking_requirements || 0) > 0,
+    );
+    return {
+      ...shortlisted,
+      data: { items: items.slice(0, 3), total: items.length },
+    };
+  }, [shortlisted]);
+  // Applied applications without a reply past the no-reply period (the owner's
+  // setting in Preferences, or 30), as the server reads it; closed by hand.
   const waiting = useFresh<ListResult<Application>>(
-    "/applications?no_reply_due=true&limit=1",
+    "/applications?needs=reply_overdue&sort=applied&limit=200",
     NONE,
     [...APPLICATIONS, "settings"],
   );
@@ -59,7 +64,7 @@ export default function TodayPage() {
         });
   const counts = stages.loading || stages.error ? null : stages.data;
   const stage = (name: string) => counts?.stage_counts?.[name];
-  const marked = counts?.ready_count ?? 0;
+  const marked = stage("ready") ?? 0;
   return (
     <>
       <PageHead title="Today">
@@ -82,9 +87,11 @@ export default function TodayPage() {
               label="Pipeline"
               steps={[
                 {
-                  label: "Preparing",
-                  value: counts ? (stage("draft") ?? 0) - marked : undefined,
-                  href: stageHref("preparing"),
+                  label: "Shortlisted",
+                  value: counts
+                    ? (stage("shortlisted") ?? 0) - marked
+                    : undefined,
+                  href: stageHref("shortlisted"),
                 },
                 {
                   label: "Ready",

@@ -94,11 +94,11 @@ export function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
   const { theme, density, toggleTheme, toggleDensity } = usePreferences();
   const { pending, refresh, notify } = useWorkspace();
   const inbox = useResource<ListResult<never>>(
-      "/jobs?queue=inbox&limit=1",
+      "/jobs?triage=new&limit=1",
       emptyList,
     ),
     applications = useResource<ListResult<never>>(
-      "/applications?status=draft&limit=1",
+      "/applications?limit=1",
       emptyList,
     );
 
@@ -218,8 +218,8 @@ export function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
   const nav = {
     route,
     counts: {
-      ready: applications.data.ready_count ?? 0,
-      inbox: inbox.data.total,
+      ready: applications.data.stage_counts?.ready ?? 0,
+      new: inbox.data.total,
     },
     onNavigate: (id: string) => navigate(id),
   };

@@ -25,7 +25,6 @@ from openings.documents import (
     ContextCreate,
     DocumentCreate,
     DocumentService,
-    ReviewUpdate,
     UploadReservation,
 )
 from openings.errors import DomainError
@@ -187,7 +186,7 @@ def test_context_freezes_preferences_evidence_and_file_bytes(workspace):
                 note="Different command",
             )
         )
-    assert ws.get_application(application["id"])["status"] == "draft"
+    assert ws.get_application(application["id"])["status"] == "shortlisted"
 
 
 def test_document_revisions_validate_evidence_and_never_inherit_old_pdf(workspace, tmp_path):
@@ -222,9 +221,7 @@ def test_document_revisions_validate_evidence_and_never_inherit_old_pdf(workspac
     assert response.status_code == 200, response.text
     pdf = response.json()
     assert pdf["source_sha256"] == hashlib.sha256(source).hexdigest()
-    documents.review_document(
-        first["id"], ReviewUpdate(expected_version=documents.get_document(first["id"])["version"])
-    )
+    # A complete revision is immutable.
     with pytest.raises(DomainError):
         documents.reserve_upload(
             UploadReservation(
@@ -356,9 +353,6 @@ def test_filtered_summary_pages_keep_large_content_in_detail_and_batch_revision_
         )
     )
     assert client.put(grant["url"], headers=grant["headers"], content=pdf).status_code == 200
-    documents.review_document(
-        first["id"], ReviewUpdate(expected_version=documents.get_document(first["id"])["version"])
-    )
     previous = first
     for number in range(25):
         previous = documents.create_document(
@@ -391,12 +385,7 @@ def test_filtered_summary_pages_keep_large_content_in_detail_and_batch_revision_
     # The text derived from the source is searched too.
     found = client.get("/api/v1/documents", params={"q": "document document"}).json()
     assert [row["id"] for row in found["items"]] == [first["id"]]
-    assert (
-        client.get(
-            "/api/v1/documents", params={"summary": "true", "review_state": "approved"}
-        ).json()["total"]
-        == 1
-    )
+    assert client.get("/api/v1/documents", params={"review_state": "approved"}).status_code == 422
     detail = client.get(f"/api/v1/documents/{first['id']}").json()
     assert detail["text"] == " ".join(["document"] * 10000) and "content" not in detail
     compact = client.get(

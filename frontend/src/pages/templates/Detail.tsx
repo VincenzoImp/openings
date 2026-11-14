@@ -19,8 +19,7 @@ const TAB_ALIASES: Record<string, string> = {
   instructions: "rules",
   "": "source",
 };
-const fileName = (template: Template) =>
-  (template.kind === "resume" ? "cv" : "letter") + ".tex";
+const fileName = (template: Template) => template.kind + ".tex";
 
 function SourceTab({ template }: { template: Template }) {
   const { mutate, pending, notify } = useWorkspace();

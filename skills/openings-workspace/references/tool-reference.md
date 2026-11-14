@@ -10,9 +10,9 @@ Step-by-step MCP/REST sequences behind the workflow skills: [Prepare Shortlist](
    `confidence`, `tier` and `reasons` (`min_confidence` defaults to 0.5). A job's `application`
    summary identifies an open attempt or the latest closed one. Use
    `applications_list` with `value.job_id` for the full history. Continue an open
-   attempt, or create Draft with `applications_create` and an idempotency key.
-   Starting retains saved interest and removes the job from the pending Shortlist queue. A separate later attempt requires the
-   previous one to be closed. Retain the attempt ID for subsequent writes.
+   attempt (shortlisting a job starts one in stage Shortlisted), or start one
+   with `applications_create` and an idempotency key, which also shortlists the
+   job. A separate later attempt requires the previous one to be closed. Retain the attempt ID for subsequent writes.
 2. Read profile, Preferences (`preferences_get`), detailed career entries,
    approved claims with their typed selection fields and selected templates. Summary lists help discovery; fetch the full records
    before writing. Ask for missing facts and keep qualifications accurate.
@@ -26,28 +26,28 @@ Step-by-step MCP/REST sequences behind the workflow skills: [Prepare Shortlist](
    instructions and answer limits.
 5. Download frozen assets through `files_reserve_download`, resolving relative
    URLs against the workspace origin. Compile externally and check page count,
-   extracted text and layout. If a compiler is unavailable, save the sources and
-   report the missing PDF.
-6. Create draft revisions with `documents_create`, keeping application/context
-   ownership and citing `claim_ids` and `knowledge_ids`; a CV or letter takes no
-   `content`. Reserve its `.tex` source upload with `files_reserve_upload`: safe
-   relative name, exact size, media type and optional SHA-256. Then reserve the
-   PDF with `source_sha256` set to the source's SHA-256. Transfer raw bytes
-   using the returned HTTP method, URL and headers; verify the stored files and
-   read the revision's derived `text`. Binary bodies do not belong in MCP
+   extracted text and layout. If a compiler is unavailable, report the missing
+   PDF: a revision without its PDF stays incomplete.
+6. Create the revision with `documents_create` once its PDF has passed the
+   checks, keeping application/context ownership and citing `claim_ids` and
+   `knowledge_ids`. A CV or letter takes no `content`: give `pdf` (safe relative
+   name, exact size, optional SHA-256) and, optionally, the TeX source inline as
+   `source` or as `source_file`. PUT the raw bytes to each returned `uploads`
+   grant with its headers, the source first; verify the stored files and read
+   the revision's `text` and `text_from`. Binary bodies do not belong in MCP
    arguments.
 7. An answers document archives a revision. Update the application's live
    `answers` separately with `applications_update`, current `expected_version`
-   and question IDs. Leave progress and review state unchanged unless requested.
+   and question IDs. Leave progress unchanged unless requested.
 
-A PDF does not record submission. A changed source needs a new revision using
-`previous_id` and its own source and PDF; `documents_compare` shows what changed. Approved revisions reject uploads. Attachment
-changes increment versions: reread and review current files before approval.
-Prepare a new context when updated source knowledge is needed.
+A PDF does not record submission. A revision is complete and immutable once its
+PDF is stored; a change needs a new revision using `previous_id` and its own
+files; `documents_compare` shows what changed. Prepare a new context when
+updated source knowledge is needed.
 
-Application list/detail `preparation` counts describe current revision leaves and
-their own PDFs/review state; they are not a submission or quality guarantee. Read
-the exact document/files before review. Context summaries include frozen labels
+Application list/detail `preparation` counts describe current revision leaves
+and how many are complete; with `ready` and `missing` they are not a submission
+or quality guarantee. Read the exact document/files before relying on them. Context summaries include frozen labels
 and evidence/claim counts for discovery. Select claims only from selected entries;
 omitting selections uses defaults, while explicit empty evidence/claim lists
 include none. Updating questions preserves compatible live answers; incompatible
@@ -105,7 +105,7 @@ unavailable and failed results before calling a collection complete.
 
 `sources_yield({since?, until?, min_sample?})` reports, per source and per
 search, what the jobs it first collected became: collected, to review,
-shortlisted, applied, employer responses, dismissed (by agent, owner or
+shortlisted, applied, employer replies, dismissed (by agent, owner or
 other), likely duplicates and postings no longer listed, with
 searches split by job board. Use it to tune sources (manage-sources).
 
@@ -116,7 +116,8 @@ the languages it states as `required` (groups, one of a group suffices) or
 observation). Signals are labels and filters; nothing dismisses a job
 automatically. `jobs_list` filters by `signal`, `posting_language`,
 `posting_language_not`, `requires` and `dismissed_by`, and
-`include_counts` returns the size of each queue. `hide_unspoken_required: true`
+`include_counts` returns `counts`: `all`, `new`, `shortlisted`, `dismissed` and
+`dismissed_by`. `hide_unspoken_required: true`
 leaves out jobs whose required languages are outside the owner's
 `spoken_languages`; with true or false the result has `unspoken_required`
 (`spoken_languages`, `count`, `hidden`). A dismissed job has `dismissal`: who,
@@ -125,74 +126,69 @@ when, why (`reason`) and its `category` (`agent`, `owner` or `other`).
 different vacancy. Whether a board still lists a posting is
 `signals.no_longer_listed`.
 
-Use `jobs_list` with `value.queue="inbox"` to review new jobs and
-`jobs_triage` / `jobs_bulk` to save or dismiss selected versioned jobs. Read full
-postings and the user's career/preferences to make a qualitative selection.
-`value.queue="shortlist"` returns saved jobs with no application attempts, with
-server-side totals and pagination. Draft (`draft`, shown as Preparing) removes a
-job from that queue. Applied, Interview, Offer and Closed history never returns
-it to Inbox or Shortlist. `triage` remains the independent interest flag;
-`queue="applications"` finds jobs with any attempt, including dismissed ones. Dismiss remembers the job during future collection. Forget deletes
+Use `jobs_list` with `value.triage="new"` to review new jobs and
+`jobs_triage` / `jobs_bulk` to shortlist or dismiss selected versioned jobs. Read
+full postings and the user's career/preferences to make a qualitative selection.
+Shortlisting starts the job's application in stage Shortlisted when it has no
+open one; `value.triage="shortlisted"` lists those jobs. Moving a job back to
+`new` or `dismissed` deletes that application only while it is empty, otherwise
+`409 application_has_work` with `details.work`. Closing an application never
+changes the job's triage. Dismiss remembers the job during future collection. Forget deletes
 job-owned history, documents, files and identities when permanent removal is
 intended. `jobs_delete` requires `job_id` and the current `expected_version`.
 
-Applications progress through Preparing (`draft`) / Applied / Interview / Offer / Closed.
+Applications progress through Shortlisted / Applied / Interview / Offer / Closed.
 Closing requires an explicit outcome. Creation or reopening cannot introduce a
 second open attempt; use the application identified by a conflict. Deleting an
 attempt preserves its job and other attempts; `applications_delete` requires
 `application_id` and the current `expected_version`. Deleting the final attempt
-returns a saved job to Shortlist; only use this deliberately.
+returns the job to New; only use this deliberately.
 `applications_bulk` applies one action to at most 200 explicit
 `{id, expected_version}` items: `close` with `outcome`, `reopen` with a non-Closed
-`status`, `mark_ready`, `unmark_ready` or `delete`. Each item reports `ok` with a result or an error (code,
+`status` or `delete`. Each item reports `ok` with a result or an error (code,
 status, message, details); reopening respects the one-open-attempt rule and only
 applies to Closed attempts. Bulk forget and delete collect orphaned file bytes once
 per call. To stop preparation
 and preserve its documents, close it with `not_pursued`. Restore known workaround
-dismissals explicitly to `saved`, using current versions: they remain in Applications
-when they have attempts and do not re-enter Inbox.
+dismissals explicitly, using current versions: to `new`, or to `shortlisted`,
+which starts an application when the job has no open one.
 
 ## Ready
 
-`applications_ready(application_id, value)` takes the application's current
-`expected_version` and `ready` (default true). Marking needs a Preparing
-application whose derived checks pass; otherwise it returns
-`409 application_not_ready` with `details.check`: `stage` (not Preparing),
-`blocked`, `none`, `missing_pdf` or `unreviewed`. The application then reports
-`readiness: "ready"`, `ready_at` and `ready_by`; marking twice changes nothing,
-and `ready: false` clears the mark. Openings clears it automatically and records
-an `application_ready_cleared` event with `reason`: `document_created`,
-`document_deleted`, `context_prepared`, `file_uploaded`, `blocking_requirement`
-or `left_preparing` (`unmarked` for an explicit clear). Every clearing changes
-the application `version`: read it again before the next update.
-`applications_list` reads the queue with `readiness: "ready"`, `sort: "ready"`,
-`ready_since` and `ready_until`, and returns `ready_count`. `applied_since` and
-`applied_until` filter by the time an application was recorded as applied;
-`ready: false` with `status: "draft"` lists Preparing applications not marked
-ready.
+Ready is computed, never stored or marked: an application is `ready` when it is
+Shortlisted, every kind in its `required_documents` (`cv`, `letter`; both by
+default, set at creation and editable with `applications_update`) has a current
+complete revision, and no blocking requirement is unresolved. Reads and list
+rows return `ready` and `missing` (`cv`, `letter`, `requirement:<id>`).
+`applications_list` filters by `stage` (`shortlisted`, `ready`, `applied`,
+`interview`, `offer`, `closed`; `ready` is the Shortlisted ones that are Ready)
+and `needs` (`documents`: Shortlisted and missing a required document;
+`reply_overdue`), and its `stage_counts` include `ready`. `applied_since` and
+`applied_until` filter by the time an application was recorded as applied.
 
-## Employer responses, no reply and insights
+Mark applied is the owner's act: `applications_update` with `status: "applied"`
+(`applied_at` defaults to now and stays editable) only when the owner says they
+sent the application. `status: "shortlisted"` undoes it while no reply exists.
 
-`responses_list(application_id)`, `responses_create(application_id, value)`,
-`responses_update(response_id, value)` and `responses_delete(response_id,
-expected_version)` manage an application's employer answers. A response has
-`kind` (`rejection`, `interview`, `offer`, `other`), `date` (not in the future;
-today when omitted), `note`, who created and updated it, and `version`. Adding
-takes an `idempotency_key`; one per kind and day (except `other`) returns
-`409 response_exists` with `details.response_id`, and a Draft never sent returns
-`409 application_not_sent`. Adding never moves the stage; removing never moves
-it back. `applications_get` returns `responses` and `last_response`; list rows
-carry `last_response`.
+## Employer replies, no reply and insights
 
-`applications_update` records the matching response when it moves a sent
-application: to `interview` from Preparing or Applied, to `offer` from an
-earlier stage, or to `closed` with `outcome: "rejected"` (accepting without an
-offer on record also records one). Closing a Draft never sent as rejected
-records nothing.
-It takes `response_date` (default today) and `response_note`; a duplicate is not
-added. Closing with `outcome: "no_response"` needs a sent application and takes
-`concluded_on` (default today). `applications_list` with `no_reply_due: true`
-lists Applied applications sent before the no-reply cutoff; every list result
+`applications_update` with `reply: {kind, date?, note?}` records an employer
+reply the owner reported on a sent application (`409 application_not_sent`
+otherwise). `kind` is `interview`, `rejection`, `offer` or `other`; `date` (not
+in the future) defaults to today. The same change moves the stage: `interview`
+to Interview, `offer` to Offer, `rejection` closes as `rejected`; `other` never
+moves it. Do not pass `status`, `outcome` or `concluded_on` with it
+(`422 reply_stage`). One reply per kind and day (except `other`) returns
+`409 reply_exists` with `details.reply_id`. `reply: {id, kind?, date?, note?}`
+corrects a reply and `reply: {id, remove: true}` removes one; corrections never
+move the stage. `applications_get` returns `replies` and `last_reply`; list rows
+carry `last_reply`.
+
+Closing with `outcome: "no_response"` needs a sent application and takes
+`concluded_on` (default today); it is always a manual act, single or with
+`applications_bulk`, and nothing closes automatically.
+`applications_list` with `needs: "reply_overdue"` lists Applied applications
+without a reply sent before the no-reply cutoff; every list result
 has `no_reply` with `days`, `source` (`settings` or `default`) and `due`. The
 period comes from the setting `no_reply_days`, else 30.
 
@@ -201,7 +197,7 @@ period comes from the setting `no_reply_days`, else 30.
 interviews, offers, rejections, no reply, waiting, the three rates,
 `median_days_to_response`, `timed`, `undated`), `time_to_response` buckets,
 `groups` (`role_family`, `seniority`, `location`, `source_kind`, `source`,
-`month`) and `excluded` (`preparing`, `closed_unsent`). A rate or median below
+`month`) and `excluded` (`shortlisted`, `closed_unsent`). A rate or median below
 the sample is `null` with `withheld`.
 
 ## Skills and the change log
@@ -239,7 +235,7 @@ expected_version)` removes a note for good and leaves a `note_deleted` event.
 `timeline_get` reads one list of notes and recorded changes: `job_id` for a job
 with all of its applications, or `application_id` for one application with its
 job's entries. Each entry has `type` (`note` or `event`), `kind` (`note`,
-`event`, or `response` for an employer response recorded, corrected or
+`event`, or `reply` for an employer reply recorded, corrected or
 removed), `scope` (`job` or `application`), `actor`, `batch_id` and either `note`
 (`body`, `version`, `pinned`) or `event` (`kind`, a text-free
 `payload`, `subject`). Pinned notes come first, then newest first. Filter with

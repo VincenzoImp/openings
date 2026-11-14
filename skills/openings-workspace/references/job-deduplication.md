@@ -1,7 +1,8 @@
 # Vacancy identity and duplicate preflight
 
-Read full postings and existing application attempts before creating a Draft.
-Check candidate duplicates across job IDs, not just within actionable queues:
+Read full postings and existing application attempts before shortlisting a job
+or starting an application. Check candidate duplicates across job IDs, not just
+within one triage list:
 application idempotency protects one job ID, not two records for the same vacancy.
 
 ## Establish identity
@@ -14,15 +15,15 @@ merge near-duplicates. Two read-only operations find candidates without writing:
   looks up a URL or source key before ingestion. It returns every matching job
   with `matched_by`, triage and all application attempts. `identity_conflict:
   true` means several records already share that identity: merge before ingesting.
-- `jobs_duplicates({value: {queue?, job_id?, match_location?, min_confidence?,
+- `jobs_duplicates({value: {triage?, job_id?, match_location?, min_confidence?,
   limit, offset}})` or `GET /jobs/duplicates` returns paginated candidate groups,
   most confident first. Each group has a `confidence` from 0 to 1, a `tier` and
   `reasons: {matched, conflicts}`, with `signals` (the matched list),
   `identical_postings`, `open_application_ids`, `merge_blocked` and a
-  `reference_id` (open attempt, then any attempt, then saved, then oldest). Items
-  carry triage, attempts, `posting_hash`, advisory text `similarity` and their own
-  `confidence` and `reasons` against the reference. `queue` keeps groups with at
-  least one member in that queue; `job_id` returns the group containing that job;
+  `reference_id` (open attempt, then any attempt, then shortlisted, then oldest).
+  Items carry triage, attempts, `posting_hash`, advisory text `similarity` and
+  their own `confidence` and `reasons` against the reference. `triage` keeps
+  groups with at least one member of that triage; `job_id` returns the group containing that job;
   `match_location` drops pairs whose locations do not agree.
 
 ### Confidence and reasons
@@ -81,7 +82,7 @@ history over a newly collected copy. Check all attempts, their stages and files.
 If both records carry important history, retain it and resolve ownership before
 continuing. Repeated collection alone does not authorize another application.
 An Applied, Interview or Offer attempt is not a new preparation request. Resume
-an intended Draft; start no later attempt after Closed without explicit scope.
+an intended Shortlisted application; start no later attempt after Closed without explicit scope.
 
 The supported merge is `jobs_merge(job_id, value: {target_id, expected_version,
 target_version})` or `POST /jobs/{source_id}/merge` with the same body. Read both
@@ -91,7 +92,7 @@ the target. The source job ID is removed. Frozen document contexts are not rewri
 The target keeps its own title, posting fields and triage; the merge does not
 choose the best description or interest state. Queued or running tasks for both
 records are cancelled. Record the surviving ID and re-read its actual application
-and queue state before continuing.
+and triage before continuing.
 
 Merge rejects more than one active application with 409. Do not close, delete or
 change an application's stage to make the merge pass. Report that conflict and
@@ -103,17 +104,17 @@ on similarity alone. A supported job note (`notes_create`, body plus optional
 `application_id`) can record the candidate canonical ID without inventing a metadata
 field. If an explicitly authorized cleanup uses dismissal instead of merge for a
 confirmed duplicate, note the canonical ID and reason first; preserve all history.
-Do not dismiss a job merely because its Draft has left actionable Shortlist.
+Do not dismiss a job merely to change which list shows it.
 
 ## Batch and rerun
 
-Build a stable cohort with `jobs_duplicates` (for example `queue: "shortlist"`
-before preparation, or `queue: "inbox"` before triage) and verify each group.
+Build a stable cohort with `jobs_duplicates` (for example `triage: "shortlisted"`
+before preparation, or `triage: "new"` before triage) and verify each group.
 Start with `min_confidence: 0.85`, continue with the default, and request `0`
 only for an exhaustive audit: the low tier is mostly different vacancies.
 Build a verified canonical-ID map before mutations. Skip a
-losing record after a confirmed merge and reuse the target's existing Draft or
-completed work. Re-read server state on rerun; notes and retained applications
-can recover the relationship without a local file. Reconcile candidate groups,
-merges, conflicts and unresolved identities at the end. A readiness audit only
+losing record after a confirmed merge and reuse the target's existing
+application or completed work. Re-read server state on rerun; notes and retained
+applications can recover the relationship without a local file. Reconcile
+candidate groups, merges, conflicts and unresolved identities at the end. An audit only
 checks these operations; it does not merge, dismiss or prepare real jobs.

@@ -29,6 +29,13 @@ const plural = (count: number, one: string) =>
 /** The day before which a sent application has waited long (as Today computes it). */
 const dayBefore = (days: number) =>
   new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+/** Shortlisted applications held by a blocking requirement, closest deadline first. */
+async function blockedOf(page: Page) {
+  const items = (
+    await call(page, "/applications?stage=shortlisted&sort=deadline&limit=200")
+  ).items.filter((item: any) => item.blocking_requirements > 0);
+  return { items, total: items.length };
+}
 async function settled(page: Page) {
   await page.waitForLoadState("networkidle");
   await expect(page.locator(".loading")).toHaveCount(0);
@@ -41,20 +48,17 @@ test("Today says what is ready, where applications stand and what waits for a re
   await settled(page);
   const ready = await call(
     page,
-    "/applications?readiness=ready&sort=deadline&limit=5",
+    "/applications?stage=ready&sort=deadline&limit=5",
   );
-  const blocked = await call(
-    page,
-    "/applications?readiness=blocked&status=draft&limit=1",
-  );
+  const blocked = await blockedOf(page);
   // The synthetic settings say 45 days of no reply; the server reads them.
-  const waiting = await call(page, "/applications?no_reply_due=true&limit=1");
+  const waiting = await call(page, "/applications?needs=reply_overdue&limit=1");
   expect(waiting.no_reply.days).toBe(45);
   expect(waiting.total).toBe(
     (
       await call(
         page,
-        `/applications?status=applied&applied_until=${dayBefore(45)}&limit=1`,
+        `/applications?stage=applied&applied_until=${dayBefore(45)}&limit=1`,
       )
     ).total,
   );
@@ -113,8 +117,11 @@ test("Today says what is ready, where applications stand and what waits for a re
   const counts = await call(page, "/applications?limit=1");
   const pipeline = page.getByRole("navigation", { name: "Pipeline" });
   const stages = [
-    ["Preparing", counts.stage_counts.draft - counts.ready_count],
-    ["Ready", counts.ready_count],
+    [
+      "Shortlisted",
+      counts.stage_counts.shortlisted - counts.stage_counts.ready,
+    ],
+    ["Ready", counts.stage_counts.ready],
     ["Applied", counts.stage_counts.applied],
     ["Interview", counts.stage_counts.interview],
     ["Offer", counts.stage_counts.offer],
@@ -122,13 +129,13 @@ test("Today says what is ready, where applications stand and what waits for a re
   await expect(pipeline.getByRole("link")).toHaveText(
     stages.map(([label, value]) => `${value}${label}`),
   );
-  // Preparing no longer includes the Ready ones: each step opens its own stage.
+  // Each step opens its own stage.
   expect(
     await pipeline
       .getByRole("link")
       .evaluateAll((links) => links.map((link) => link.getAttribute("href"))),
   ).toEqual([
-    "#applications?stage=preparing",
+    "#applications?stage=shortlisted",
     "#applications?stage=ready&sort=deadline",
     "#applications?stage=applied",
     "#applications?stage=interview",
@@ -143,6 +150,12 @@ test("Today says what is ready, where applications stand and what waits for a re
   await expect(wait).toContainText(
     `${waiting.total} applications were sent more than 45 days ago without an answer.`,
   );
+  // Each is listed with its own Close as no reply.
+  await expect(
+    wait
+      .getByRole("list", { name: "Applications without a reply" })
+      .getByRole("button", { name: /^Close as no reply/ }),
+  ).toHaveCount(Math.min(waiting.total, 5));
   // Closing them as no reply lists them first; keeping them open changes nothing.
   await wait
     .getByRole("button", { name: `Close ${waiting.total} as no reply` })
@@ -189,7 +202,7 @@ test("Today says what is ready, where applications stand and what waits for a re
 test("every card of Today has its empty, loading and error state", async ({
   page,
 }) => {
-  const empty = { items: [], total: 0, stage_counts: {}, ready_count: 0 };
+  const empty = { items: [], total: 0, stage_counts: {} };
   // An empty workspace: every list answers with nothing.
   await page.route(/\/api\/v1\/applications(\?|$)/, (route) =>
     route.fulfill({ json: empty }),
@@ -199,9 +212,6 @@ test("every card of Today has its empty, loading and error state", async ({
   await expect(page.locator(".page-head")).toContainText(
     "Nothing is waiting for you.",
   );
-  // The removed agent cards are gone for good.
-  for (const title of ["Needs your decision", "Since your last visit"])
-    await expect(card(page, title)).toHaveCount(0);
   for (const [title, state] of [
     ["Ready to apply", "Nothing is ready to apply"],
     ["Waiting for a reply", "No long wait"],
@@ -215,13 +225,10 @@ test("every card of Today has its empty, loading and error state", async ({
   await page.unrouteAll();
   let release = () => {};
   const held = new Promise<void>((resolve) => (release = resolve));
-  await page.route(
-    /\/api\/v1\/applications\?readiness=ready/,
-    async (route) => {
-      await held;
-      await route.continue();
-    },
-  );
+  await page.route(/\/api\/v1\/applications\?stage=ready/, async (route) => {
+    await held;
+    await route.continue();
+  });
   await page.reload();
   await expect(card(page, "Ready to apply").getByRole("status")).toHaveText(
     "Loading ready applications…",
@@ -236,7 +243,7 @@ test("every card of Today has its empty, loading and error state", async ({
   await page.unrouteAll();
   let fail = true;
   await page.route(
-    /\/api\/v1\/applications\?(readiness=ready|no_reply_due=true)/,
+    /\/api\/v1\/applications\?(stage=ready|needs=reply_overdue)/,
     (route) =>
       fail
         ? route.fulfill({

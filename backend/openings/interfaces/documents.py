@@ -10,7 +10,6 @@ from ..documents import (
     ContextCreate,
     DocumentCreate,
     DocumentService,
-    ReviewUpdate,
     UploadReservation,
 )
 from ..documents.models import ContextQuery, DocumentQuery, FileQuery, StalenessQuery
@@ -96,7 +95,7 @@ OPERATIONS = (
         "documents",
         "create",
         "Applications and documents",
-        "Create a new immutable revision (CV/letter: then upload source and PDF)",
+        "Create a new revision (CV/letter: a PDF and an optional TeX source, uploaded with the grants it returns)",
         params=(Param("value", DocumentCreate),),
         call=lambda s, value: s.create_document(value),
         rest=(Route("POST", "/documents", "create_document", status_code=201),),
@@ -145,17 +144,6 @@ OPERATIONS = (
         call=lambda s, application_id: s.application_staleness(application_id),
         rest=(Route("GET", "/applications/{application_id}/staleness", "application_staleness"),),
         tool=Tool(LOOKUP, method="application_staleness"),
-    ),
-    Operation(
-        "documents.review",
-        "documents",
-        "review",
-        "Applications and documents",
-        "Approve the exact revision and its files",
-        params=(Param("document_id", str), Param("value", ReviewUpdate)),
-        call=lambda s, document_id, value: s.review_document(document_id, value),
-        rest=(Route("POST", "/documents/{document_id}/review", "review_document"),),
-        tool=Tool(REPLACE, method="review_document"),
     ),
     Operation(
         "documents.delete",
@@ -243,7 +231,7 @@ OPERATIONS = (
 EXEMPTIONS = (
     Exemption(
         "immutable.records",
-        "Frozen contexts and lifecycle history have no arbitrary PATCH/DELETE. Document content changes create revisions; approved revisions stay immutable. Context deletion is scoped to deleting the owning application/job.",
+        "Frozen contexts and lifecycle history have no arbitrary PATCH/DELETE. Document content changes create revisions; a complete revision (its PDF stored) stays immutable. Context deletion is scoped to deleting the owning application/job.",
     ),
     Exemption(
         "binary.transfers",

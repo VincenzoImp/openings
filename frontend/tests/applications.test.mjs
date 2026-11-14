@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 // Node strips the types of these modules; none of them uses React.
 const model = await import("../src/pages/applications/model.ts");
-const { respondPlan, likelyChoice } =
+const { replyPlan, likelyChoice } =
   await import("../src/pages/applications/recording.ts");
 const review = await import("../src/pages/review/model.ts");
 const staleness = await import("../src/library/staleness.ts");
@@ -12,9 +12,9 @@ const now = new Date(2026, 10, 13, 10, 0);
 const app = (fields) => ({
   id: "a1",
   job_id: "j1",
-  status: "draft",
+  status: "shortlisted",
   outcome: null,
-  ready_at: null,
+  ready: false,
   version: 1,
   note: "",
   questions: [],
@@ -22,19 +22,25 @@ const app = (fields) => ({
   ...fields,
 });
 
-test("Ready is a stage of its own: Preparing counts only the others", () => {
-  assert.equal(model.stageOf(app({})), "preparing");
-  assert.equal(model.stageOf(app({ ready_at: "2026-11-01" })), "ready");
+test("Ready is a computed stage inside Shortlisted, with what is missing", () => {
+  assert.equal(model.stageOf(app({})), "shortlisted");
+  assert.equal(model.stageOf(app({ ready: true })), "ready");
   assert.equal(model.stageOf(app({ status: "offer" })), "offer");
   assert.deepEqual(
     model.stageCounts({
       total: 20,
-      stage_counts: { draft: 9, applied: 5, interview: 2, offer: 1, closed: 3 },
-      ready_count: 4,
+      stage_counts: {
+        shortlisted: 9,
+        ready: 4,
+        applied: 5,
+        interview: 2,
+        offer: 1,
+        closed: 3,
+      },
     }),
     {
       all: 20,
-      preparing: 5,
+      shortlisted: 9,
       ready: 4,
       applied: 5,
       interview: 2,
@@ -45,27 +51,43 @@ test("Ready is a stage of its own: Preparing counts only the others", () => {
   const query = (stage) =>
     model.listQuery({ ...model.DEFAULTS, stage }, 200).toString();
   assert.equal(
-    query("preparing"),
-    "status=draft&ready=false&sort=updated&limit=200",
+    query("shortlisted"),
+    "stage=shortlisted&sort=updated&limit=200",
   );
-  assert.equal(
-    query("ready"),
-    "status=draft&ready=true&sort=updated&limit=200",
-  );
-  assert.equal(query("closed"), "status=closed&sort=updated&limit=200");
+  assert.equal(query("ready"), "stage=ready&sort=updated&limit=200");
+  assert.equal(query("all"), "sort=updated&limit=200");
   assert.equal(
     model
       .listQuery({ ...model.DEFAULTS, waiting: "1", q: "Data" }, 50, 100)
       .toString(),
-    "q=Data&no_reply_due=true&sort=updated&limit=50&offset=100",
+    "q=Data&needs=reply_overdue&sort=updated&limit=50&offset=100",
   );
+  assert.equal(
+    model.missingText(app({ status: "shortlisted", missing: ["letter"] })),
+    "Missing: letter",
+  );
+  assert.equal(
+    model.missingText(
+      app({
+        status: "shortlisted",
+        missing: ["cv", "requirement:r1"],
+        requirements: [{ id: "r1", text: "Work permit" }],
+      }),
+    ),
+    "Missing: CV, requirement “Work permit”",
+  );
+  assert.equal(
+    model.missingText(app({ status: "applied", missing: ["cv"] })),
+    "",
+  );
+  assert.equal(model.missingText(app({ missing: [] })), "");
 });
 
 test("addresses of the old Applications page open the stage they meant", () => {
   const hash = routes.canonicalHash;
   assert.equal(
     hash("#applications?status=draft&view=list"),
-    "#applications?view=list&stage=preparing",
+    "#applications?view=list&stage=shortlisted",
   );
   assert.equal(
     hash("#applications?status=applied&applied_until=2026-10-01"),
@@ -73,18 +95,25 @@ test("addresses of the old Applications page open the stage they meant", () => {
   );
   assert.equal(
     hash("#applications?readiness=ready&sort=ready"),
-    "#applications?sort=ready&stage=ready",
+    "#applications?sort=deadline&stage=ready",
   );
-  // A readiness filter inside another stage stays a filter.
-  assert.equal(hash("#applications?stage=all&readiness=blocked"), null);
+  assert.equal(
+    hash("#applications?stage=preparing"),
+    "#applications?stage=shortlisted",
+  );
+  // The removed Readiness filter is dropped.
+  assert.equal(
+    hash("#applications?stage=all&readiness=blocked"),
+    "#applications?stage=all",
+  );
   assert.equal(hash("#applications?stage=applied"), null);
   assert.equal(routes.routeOf("#applications?application=a1"), "review");
 });
 
-test("the employer's answer, or the wait, in words", () => {
+test("the employer's reply, or the wait, in words", () => {
   const sent = { applied_at: "2026-10-01T09:00:00+00:00" };
   assert.deepEqual(
-    model.responseLine(app({ status: "applied", ...sent }), 30, now),
+    model.replyLine(app({ status: "applied", ...sent }), 30, now),
     {
       text: "No reply for 43 days",
       tone: "attention",
@@ -92,15 +121,15 @@ test("the employer's answer, or the wait, in words", () => {
     },
   );
   assert.equal(
-    model.responseLine(app({ status: "applied", ...sent }), 45, now).tone,
+    model.replyLine(app({ status: "applied", ...sent }), 45, now).tone,
     undefined,
   );
   assert.equal(
-    model.responseLine(
+    model.replyLine(
       app({
         status: "interview",
         ...sent,
-        last_response: { kind: "interview", date: "2026-11-06" },
+        last_reply: { kind: "interview", date: "2026-11-06" },
       }),
       30,
       now,
@@ -108,12 +137,12 @@ test("the employer's answer, or the wait, in words", () => {
     "Interview · 6 Nov",
   );
   assert.equal(
-    model.responseLine(
+    model.replyLine(
       app({
         status: "closed",
         outcome: "rejected",
         ...sent,
-        last_response: { kind: "rejection", date: "2026-10-13" },
+        last_reply: { kind: "rejection", date: "2026-10-13" },
       }),
       30,
       now,
@@ -121,7 +150,7 @@ test("the employer's answer, or the wait, in words", () => {
     "Rejection · 13 Oct, after 12 days",
   );
   assert.equal(
-    model.responseLine(
+    model.replyLine(
       app({
         status: "closed",
         outcome: "no_response",
@@ -134,14 +163,10 @@ test("the employer's answer, or the wait, in words", () => {
     "No reply · closed 10 Nov after 40 days",
   );
   assert.deepEqual(
-    model.responseLine(
-      app({ status: "closed", outcome: "not_pursued" }),
-      30,
-      now,
-    ),
+    model.replyLine(app({ status: "closed", outcome: "not_pursued" }), 30, now),
     { text: "Not pursued · not counted in Insights", quiet: true },
   );
-  assert.equal(model.responseLine(app({}), 30, now).text, "");
+  assert.equal(model.replyLine(app({}), 30, now).text, "");
 });
 
 test("plan tags and the state of the documents", () => {
@@ -161,21 +186,25 @@ test("plan tags and the state of the documents", () => {
   assert.equal(kinds([]), "None");
   assert.equal(
     kinds([
-      { kind: "resume", revisions: 1, pdf: 1, approved: 1 },
-      { kind: "cover_letter", revisions: 1, pdf: 1, approved: 1 },
+      { kind: "cv", revisions: 1, complete: 1 },
+      { kind: "letter", revisions: 1, complete: 1 },
     ]),
-    "CV and letter approved",
+    "CV and letter uploaded",
   );
   assert.equal(
     kinds([
-      { kind: "resume", revisions: 1, pdf: 1, approved: 1 },
-      { kind: "cover_letter", revisions: 1, pdf: 0, approved: 0 },
+      { kind: "cv", revisions: 1, complete: 1 },
+      { kind: "letter", revisions: 1, complete: 0 },
     ]),
-    "CV approved, letter not yet",
+    "CV uploaded, letter without PDF",
   );
   assert.equal(
-    kinds([{ kind: "resume", revisions: 1, pdf: 0, approved: 0 }]),
-    "Written, without PDF",
+    kinds([{ kind: "cv", revisions: 1, complete: 0 }]),
+    "Waiting for the PDF",
+  );
+  assert.deepEqual(
+    model.documentState(app({ preparation: [], missing: ["letter"] }))[1],
+    { text: "Missing: letter", tone: "attention" },
   );
   assert.equal(
     model.documentState(app({ preparation: [], stale_inputs: ["profile"] }))[1]
@@ -266,20 +295,20 @@ test("what changed since the documents were written, in words", () => {
   const report = {
     documents: [
       {
-        kind: "resume",
+        kind: "cv",
         context_id: "c",
         changes: [summary, page],
         comparison: { profile: "parts", preferences: "items" },
       },
       {
-        kind: "cover_letter",
+        kind: "letter",
         context_id: "c",
         changes: [summary],
         comparison: { profile: "parts", preferences: "not_frozen" },
       },
     ],
   };
-  const kinds = { resume: "CV", cover_letter: "Letter" };
+  const kinds = { cv: "CV", letter: "Letter" };
   assert.equal(staleness.concerned(page, report, kinds), "CV");
   assert.equal(staleness.concerned(summary, report, kinds), "");
   assert.equal(staleness.comparisonNotes(report).length, 1);
@@ -289,40 +318,43 @@ test("what changed since the documents were written, in words", () => {
   );
 });
 
-test("recording an answer: a stage change with its response, or a response alone", () => {
+test("recording a reply: one update that moves the stage when the reply implies it", () => {
   const day = "2026-11-10";
-  assert.deepEqual(respondPlan("applied", "interview", day, "Call"), {
-    call: "update",
-    body: { status: "interview", response_date: day, response_note: "Call" },
-    submit: "Save and move to Interview",
+  assert.deepEqual(replyPlan("applied", "interview", day, "Call"), {
+    body: { reply: { kind: "interview", date: day, note: "Call" } },
+    submit: "Save the interview",
     caption:
       "The application moves to Interview. The date stays correctable in its timeline.",
     note: true,
   });
-  assert.equal(respondPlan("interview", "interview", day, "").call, "add");
-  assert.deepEqual(respondPlan("interview", "interview", day, "").body, {
-    kind: "interview",
-    date: day,
-    note: "",
+  assert.match(
+    replyPlan("interview", "interview", day, "").caption,
+    /stage does not change/,
+  );
+  assert.deepEqual(replyPlan("interview", "interview", day, "").body, {
+    reply: { kind: "interview", date: day },
   });
-  assert.deepEqual(respondPlan("offer", "rejection", day, "").body, {
-    status: "closed",
-    outcome: "rejected",
-    response_date: day,
-  });
-  const silence = respondPlan("applied", "no_reply", day, "ignored");
+  assert.match(replyPlan("offer", "rejection", day, "").caption, /closes/);
+  assert.match(
+    replyPlan("closed", "offer", day, "", "no_response").caption,
+    /moves to Offer/,
+  );
+  const silence = replyPlan("applied", "no_reply", day, "ignored");
   assert.deepEqual(silence.body, {
     status: "closed",
     outcome: "no_response",
     concluded_on: day,
   });
   assert.equal(silence.note, false);
-  assert.equal(respondPlan("applied", "other", day, "").call, "add");
+  assert.match(
+    replyPlan("applied", "other", day, "").caption,
+    /does not change/,
+  );
   assert.equal(likelyChoice("applied"), "interview");
   assert.equal(likelyChoice("interview"), "offer");
 });
 
-test("a CV or letter is approved with its source and the PDF built from it", () => {
+test("a CV or letter is complete with its PDF; a source pairs with it", () => {
   const tex = { name: "cv.tex", media_type: "application/x-tex", sha256: "s1" };
   const pdf = (built) => ({
     name: "cv.pdf",
@@ -330,11 +362,12 @@ test("a CV or letter is approved with its source and the PDF built from it", () 
     sha256: "p1",
     source_sha256: built,
   });
-  const cv = (files) => ({ kind: "resume", files });
-  assert.match(review.approvalBlock(cv([])), /source/);
-  assert.match(review.approvalBlock(cv([tex])), /PDF/);
-  assert.equal(review.approvalBlock(cv([tex, pdf("s1")])), null);
-  assert.equal(review.approvalBlock({ kind: "answers", files: [] }), null);
+  const cv = (files) => ({ kind: "cv", files });
+  assert.match(review.incompleteReason(cv([])), /PDF/);
+  assert.match(review.incompleteReason(cv([tex])), /PDF/);
+  assert.equal(review.incompleteReason(cv([pdf(null)])), null);
+  assert.equal(review.incompleteReason(cv([tex, pdf("s1")])), null);
+  assert.equal(review.incompleteReason({ kind: "answers", files: [] }), null);
   assert.equal(review.sourceAndPdf(cv([tex, pdf("s1")])).pairing, "matches");
   assert.equal(review.sourceAndPdf(cv([tex, pdf(null)])).pairing, "unnamed");
   assert.equal(review.sourceAndPdf(cv([tex, pdf("s2")])).pairing, "other");
@@ -352,12 +385,12 @@ test("a CV or letter is approved with its source and the PDF built from it", () 
 
 test("the review page: current revisions, before you send, the queue and old tabs", () => {
   const revisions = [
-    { id: "a", kind: "resume", created_at: "1", previous_id: null },
-    { id: "b", kind: "resume", created_at: "2", previous_id: "a" },
-    { id: "c", kind: "cover_letter", created_at: "3", previous_id: null },
+    { id: "a", kind: "cv", created_at: "1", previous_id: null },
+    { id: "b", kind: "cv", created_at: "2", previous_id: "a" },
+    { id: "c", kind: "letter", created_at: "3", previous_id: null },
   ];
-  assert.equal(review.currentOf(revisions, "resume").id, "b");
-  assert.equal(review.currentOf(revisions, "cover_letter").id, "c");
+  assert.equal(review.currentOf(revisions, "cv").id, "b");
+  assert.equal(review.currentOf(revisions, "letter").id, "c");
   assert.equal(review.currentOf(revisions, "answers"), null);
   const notices = review.beforeYouSend(
     app({
@@ -396,27 +429,12 @@ test("the review page: current revisions, before you send, the queue and old tab
 });
 
 test("bulk actions are offered only when valid for every selected application", () => {
-  const draft = {
-    status: "draft",
-    applied_at: null,
-    ready_at: null,
-    readiness: "reviewed",
-  };
-  const ready = {
-    ...draft,
-    ready_at: "2026-11-12T10:00:00Z",
-    readiness: "ready",
-  };
-  const applied = {
-    status: "applied",
-    applied_at: "2026-11-01T10:00:00Z",
-    ready_at: null,
-    readiness: "ready",
-  };
+  const shortlisted = { status: "shortlisted", applied_at: null };
+  const applied = { status: "applied", applied_at: "2026-11-01T10:00:00Z" };
   const interview = { ...applied, status: "interview" };
   const closed = { ...applied, status: "closed" };
   assert.deepEqual(model.bulkActions([]), []);
-  assert.deepEqual(model.bulkActions([applied, interview, draft]), [
+  assert.deepEqual(model.bulkActions([applied, interview, shortlisted]), [
     "close",
     "delete",
   ]);
@@ -425,17 +443,7 @@ test("bulk actions are offered only when valid for every selected application", 
     "close",
     "delete",
   ]);
-  assert.deepEqual(model.bulkActions([draft]), [
-    "close",
-    "mark_ready",
-    "delete",
-  ]);
-  assert.deepEqual(model.bulkActions([ready]), [
-    "close",
-    "unmark_ready",
-    "delete",
-  ]);
-  assert.deepEqual(model.bulkActions([draft, ready]), ["close", "delete"]);
+  assert.deepEqual(model.bulkActions([shortlisted]), ["close", "delete"]);
   assert.deepEqual(model.bulkActions([closed]), ["reopen", "delete"]);
   assert.deepEqual(model.bulkActions([closed, applied]), ["delete"]);
 });

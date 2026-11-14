@@ -1,4 +1,4 @@
-"""Application priority, deadline, employer requirements and readiness (schema 7)."""
+"""Application priority, deadline, employer requirements and readiness and what is missing for Ready."""
 
 import json
 
@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 
 from document_fixtures import attach, attach_pdf
 from openings.app import create_app
-from openings.documents import DocumentCreate, ReviewUpdate
+from openings.documents import DocumentCreate
 from openings.errors import DomainError
 from openings.workspace import Workspace
 from timeline_fixtures import guided_application
@@ -56,7 +56,7 @@ def test_planning_fields_validate_and_clear_explicitly(tmp_path):
         "resolved": False,
         "note": "",
     }
-    assert application["readiness"] == "blocked"
+    assert application["missing"] == ["cv", "letter", "requirement:" + first["id"]]
     assert (application["open_requirements"], application["blocking_requirements"]) == (2, 1)
 
     for invalid in (
@@ -89,7 +89,8 @@ def test_planning_fields_validate_and_clear_explicitly(tmp_path):
         {"expected_version": application["version"], "requirements": resolved},
     )
     assert application["requirements"] == resolved
-    assert application["readiness"] == "none" and application["blocking_requirements"] == 0
+    assert application["missing"] == ["cv", "letter"]
+    assert application["blocking_requirements"] == 0
     unchanged = workspace.update_application(
         application["id"],
         {"expected_version": application["version"], "requirements": resolved},
@@ -109,7 +110,7 @@ def test_planning_fields_validate_and_clear_explicitly(tmp_path):
     assert {"priority", "deadline"} <= set(events[0]["payload"]["fields"])
 
 
-def test_readiness_follows_current_revisions_and_sorts_by_plan(tmp_path):
+def test_missing_documents_follow_current_revisions_and_sorts_by_plan(tmp_path):
     app = create_app(tmp_path / "readiness.sqlite", start_worker=False)
     workspace, documents = app.state.workspace, app.state.documents
 
@@ -117,65 +118,56 @@ def test_readiness_follows_current_revisions_and_sorts_by_plan(tmp_path):
         job = workspace.ingest_job({"title": title, "company": "Example", "posting": "Build."})
         return workspace.create_application({"job_id": job["id"], **fields})
 
-    def readiness(application):
-        return workspace.get_application(application["id"])["readiness"]
+    def missing(application):
+        return workspace.get_application(application["id"])["missing"]
 
     def ids(**query):
         return [item["id"] for item in workspace.list_applications(**query)["items"]]
 
     late = start("Late", deadline="2027-03-01", priority=3)
-    soon = start("Soon", deadline="2026-12-01")
+    soon = start("Soon", deadline="2026-12-01", required_documents=["cv"])
     urgent = start("Urgent", deadline="2027-03-01", priority=1)
     loose = start("Loose")
     assert ids(sort="deadline") == [soon["id"], urgent["id"], late["id"], loose["id"]]
     assert ids(sort="priority") == [urgent["id"], late["id"], soon["id"], loose["id"]]
 
-    cv = documents.create_document(
-        DocumentCreate(application_id=soon["id"], kind="resume", title="CV")
-    )
-    answers = documents.create_document(
+    cv = documents.create_document(DocumentCreate(application_id=soon["id"], kind="cv", title="CV"))
+    documents.create_document(
         DocumentCreate(
             application_id=soon["id"], kind="answers", title="Form", content={"text": "B"}
         )
     )
-    assert readiness(soon) == "missing_pdf"
+    assert missing(soon) == ["cv"]
     with TestClient(app) as client:
         attach(documents, client.put, cv["id"], "A", pdf=False)
-        assert readiness(soon) == "missing_pdf"
+        assert missing(soon) == ["cv"]
         attach_pdf(documents, client.put, cv["id"], "A")
-    assert readiness(soon) == "unreviewed"
-    for document in (cv, answers):
-        current = documents.get_document(document["id"])
-        documents.review_document(document["id"], ReviewUpdate(expected_version=current["version"]))
-    # Every check passes; Ready itself is the stored step (test_application_ready.py).
-    assert readiness(soon) == "reviewed"
-    assert ids(readiness="reviewed") == [soon["id"]] and ids(readiness="ready") == []
-    # A new revision replaces the approved leaf; its parent's PDF does not count.
+    # Form answers never affect Ready.
+    assert missing(soon) == [] and ids(stage="ready") == [soon["id"]]
+    # A new revision replaces the complete leaf; its parent's PDF does not count.
     documents.create_document(
-        DocumentCreate(
-            application_id=soon["id"],
-            kind="resume",
-            title="CV v2",
-            previous_id=cv["id"],
-        )
+        DocumentCreate(application_id=soon["id"], kind="cv", title="CV v2", previous_id=cv["id"])
     )
-    assert readiness(soon) == "missing_pdf"
-    workspace.update_application(
+    assert missing(soon) == ["cv"]
+    updated = workspace.update_application(
         late["id"],
         {
             "expected_version": late["version"],
-            "requirements": [{"kind": "eligibility", "text": "Work permit", "blocking": True}],
+            "requirements": [
+                {"id": "permit", "kind": "eligibility", "text": "Work permit", "blocking": True}
+            ],
         },
     )
-    assert ids(readiness="missing_pdf") == [soon["id"]]
-    assert ids(readiness="blocked") == [late["id"]]
-    assert set(ids(readiness="none")) == {urgent["id"], loose["id"]}
-    assert ids(readiness="ready") == []
-    listed = workspace.list_applications(readiness="blocked")["items"][0]
+    assert updated["missing"] == ["cv", "letter", "requirement:permit"]
+    assert ids(stage="ready") == []
+    assert set(ids(needs="documents")) == {soon["id"], late["id"], urgent["id"], loose["id"]}
+    listed = next(
+        item for item in workspace.list_applications()["items"] if item["id"] == late["id"]
+    )
     assert listed["blocking_requirements"] == listed["open_requirements"] == 1
     assert "requirements" not in listed
     with pytest.raises(DomainError):
-        workspace.list_applications(readiness="maybe")
+        workspace.list_applications(stage="maybe")
 
 
 def test_applications_filter_by_the_time_they_were_applied(tmp_path):
@@ -200,11 +192,11 @@ def test_applications_filter_by_the_time_they_were_applied(tmp_path):
     def ids(**query):
         return [item["id"] for item in workspace.list_applications(**query)["items"]]
 
-    assert ids(status="applied", applied_until="2026-10-12T00:00:00+00:00") == [old]
+    assert ids(stage="applied", applied_until="2026-10-12T00:00:00+00:00") == [old]
     assert ids(applied_since="2026-10-12T00:00:00+00:00") == [recent]
     # An application never recorded as applied has no time to compare.
     assert set(ids(applied_until="2027-01-01T00:00:00+00:00")) == {old, recent}
-    waiting = workspace.list_applications(status="applied", applied_until="2026-10-12", limit=1)
+    waiting = workspace.list_applications(stage="applied", applied_until="2026-10-12", limit=1)
     assert (waiting["total"], waiting["stage_counts"]["applied"]) == (1, 1)
     with TestClient(app, base_url="http://localhost:8080", headers=headers) as client:
         # A date without a time includes its whole day, as the other ranges do.
@@ -276,7 +268,7 @@ def test_planning_fields_have_rest_and_mcp_parity(tmp_path, transport):
                 }
             },
         )
-        assert status == 200 and created["readiness"] == "blocked"
+        assert status == 200 and created["missing"] == ["cv", "letter", "requirement:ai"]
         status, updated = call(
             "applications_update",
             "PATCH",
@@ -290,7 +282,8 @@ def test_planning_fields_have_rest_and_mcp_parity(tmp_path, transport):
                 },
             },
         )
-        assert status == 200 and updated["readiness"] == "none" and updated["deadline"] is None
+        assert status == 200 and updated["missing"] == ["cv", "letter"]
+        assert updated["deadline"] is None
         status, _ = call(
             "applications_update",
             "PATCH",
@@ -305,11 +298,11 @@ def test_planning_fields_have_rest_and_mcp_parity(tmp_path, transport):
             "applications_list",
             "GET",
             "/applications",
-            {"value": {"readiness": "none", "sort": "priority"}},
+            {"value": {"needs": "documents", "sort": "priority"}},
         )
         assert status == 200 and listed["total"] == 1
         item = listed["items"][0]
-        assert (item["priority"], item["deadline"], item["readiness"]) == (2, None, "none")
+        assert (item["priority"], item["deadline"], item["ready"]) == (2, None, False)
         assert item["open_requirements"] == item["blocking_requirements"] == 0
         status, got = call(
             "applications_get",

@@ -12,7 +12,7 @@ compatibility: Requires a machine with Docker Compose v2 for installation, or an
 Use this workflow when the owner wants to start using Openings, or when a
 workspace exists but is not yet ready for the routine workflows. It ends when
 the workspace has a career record, a Profile, Preferences, both templates and running
-sources, and the owner knows their own part: apply to Drafts and mark them
+sources, and the owner knows their own part: apply to Ready applications and mark them
 Applied or close them.
 
 Read [Openings workspace](../openings-workspace/SKILL.md) for connection and
@@ -65,7 +65,7 @@ answer the owner did not give. Report what you did in the chat.
 
 To try the workflow before sharing personal data, import the repository's
 synthetic `examples/career.json`, add the sections and settings of `examples/preferences.json` and use
-`examples/resume.tex` and `examples/cover-letter.tex`; replace them with the
+`examples/cv.tex` and `examples/letter.tex`; replace them with the
 owner's records afterwards.
 
 Work in this order; each step uses records the next ones need.
@@ -88,10 +88,10 @@ Work in this order; each step uses records the next ones need.
    and edit everything under **Preferences** in the dashboard. In a workspace
    upgraded from an earlier version, sort the copied statements first as
    [Maintain Career](../maintain-career/SKILL.md) describes.
-3. **Templates.** Start from the repository `examples/resume.tex` and
-   `examples/cover-letter.tex` or the owner's own documents. Build a one-page CV
+3. **Templates.** Start from the repository `examples/cv.tex` and
+   `examples/letter.tex` or the owner's own documents. Build a one-page CV
    MASTER from the Career record, compile it, check the PDF, and store source,
-   guidance and rules in the resume template. Do the same for the letter template.
+   guidance and rules in the CV template. Do the same for the letter template.
 4. **Writing rules.** Store general writing guidance as Writing rules with scope
    `all` (`preferences_update` on `writing`): language register, evidence
    rules, what never to claim.
@@ -101,7 +101,7 @@ Work in this order; each step uses records the next ones need.
 
 ## Hand over
 
-Run one [Review Inbox](../review-inbox/SKILL.md) pass and prepare one Draft with
+Run one [Review new jobs](../review-inbox/SKILL.md) pass and prepare one application with
 [Prepare Shortlist](../prepare-shortlist/SKILL.md) so the owner can see a real
 result. Explain the owner's part in two sentences and report what you did in the chat,
 including the open questions about their career.

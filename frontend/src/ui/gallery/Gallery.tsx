@@ -661,7 +661,7 @@ function ApplicationsPhone({ account }: { account: Account }) {
           onChange={setTab}
           items={[
             { id: "ready", label: "Ready", count: 2 },
-            { id: "preparing", label: "Preparing", count: 13 },
+            { id: "shortlisted", label: "Shortlisted", count: 13 },
             { id: "applied", label: "Applied", count: 16 },
           ]}
         />

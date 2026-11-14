@@ -1,13 +1,13 @@
 import { useState } from "react";
-import { api, localToday, newId, type Application } from "../../api";
+import { api, localToday, type Application } from "../../api";
 import { ResponseForm } from "../../design";
 import { useAct } from "../../library/records";
-import { CHOICES, likelyChoice, respondPlan, type Choice } from "./recording";
+import { CHOICES, likelyChoice, replyPlan, type Choice } from "./recording";
 
 /**
- * Record what the employer answered a sent application: an interview, a
- * rejection, an offer, another answer, or no reply. A stage change and its
- * response are one call; another answer is added without moving the stage.
+ * Record reply: what the employer did about a sent application (an interview,
+ * a rejection, an offer or another reply), or close it as no reply. One update
+ * records the reply and moves the stage when the reply implies it.
  */
 export function Respond({
   application,
@@ -27,41 +27,37 @@ export function Respond({
   );
   const [date, setDate] = useState(localToday);
   const [note, setNote] = useState("");
-  const [key] = useState(newId);
   const { act, busy } = useAct(reload);
-  const plan = respondPlan(application.status, choice, date, note);
+  const plan = replyPlan(
+    application.status,
+    choice,
+    date,
+    note,
+    application.outcome,
+  );
   const title = application.job?.title || "this application";
   const company = application.job?.company || "the employer";
   async function save() {
     const outcome = await act(
       () =>
-        plan.call === "update"
-          ? api(`/applications/${application.id}`, "PATCH", {
-              ...plan.body,
-              expected_version: application.version,
-            })
-          : api(`/applications/${application.id}/responses`, "POST", {
-              ...plan.body,
-              idempotency_key: key,
-            }),
-      choice === "no_reply"
-        ? "Closed as no reply."
-        : choice === "rejection"
-          ? "Rejection saved; the application is closed."
-          : "Response saved.",
+        api(`/applications/${application.id}`, "PATCH", {
+          ...plan.body,
+          expected_version: application.version,
+        }),
+      choice === "no_reply" ? "Closed as no reply." : "Reply saved.",
     );
     if (outcome === "ok") onDone();
   }
   return (
     <ResponseForm
-      label={`Record the employer's response for ${title}, ${company}`}
-      question={`What did ${company} answer?`}
+      label={`Record the employer's reply for ${title}, ${company}`}
+      question={`What happened with ${company}?`}
       options={CHOICES}
       choice={choice}
       onChoice={(id) => setChoice(id as Choice)}
       date={date}
       onDate={setDate}
-      dateLabel={choice === "no_reply" ? "Concluded on" : "Date of the answer"}
+      dateLabel={choice === "no_reply" ? "Concluded on" : "Date of the reply"}
       note={note}
       onNote={setNote}
       withNote={plan.note}

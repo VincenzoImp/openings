@@ -3,7 +3,6 @@ export interface ListResult<T> {
   items: T[];
   total: number;
   stage_counts?: Record<string, number>;
-  ready_count?: number;
   facets?: Record<string, string[]>;
   /** On the application list: the no-reply period and how many wait past it. */
   no_reply?: NoReply;
@@ -12,16 +11,16 @@ export interface ListResult<T> {
 export interface NoReply {
   days: number;
   source: "settings" | "default";
-  /** Applied applications sent longer ago than `days`. */
-  due?: number;
+  /** Applied applications without a reply for longer than `days`. */
+  overdue?: number;
 }
-export type ResponseKind = "rejection" | "interview" | "offer" | "other";
-/** An employer's answer to a sent application. */
-export interface EmployerResponse {
+export type ReplyKind = "interview" | "rejection" | "offer" | "other";
+/** An employer's reply to a sent application. */
+export interface Reply {
   id: string;
   application_id: string;
   job_id?: string;
-  kind: ResponseKind;
+  kind: ReplyKind;
   /** The day it arrived, YYYY-MM-DD. */
   date: string;
   note: string;
@@ -37,8 +36,10 @@ export interface Versioned {
   created_at?: string;
   updated_at?: string;
 }
-export type Triage = "inbox" | "saved" | "dismissed";
-export type Stage = "draft" | "applied" | "interview" | "offer" | "closed";
+export type Triage = "new" | "shortlisted" | "dismissed";
+export type Stage =
+  "shortlisted" | "applied" | "interview" | "offer" | "closed";
+export type DocumentKind = "cv" | "letter";
 export interface ApplicationSummary extends Versioned {
   status: Stage;
   outcome: string | null;
@@ -83,9 +84,8 @@ export interface Observation {
 }
 export interface JobCounts {
   all: number;
-  inbox: number;
-  shortlist: number;
-  applications: number;
+  new: number;
+  shortlisted: number;
   dismissed: number;
   dismissed_by: Record<DismissedBy, number>;
 }
@@ -215,7 +215,7 @@ export interface Note {
   pinned?: boolean;
   pinned_at?: string | null;
 }
-export type TimelineKind = "note" | "event" | "response";
+export type TimelineKind = "note" | "event" | "reply";
 /** One entry of a job's or an application's timeline: a note or a recorded change. */
 export interface TimelineItem {
   type: "note" | "event";
@@ -276,16 +276,6 @@ export interface Requirement {
   resolved: boolean;
   note: string;
 }
-export type Readiness =
-  "blocked" | "none" | "missing_pdf" | "unreviewed" | "reviewed" | "ready";
-export const readinessLabels: Record<Readiness, string> = {
-  blocked: "Blocked by a requirement",
-  none: "No documents",
-  missing_pdf: "Missing PDF",
-  unreviewed: "Needs review",
-  reviewed: "Reviewed, not marked ready",
-  ready: "Ready to apply",
-};
 export interface Application extends Versioned {
   job_id: string;
   status: Stage;
@@ -299,17 +289,19 @@ export interface Application extends Versioned {
   priority?: number | null;
   deadline?: string | null;
   requirements?: Requirement[];
-  readiness?: Readiness;
-  ready_at?: string | null;
-  ready_by?: Actor;
+  /** Computed: Shortlisted, every required document complete, no blocking requirement. */
+  ready?: boolean;
+  /** What Ready lacks: "cv", "letter" or "requirement:<id>". */
+  missing?: string[];
+  required_documents?: DocumentKind[];
+  from_shortlist?: boolean;
   open_requirements?: number;
   blocking_requirements?: number;
   documents_count?: number;
   preparation?: {
     kind: string;
     revisions: number;
-    pdf: number;
-    approved: number;
+    complete: number;
   }[];
   stale_inputs?: StaleInput[];
   /** The first changes since the current revisions were written. */
@@ -317,10 +309,10 @@ export interface Application extends Versioned {
   stale_changes_total?: number;
   /** The day an application closed as no_response was concluded. */
   concluded_on?: string | null;
-  responses?: EmployerResponse[];
-  last_response?: {
+  replies?: Reply[];
+  last_reply?: {
     id: string;
-    kind: ResponseKind;
+    kind: ReplyKind;
     date: string;
     count: number;
   } | null;
@@ -447,7 +439,7 @@ export interface TemplateRules extends Json {
 }
 export interface Template extends Versioned {
   name: string;
-  kind: "resume" | "cover_letter";
+  kind: DocumentKind;
   tex: string;
   guidance: string;
   rules: TemplateRules;
@@ -498,8 +490,12 @@ export interface Document extends Versioned {
   title: string;
   /** Structured content of form answers and other kinds; a CV or letter has none. */
   content?: Json;
-  /** Text derived from the revision's .tex source; null without one. */
+  /** Readable text, from the .tex source or else the PDF; null without one. */
   text?: string | null;
+  /** Where the text came from. */
+  text_from?: "tex" | "pdf" | null;
+  /** A CV or letter is complete once its PDF is stored; other kinds always are. */
+  complete?: boolean;
   /** Content a CV or letter stored before 0.22, read-only. */
   legacy_content?: Json | null;
   /** The SHA-256 of the revision's source, which its PDF names. */
@@ -508,7 +504,6 @@ export interface Document extends Versioned {
   claim_ids?: string[];
   knowledge_ids?: string[];
   previous_id?: string;
-  review_state: string;
   revision_number?: number;
   files?: WorkspaceFile[];
   file_count?: number;
@@ -642,7 +637,7 @@ export interface Insights {
     share: number | null;
   }[];
   groups: Record<InsightDimension, InsightGroup[]>;
-  excluded: { preparing: number; closed_unsent: number };
+  excluded: { shortlisted: number; closed_unsent: number };
   no_reply: NoReply;
 }
 export interface FunnelStep {
@@ -655,9 +650,9 @@ export interface Overview {
   interviews: number;
   offers: number;
   active: number;
-  drafts: number;
+  shortlisted: number;
   ready?: number;
-  inbox: number;
+  new: number;
   incomplete: number;
   funnel: FunnelStep[];
   activity: Activity[];
@@ -837,11 +832,7 @@ export async function uploadFile(
   ownerId: string,
   sourceSha256?: string | null,
 ): Promise<WorkspaceFile> {
-  const ticket = await api<{
-    url: string;
-    headers?: Record<string, string>;
-    method?: string;
-  }>("/files/uploads", "POST", {
+  const ticket = await api<UploadGrant>("/files/uploads", "POST", {
     owner_type: ownerType,
     owner_id: ownerId,
     name: file.name,
@@ -850,6 +841,32 @@ export async function uploadFile(
     media_type: mediaTypeOf(file),
     ...(sourceSha256 ? { source_sha256: sourceSha256 } : {}),
   });
+  return sendUpload(ticket, file);
+}
+/** A one-shot upload grant: PUT the exact bytes to its url with its headers. */
+export interface UploadGrant {
+  url: string;
+  headers?: Record<string, string>;
+  method?: string;
+}
+/** What a create of a CV or letter revision returns beside the revision. */
+export interface DocumentWithUploads extends Document {
+  uploads?: { pdf: UploadGrant | null; source: UploadGrant | null };
+}
+/** The name, size and hash of a file a create declares for its grant. */
+export async function fileSpec(file: File) {
+  const digest = await sha256(file);
+  return {
+    name: file.name,
+    size: file.size,
+    ...(digest ? { sha256: digest } : {}),
+  };
+}
+/** Send one file's bytes with a grant. */
+export async function sendUpload(
+  ticket: UploadGrant,
+  file: File,
+): Promise<WorkspaceFile> {
   const response = await fetch(ticket.url, {
     method: ticket.method || "PUT",
     headers: ticket.headers,

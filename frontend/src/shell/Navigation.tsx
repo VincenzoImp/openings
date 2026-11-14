@@ -6,7 +6,7 @@ import { preloadScreen } from "./Screens";
 
 export interface NavCounts {
   ready: number;
-  inbox: number;
+  new: number;
 }
 interface NavProps {
   route: string;
@@ -26,13 +26,13 @@ function NavCount({ item, counts }: { item: Destination; counts: NavCounts }) {
       />
     );
   // The review queue informs; it does not ask the owner to act.
-  if (item.count === "inbox")
+  if (item.count === "new")
     return (
       <Count
-        value={counts.inbox}
+        value={counts.new}
         quiet
         className="navcount"
-        label={plural(counts.inbox, "job", "jobs") + " to review"}
+        label={plural(counts.new, "new job", "new jobs")}
       />
     );
   return null;

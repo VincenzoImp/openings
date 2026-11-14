@@ -31,8 +31,6 @@ QUERIES = [
         "SELECT * FROM events WHERE subject_type=? AND subject_id=? ORDER BY created_at DESC",
         "events",
     ),
-    # The ready queue (schema 8).
-    ("SELECT id FROM applications app WHERE app.ready_at IS NOT NULL", "app"),
 ]
 
 

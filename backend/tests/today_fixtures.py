@@ -16,6 +16,13 @@ from openings.common import new_id
 POSTING = "Build reliable data services.\n\nResponsibilities\nDesign pipelines with a small team."
 
 
+def dated(value):
+    """A day as ISO text, also inside a reply."""
+    if isinstance(value, dict):
+        return {key: dated(item) for key, item in value.items()}
+    return value.isoformat() if hasattr(value, "isoformat") else value
+
+
 def ago(**delta):
     return (datetime.now(UTC) - timedelta(**delta)).isoformat(timespec="microseconds")
 
@@ -34,7 +41,8 @@ def seed_today(app, client, before_agent):
         return workspace.create_application({"job_id": job["id"], **fields})
 
     def make_ready(application):
-        for kind, title in (("resume", "CV"), ("cover_letter", "Letter")):
+        """A CV and a letter, each with its source and PDF: the application is Ready."""
+        for kind, title in (("cv", "CV"), ("letter", "Letter")):
             source_revision(
                 documents,
                 client.put,
@@ -42,10 +50,7 @@ def seed_today(app, client, before_agent):
                 kind,
                 "Synthetic.",
                 title=title,
-                approve=True,
             )
-        current = workspace.get_application(application["id"])
-        workspace.set_ready(application["id"], {"expected_version": current["version"]})
 
     def shift(batch_id, started, minutes=0):
         """Move the changes of one batch into the past."""
@@ -86,8 +91,8 @@ def seed_today(app, client, before_agent):
             },
         )
 
-    # What employers answered: an interview, a rejection, an application closed as
-    # no reply and a Draft closed without being sent (left out of Insights).
+    # What employers replied: an interview, a rejection, an application closed as
+    # no reply and one closed without being sent (left out of Insights).
     with acting_as(OWNER):
         for title, company, location, sent, moves in (
             (
@@ -95,7 +100,7 @@ def seed_today(app, client, before_agent):
                 "Alpine Research",
                 "Lausanne, Switzerland",
                 24,
-                [{"status": "interview", "response_date": (today - timedelta(days=16))}],
+                [{"reply": {"kind": "interview", "date": (today - timedelta(days=16))}}],
             ),
             (
                 "Engineering Lead",
@@ -104,10 +109,11 @@ def seed_today(app, client, before_agent):
                 23,
                 [
                     {
-                        "status": "closed",
-                        "outcome": "rejected",
-                        "response_date": (today - timedelta(days=11)),
-                        "response_note": "Position filled internally.",
+                        "reply": {
+                            "kind": "rejection",
+                            "date": (today - timedelta(days=11)),
+                            "note": "Position filled internally.",
+                        }
                     }
                 ],
             ),
@@ -147,10 +153,7 @@ def seed_today(app, client, before_agent):
                     application["id"],
                     {
                         "expected_version": application["version"],
-                        **{
-                            key: value.isoformat() if hasattr(value, "isoformat") else value
-                            for key, value in move.items()
-                        },
+                        **{key: dated(value) for key, value in move.items()},
                     },
                 )
 
@@ -179,8 +182,12 @@ def seed_today(app, client, before_agent):
         notes_batch = last_batch()
     with acting_as(agent), batch():
         # One review: two shortlisted, one dismissed with a reason.
-        workspace.set_triage(inbox[0]["id"], "saved", workspace.get_job(inbox[0]["id"])["version"])
-        workspace.set_triage(inbox[1]["id"], "saved", workspace.get_job(inbox[1]["id"])["version"])
+        workspace.set_triage(
+            inbox[0]["id"], "shortlisted", workspace.get_job(inbox[0]["id"])["version"]
+        )
+        workspace.set_triage(
+            inbox[1]["id"], "shortlisted", workspace.get_job(inbox[1]["id"])["version"]
+        )
         workspace.set_triage(
             inbox[2]["id"], "dismissed", inbox[2]["version"], reason="Support role, not data."
         )

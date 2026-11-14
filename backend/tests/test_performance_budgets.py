@@ -9,7 +9,7 @@ The budgets were set from the median on an Apple M-series laptop, times three
 for a shared CI runner, times two again for noise, rounded up; a route that
 outgrows its budget has become several times slower, not a little noisier.
 Measured on the laptop (2026-11): applications 24 ms, Today's reads 38 ms in
-all, inbox 12 ms (29 ms with counts or facets), text search 106 ms, overview
+all, new 12 ms (29 ms with counts or facets), text search 106 ms, overview
 19 ms, staleness 6 ms, insights 8 ms, source yield 90 ms; the three reads of a busy
 timeline (1,500 entries) 13 ms.
 
@@ -36,9 +36,9 @@ JOBS, APPLICATIONS, SOURCES, CONTEXTS = 25_000, 500, 20, 60
 TODAY = (
     "/api/v1/overview",
     "/api/v1/applications?limit=1",
-    "/api/v1/applications?readiness=ready&sort=deadline&limit=5",
-    "/api/v1/applications?readiness=blocked&status=draft&sort=deadline&limit=3",
-    "/api/v1/applications?no_reply_due=true&limit=1",
+    "/api/v1/applications?stage=ready&sort=deadline&limit=5",
+    "/api/v1/applications?needs=documents&sort=deadline&limit=3",
+    "/api/v1/applications?needs=reply_overdue&limit=1",
     "/api/v1/questions?state=open&limit=3",
     "/api/v1/runs?limit=1",
     "/api/v1/collection/runs?limit=100",
@@ -46,9 +46,9 @@ TODAY = (
 BUDGETS_MS = {
     "applications": (("/api/v1/applications?limit=200",), 200),
     "today": (TODAY, 300),
-    "jobs inbox": (("/api/v1/jobs?queue=inbox&limit=200",), 100),
-    "jobs inbox counts": (("/api/v1/jobs?queue=inbox&limit=200&include_counts=true",), 200),
-    "jobs inbox facets": (("/api/v1/jobs?queue=inbox&limit=200&include_facets=true",), 200),
+    "jobs new": (("/api/v1/jobs?triage=new&limit=200",), 100),
+    "jobs new counts": (("/api/v1/jobs?triage=new&limit=200&include_counts=true",), 200),
+    "jobs new facets": (("/api/v1/jobs?triage=new&limit=200&include_facets=true",), 200),
     "jobs search": (("/api/v1/jobs?q=engineer&limit=200",), 700),
     "overview": (("/api/v1/overview",), 150),
     "staleness": (("/api/v1/staleness?status=all&stale_only=false",), 100),
@@ -85,7 +85,7 @@ def client(tmp_path_factory):
         TemplateCreate(name="Synthetic CV", tex="Synthetic TeX", is_default=True)
     )
     drafts = workspace.db.all(
-        "SELECT id FROM applications WHERE status='draft' ORDER BY id LIMIT ?", (CONTEXTS,)
+        "SELECT id FROM applications WHERE status='shortlisted' ORDER BY id LIMIT ?", (CONTEXTS,)
     )
     for row in drafts:
         app.state.documents.prepare_context(ContextCreate(application_id=row["id"]))

@@ -3,7 +3,7 @@
 A small directory from which your AI agent runs your Openings job search. Copy
 it, point it at your server, start your agent here, and let it work: it reads
 the skills from your Openings server, onboards your career and keeps the search
-going. You answer its questions in the chat, apply to the Drafts it prepares, and mark them
+going. You answer its questions in the chat, apply to the applications it makes Ready, and mark them
 Applied or close them. See [Agent-operated job search](../../docs/user/agent-operated.md).
 
 ## Set up
@@ -39,7 +39,7 @@ Ask the agent to set up your workspace. It follows the `setup-openings` skill:
 it imports your CV or LinkedIn export into the Career record, asks about your
 target roles, locations and constraints, writes your Profile, records your
 Preferences in your words, builds your CV and letter templates, adds searches and companies to
-follow, and prepares a first Draft so you can see the result.
+follow, and prepares a first application so you can see the result.
 
 Afterwards, ask in plain language: "what should I apply to today?", "I have an
 interview at X", "add these companies". You can narrow the agent's mandate by

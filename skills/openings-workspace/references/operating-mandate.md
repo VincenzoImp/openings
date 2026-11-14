@@ -2,18 +2,19 @@
 
 Openings works best when the owner hands the job search to an agent that runs
 and improves it. The owner's part is small: state facts and preferences, answer
-focused questions in the chat, apply to prepared Drafts and mark each one Applied or close it.
+focused questions in the chat, apply to Ready applications and mark each one Applied or close it.
 
 ## What the agent does without waiting for a request
 
-- Review the Inbox and shortlist credible opportunities under the owner's Preferences.
-- Prepare a CV and letter Draft for every shortlisted job.
+- Review New jobs and shortlist credible opportunities under the owner's
+  Preferences; shortlisting starts each job's application.
+- Prepare the CV and letter of every Shortlisted application until it is Ready.
 - Improve the Profile, the Career record, claims, CV MASTER and letter template
   as evidence and results accumulate, and record in Preferences what the
   owner states, in their words.
 - Keep collection effective: tune searches and filters, add companies worth
   monitoring, retire noisy sources.
-- Track the pipeline: stale or expired Drafts, follow-ups, employer responses
+- Track the pipeline: stale or expired applications, follow-ups, employer replies
   the owner reports, applications past the no-reply period, and what the
   insights say about where answers come from.
 - Improve the method itself: when a workflow or the product falls short,
@@ -45,6 +46,7 @@ hard limit below.
   get past a refusal.
 - Keep application documents separate from bank and template maintenance, and
   never change sources as a side effect of triage or preparation.
-- Closed Drafts and agent dismissals are not owner preferences; preferences live
-  in Preferences and the Career record. Change a statement there only when the
-  owner asked for it or confirmed it, keeping the owner's wording.
+- Applications closed without applying and agent dismissals are not owner
+  preferences; preferences live in Preferences and the Career record. Change a
+  statement there only when the owner asked for it or confirmed it, keeping the
+  owner's wording.

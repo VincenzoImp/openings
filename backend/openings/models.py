@@ -75,8 +75,13 @@ def dismiss_reason():
     )
 
 
+Triage = Literal["new", "shortlisted", "dismissed"]
+
+
 class TriageInput(Versioned):
-    triage: Literal["inbox", "saved", "dismissed"]
+    triage: Triage = Field(
+        description="new (to review), shortlisted (starts an application in stage Shortlisted when the job has no open one) or dismissed. Moving a shortlisted job back to new or dismissed removes the application its shortlist started while it is still empty; otherwise 409 application_has_work."
+    )
     reason: str | None = dismiss_reason()
 
 
@@ -194,8 +199,22 @@ Outcome = Literal["accepted", "rejected", "not_pursued", "no_response"]
 OUTCOMES = ("accepted", "rejected", "not_pursued", "no_response")
 
 
+DocumentKindRequired = Literal["cv", "letter"]
+Stage = Literal["shortlisted", "applied", "interview", "offer", "closed"]
+ReplyKind = Literal["interview", "rejection", "offer", "other"]
+
+
+def required_documents_field(default):
+    return Field(
+        default=default,
+        max_length=2,
+        description="The documents Ready needs: a subset of cv and letter (both by default). Form answers never affect Ready.",
+    )
+
+
 class ApplicationInput(Input):
     job_id: str
+    required_documents: list[DocumentKindRequired] = required_documents_field(["cv", "letter"])
     questions: list[Question] = Field(default_factory=list, max_length=100)
     priority: Priority | None = None
     deadline: str | None = Field(default=None, description="Closing date as YYYY-MM-DD.")
@@ -208,8 +227,44 @@ class ApplicationInput(Input):
         return valid_deadline(value)
 
 
+class ReplyChange(Input):
+    """An employer reply to record, correct or remove."""
+
+    id: str | None = Field(
+        default=None,
+        max_length=100,
+        description="The reply to correct or remove; omit to record a new reply.",
+    )
+    kind: ReplyKind | None = Field(
+        default=None,
+        description="interview (an invitation), rejection, offer or other (any other answer). Required for a new reply.",
+    )
+    date: str | None = Field(
+        default=None,
+        description="The day it arrived (YYYY-MM-DD, not in the future); today (UTC) for a new reply when omitted.",
+    )
+    note: str | None = Field(default=None, max_length=2000)
+    remove: bool = Field(default=False, description="With id: delete a reply recorded by mistake.")
+
+    @field_validator("date")
+    @classmethod
+    def valid_day(cls, value):
+        return past_day(value)
+
+    @model_validator(mode="after")
+    def valid_change(self):
+        if self.remove and (self.id is None or self.model_fields_set & {"kind", "date", "note"}):
+            raise ValueError("remove takes the id of the reply only.")
+        if self.id is None and self.kind is None:
+            raise ValueError("A new reply needs its kind.")
+        return self
+
+
 class ApplicationPatch(Versioned):
-    status: Literal["draft", "applied", "interview", "offer", "closed"] | None = None
+    status: Stage | None = Field(
+        default=None,
+        description="applied is Mark applied (applied_at defaults to now); shortlisted again undoes it while the application has no reply, clearing applied_at. Record an employer reply with reply, which sets the stage itself.",
+    )
     outcome: Outcome | None = Field(
         default=None,
         description="Required to close: accepted, rejected (by the employer), not_pursued (stopped by the owner) or no_response (no answer within the no-reply period; only for a sent application).",
@@ -217,6 +272,7 @@ class ApplicationPatch(Versioned):
     questions: list[Question] | None = Field(default=None, max_length=100)
     answers: dict[str, Any] | None = None
     applied_at: str | None = None
+    required_documents: list[DocumentKindRequired] | None = required_documents_field(None)
     priority: Priority | None = None
     deadline: str | None = Field(
         default=None, description="Closing date as YYYY-MM-DD; null clears it."
@@ -230,14 +286,9 @@ class ApplicationPatch(Versioned):
         default=None,
         description="With outcome no_response: the day it was concluded that no reply will come (YYYY-MM-DD, not in the future); today (UTC) when omitted.",
     )
-    response_date: str | None = Field(
+    reply: ReplyChange | None = Field(
         default=None,
-        description="The day the employer responded (YYYY-MM-DD, not in the future), for a change that records an employer response: moving to Interview or Offer, or closing as rejected or accepted. Today (UTC) when omitted.",
-    )
-    response_note: str | None = Field(
-        default=None,
-        max_length=2000,
-        description="A note on the employer response this change records.",
+        description="Record an employer reply (kind, date, note) and move the stage with it in the same change: interview moves an Applied application to Interview, offer moves it to Offer, rejection closes it as rejected; other never moves the stage. A Closed application without a reply (no_response) is reopened the same way. With id: correct a reply's kind, date or note, or remove it (remove=true); a correction never moves the stage.",
     )
 
     @field_validator("applied_at")
@@ -245,7 +296,7 @@ class ApplicationPatch(Versioned):
     def valid_applied_date(cls, value):
         return normalized_date(value)
 
-    @field_validator("concluded_on", "response_date")
+    @field_validator("concluded_on")
     @classmethod
     def valid_past_day(cls, value):
         return past_day(value)
@@ -257,24 +308,24 @@ class ApplicationPatch(Versioned):
 
     @model_validator(mode="after")
     def reject_null_fields(self):
-        for key in self.model_fields_set & {"status", "questions", "answers", "requirements"}:
+        for key in self.model_fields_set & {
+            "status",
+            "questions",
+            "answers",
+            "requirements",
+            "required_documents",
+            "reply",
+        }:
             if getattr(self, key) is None:
                 raise ValueError(f"{key} cannot be null; omit it to keep the existing value.")
         return self
-
-
-class ApplicationReady(Versioned):
-    ready: bool = Field(
-        default=True,
-        description="True marks the application ready to apply; false clears the mark.",
-    )
 
 
 class NotePatch(Versioned):
     body: str = Field(min_length=1, max_length=30_000)
 
 
-TimelineKind = Literal["note", "event", "response"]
+TimelineKind = Literal["note", "event", "reply"]
 TimelineWho = Literal["owner", "agent", "system", "unknown"]
 
 
@@ -282,7 +333,7 @@ class TimelineQuery(Input):
     kinds: list[TimelineKind] | None = Field(
         default=None,
         max_length=3,
-        description="Only these kinds of entry: note, event (a recorded change) and response (an employer response recorded, corrected or removed). Every kind when omitted.",
+        description="Only these kinds of entry: note, event (a recorded change) and reply (an employer reply recorded, corrected or removed). Every kind when omitted.",
     )
     who: list[TimelineWho] | None = Field(
         default=None,
@@ -311,7 +362,7 @@ class BulkItem(Versioned):
 
 
 class JobBulk(Input):
-    action: Literal["saved", "dismissed", "inbox", "forget"]
+    action: Literal["shortlisted", "dismissed", "new", "forget"]
     items: list[BulkItem] = Field(min_length=1, max_length=200)
     reason: str | None = dismiss_reason()
 
@@ -329,10 +380,10 @@ def unique_items(items, label):
 
 
 class ApplicationBulk(Input):
-    action: Literal["close", "reopen", "delete", "mark_ready", "unmark_ready"]
+    action: Literal["close", "reopen", "delete"]
     items: list[BulkItem] = Field(min_length=1, max_length=200)
     outcome: Outcome | None = None
-    status: Literal["draft", "applied", "interview", "offer"] | None = None
+    status: Literal["shortlisted", "applied", "interview", "offer"] | None = None
 
     @model_validator(mode="after")
     def valid_options(self):
@@ -361,7 +412,7 @@ class JobResolve(Input):
 
 
 class DuplicateQuery(Input):
-    queue: Literal["inbox", "shortlist", "applications", "dismissed"] | None = None
+    triage: Triage | None = None
     job_id: str | None = Field(default=None, max_length=100)
     match_location: bool = False
     min_confidence: float = Field(
@@ -391,8 +442,10 @@ def normalized_date(value, *, end=False):
 
 class JobQuery(Input):
     q: str = Field(default="", max_length=1000)
-    triage: Literal["inbox", "saved", "dismissed", "active"] | None = None
-    queue: Literal["inbox", "shortlist", "applications", "dismissed"] | None = None
+    triage: Literal["new", "shortlisted", "dismissed", "active"] | None = Field(
+        default=None,
+        description="new (to review), shortlisted (each has an application), dismissed, or active (not dismissed).",
+    )
     company: str | None = Field(default=None, max_length=300)
     location: str | None = Field(default=None, max_length=500)
     source: str | None = Field(default=None, max_length=300)
@@ -451,7 +504,7 @@ class JobQuery(Input):
     )
     include_counts: bool = Field(
         default=False,
-        description="Also return counts: jobs in each queue (inbox, shortlist, applications, dismissed, all) and dismissed jobs by who dismissed them, for the same search, company, location, source, date and signal filters.",
+        description="Also return counts: jobs by triage (new, shortlisted, dismissed, all) and dismissed jobs by who dismissed them, for the same search, company, location, source, date and signal filters.",
     )
 
     @field_validator("created_since", "created_until", "since")
@@ -469,35 +522,24 @@ class JobQuery(Input):
 class ApplicationQuery(Input):
     q: str = Field(default="", max_length=1000)
     job_id: str | None = None
-    status: Literal["draft", "applied", "interview", "offer", "closed"] | None = None
+    stage: Literal["shortlisted", "ready", "applied", "interview", "offer", "closed"] | None = (
+        Field(
+            default=None,
+            description="Only applications in this stage; ready is the Shortlisted ones that are Ready (every required document complete, no open blocking requirement).",
+        )
+    )
+    needs: Literal["documents", "reply_overdue"] | None = Field(
+        default=None,
+        description="documents: Shortlisted applications missing a required document; reply_overdue: Applied applications without a reply for longer than the no-reply period, to close as no_response by hand.",
+    )
     outcome: Outcome | None = None
     company: str | None = Field(default=None, max_length=300)
-    ready: bool | None = Field(
-        default=None,
-        description="true: only applications marked ready (the stored step); false: only those not marked.",
-    )
-    no_reply_due: bool | None = Field(
-        default=None,
-        description="true: only Applied applications sent longer ago than the no-reply period (settings no_reply_days, 30 by default), the ones to close as no_response; false: every other application.",
-    )
-    readiness: (
-        Literal["blocked", "none", "missing_pdf", "unreviewed", "reviewed", "ready"] | None
-    ) = Field(
-        default=None,
-        description="ready is the stored step (marked ready and still passing every check); reviewed passes every check but is not marked; the other values are derived from current revision leaves and unresolved blocking requirements.",
-    )
-    ready_since: str | None = Field(
-        default=None, description="Only applications marked ready at or after this time."
-    )
-    ready_until: str | None = Field(
-        default=None, description="Only applications marked ready at or before this time."
-    )
     applied_since: str | None = Field(
         default=None, description="Only applications recorded as applied at or after this time."
     )
     applied_until: str | None = Field(
         default=None,
-        description="Only applications recorded as applied at or before this time; with status=applied, the ones still waiting for a reply.",
+        description="Only applications recorded as applied at or before this time; with stage=applied, the ones still waiting for a reply.",
     )
     sort: Literal[
         "updated",
@@ -508,12 +550,11 @@ class ApplicationQuery(Input):
         "applied",
         "deadline",
         "priority",
-        "ready",
     ] = "updated"
     limit: int = Field(default=100, ge=1, le=200)
     offset: int = Field(default=0, ge=0)
 
-    @field_validator("ready_since", "ready_until", "applied_since", "applied_until")
+    @field_validator("applied_since", "applied_until")
     @classmethod
     def valid_date(cls, value, info):
         return normalized_date(value, end=info.field_name.endswith("_until"))

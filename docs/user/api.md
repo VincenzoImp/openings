@@ -17,7 +17,7 @@ sign in again); API/MCP tokens stay valid.
 ```bash
 export OPENINGS_URL=http://127.0.0.1:8080
 # Set OPENINGS_TOKEN to the token shown once in Settings.
-curl --fail "$OPENINGS_URL/api/v1/jobs?queue=inbox&limit=50" \
+curl --fail "$OPENINGS_URL/api/v1/jobs?triage=new&limit=50" \
   -H "Authorization: Bearer $OPENINGS_TOKEN"
 
 curl --fail "$OPENINGS_URL/api/v1/jobs" \
@@ -36,21 +36,20 @@ Paste the posting when extraction cannot obtain the complete text.
 | Archive | `GET/POST /jobs`, `GET /jobs/resolve`, `GET /jobs/duplicates`, `POST /jobs/bulk`, `GET/PATCH/DELETE /jobs/{id}`, `POST /jobs/{id}/triage`, `/merge`, `/distinct`, `GET/POST /jobs/{id}/notes` |
 | Notes and timelines | `GET/PATCH/DELETE /notes/{id}`, `POST /notes/{id}/pin` plus job-owned list/create routes; `GET /jobs/{id}/timeline`, `GET /applications/{id}/timeline` |
 | Applications | `GET/POST /applications`, `POST /applications/bulk`, `GET/PATCH/DELETE /applications/{id}`, `GET /applications/{id}/events`, `GET /applications/{id}/staleness`, `GET /staleness` |
-| Employer responses | `GET/POST /applications/{id}/responses`, `PATCH/DELETE /responses/{id}`; `GET /insights` |
+| Employer replies | `PATCH /applications/{id}` with `reply`; `GET /insights` |
 | Career | `GET/PATCH /career/profile`, CRUD `/career/knowledge` and `/career/claims`, `POST /career/import/preview` then `/career/import` |
 | Preferences | `GET /preferences`, `PUT /preferences/{section}`, `PATCH /settings` |
 | Templates | CRUD `/templates` |
 | Collection | `GET/PATCH /collection`, `GET /providers`, `PATCH /providers/{id}`, CRUD `/sources`, `/sources/schemas`, preview/run, `/sources/bulk`, `/collection/runs` and `GET /collection/yield` |
 | Tasks | `GET /tasks`, `GET /tasks/{id}`, `POST /tasks/{id}/cancel` or `/retry` |
-| Documents | `GET/POST /contexts`, `GET /contexts/{id}`, `GET/POST /documents`, `GET/DELETE /documents/{id}`, `GET /documents/{id}/comparison`, `POST /documents/{id}/review` |
+| Documents | `GET/POST /contexts`, `GET /contexts/{id}`, `GET/POST /documents`, `GET/DELETE /documents/{id}`, `GET /documents/{id}/comparison` |
 | Files | `GET /files`, `GET/DELETE /files/{id}`, `GET /files/{id}/content`, `POST /files/uploads`, `POST /files/{id}/download` |
 | Change log | `GET /events` |
 | Skills | `GET /skills`, `GET /skills/{name}`, `GET /skills/{name}/files/{path}` |
 | Operations | `GET /workspace`, `/capabilities`, `/overview`, `/export`, `/backup`; `POST /backup/restore`; `/tokens`; `POST /auth/password` |
 
 Paged list routes take bounded `limit` and `offset` and return `items`, `total`,
-`limit` and `offset`. `GET /jobs/{id}/notes`, `/applications/{id}/responses`,
-`/providers`, `/skills` and `/tokens` are bounded by one job, one application or
+`limit` and `offset`. `GET /jobs/{id}/notes`, `/providers`, `/skills` and `/tokens` are bounded by one job, one application or
 the installation and return every item with `total`. Job rows include `application_count` and a compact `application`
 summary with `id`, `status`, `outcome` and `version`: the open attempt, otherwise
 the latest closed attempt, or null. Read detail records for full postings,
@@ -65,7 +64,7 @@ Lists return summaries by default and take `summary=false` for full records:
 | `GET /career/knowledge` | Entry fields, bounded `narrative_preview` and `claim_preview`, claim and file counts | `narrative` and `metadata` |
 | `GET /career/claims` | Claim fields, the typed selection fields, a bounded `text_preview` and the entry's title and organization | Full `text` and `metadata` |
 | `GET /templates` | Name, kind, default flag, version and `file_count` | `tex`, `guidance` and `rules` |
-| `GET /documents` | Revision metadata, `revision_number`, `file_count` | Derived `text`, form `content`, evidence ids and `files` |
+| `GET /documents` | Revision metadata, `revision_number`, `file_count`, `complete` | Readable `text` and `text_from`, form `content`, evidence ids and `files` |
 | `GET /sources` | Source settings, outcome/counts, `last_diagnostic_count`, compact `last_run` | `last_diagnostics`, full `last_run` with `source_snapshot` and task payloads/results |
 | `GET /collection/runs` | Run state, counts, timing, compact `tasks` (`id`, `kind`, `provider`, `state`, `attempts`, `error`, `next_run_at`, `updated_at`) | `source_snapshot` and full task payloads/results |
 
@@ -88,10 +87,9 @@ Job mutations return the compact job summary used by list rows (with
 embeds the same compact `job`. The new `version`, `triage` and `application`
 fields stay present; read `GET /jobs/{id}` for the full posting.
 Application list/detail records include `preparation`: per-kind counts of current
-revision leaves (`revisions`), leaves with their own PDF (`pdf`) and leaves with
-an approved PDF (`approved`). A new revision inherits neither files nor approval.
-These counts do not certify content quality, required document completeness or
-submission. `stale_inputs` lists the input kinds (`profile`, `preferences`,
+revision leaves (`revisions`) and of complete ones, their PDF stored
+(`complete`). A new revision inherits no files. These counts do not certify
+content quality or submission. `stale_inputs` lists the input kinds (`profile`, `preferences`,
 `template`, `knowledge`, `claim`) that changed after the contexts
 of the current leaves were frozen; it is empty when they are current.
 `stale_changes` holds the first three changes of the staleness report and
@@ -99,20 +97,25 @@ of the current leaves were frozen; it is empty when they are current.
 A version conflict returns HTTP 409 with the stored version, for example
 `{"error":{"code":"conflict","message":"…","details":{"current_version":4}}}`;
 reload before editing again. This includes settings records (profile,
-Preferences sections, settings, collection switch), document review and per-item errors from
+Preferences sections, settings, collection switch) and per-item errors from
 `/jobs/bulk` and `/sources/bulk`. MCP tool errors carry the same `code`, `status`,
 `message` and `details` as a JSON `{"error":{…}}` text result, including field
 lists for `validation` errors.
 
-For Shortlist use `{"expected_version":3,"triage":"saved"}`; `inbox` returns a
-job without attempts to review and `dismissed` remembers it outside active review.
+To shortlist use `{"expected_version":3,"triage":"shortlisted"}`: it starts the
+job's application in stage Shortlisted when it has no open one. `new` returns a
+job to review and `dismissed` remembers it outside active review. Leaving
+`shortlisted` deletes the application its shortlist started while it is still
+empty; otherwise it is refused with 409 `application_has_work`, whose
+`details.work` names what exists (for example `documents`, `notes`, `replies`).
+Closing an application never changes the job's triage.
 A dismissal takes an optional `reason` (at most 500 characters), as does the
 `dismissed` action of `POST /jobs/bulk`. Every job read carries `dismissal`
 (null unless dismissed): `at`, `by` (the actor label, or null), `category`
 (`agent`, `owner` or `system`) and `reason`. Restoring a job clears it.
 `GET /jobs` filters dismissed jobs with `dismissed_by` (`owner`, `agent`,
 `system` or `agent:<token name>`), `batch_id` and `since` (dismissed at or after
-a time); `POST /jobs/bulk` with action `inbox` restores a selection. Nothing dismisses a job
+a time); `POST /jobs/bulk` with action `new` restores a selection. Nothing dismisses a job
 automatically.
 
 ### Ingest signals
@@ -148,8 +151,8 @@ required languages are outside the `spoken_languages` setting (a job is left
 out when one required group has no spoken language); with `true` or `false`
 the response adds `unspoken_required`: `spoken_languages`, the `count` of such
 jobs under the other filters and whether they are `hidden`. `include_counts=true` adds
-`counts`: jobs in each queue (`inbox`, `shortlist`, `applications`,
-`dismissed`, `all`) and `dismissed_by`, for the same filters.
+`counts`: jobs of each triage (`all`, `new`, `shortlisted`, `dismissed`) and
+`dismissed_by`, for the same filters.
 
 Whether a company board still lists a posting is `signals.no_longer_listed`.
 
@@ -163,87 +166,87 @@ in `total`: `collected`, `to_review`, `shortlisted`, `applied`, `responded`,
 by the time it was added; jobs added by hand or by a removed source have a row
 with `source_id: null`.
 
-Creating an application retains saved interest and starts Preparing (`draft`).
-Use `queue=inbox` / `shortlist` for jobs without any application attempts;
-`queue=applications` includes all jobs with attempts, even Closed or dismissed.
-Omitting `queue` searches the full archive. `triage=saved` remains an inclusive
-interest filter. Queue predicates apply before totals, facets and pagination.
+`POST /applications` starts an application in stage Shortlisted and shortlists
+its job; shortlisting the job starts one too. Application stages are
+`shortlisted`, `applied`, `interview`, `offer` and `closed`. `GET /jobs?triage=`
+takes `new`, `shortlisted`, `dismissed` or `active` (not dismissed); omitting it
+searches the full archive. Filters apply before totals, facets and pagination.
 Each job permits one
 non-Closed attempt. A conflicting creation or reopening returns 409
 `application_in_progress` with the active `application_id`; use that attempt or
 close it before starting another. Use `idempotency_key` for retries of one creation.
 `GET /applications?job_id=JOB_ID` lists the exact job's attempts with pagination.
-`readiness=none|missing_pdf|unreviewed|blocked|reviewed|ready` filters by the
-preparation state, and `sort=deadline` or `sort=priority` lists planned attempts
-first. Rows include `priority`, `deadline`, `readiness`, `ready_at`, `ready_by`,
-`open_requirements` and `blocking_requirements`; the full `requirements` list is
-on the single read.
 
-`ready` is a stored step: `POST /applications/{id}/ready` with
-`{"expected_version":4}` marks a Preparing application ready and
-`{"expected_version":5,"ready":false}` clears the mark. Marking is refused with
-409 `application_not_ready` while a check fails; `details.check` names it
-(`stage`, `blocked`, `none`, `missing_pdf` or `unreviewed`). `reviewed` means
-that every check passes and nobody marked the application. The mark is cleared
-automatically, with an `application_ready_cleared` event and its `reason`, by a
-new revision or context, a deleted revision, a file added to a current revision,
-an unresolved blocking requirement or leaving Preparing. `readiness=ready`,
-`sort=ready` (longest waiting first), `ready_since` and `ready_until` read the
-queue; the list also returns `ready_count`, and the overview `ready`.
+Ready is computed, never stored: an application is `ready` when it is
+Shortlisted, every kind in its `required_documents` (`cv`, `letter`; both by
+default, set at creation and editable with `PATCH`) has a current complete
+revision, and no blocking requirement is unresolved. Reads and rows return
+`ready` and `missing` (for example `["letter", "requirement:REQ_ID"]`).
+`stage=shortlisted|ready|applied|interview|offer|closed` filters by stage
+(`ready` is the Shortlisted ones that are Ready), and `needs=documents` lists
+the Shortlisted ones missing a required document. `stage_counts` include
+`ready`, and the overview returns `ready`. `sort=deadline` or `sort=priority`
+lists planned attempts first. Rows include `priority`, `deadline`,
+`open_requirements` and `blocking_requirements`; the full `requirements` list
+is on the single read.
 `applied_since` and `applied_until` filter by the time an application was
-recorded as applied: `status=applied&applied_until=2026-10-12` lists the ones
-still waiting for a reply since that day. `no_reply_due=true` lists the Applied
-applications sent longer ago than the no-reply period, and `ready=false` the
-Preparing ones not marked ready. Every list returns `no_reply`: the period in
-`days`, its `source` (`settings`, the `no_reply_days` setting, or `default`,
-30 days) and how many applications are `due`. Each row has its `last_response`
-(`kind`, `date`, `count`) and `concluded_on`.
-Create and `PATCH` accept `priority` (1 highest to 5), `deadline` (`YYYY-MM-DD`)
-and `requirements`, a list of `{id, kind, text, blocking, resolved, note}`.
+recorded as applied: `stage=applied&applied_until=2026-10-12` lists the ones
+still waiting for a reply since that day. `needs=reply_overdue` lists the
+Applied applications without a reply sent longer ago than the no-reply period.
+Every list returns `no_reply`: the period in `days`, its `source` (`settings`,
+the `no_reply_days` setting, or `default`, 30 days) and how many applications
+are `due`. Each row has its `last_reply` (`id`, `kind`, `date`, `count`) and
+`concluded_on`.
+Create and `PATCH` accept `required_documents`, `priority` (1 highest to 5),
+`deadline` (`YYYY-MM-DD`) and `requirements`, a list of
+`{id, kind, text, blocking, resolved, note}`.
 A requirements patch replaces the whole list; keep existing `id` values. `null`
 clears `priority` or `deadline`.
 
 Application changes use `PATCH /applications/{id}` and its `expected_version`.
+Mark applied is `{"status": "applied"}`: `applied_at` defaults to now and stays
+editable. It is the owner's act; an agent records it only when the owner says
+the application was sent. `{"status": "shortlisted"}` undoes it while the
+application has no reply, clearing `applied_at`.
 Entering Closed requires an explicit outcome: `accepted`, `rejected` (by the
 employer), `not_pursued` (stopped by you) or `no_response` (no answer within the
 no-reply period; only for a sent application, with `concluded_on`, today by
-default). Send `applied_at: null` to clear the submission date.
+default). Closing as no reply is always manual, one by one or with
+`POST /applications/bulk`; nothing closes automatically.
 
-### Employer responses and insights
+### Employer replies and insights
 
-A response records what an employer did about a sent application: `kind`
-(`rejection`, `interview`, `offer` or `other`), the `date` it arrived (not in the
-future), a `note`, who recorded it and a `version`. Moving an application to
-Interview or Offer, or closing it as `rejected` (or `accepted` without an offer
-on record) records the matching response; `response_date` and `response_note`
-on the same `PATCH` set its day (today by default) and note. A response of the
-same kind on the same day is never recorded twice.
+A reply records what an employer did about a sent application: `kind`
+(`interview`, `rejection`, `offer` or `other`), the `date` it arrived (not in
+the future, today by default) and a `note`. `reply` on `PATCH` records it and
+moves the stage in the same change: `interview` to Interview (from Applied),
+`offer` to Offer, `rejection` closes the application as `rejected`, and `other`
+leaves the stage. Do not send `status`, `outcome` or `concluded_on` with it
+(422 `reply_stage`).
 
 ```json
 PATCH /applications/APPLICATION_ID
-{"expected_version": 6, "status": "interview", "response_date": "2026-11-06"}
+{"expected_version": 6, "reply": {"kind": "interview", "date": "2026-11-06"}}
 ```
 
-`POST /applications/{id}/responses` with `{"kind": "other", "date":
-"2026-11-04", "note": "Asked for references.", "idempotency_key": "…"}` adds a
-response without moving the stage; it is refused with 409
-`application_not_sent` for an application never sent, and with 409
-`response_exists` (`details.response_id`) for a second one of a kind on a day.
-`PATCH /responses/{id}` corrects `kind`, `date` or `note` with
-`expected_version`, and `DELETE /responses/{id}?expected_version=1` removes one.
-The application read lists its `responses`.
+A reply is refused with 409 `application_not_sent` for an application never
+sent, and with 409 `reply_exists` (`details.reply_id`) for a second one of a
+kind (other than `other`) on a day. `{"reply": {"id": "REPLY_ID", "date":
+"2026-11-05"}}` corrects `kind`, `date` or `note`, and `{"reply": {"id":
+"REPLY_ID", "remove": true}}` removes one; neither moves the stage. The
+application read lists its `replies` and `last_reply`.
 
 `GET /insights` reports how employers answered the sent applications: `sent`,
-`responded`, `interviews` (an interview or offer response), `offers`,
+`responded`, `interviews` (an interview or offer reply), `offers`,
 `rejections`, `no_reply`, `waiting`, the `response_rate`, `interview_rate` and
-`offer_rate`, and the `median_days_to_response` (first response day minus the
+`offer_rate`, and the `median_days_to_response` (first reply day minus the
 `applied_at` day), overall and in `groups` by `role_family`, `seniority`,
 `location`, `source_kind`, `source` and `month` applied, plus a
 `time_to_response` table. A rate is `null` with `withheld: "too_few_sent"` when
 fewer than `min_sample` applications (default 5, 1 to 100) were sent; a median
 needs as many dated answers. `applied_since` and `applied_until` narrow the
-sample. Drafts and attempts closed without being sent are counted in
-`excluded`, never in a rate. Role family and seniority come from the job title
+sample. Shortlisted applications and attempts closed without being sent are
+counted in `excluded` (`shortlisted`, `closed_unsent`), never in a rate. Role family and seniority come from the job title
 (see [Applications](applications.md#insights)).
 Updating `questions` without `answers` preserves compatible existing answers.
 Incompatible answers reject the update atomically; explicitly update or remove
@@ -258,8 +261,9 @@ DELETE /applications/APPLICATION_ID?expected_version=2
 
 Forgetting a job removes its identities, documents and application history.
 Deleting an application removes that attempt and its contexts/documents/files,
-while preserving the job and other attempts. Frozen contexts and approved
-revisions retain their content; create a new revision/context for changed input.
+while preserving the job and other attempts; deleting a job's last application
+returns the job to `new`. Frozen contexts and complete revisions retain their
+content; create a new revision/context for changed input.
 
 The authenticated `/capabilities` list gives the version, the schema, the
 caller's `token_kind` and, for each operation, its MCP `name`, its main REST
@@ -292,8 +296,8 @@ another one unpins it, with a `note_unpinned` change naming the replacement.
 curl -sS -X POST "$OPENINGS_URL/api/v1/jobs/$JOB/notes" -H "Authorization: Bearer $OPENINGS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"body": "Lead with the platform work.", "application_id": "'"$APPLICATION"'", "pinned": true}'
-# The application's notes and changes with its job's, notes and responses only.
-curl -sS "$OPENINGS_URL/api/v1/applications/$APPLICATION/timeline?kinds=note&kinds=response&limit=50" \
+# The application's notes and changes with its job's, notes and replies only.
+curl -sS "$OPENINGS_URL/api/v1/applications/$APPLICATION/timeline?kinds=note&kinds=reply&limit=50" \
   -H "Authorization: Bearer $OPENINGS_TOKEN"
 ```
 
@@ -301,7 +305,7 @@ curl -sS "$OPENINGS_URL/api/v1/applications/$APPLICATION/timeline?kinds=note&kin
 all its applications; `GET /applications/{id}/timeline` those of one
 application and of its job, not of the job's other applications. Pinned notes
 come first, then everything newest first. Each entry has `type` (`note` or
-`event`), `kind` (`note`, `event`, or `response` for an employer response
+`event`), `kind` (`note`, `event`, or `reply` for an employer reply
 recorded, corrected or removed), `scope` (`{"type": "job" | "application",
 "id"}`), `actor`, `batch_id` and either `note` (`body`, `version`, `updated_at`,
 `pinned`, `pinned_at`) or `event` (`kind`, `payload`, `subject`).
@@ -344,7 +348,7 @@ once. System changes are left out unless `actor=system` or
 # What the agent token "laptop" changed since this morning.
 curl -sS "$OPENINGS_URL/api/v1/events?actor=agent:laptop&since=2026-03-02T08:00:00Z" \
   -H "Authorization: Bearer $OPENINGS_TOKEN"
-# The jobs one batch dismissed, ready to restore with POST /jobs/bulk (action "inbox").
+# The jobs one batch dismissed, ready to restore with POST /jobs/bulk (action "new").
 curl -sS "$OPENINGS_URL/api/v1/jobs?triage=dismissed&dismissed_by=agent&batch_id=BATCH_ID" \
   -H "Authorization: Bearer $OPENINGS_TOKEN"
 ```
@@ -377,7 +381,7 @@ Both reads are side-effect free; neither fetches a page nor merges records.
 
 ```text
 GET /jobs/resolve?url=https://jobs.example.test/123&source_key=linkedin:42
-GET /jobs/duplicates?queue=shortlist&limit=20&offset=0
+GET /jobs/duplicates?triage=shortlisted&limit=20&offset=0
 GET /jobs/duplicates?job_id=JOB_ID
 GET /jobs/duplicates?min_confidence=0.85
 ```
@@ -407,10 +411,10 @@ nothing is merged automatically.
  "items": [{"id": "APPLICATION_ID", "expected_version": 3}]}
 ```
 
-`reopen` takes `status` (`draft`, `applied`, `interview` or `offer`) and only
+`reopen` takes `status` (`shortlisted`, `applied`, `interview` or `offer`) and only
 applies to Closed attempts; `delete` takes neither field. Closing with
 `no_response` applies only to sent attempts; list them first with
-`GET /applications?no_reply_due=true`. Each result item has `ok` and either
+`GET /applications?needs=reply_overdue`. Each result item has `ok` and either
 `result` or `error`.
 
 ## Collection recipes
@@ -468,32 +472,34 @@ settings, defaults, run counters and request pacing.
    assets.
 2. `POST /documents` with `application_id`, `context_id`, `kind`, `title`, the
    evidence it uses (`claim_ids`, `knowledge_ids`) and an optional `note`. Kinds:
-   `resume`, `cover_letter`, `answers`, `other`. A CV or letter (`resume`,
-   `cover_letter`) is its `.tex` source and PDF and takes no `content`
-   (`422 content_not_accepted`); form answers and `other` keep structured
+   `cv`, `letter`, `answers`, `other`. A CV or letter is a required PDF and an
+   optional `.tex` source and takes no `content` (`422 content_not_accepted`):
+   give `pdf` (`name`, `size`, optional `sha256`) and optionally the source
+   inline as `source` (UTF-8, at most 256 KB) or as `source_file` (`name`,
+   `size`, optional `sha256`). Form answers and `other` keep structured
    `content`. Use `previous_id` for a new revision. New revisions inherit no old
    PDF/files.
-3. Reserve `POST /files/uploads` with `owner_type`, `owner_id`, relative `name`,
-   `media_type`, exact `size` in bytes and optional hex `sha256`. File owners are
-   `knowledge`, `template`, `document` or `job`; frozen context assets are read-only.
-   For a CV or letter, upload the `.tex` source (UTF-8) first, then the PDF with
-   `source_sha256`, the source's SHA-256 (see below).
-4. Resolve the returned relative `url` against the workspace origin and send raw
+3. The response's `uploads` holds one-shot grants: `pdf`, and `source` for a
+   `source_file`. Send the source first, then the PDF; the PDF grant already
+   names the source's SHA-256. `POST /files/uploads` still reserves other
+   uploads with `owner_type`, `owner_id`, relative `name`, `media_type`, exact
+   `size` in bytes and optional hex `sha256`. File owners are `knowledge`,
+   `template`, `document` or `job`; frozen context assets are read-only.
+4. Resolve each returned relative `url` against the workspace origin and send raw
    bytes with its returned `method` and `headers`. This scoped transfer needs no
    owner bearer token. SHA-256 is always computed server-side. Files are limited
    to 20 MiB; grants expire after ten minutes.
-5. Read the document and its files, then review `POST /documents/{id}/review` with
-   `{"review_state":"approved","expected_version":3}`, using the version just read.
-   An attachment change invalidates that version. Reload and review the current
-   files before retrying a conflict. Approved revisions reject added files.
-   A changed source belongs in a new revision. A CV or letter is approved only
-   with its source (`409 source_required`) and its PDF (`409 pdf_required`).
+5. A CV or letter revision is incomplete until its PDF is stored, then complete
+   and immutable (`409 revision_complete` for any further file); a change is a
+   new revision with `previous_id`. Only complete revisions count toward Ready.
+   Read the document and its files to verify them.
 
-### Source, PDF and derived text
+### Source, PDF and readable text
 
-A CV or letter revision has one `.tex` source and one PDF (a file is a source by
-a `.tex`/`.ltx` name or a TeX media type). The PDF reservation names the source
-it was built from:
+A CV or letter revision has one PDF and at most one `.tex` source (a file is a
+source by a `.tex`/`.ltx` name or a TeX media type). With a source, the PDF
+reservation names the source it was built from; a PDF-only revision has no
+source hash:
 
 ```json
 {"owner_type": "document", "owner_id": "DOCUMENT_ID", "name": "cv.pdf",
@@ -502,32 +508,34 @@ it was built from:
 
 | Refusal | When |
 |---|---|
-| `422 source_required` | A CV or letter PDF without `source_sha256` |
-| `409 source_required` | The revision has no source yet |
+| `422 source_sha256_required` | A PDF without `source_sha256` for a revision with a source |
+| `409 source_required` | The PDF names a source the revision does not have yet |
 | `409 source_mismatch` | `source_sha256` is not the revision's source |
 | `409 source_exists`, `409 pdf_exists` | A second source or PDF; create a new revision |
 | `422 source_encoding` | A source that is not UTF-8 |
 | `422 pdf_media_type` | A `.pdf` sent with another media type |
 
 The file record returns `source_sha256` (null for every other file and for PDFs
-uploaded before 0.22). When the source arrives the server derives the revision's
-`text`, as a reader sees it in the PDF: the document body with macros the source
+uploaded before 0.22). When there is a source the server derives the revision's
+`text` from it (`text_from: "tex"`), as a reader sees it in the PDF: the document body with macros the source
 defines expanded; the personal data, entries, openings and closings of moderncv,
 `letter` and `scrlttr2` printed where the class prints them; link text without
 the address; comments, settings and markup removed; accents composed; and the
 breaks TeX makes (paragraphs, `\\`, items, headings) kept as lines. An unknown
-command contributes the text of its arguments. No TeX runtime is used, so
-the text is for review, search and comparison; the PDF shows the layout.
-`GET /documents/{id}` returns `text`, `source_sha256`, `claim_ids`,
+command contributes the text of its arguments. No TeX runtime is used. Without
+a source, the text is extracted from the PDF with a pure-Python reader
+(`text_from: "pdf"`); when extraction fails the revision has no text and is
+still complete. The text is for search and comparison; the PDF is the document.
+`GET /documents/{id}` returns `complete`, `text`, `text_from`, `source_sha256`, `claim_ids`,
 `knowledge_ids`, `note`, `files` and `legacy_content` (the content a CV or
 letter stored before 0.22, read-only, else null); form answers also return
-`content`. `GET /documents?q=` searches titles, notes and the derived text.
+`content`. `GET /documents?q=` searches titles, notes and the readable text.
 
 `GET /documents/{id}/comparison` (MCP `documents_compare`) compares a revision's
 text with the revision it replaces, or with `other_id` of the same application,
 line by line: `lines` of `{"change": "same" | "added" | "removed", "text"}`,
 the `added` and `removed` counts, and `text.document`/`text.other`, false for a
-side without text (a CV or letter without a source). Form answers compare their
+side without text (a CV or letter whose text could not be read). Form answers compare their
 content as `path: value` lines.
 
 ### Stale contexts
@@ -551,8 +559,8 @@ Only what documents use is compared:
   also hold the Profile's `preferences` and `roles`; they are not compared.)
 - **Preferences:** the statements of `facts` and `writing`, by content (text
   and scope). The other sections and the order of statements are not compared.
-  A writing rule scoped to `cv` concerns the CV (`resume`) only, one scoped to
-  `letter` the letter (`cover_letter`) only.
+  A writing rule scoped to `cv` concerns the CV only, one scoped to `letter`
+  the letter only.
 - **Templates, entries and claims:** by the content documents
   use: a template's kind, source, guidance and rules; an
   entry's kind, title, organization, dates, skills and narrative; a claim's text
@@ -578,7 +586,7 @@ null and the Profile version is compared); `preferences` is `items`, or
 `not_frozen` for a context prepared before 0.24, which is not compared for it.
 
 `GET /staleness` lists such reports across applications: `status` defaults to
-`draft` (`all` for every stage), `stale_only` defaults to `true`,
+`shortlisted` (`all` for every stage), `stale_only` defaults to `true`,
 with `limit`/`offset`. These reads never change a context. To refresh an
 application, prepare a new context and save new revisions linked with `previous_id`.
 

@@ -9,8 +9,8 @@ interface Resolved {
   })[];
 }
 const PLACES: Record<string, string> = {
-  inbox: "to review",
-  saved: "in the Shortlist",
+  new: "in New",
+  shortlisted: "shortlisted",
   dismissed: "dismissed",
 };
 

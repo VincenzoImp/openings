@@ -3,16 +3,18 @@ name: review-inbox
 title: Review new jobs
 summary: Have new jobs read against your Preferences and Career, then shortlisted or dismissed with a reason.
 example: Go through my new jobs and shortlist the good ones.
-description: Review or clear the Openings Inbox by reading full jobs against current Profile and Career evidence, then shortlist credible opportunities or dismiss confirmed mismatches; runs routinely under the operating mandate.
+description: Review or clear the Openings New jobs (to review) by reading full jobs against current Profile and Career evidence, then shortlist credible opportunities or dismiss confirmed mismatches; runs routinely under the operating mandate.
 compatibility: Requires access to the Openings MCP server or REST API, as described in the openings-workspace skill.
 ---
 
-# Review Inbox
+# Review new jobs
 
-Use this workflow to review, classify and clear Inbox jobs, as routine work under
+Use this workflow to review, classify and clear New jobs (`triage: "new"`, to
+review), as routine work under
 the [operating mandate](../openings-workspace/references/operating-mandate.md). A run the owner asked only to inspect is
-read-only. Triage does not prepare applications, change application stages or
-change collection.
+read-only. Shortlisting a job starts its application in stage Shortlisted; triage
+does not prepare documents, change later application stages or change
+collection.
 
 Read [Openings workspace](../openings-workspace/SKILL.md) for connection, schemas,
 versions and the shared API reference. Read the owner's Preferences
@@ -30,7 +32,7 @@ answer the owner did not give. Report what you did in the chat.
 
 ## Establish and read the cohort
 
-Count the requested Inbox and snapshot all its IDs through complete pagination
+Count the requested New jobs and snapshot all their IDs through complete pagination
 before mutations. Keep a small task log of IDs, decisions, unresolved facts and
 successful writes. Server state is authoritative on every resume.
 
@@ -78,8 +80,8 @@ Explain the fit or mismatch with specific facts, not a keyword score.
 Missing evidence does not establish that a skill or experience is absent.
 
 Shortlist or dismiss only when the evidence supports the decision. If a plausible
-role depends on a specific unresolved fact, leave it in Inbox, ask the owner in the
-chat and continue the other jobs. Do not manufacture certainty to empty a queue.
+role depends on a specific unresolved fact, leave it in New, ask the owner in the
+chat and continue the other jobs. Do not manufacture certainty to empty the list.
 
 ## Write and resume safely
 
@@ -92,20 +94,22 @@ preserve a concurrent decision. On an uncertain response, read server state
 before retrying. Record successful IDs so reruns do not repeat completed work.
 
 Do not move existing pursued jobs or application attempts outside the requested
-scope. Saved interest and application stages are different. Do not dismiss a job
-to remove it from another pipeline view.
+scope. Moving a shortlisted job back to New or dismissing it deletes its
+application only while that is still empty; otherwise the server refuses with
+`application_has_work`, and the application must be closed deliberately instead.
+Do not dismiss a job to remove it from another pipeline view.
 
 Reconcile the initial cohort, successful changes, unresolved jobs and new arrivals.
-Use a fresh Inbox query at the end. Report actual saved/dismissed counts, remaining
+Use a fresh `triage: "new"` query at the end. Report actual shortlisted/dismissed counts, remaining
 IDs with reasons, failures and any arrivals outside the reviewed cohort, in the
 chat. When the
 same kind of clear mismatch recurs from one source, mention it for
 [Manage sources](../manage-sources/SKILL.md) instead of changing sources here.
-Only call the Inbox empty when the final queue check establishes it.
+Only call New empty when the final check establishes it.
 
 ## Duplicate awareness
 
-Before saving candidates, and when a posting appears repeated, use the shared
+Before shortlisting candidates, and when a posting appears repeated, use the shared
 [vacancy identity check](../openings-workspace/references/job-deduplication.md).
 Check existing applications across records. Similar titles alone do not prove a
 duplicate. Report uncertain identity; resolve verified duplicates only within

@@ -45,9 +45,7 @@ export function Skills({ release }: { release?: string }) {
               <h3 className="title">{item.title || item.name}</h3>
               <p className="meta">{item.summary || item.description}</p>
               {item.example && (
-                <p className="caption example">
-                  For example: <q>{item.example}</q>
-                </p>
+                <p className="caption example">For example: “{item.example}”</p>
               )}
             </div>
           </li>

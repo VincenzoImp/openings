@@ -1,4 +1,4 @@
-"""A CV or letter revision is its .tex source and PDF; its text is derived from the source."""
+"""A CV or letter revision's TeX source and the PDF built from it; text derived from the source."""
 
 import hashlib
 import json
@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 
 from document_fixtures import PDF, tex, upload
 from openings.app import create_app
-from openings.documents import DocumentCreate, ReviewUpdate
+from openings.documents import DocumentCreate
 from openings.documents.text import derive_text, revision_text, tokens
 from openings.errors import DomainError
 
@@ -256,7 +256,7 @@ def test_a_cv_is_its_source_and_the_pdf_built_from_it(client):
     application = workspace.create_application({"job_id": job["id"]})
     refused = client.post(
         "/api/v1/documents",
-        json={"application_id": application["id"], "kind": "resume", "content": {"text": "CV"}},
+        json={"application_id": application["id"], "kind": "cv", "content": {"text": "CV"}},
     )
     assert code(refused) == (422, "content_not_accepted")
     _, error = tool(
@@ -264,7 +264,7 @@ def test_a_cv_is_its_source_and_the_pdf_built_from_it(client):
         "documents_create",
         {"value": {"application_id": application["id"], "content": {"text": "CV"}}},
     )
-    assert "content_not_accepted" in error or "source and PDF" in error
+    assert "content_not_accepted" in error or "optional TeX source" in error
     created = client.post(
         "/api/v1/documents",
         json={"application_id": application["id"], "title": "CV", "note": "First draft."},
@@ -274,11 +274,7 @@ def test_a_cv_is_its_source_and_the_pdf_built_from_it(client):
     assert "content" not in cv and (cv["text"], cv["legacy_content"]) == (None, None)
     assert (cv["note"], cv["claim_ids"], cv["knowledge_ids"]) == ("First draft.", [], [])
 
-    # The PDF comes after its source and names it.
-    assert code(reserve(client, cv["id"], "cv.pdf", PDF, "application/pdf")) == (
-        422,
-        "source_required",
-    )
+    # A PDF naming a source comes after that source.
     source = SOURCE.encode()
     assert code(reserve(client, cv["id"], "cv.pdf", PDF, "application/pdf", sha(source))) == (
         409,
@@ -310,29 +306,27 @@ def test_a_cv_is_its_source_and_the_pdf_built_from_it(client):
         422,
         "source_sha256",
     )
-    review = f"/api/v1/documents/{cv['id']}/review"
-    version = client.get(f"/api/v1/documents/{cv['id']}").json()["version"]
-    assert code(client.post(review, json={"expected_version": version})) == (409, "pdf_required")
+    # With a source, the PDF must name it.
+    assert code(reserve(client, cv["id"], "cv.pdf", PDF, "application/pdf")) == (
+        422,
+        "source_sha256_required",
+    )
+    assert client.get(f"/api/v1/documents/{cv['id']}").json()["complete"] is False
     pdf = send(client, cv["id"], "cv.pdf", PDF, "application/pdf", sha(source)).json()
     assert pdf["source_sha256"] == sha(source)
+    # Complete once its PDF is stored, and immutable: a change is a new revision.
     assert code(reserve(client, cv["id"], "copy.pdf", PDF, "application/pdf", sha(source))) == (
         409,
-        "pdf_exists",
+        "revision_complete",
     )
-    # The consistency override is gone with the check.
-    version = client.get(f"/api/v1/documents/{cv['id']}").json()["version"]
-    assert (
-        client.post(
-            review, json={"expected_version": version, "allow_content_mismatch": True}
-        ).status_code
-        == 422
-    )
-    assert client.get(f"/api/v1/documents/{cv['id']}/consistency").status_code in {404, 405}
-    assert tool(client, "documents_consistency", {"document_id": cv["id"]})[0] is None
-    approved = client.post(review, json={"expected_version": version}).json()
-    assert approved["review_state"] == "approved" and approved["text"] == TEXT
+    complete = client.get(f"/api/v1/documents/{cv['id']}").json()
+    assert complete["complete"] is True and "review_state" not in complete
+    # The text stays the one derived from the TeX source.
+    assert (complete["text"], complete["text_from"]) == (TEXT, "tex")
+    assert client.post(f"/api/v1/documents/{cv['id']}/review", json={}).status_code in {404, 405}
+    assert tool(client, "documents_review", {"document_id": cv["id"]})[0] is None
     mcp, _ = tool(client, "documents_get", {"document_id": cv["id"]})
-    assert mcp == approved
+    assert mcp == complete
 
     # A new revision is compared with the one it replaces, line by line.
     revised = client.post(
@@ -375,8 +369,7 @@ def test_form_answers_keep_structured_content_and_compare_it(client):
         )
     )
     assert first["content"] == {"answers": {"why": "Reliable services."}}
-    # Approving form answers needs no file.
-    documents.review_document(first["id"], ReviewUpdate(expected_version=first["version"]))
+    assert first["complete"] is True
     second = documents.create_document(
         DocumentCreate(
             application_id=application["id"],
@@ -401,7 +394,7 @@ def test_form_answers_keep_structured_content_and_compare_it(client):
     assert error.value.code == "comparison_target"
 
 
-def test_a_retry_returns_only_an_empty_draft(tmp_path):
+def test_a_retry_returns_only_a_revision_without_files(tmp_path):
     app = create_app(tmp_path / "retry.sqlite", start_worker=False)
     workspace, documents = app.state.workspace, app.state.documents
     job = workspace.ingest_job({"title": "Synthetic engineer", "posting": "Build services."})

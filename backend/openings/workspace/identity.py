@@ -6,6 +6,7 @@ import threading
 import time
 
 from .. import events
+from ..actors import current_actor
 from ..common import check_version, now
 from ..db import encode
 from ..duplicate_signals import job_features, posting_similarity
@@ -337,8 +338,8 @@ class JobIdentity:
             groups = index.groups(value.min_confidence, value.match_location)
             if value.job_id:
                 groups = [group for group in groups if value.job_id in group["ids"]]
-            if value.queue:
-                where, args = self._job_filters(queue=value.queue)
+            if value.triage:
+                where, args = self._job_filters(triage=value.triage)
                 in_queue = {
                     row[0] for row in connection.execute("SELECT j.id FROM jobs j" + where, args)
                 }
@@ -378,13 +379,13 @@ class JobIdentity:
         for group in page:
             items = [summaries[job_id] for job_id in group["ids"]]
             # Prefer the record a merge would most likely keep: an open attempt,
-            # then any attempt, then saved interest, then the oldest record.
+            # then any attempt, then a shortlisted job, then the oldest record.
             reference = min(
                 items,
                 key=lambda item: (
                     not any(a["status"] != "closed" for a in item["applications"]),
                     not item["applications"],
-                    item["triage"] != "saved",
+                    item["triage"] != "shortlisted",
                     item["created_at"],
                     item["id"],
                 ),
@@ -444,9 +445,15 @@ class JobIdentity:
                     c.execute("SELECT * FROM jobs WHERE id=?", (record_id,)).fetchone(), version
                 )
             active = c.execute(
-                "SELECT id FROM applications WHERE job_id IN (?,?) AND status<>'closed'",
-                (source_id, target_id),
+                "SELECT * FROM applications WHERE job_id IN (?,?) AND status<>'closed' "
+                "ORDER BY job_id=?",
+                (source_id, target_id, target_id),
             ).fetchall()
+            # Both jobs were shortlisted: an application still empty gives way.
+            empty = [row for row in active if not self.application_work(c, row)]
+            if len(active) > 1 and empty:
+                self.remove_application(c, empty[0])
+                active = [row for row in active if row["id"] != empty[0]["id"]]
             if len(active) > 1:
                 raise DomainError(
                     409,
@@ -497,6 +504,10 @@ class JobIdentity:
                 "UPDATE jobs SET version=version+1,content_version=?,updated_at=? WHERE id=?",
                 (next_content, now(), target_id),
             )
+            # A job with an open application is shortlisted.
+            target = c.execute("SELECT * FROM jobs WHERE id=?", (target_id,)).fetchone()
+            if active and target["triage"] != "shortlisted":
+                self._triage(c, target, "shortlisted", current_actor())
             c.execute(
                 "UPDATE job_signals SET content_version=?,duplicate_of=CASE WHEN duplicate_of=? "
                 "THEN NULL ELSE duplicate_of END WHERE job_id=?",

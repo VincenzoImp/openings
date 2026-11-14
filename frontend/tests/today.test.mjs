@@ -21,17 +21,23 @@ test("the summary leads with ready applications and counts in words", () => {
     },
   );
   // Nothing ready: the first thing that waits leads.
-  assert.deepEqual(todaySummary({ ready: 0, blocked: 2, waiting: 0, days: 30 }), {
-    lead: "2 applications are blocked by a requirement.",
-    rest: "",
-    quiet: false,
-  });
+  assert.deepEqual(
+    todaySummary({ ready: 0, blocked: 2, waiting: 0, days: 30 }),
+    {
+      lead: "2 applications are blocked by a requirement.",
+      rest: "",
+      quiet: false,
+    },
+  );
   // Nothing waits: say so.
-  assert.deepEqual(todaySummary({ ready: 0, blocked: 0, waiting: 0, days: 30 }), {
-    lead: "Nothing is waiting for you.",
-    rest: "",
-    quiet: true,
-  });
+  assert.deepEqual(
+    todaySummary({ ready: 0, blocked: 0, waiting: 0, days: 30 }),
+    {
+      lead: "Nothing is waiting for you.",
+      rest: "",
+      quiet: true,
+    },
+  );
 });
 
 test("times read as a person says them", () => {
@@ -75,15 +81,15 @@ test("a change says where it moved a record", () => {
   const change = (kind, payload) => ({ kind, payload });
   assert.equal(
     changes.changeDetail(
-      change("application_updated", { from: "draft", to: "applied" }),
+      change("application_updated", { from: "shortlisted", to: "applied" }),
     ),
-    "Preparing → Applied",
+    "Shortlisted → Applied",
   );
   assert.equal(
     changes.changeDetail(
-      change("triage_changed", { from: "inbox", to: "saved" }),
+      change("triage_changed", { from: "new", to: "shortlisted" }),
     ),
-    "Inbox → Shortlist",
+    "New → Shortlisted",
   );
   // A change that kept the stage names the fields it touched instead.
   assert.equal(

@@ -24,7 +24,7 @@ def job(workspace, title="Synthetic engineer"):
 
 
 def seeded(workspace):
-    """A job with two applications (one closed), job and application notes and a response."""
+    """A job with two applications (one closed), job and application notes and a reply."""
     first_job = job(workspace)
     with acting_as(OWNER):
         older = workspace.create_application({"job_id": first_job["id"]})
@@ -42,7 +42,10 @@ def seeded(workspace):
             first_job["id"], {"body": "Agent observation.", "application_id": current["id"]}
         )
         applied = workspace.update_application(
-            current["id"], {"expected_version": current["version"], "status": "interview"}
+            current["id"], {"expected_version": current["version"], "status": "applied"}
+        )
+        applied = workspace.update_application(
+            current["id"], {"expected_version": applied["version"], "reply": {"kind": "interview"}}
         )
     return {
         "job": first_job,
@@ -88,13 +91,13 @@ def test_an_application_timeline_holds_its_entries_and_its_jobs_only(tmp_path):
     kinds = [item["event"]["kind"] for item in items if item["type"] == "event"]
     assert "note_added" not in kinds and "job_added" in kinds
     assert "application_created" in kinds
-    # Moving to Interview recorded an employer response: kind response.
-    responses = [item for item in items if item["kind"] == "response"]
-    assert [item["event"]["kind"] for item in responses] == ["response_added"]
+    # Recording the interview invitation: kind reply.
+    replies = [item for item in items if item["kind"] == "reply"]
+    assert [item["event"]["kind"] for item in replies] == ["reply_added"]
     assert result["counts"] == {
         "note": 3,
         "event": len(items) - 3 - 1,
-        "response": 1,
+        "reply": 1,
     }
     # Events stay text-free: no note text in any payload.
     for item in items:
@@ -130,7 +133,7 @@ def test_filters_counts_and_paging(tmp_path):
     assert notes["total"] == notes["counts"]["note"] == 3
     # Counts follow every filter but the kind.
     assert notes["counts"] == full["counts"]
-    events = read(kinds=["event", "response"])
+    events = read(kinds=["event", "reply"])
     assert events["total"] == full["total"] - 3
     by_agent = read(who=["agent"])
     assert by_agent["items"] and {item["actor"] for item in by_agent["items"]} == {
@@ -302,7 +305,7 @@ def test_rest_and_mcp_return_identical_timelines(tmp_path):
     job_id, application_id = ids["job"]["id"], ids["current"]["id"]
     cases = [
         ({}, ""),
-        ({"kinds": ["note", "response"]}, "?kinds=note&kinds=response"),
+        ({"kinds": ["note", "reply"]}, "?kinds=note&kinds=reply"),
         (
             {"who": ["agent", "owner"], "scope": "application"},
             "?who=agent&who=owner&scope=application",

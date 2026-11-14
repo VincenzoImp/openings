@@ -103,7 +103,7 @@ def seed(path, *, entries=6, claims=4, applications=3, narrative=60, seed=3):
                 name=name, kind=kind, tex=words(rng, 150), guidance=words(rng, 60), is_default=True
             )
         )["id"]
-        for name, kind in (("MASTER CV", "resume"), ("MASTER letter", "cover_letter"))
+        for name, kind in (("MASTER CV", "cv"), ("MASTER letter", "letter"))
     ]
     add_asset(workspace, "template_id", templates[0], "assets/logo.png", b"synthetic logo")
     add_asset(workspace, "template_id", templates[0], "fonts/Ünï cödé.ttf", b"synthetic font")

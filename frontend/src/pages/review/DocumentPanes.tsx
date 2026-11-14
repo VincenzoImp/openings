@@ -7,6 +7,7 @@ import {
   type WorkspaceFile,
 } from "../../api";
 import {
+  Button,
   Card,
   EmptyState,
   ErrorBanner,
@@ -17,26 +18,33 @@ import {
 } from "../../design";
 import { FileDialog } from "../../library/Assets";
 import { dayTime } from "../../library/time";
-import { useResource } from "../../state";
+import { useFresh } from "../../library/useFresh";
 import { currentOf, isPdf, isSource, kindLabels } from "./model";
+import { RevisionDialog } from "./RevisionDialog";
 
 const NONE: ListResult<Document> = { items: [], total: 0 };
 
+const SCOPES = ["documents", "files"];
+
 /** The current CV and letter of an application, with their files. */
 export function useCurrentDocuments(applicationId: string) {
-  const list = useResource<ListResult<Document>>(
+  // Read again after every document or file change, whatever form is open.
+  const list = useFresh<ListResult<Document>>(
     `/documents?application_id=${applicationId}&summary=true&limit=100`,
     NONE,
+    SCOPES,
   );
-  const cvId = currentOf(list.data.items, "resume")?.id;
-  const letterId = currentOf(list.data.items, "cover_letter")?.id;
-  const cv = useResource<Document | null>(
+  const cvId = currentOf(list.data.items, "cv")?.id;
+  const letterId = currentOf(list.data.items, "letter")?.id;
+  const cv = useFresh<Document | null>(
     cvId ? `/documents/${cvId}` : null,
     null,
+    SCOPES,
   );
-  const letter = useResource<Document | null>(
+  const letter = useFresh<Document | null>(
     letterId ? `/documents/${letterId}` : null,
     null,
+    SCOPES,
   );
   const pdfs = [cv.data, letter.data]
     .map((item) => item?.files?.find(isPdf))
@@ -75,34 +83,39 @@ function PdfFrame({ file, title }: { file: WorkspaceFile; title: string }) {
 }
 
 /**
- * One current revision: its PDF beside the text read from its source, one at
- * a time, or the text alone while it has no PDF.
+ * One current revision: its PDF beside its readable text, one at a time, or
+ * the text alone while it has no PDF; and the upload of a new PDF.
  */
 function RevisionPane({
+  application,
   kind,
   revision,
   loading,
 }: {
-  kind: "resume" | "cover_letter";
+  application: Application;
+  kind: "cv" | "letter";
   revision: Document | null;
   loading: boolean;
 }) {
   const [opened, setOpened] = useState<WorkspaceFile | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [view, setView] = useState("pdf");
   const name = kindLabels[kind];
   const pdf = revision?.files?.find(isPdf);
   const source = revision?.files?.find(isSource);
   const text = revision?.text || "";
-  const approved = revision?.review_state === "approved";
   const shown = pdf && text ? view : pdf ? "pdf" : "text";
+  const required = (
+    application.required_documents || ["cv", "letter"]
+  ).includes(kind);
   return (
     <Card
       title={name}
       actions={
         revision && (
           <>
-            <Tag tone={approved ? "ready" : "attention"}>
-              {approved ? "Approved" : "Not approved"}
+            <Tag tone={pdf ? "ready" : "attention"}>
+              {pdf ? "Complete" : "Without PDF"}
             </Tag>
             {pdf && (
               <button
@@ -133,8 +146,9 @@ function RevisionPane({
           <Loading label={`Loading the ${name}…`} />
         ) : !revision ? (
           <EmptyState title={`No ${name} yet`}>
-            Your agent writes it from a frozen copy of your record. It appears
-            here with its PDF.
+            {required
+              ? `Upload the ${name} as a PDF, with its .tex source if you have one. The application is Ready once its required documents are uploaded.`
+              : `This application does not require a ${name}.`}
           </EmptyState>
         ) : pdf && shown === "pdf" ? (
           <PdfFrame file={pdf} title={`Preview of the ${name}, ${pdf.name}`} />
@@ -148,28 +162,42 @@ function RevisionPane({
           </div>
         ) : (
           <EmptyState title="No PDF yet">
-            This revision has no PDF and no source yet. Its files are in the
-            Documents tab.
+            This revision has no PDF yet, so it does not count for Ready. Upload
+            its PDF.
           </EmptyState>
         )}
       </div>
-      {revision && (
-        <footer>
-          <span className="caption">
-            Revision {revision.revision_number || 1}
-            {source && (
-              <>
-                {" · built from "}
-                <span className="mono">{source.name}</span>
-              </>
-            )}
-            {" · "}
-            {dayTime(revision.created_at)}
-            {!pdf && " · no PDF"}
-          </span>
-        </footer>
-      )}
+      <footer>
+        <span className="caption">
+          {revision && (
+            <>
+              Revision {revision.revision_number || 1}
+              {source && (
+                <>
+                  {" · built from "}
+                  <span className="mono">{source.name}</span>
+                </>
+              )}
+              {" · "}
+              {dayTime(revision.created_at)}
+              {!pdf && " · no PDF"}
+            </>
+          )}
+        </span>
+        <Button size="sm" icon="upload" onClick={() => setUploading(true)}>
+          {pdf ? "New PDF" : "Upload PDF"}
+          <span className="sr"> of the {name}</span>
+        </Button>
+      </footer>
       {opened && <FileDialog file={opened} onClose={() => setOpened(null)} />}
+      {uploading && (
+        <RevisionDialog
+          application={application}
+          previous={revision || undefined}
+          kind={kind}
+          onClose={() => setUploading(false)}
+        />
+      )}
     </Card>
   );
 }
@@ -255,7 +283,8 @@ export function DocumentPanes({
           label: "CV",
           content: (
             <RevisionPane
-              kind="resume"
+              application={application}
+              kind="cv"
               revision={cv.data}
               loading={loading(cv)}
             />
@@ -266,7 +295,8 @@ export function DocumentPanes({
           label: "Letter",
           content: (
             <RevisionPane
-              kind="cover_letter"
+              application={application}
+              kind="letter"
               revision={letter.data}
               loading={loading(letter)}
             />
