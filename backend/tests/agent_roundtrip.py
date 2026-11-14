@@ -1,6 +1,17 @@
-"""Practical external-agent round trip against an isolated production workspace.
+"""Practical external-agent round trip against an isolated workspace over real HTTP.
 
-Requires the development environment and an external Tectonic executable.
+An agent connects over MCP with an agent token and works as the skills describe:
+the start read, a triage of 50 collected jobs in batches, CV and letter for one
+shortlisted application (a TeX source compiled on the agent's machine and a
+PDF-only letter, each uploaded with the PUT its revision returns), the computed
+Ready, the owner's reply recorded on request, the change log of one batch and
+the owner's correction read back as feedback. It also counts the calls each
+task needs.
+
+    uv run python backend/tests/agent_roundtrip.py [--tectonic /path/to/tectonic]
+
+Without ``--tectonic`` the PDF is a small synthetic one (CI); with it the CV is
+compiled from the shipped example template.
 """
 
 import argparse
@@ -10,6 +21,7 @@ import json
 import socket
 import sqlite3
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -22,472 +34,363 @@ import uvicorn
 from mcp import Client
 from mcp.client.streamable_http import streamable_http_client
 
-from openings.app import create_app
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from document_fixtures import text_pdf  # noqa: E402
+
+from openings.app import create_app  # noqa: E402
+
+JOBS = 50
+SHORTLIST = 4
+EXAMPLE_TEX = Path(__file__).resolve().parents[2] / "examples" / "cv.tex"
 
 
-def unpack(result):
-    if result.is_error:
-        raise RuntimeError(result.content[0].text)
-    if result.structured_content is not None:
-        return result.structured_content
-    return json.loads(next(item.text for item in result.content if item.type == "text"))
+class Agent:
+    """MCP calls that count themselves and unpack compact JSON results."""
+
+    def __init__(self, session):
+        self.session, self.calls = session, 0
+
+    async def raw(self, name, arguments=None):
+        self.calls += 1
+        return await self.session.call_tool(name, arguments or {})
+
+    async def __call__(self, name, arguments=None):
+        result = await self.raw(name, arguments)
+        if result.is_error:
+            raise RuntimeError(f"{name}: {result.content[0].text}")
+        return json.loads(next(item.text for item in result.content if item.type == "text"))
 
 
-async def exercise(base, token, folder, tectonic):
-    headers = {"Authorization": f"Bearer {token}"}
-    checks = {}
-    async with httpx.AsyncClient(headers=headers, timeout=30) as http:
-        async with httpx.AsyncClient() as anonymous:
-            checks["rest_requires_owner"] = (
-                await anonymous.get(base + "/api/v1/career/profile")
-            ).status_code == 401
-        # Kept nested: merging the two contexts would re-indent the whole driver body.
-        # The SDK client speaks httpx2; it takes its headers from the client it is given.
-        async with httpx2.AsyncClient(headers=headers, timeout=30) as agent_http:  # noqa: SIM117
-            async with Client(
-                streamable_http_client(base + "/mcp/", http_client=agent_http)
-            ) as session:
-                tools = await session.list_tools()
-                names = {tool.name for tool in tools.tools}
-                by_name = {tool.name: tool for tool in tools.tools}
-                checks["typed_module_discovery"] = {
-                    "profile_get",
-                    "templates_create",
-                    "documents_create",
-                    "files_reserve_upload",
-                } <= names
-                checks["career_file_tool_annotations"] = (
-                    by_name["knowledge_list"].annotations.read_only_hint
-                    and by_name["documents_get"].annotations.read_only_hint
-                    and by_name["documents_delete"].annotations.destructive_hint
-                    and not by_name["files_reserve_upload"].annotations.read_only_hint
-                    and not by_name["files_reserve_upload"].annotations.open_world_hint
-                )
-                profile = unpack(await session.call_tool("profile_get", {}))
-                unpack(
-                    await session.call_tool(
-                        "profile_update",
-                        {
-                            "expected_version": profile["version"],
-                            "name": "Alex Example",
-                            "headline": "Backend engineer",
-                            "summary": "Built Python APIs and reduced latency by 20%.",
-                        },
-                    )
-                )
-                evidence = unpack(
-                    await session.call_tool(
-                        "knowledge_create",
-                        {
-                            "kind": "project",
-                            "title": "Example API",
-                            "narrative": "Built Python APIs and reduced latency by 20%.",
-                        },
-                    )
-                )
-                claim = unpack(
-                    await session.call_tool(
-                        "claims_create",
-                        {
-                            "knowledge_id": evidence["id"],
-                            "text": "Reduced latency by 20%.",
-                            "approved": True,
-                        },
-                    )
-                )
-                tex = (Path(__file__).resolve().parents[2] / "examples/cv.tex").read_text()
-                template = unpack(
-                    await session.call_tool(
-                        "templates_create",
-                        {
-                            "name": "Synthetic CV",
-                            "tex": tex,
-                            "guidance": "Use concise evidence-backed bullets.",
-                            "rules": {"max_bullet_chars": 150},
-                        },
-                    )
-                )
-                job = unpack(
-                    await session.call_tool(
-                        "jobs_create",
-                        {
-                            "title": "Backend engineer",
-                            "company": "Example Co",
-                            "posting": "Build Python APIs.",
-                        },
-                    )
-                )
-                job = unpack(
-                    await session.call_tool(
-                        "jobs_triage",
-                        {
-                            "job_id": job["id"],
-                            "triage": "shortlisted",
-                            "expected_version": job["version"],
-                        },
-                    )
-                )
-                checks["shortlist_starts_the_application"] = (
-                    unpack(await session.call_tool("jobs_list", {"triage": "shortlisted"}))["total"]
-                    == 1
-                    and job["application"]["status"] == "shortlisted"
-                )
-                second_start = await session.call_tool("applications_create", {"job_id": job["id"]})
-                checks["one_open_application_per_job"] = second_start.is_error
-                application = unpack(
-                    await session.call_tool(
-                        "applications_get", {"application_id": job["application"]["id"]}
-                    )
-                )
-                checks["cv_and_letter_required_by_default"] = (
-                    application["required_documents"] == ["cv", "letter"]
-                    and application["missing"] == ["cv", "letter"]
-                    and application["ready"] is False
-                )
-                # Standing guidance is the application's pinned note (the note field is gone).
-                pinned = unpack(
-                    await session.call_tool(
-                        "notes_create",
-                        {
-                            "job_id": job["id"],
-                            "body": "Prefer technical detail.",
-                            "application_id": application["id"],
-                            "pinned": True,
-                        },
-                    )
-                )
-                removed = await session.call_tool(
-                    "applications_update",
+def error_of(result):
+    return json.loads(result.content[0].text)["error"] if result.is_error else None
+
+
+def compile_cv(folder, tex, tectonic):
+    """The CV PDF: compiled from its TeX source with Tectonic, or a synthetic PDF."""
+    if not tectonic:
+        return text_pdf("Alex Example", "Backend engineer", "Reduced API p95 latency by 20%.")
+    source = folder / "cv.tex"
+    source.write_text(tex)
+    subprocess.run(
+        [tectonic, "--untrusted", "--outdir", str(folder), str(source)],
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        timeout=180,
+    )
+    return source.with_suffix(".pdf").read_bytes()
+
+
+async def exercise(base, agent_token, owner_token, folder, tectonic):
+    checks, counts = {}, {}
+    owner = httpx.AsyncClient(headers={"Authorization": f"Bearer {owner_token}"}, timeout=30)
+    async with owner, httpx.AsyncClient(timeout=30) as http:
+        checks["rest_requires_a_token"] = (
+            await http.get(base + "/api/v1/workspace/context")
+        ).status_code == 401
+        headers = {"Authorization": f"Bearer {agent_token}"}
+        async with (
+            httpx2.AsyncClient(headers=headers, timeout=60) as agent_http,
+            Client(streamable_http_client(base + "/mcp/", http_client=agent_http)) as client,
+        ):
+            call = Agent(client)
+            tools = {tool.name: tool for tool in (await client.list_tools()).tools}
+            instructions = client.instructions or ""
+            checks["forty_four_tools_and_instructions"] = (
+                44 <= len(tools) <= 45
+                and "workspace_context" in instructions
+                and "Never submit an application" in instructions
+            )
+            checks["no_owner_only_tool"] = not {
+                "workspace_export",
+                "career_import",
+                "tokens_list",
+            } & set(tools)
+            checks["annotations"] = (
+                tools["workspace_context"].annotations.read_only_hint
+                and tools["jobs_triage"].annotations.destructive_hint is False
+                and tools["jobs_delete"].annotations.destructive_hint is not False
+                and tools["sources_run"].annotations.open_world_hint is not False
+            )
+            renamed = error_of(await call.raw("jobs_bulk", {}))
+            checks["0_23_names_answer_their_replacement"] = (
+                renamed["code"] == "renamed" and renamed["details"]["use"] == "jobs_triage"
+            )
+            wrapped = error_of(await call.raw("jobs_list", {"value": {"q": "x"}}))
+            checks["flat_arguments_only"] = wrapped["code"] == "validation"
+
+            # Setup the agent does once: profile, a career entry, a highlight, a template.
+            context = await call("workspace_context")
+            await call(
+                "profile_update",
+                {
+                    "expected_version": context["profile"]["version"],
+                    "name": "Alex Example",
+                    "headline": "Backend engineer",
+                },
+            )
+            entry = (
+                await call(
+                    "career_save",
                     {
-                        "application_id": application["id"],
-                        "expected_version": application["version"],
-                        "note": "Gone",
+                        "items": [
+                            {
+                                "kind": "project",
+                                "title": "Example API",
+                                "narrative": "Built Python APIs and reduced latency by 20%.",
+                                "idempotency_key": "example-api",
+                            }
+                        ]
                     },
                 )
-                # Arguments are flat: the 0.23 `value` wrapper is refused, not ignored.
-                flat = await session.call_tool("knowledge_list", {"q": "Example API"})
-                wrapped = await session.call_tool("knowledge_list", {"value": {"q": "Example"}})
-                unversioned = await session.call_tool("notes_delete", {"note_id": pinned["id"]})
-                gone = [
-                    name
-                    for name in ("documents_review", "applications_ready", "responses_create")
-                    if name in names
-                ]
-                checks["removed_fields_and_tools_refused"] = (
-                    removed.is_error
-                    and not flat.is_error
-                    and wrapped.is_error
-                    and unversioned.is_error
-                    and "expected_version" in unversioned.content[0].text
-                    and gone == []
-                )
-                # The agent reads the live records; frozen contexts are gone (0.24).
-                frozen = await session.call_tool(
-                    "contexts_create", {"application_id": application["id"]}
-                )
-                checks["contexts_removed_with_a_hint"] = (
-                    frozen.is_error
-                    and "tool_removed" in frozen.content[0].text
-                    and "contexts_create" not in names
-                    and not {"contexts_get", "contexts_list", "staleness_get"} & names
-                )
-                guidance = unpack(
-                    await session.call_tool(
-                        "applications_get", {"application_id": application["id"]}
-                    )
-                )["pinned_note"]
-                writing = unpack(await session.call_tool("preferences_get", {}))
-                live = unpack(
-                    await session.call_tool("templates_get", {"template_id": template["id"]})
-                )
-                checks["pinned_note_on_the_application"] = (
-                    guidance["body"] == "Prefer technical detail."
-                )
-                checks["live_instructions_readable"] = (
-                    bool(writing) and live["guidance"] == "Use concise evidence-backed bullets."
-                )
-                source = folder / "application.tex"
-                source.write_text(live["tex"])
-                subprocess.run(  # noqa: ASYNC221 - sequential manual driver
-                    [tectonic, "--untrusted", "--outdir", str(folder), str(source)],
-                    check=True,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    timeout=120,
-                )
-                pdf = source.with_suffix(".pdf").read_bytes()
-                checks["external_compilation"] = pdf.startswith(b"%PDF-")
-                refused = await session.call_tool(
-                    "documents_create",
+            )["items"][0]
+            highlight = (
+                await call(
+                    "highlights_save",
                     {
-                        "application_id": application["id"],
-                        "kind": "cv",
-                        "content": {"text": "Free-form wording."},
+                        "items": [
+                            {
+                                "career_id": entry["id"],
+                                "text": "Reduced API p95 latency by 20%.",
+                                "approved": True,
+                            }
+                        ]
                     },
                 )
-                checks["cv_content_refused"] = refused.is_error and (
-                    "content_not_accepted" in refused.content[0].text
-                    or "optional TeX source" in refused.content[0].text
-                )
-                tex_bytes = source.read_bytes()
-                tex_sha = hashlib.sha256(tex_bytes).hexdigest()
+            )["items"][0]
+            await call(
+                "templates_save",
+                {
+                    "name": "Synthetic CV",
+                    "kind": "cv",
+                    "tex": EXAMPLE_TEX.read_text(),
+                    "guidance": "Concise, evidence first.",
+                },
+            )
 
-                def spec(name, data):
-                    return {
-                        "name": name,
-                        "size": len(data),
-                        "sha256": hashlib.sha256(data).hexdigest(),
-                    }
+            # "Empty my inbox using my criteria": the start read, one page, batched reads,
+            # one batch of decisions.
+            start = call.calls
+            context = await call("workspace_context", {"include": ["career_full"]})
+            page = await call("jobs_list", {"triage": "new", "limit": JOBS})
+            ids = [item["id"] for item in page["items"]]
+            postings = []
+            for offset in range(0, len(ids), 20):
+                postings += (await call("jobs_get", {"ids": ids[offset : offset + 20]}))["items"]
+            decisions = [
+                {"job_id": job["id"], "to": "shortlisted"}
+                if "Python" in job["posting"]
+                else {"job_id": job["id"], "to": "dismissed", "reason": "No Python in the role."}
+                for job in postings
+            ]
+            triage = await call("jobs_triage", {"items": decisions})
+            counts["triage_50_jobs"] = call.calls - start
+            checks["triage_in_4_plus_n_over_20_calls"] = counts["triage_50_jobs"] <= 4 + JOBS / 20
+            checks["triage_items_each_succeed"] = (
+                page["total"] == JOBS
+                and triage["succeeded"] == JOBS
+                and sum(item["to"] == "shortlisted" for item in decisions) == SHORTLIST
+            )
+            shortlisted = [
+                item["result"]["application_id"]
+                for item in triage["items"]
+                if item["result"].get("application_id")
+            ]
+            checks["shortlisting_starts_applications"] = len(shortlisted) == SHORTLIST
+            changes = await call("changes_list", {"batch_id": triage["batch_id"], "limit": 200})
+            checks["one_batch_per_call"] = changes["total"] >= JOBS and {
+                item["actor"] for item in changes["items"]
+            } == {"agent:synthetic-agent"}
 
-                async def put(grant, data):
-                    response = await http.put(
-                        urljoin(base, grant["url"]), headers=grant["headers"], content=data
-                    )
-                    if response.status_code >= 400:
-                        return None, response.text
-                    return response.json(), None
-
-                document = unpack(
-                    await session.call_tool(
-                        "documents_create",
-                        {
-                            "application_id": application["id"],
-                            "kind": "cv",
-                            "title": "CV",
-                            "claim_ids": [claim["id"]],
-                            "knowledge_ids": [evidence["id"]],
-                            "note": "Built from the synthetic template.",
-                            "source_file": spec("application.tex", tex_bytes),
-                            "pdf": spec("application.pdf", pdf),
-                        },
-                    )
-                )
-                checks["cv_has_no_content"] = "content" not in document
-                checks["create_returns_grants"] = (
-                    document["complete"] is False
-                    and document["uploads"]["source"] is not None
-                    and document["uploads"]["pdf"] is not None
-                )
-                _, early = await put(document["uploads"]["pdf"], pdf)
-                checks["pdf_waits_for_its_source"] = bool(early) and "source" in early
-                uploaded = []
-                for kind, data in (("source", tex_bytes), ("pdf", pdf)):
-                    stored, error = await put(document["uploads"][kind], data)
-                    if error:
-                        raise RuntimeError(error)
-                    uploaded.append(stored)
-                    download = unpack(
-                        await session.call_tool("files_reserve_download", {"file_id": stored["id"]})
-                    )
-                    fetched = await http.get(
-                        urljoin(base, download["url"]), headers=download["headers"]
-                    )
-                    checks["exact_" + stored["name"]] = fetched.content == data
-                checks["pdf_names_its_source"] = uploaded[1]["source_sha256"] == tex_sha
-                current = unpack(
-                    await session.call_tool("documents_get", {"document_id": document["id"]})
-                )
-                checks["text_derived_from_source"] = (
-                    current["source_sha256"] == tex_sha
-                    and current["complete"] is True
-                    and current["text_from"] == "tex"
-                    and "Reduced API p95 latency by 20%" in (current["text"] or "")
-                    and "\\" not in current["text"]
-                    and current["claim_ids"] == [claim["id"]]
-                )
-                checks["complete_revision_is_immutable"] = (
-                    await session.call_tool(
-                        "files_reserve_upload",
-                        {
-                            "owner_type": "document",
-                            "owner_id": document["id"],
-                            "name": "late.pdf",
-                            "media_type": "application/pdf",
-                            "size": len(pdf),
-                        },
-                    )
-                ).is_error
-                # A letter without TeX: the PDF alone, its text read from the PDF.
-                letter = unpack(
-                    await session.call_tool(
-                        "documents_create",
-                        {
-                            "application_id": application["id"],
-                            "kind": "letter",
-                            "pdf": spec("letter.pdf", pdf),
-                        },
-                    )
-                )
-                checks["letter_needs_no_source"] = letter["uploads"]["source"] is None
-                _, error = await put(letter["uploads"]["pdf"], pdf)
-                letter = unpack(
-                    await session.call_tool("documents_get", {"document_id": letter["id"]})
-                )
-                checks["pdf_only_text_from_pdf"] = (
-                    error is None
-                    and letter["complete"]
-                    and letter["text_from"] == "pdf"
-                    and "Example" in (letter["text"] or "")
-                )
-                ready = unpack(await session.call_tool("applications_list", {"stage": "ready"}))
-                checks["ready_is_computed"] = [item["id"] for item in ready["items"]] == [
-                    application["id"]
-                ] and ready["items"][0]["missing"] == []
-                revised = unpack(
-                    await session.call_tool(
-                        "documents_create",
-                        {
-                            "application_id": application["id"],
-                            "previous_id": document["id"],
-                            "kind": "cv",
-                            "note": "Edited source awaiting a newly compiled PDF.",
-                            "source": tex_bytes.decode().replace("Linux.", "Linux, Kubernetes."),
-                            "pdf": spec("application.pdf", pdf),
-                        },
-                    )
-                )
-                checks["revision_has_no_inherited_pdf"] = [
-                    file["name"] for file in revised["files"]
-                ] == ["cv.tex"] and not revised["complete"]
-                checks["incomplete_revision_clears_ready"] = unpack(
-                    await session.call_tool(
-                        "applications_get", {"application_id": application["id"]}
-                    )
-                )["missing"] == ["cv"]
-                _, mismatch = await put(revised["uploads"]["pdf"], pdf + b"\n")
-                comparison = unpack(
-                    await session.call_tool("documents_compare", {"document_id": revised["id"]})
-                )
-                checks["changed_source_compared"] = (
-                    comparison["other_id"] == document["id"]
-                    and (comparison["added"], comparison["removed"]) == (1, 1)
-                    and [line["change"] for line in comparison["lines"] if line["change"] != "same"]
-                    == ["removed", "added"]
-                )
-                checks["pdf_grant_bound_to_its_bytes"] = bool(mismatch)
-                summaries = unpack(
-                    await session.call_tool(
-                        "documents_list",
-                        {"application_id": application["id"], "summary": True, "limit": 1},
-                    )
-                )
-                rest_summaries = (
-                    await http.get(
-                        base + "/api/v1/documents",
-                        params={
-                            "application_id": application["id"],
-                            "summary": "true",
-                            "limit": 1,
-                        },
-                    )
-                ).json()
-                checks["rest_mcp_compact_document_page"] = (
-                    summaries == rest_summaries
-                    and summaries["total"] == 3
-                    and "content" not in summaries["items"][0]
-                    and "files" not in summaries["items"][0]
-                    and summaries["items"][0]["revision_number"] == 2
-                )
-                checks["summary_filters_preserve_detail"] = (
-                    unpack(
-                        await session.call_tool(
-                            "knowledge_list",
-                            {"summary": True, "q": "Example API"},
-                        )
-                    )["items"][0]["id"]
-                    == evidence["id"]
-                    and unpack(
-                        await session.call_tool(
-                            "templates_get",
-                            {
-                                "template_id": template["id"],
-                            },
-                        )
-                    )["tex"]
-                    == tex
-                )
-                current = unpack(
-                    await session.call_tool(
-                        "applications_get", {"application_id": application["id"]}
-                    )
-                )
-                checks["files_do_not_mark_application_sent"] = (
-                    current["status"] == "shortlisted" and current["applied_at"] is None
-                )
-                # The owner reports sending it and an interview invitation.
-                for value in ({"status": "applied"}, {"reply": {"kind": "interview"}}):
-                    current = unpack(
-                        await session.call_tool(
-                            "applications_update",
-                            {
-                                "application_id": application["id"],
-                                "expected_version": current["version"],
-                                **value,
-                            },
-                        )
-                    )
-                checks["reply_moves_the_stage"] = current["status"] == "interview" and [
-                    reply["kind"] for reply in current["replies"]
-                ] == ["interview"]
-                current = unpack(
-                    await session.call_tool(
-                        "applications_update",
-                        {
-                            "application_id": application["id"],
-                            "expected_version": current["version"],
-                            "reply": {"kind": "rejection"},
-                        },
-                    )
-                )
-                checks["closing_keeps_the_shortlist"] = (
-                    (current["status"], current["outcome"]) == ("closed", "rejected")
-                    and unpack(await session.call_tool("jobs_list", {"triage": "shortlisted"}))[
-                        "total"
+            # Applications for the shortlisted jobs, in one call: they already exist.
+            jobs = [item["job_id"] for item in decisions if item["to"] == "shortlisted"]
+            created = await call(
+                "applications_create",
+                {
+                    "items": [
+                        {"job_id": job, "required_documents": ["cv", "letter"]} for job in jobs
                     ]
-                    == 1
-                    and unpack(await session.call_tool("jobs_list", {"triage": "new"}))["total"]
-                    == 0
+                },
+            )
+            checks["applications_create_returns_the_open_ones"] = sorted(
+                item["id"] for item in created["items"]
+            ) == sorted(shortlisted) and not any(
+                item["result"]["created"] for item in created["items"]
+            )
+            application = (await call("applications_get", {"ids": [shortlisted[0]]}))["items"][0]
+            checks["missing_cv_and_letter"] = application["missing"] == ["cv", "letter"]
+
+            # "Prepare CV and letter for this application": two revisions, two PUTs.
+            template = (await call("workspace_context", {"include": ["templates_full"]}))[
+                "templates"
+            ][0]
+            tex = template["tex"]
+            pdf = compile_cv(folder, tex, tectonic)
+            letter_pdf = text_pdf("Dear hiring team,", "Alex Example applies.")
+            checks["pdf_bytes"] = pdf.startswith(b"%PDF-")
+
+            def spec(name, data):
+                return {"name": name, "size": len(data), "sha256": hashlib.sha256(data).hexdigest()}
+
+            async def put(grant, data):
+                response = await http.put(
+                    urljoin(base, grant["url"]), headers=grant["headers"], content=data
                 )
-                response = await http.get(base + "/api/v1/backup")
-                response.raise_for_status()
-                backup = folder / "backup.sqlite"
-                backup.write_bytes(response.content)
-                with sqlite3.connect(backup) as restored:
-                    checks["backup_integrity"] = (
-                        restored.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
-                    )
-                    checks["backup_foreign_keys"] = (
-                        restored.execute("PRAGMA foreign_key_check").fetchall() == []
-                    )
-                    checks["backup_exact_pdf"] = (
-                        restored.execute(
-                            "SELECT content FROM blobs WHERE sha256=?", (uploaded[1]["sha256"],)
-                        ).fetchone()[0]
-                        == pdf
-                    )
-                    checks["backup_revisions"] = (
-                        restored.execute("SELECT COUNT(*) FROM documents").fetchone()[0] == 3
-                    )
+                return response.status_code, response.json()
+
+            start, puts = call.calls, 0
+            cv = await call(
+                "documents_create",
+                {
+                    "application_id": application["id"],
+                    "kind": "cv",
+                    "title": "CV",
+                    "source": tex,
+                    "pdf": spec("cv.pdf", pdf),
+                    "highlight_ids": [highlight["id"]],
+                    "career_ids": [entry["id"]],
+                },
+            )
+            status, stored = await put(cv["uploads"]["pdf"], pdf)
+            puts += 1
+            checks["cv_pdf_names_its_source"] = (
+                status == 200
+                and stored["source_sha256"] == hashlib.sha256(tex.encode()).hexdigest()
+            )
+            checks["curl_line_given"] = cv["uploads"]["pdf"]["curl"].startswith("curl -fsS -X PUT")
+            letter = await call(
+                "documents_create",
+                {
+                    "application_id": application["id"],
+                    "kind": "letter",
+                    "pdf": spec("letter.pdf", letter_pdf),
+                },
+            )
+            status, _ = await put(letter["uploads"]["pdf"], letter_pdf)
+            puts += 1
+            counts["prepare_cv_and_letter"] = {"mcp": call.calls - start, "put": puts}
+            checks["prepare_in_2_calls_and_2_puts"] = counts["prepare_cv_and_letter"] == {
+                "mcp": 2,
+                "put": 2,
+            }
+            cv_read = await call("documents_get", {"document_id": cv["id"]})
+            letter_read = await call("documents_get", {"document_id": letter["id"]})
+            checks["text_from_source_and_from_pdf"] = (
+                cv_read["complete"]
+                and cv_read["text_from"] == "tex"
+                and letter_read["complete"]
+                and letter_read["text_from"] == "pdf"
+                and "Alex Example" in letter_read["text"]
+                and cv_read["highlight_ids"] == [highlight["id"]]
+            )
+            late = await call.raw(
+                "files_upload",
+                {
+                    "owner_type": "document",
+                    "owner_id": cv["id"],
+                    "name": "late.pdf",
+                    "media_type": "application/pdf",
+                    "size": len(pdf),
+                },
+            )
+            checks["complete_revision_is_immutable"] = error_of(late)["code"] == "revision_complete"
+            download = await call("files_download", {"file_id": stored["id"]})
+            fetched = await http.get(urljoin(base, download["url"]), headers=download["headers"])
+            checks["exact_pdf_download"] = fetched.content == pdf
+            ready = await call("applications_list", {"stage": "ready"})
+            checks["ready_is_computed"] = [item["id"] for item in ready["items"]] == [
+                application["id"]
+            ]
+            refused = await call.raw(
+                "applications_update",
+                {"items": [{"application_id": application["id"], "ready": True}]},
+            )
+            checks["ready_cannot_be_set"] = error_of(refused)["code"] == "validation"
+
+            # The owner says they applied and got an interview invitation.
+            sent = await call(
+                "applications_update",
+                {"items": [{"application_id": application["id"], "stage": "applied"}]},
+            )
+            replied = await call(
+                "applications_update",
+                {
+                    "items": [
+                        {
+                            "application_id": application["id"],
+                            "reply": {"kind": "interview", "note": "Call on Monday."},
+                        }
+                    ]
+                },
+            )
+            checks["reply_moves_the_stage"] = (
+                sent["items"][0]["result"]["status"] == "applied"
+                and replied["items"][0]["result"]["status"] == "interview"
+            )
+
+            # The owner restores one dismissal; the agent reads it as feedback.
+            dismissed = next(item for item in decisions if item["to"] == "dismissed")
+            job = (await owner.get(f"{base}/api/v1/jobs/{dismissed['job_id']}")).json()
+            restored = await owner.post(
+                f"{base}/api/v1/jobs/{job['id']}/triage",
+                json={"triage": "new", "expected_version": job["version"]},
+            )
+            feedback = (await call("workspace_context"))["feedback"]
+            checks["owner_correction_is_feedback"] = restored.status_code == 200 and any(
+                item["subject"]["id"] == job["id"]
+                and item["reason_was"] == "No Python in the role."
+                for item in feedback
+            )
+
+            backup = await call("workspace_backup")
+            response = await http.get(urljoin(base, backup["url"]), headers=backup["headers"])
+            path = folder / "backup.sqlite"
+            path.write_bytes(response.content)
+            with sqlite3.connect(path) as restored_db:
+                checks["backup_integrity"] = (
+                    restored_db.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+                    and restored_db.execute("PRAGMA foreign_key_check").fetchall() == []
+                    and restored_db.execute("SELECT count(*) FROM api_tokens").fetchone()[0] == 0
+                    and restored_db.execute(
+                        "SELECT content FROM blobs WHERE sha256=?", (stored["sha256"],)
+                    ).fetchone()[0]
+                    == pdf
+                )
     return {
-        "purpose": "new production-module MCP/REST/external-compilation/file/backup round trip",
+        "purpose": "an external agent's MCP round trip: start read, batches, files, feedback",
+        "compiled_with": "tectonic" if tectonic else "synthetic pdf",
+        "calls": counts,
         "checks": checks,
         "all_passed": all(checks.values()),
-        "pdf_bytes": len(pdf),
-        "tools_discovered": len(names),
     }
+
+
+def seed(app):
+    """Fifty collected jobs, four of them about Python, as a source would store them."""
+    for number in range(JOBS):
+        stack = "Python" if number < SHORTLIST else "Java"
+        app.state.workspace.ingest_job(
+            {
+                "url": f"https://jobs.example.org/{number}",
+                "title": f"Backend engineer {number}",
+                "company": f"Example {number % 7}",
+                "posting": f"Build {stack} services for a synthetic product team. " * 20,
+            }
+        )
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--out", type=Path)
-    parser.add_argument("--tectonic", default="tectonic")
+    parser.add_argument("--tectonic", default="", help="Compile the CV with this Tectonic.")
     args = parser.parse_args()
     with tempfile.TemporaryDirectory() as temporary:
         folder = Path(temporary)
         app = create_app(folder / "workspace.sqlite", start_worker=False)
-        if not app.state.auth.configured():
-            app.state.auth.setup("synthetic-probe-password")
-        token = app.state.auth.create_token("synthetic-agent-probe")["token"]
+        app.state.auth.setup("synthetic-probe-password")
+        agent = app.state.auth.create_token("synthetic-agent", "agent")["token"]
+        owner = app.state.auth.create_token("synthetic-owner", "owner")["token"]
+        seed(app)
         sock = socket.socket()
         sock.bind(("127.0.0.1", 0))
         port = sock.getsockname()[1]
@@ -500,7 +403,8 @@ def main():
                 time.sleep(0.05)
             if not server.started:
                 raise RuntimeError("Probe HTTP server did not start.")
-            record = asyncio.run(exercise(f"http://127.0.0.1:{port}", token, folder, args.tectonic))
+            base = f"http://127.0.0.1:{port}"
+            record = asyncio.run(exercise(base, agent, owner, folder, args.tectonic))
             if args.out:
                 args.out.write_text(json.dumps(record, indent=2) + "\n")
             print(json.dumps(record, indent=2))
