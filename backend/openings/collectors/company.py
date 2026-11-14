@@ -192,7 +192,7 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
         if not any(character.isalnum() for character in posting):
             posting = ""
         if not posting and key in known:
-            posting = (source.get("known_postings") or {}).get(key, "")
+            posting = source["known_posting"](key) if source.get("known_posting") else ""
         if not posting and key in attempts and key not in pending:
             if attempts[key] < 3:
                 pending.add(key)

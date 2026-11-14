@@ -20,6 +20,8 @@ from .feeds import fetch_postings, normalize_posting
 from .network import HTTP_BUDGET
 
 LOG = logging.getLogger(__name__)
+# Collected postings between two writes of a running task's progress.
+PERSIST_EVERY = 25
 
 
 class TaskOperations:
@@ -190,9 +192,7 @@ class TaskOperations:
             else f"{source['kind']}:{source['config'].get('board', '')}:"
         )
         known_rows = self.db.all(
-            "SELECT i.identity,j.metadata,j.posting,d.checked_at,"
-            + posting_complete_sql()
-            + " AS complete "
+            "SELECT i.identity,j.metadata,d.checked_at," + posting_complete_sql() + " AS complete "
             "FROM job_identities i JOIN jobs j ON j.id=i.job_id "
             "LEFT JOIN posting_details d ON d.identity=i.identity AND d.job_id=j.id "
             "WHERE i.identity>=? AND i.identity<?",
@@ -201,9 +201,19 @@ class TaskOperations:
         source["known"] = {
             row["identity"]: json.loads(row["metadata"]) for row in known_rows if row["complete"]
         }
-        source["known_postings"] = {
-            row["identity"]: row["posting"] for row in known_rows if row["complete"]
-        }
+
+        def known_posting(identity):
+            """The archived text of a complete known posting, read only when a collector needs it."""
+            if identity not in source["known"]:
+                return ""
+            row = self.db.one(
+                "SELECT j.posting FROM job_identities i JOIN jobs j ON j.id=i.job_id "
+                "WHERE i.identity=?",
+                (identity,),
+            )
+            return row["posting"] if row else ""
+
+        source["known_posting"] = known_posting
         source["detail_checked"] = {
             row["identity"]: row["checked_at"] for row in known_rows if row["checked_at"]
         }
@@ -219,8 +229,11 @@ class TaskOperations:
         result.setdefault("started_at", now())
         task["partial_result"] = result
         observed = set(task["payload"].get("observed_identities") or [])
+        unsaved = [0]  # postings stored since the task was last written
 
         def persist():
+            unsaved[0] = 0
+            task["payload"]["observed_identities"] = sorted(observed)
             self.db.execute(
                 "UPDATE tasks SET payload=?,result=?,updated_at=? WHERE id=? AND state='running' AND lease_owner=?",
                 (encode(task["payload"]), encode(result), now(), task["id"], owner),
@@ -299,8 +312,17 @@ class TaskOperations:
                         observed.add(identity)
                     if saved.get("created"):
                         created = saved["id"]
-                task["payload"]["observed_identities"] = sorted(observed)
-                persist()
+                # The counts are written with each posting; the growing list of observed
+                # identities every few postings, at each checkpoint and when the attempt
+                # ends (after a crash, up to that many may be counted again).
+                unsaved[0] += 1
+                if unsaved[0] >= PERSIST_EVERY:
+                    persist()
+                else:
+                    self.db.execute(
+                        "UPDATE tasks SET result=?,updated_at=? WHERE id=? AND state='running' AND lease_owner=?",
+                        (encode(result), now(), task["id"], owner),
+                    )
             return created
 
         source["on_item"] = store
@@ -316,6 +338,8 @@ class TaskOperations:
             postings = fetch_postings(source)
         finally:
             HTTP_BUDGET.reset(token)
+            if unsaved[0]:
+                persist()
         if len(postings) > 2000:
             raise DomainError(
                 422,
@@ -328,8 +352,12 @@ class TaskOperations:
                 for posting in postings
                 if matches_filters(posting, source["config"].get("filters") or {})
             )
-            for posting in postings:
-                store(posting)
+            try:
+                for posting in postings:
+                    store(posting)
+            finally:
+                if unsaved[0]:
+                    persist()
         diagnostic = source.get("diagnostic") or budget.diagnostics()
         for key, message in (
             (

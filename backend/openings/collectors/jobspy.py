@@ -111,10 +111,12 @@ def collect(config, provider, budget, *, preview=False, source=None):
     scraper.checkpoint = source.setdefault("checkpoint", {}) if not preview else {}
     scraper.on_checkpoint = source.get("on_checkpoint") if not preview else None
     cutoff = (datetime.now(UTC) - timedelta(hours=24)).isoformat()
+    # The archived text of complete postings whose details were checked in the last day.
+    known_posting = source.get("known_posting")
     scraper.known_postings = {
-        key: value
-        for key, value in (source.get("known_postings") or {}).items()
-        if (source.get("detail_checked") or {}).get(key, "") > cutoff
+        key: known_posting(key)
+        for key, checked in (source.get("detail_checked") or {}).items()
+        if known_posting and checked > cutoff and key in (source.get("known") or {})
     }
     scraper_input = ScraperInput(
         site_name=[Site(provider)],
