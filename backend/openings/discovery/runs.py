@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 
+from pydantic import ValidationError
+
 from .. import events
 from ..collectors import jobspy as jobspy_collector
 from ..collectors.policy import ProviderPatch
@@ -334,9 +336,17 @@ class RunOperations:
             source["config"] = {**source["config"], **options}
             # Validate the frozen effective configuration, not a temporary edit of the saved source.
             if source["kind"] == "jobspy":
-                jobspy_collector.JobSpyConfig.model_validate(
-                    {k: v for k, v in source["config"].items() if k not in ("url", "filters")}
-                )
+                try:
+                    jobspy_collector.JobSpyConfig.model_validate(
+                        {k: v for k, v in source["config"].items() if k not in ("url", "filters")}
+                    )
+                except ValidationError as error:
+                    raise DomainError(
+                        422,
+                        "source_config",
+                        "The saved search configuration is invalid; edit the source first.",
+                        error.errors(include_url=False, include_context=False),
+                    ) from error
             providers = (
                 source["config"]["providers"] if source["kind"] == "jobspy" else [source["kind"]]
             )

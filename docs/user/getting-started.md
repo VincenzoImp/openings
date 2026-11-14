@@ -89,21 +89,19 @@ explains every setting.
 
 You can do this without an agent or LaTeX. Have your CV and letter ready as PDFs.
 
-1. Open **Applications** and select the application you just started. It opens
-   on its own page: the posting, a slot for the CV and a slot for the letter.
-2. In each slot, choose **Upload PDF**. Enter a title and choose the PDF. If you
-   built it from LaTeX, add the `.tex` source too.
-3. Open the **Requirements** tab if the employer sets conditions, such as a
-   required reference. Add them and mark the ones that must be settled first as
-   **Blocking**. Use **Answers** for the questions on the application form.
+1. Open **Applications** and select the application you just started. Its page
+   says what is missing and has a slot for the CV and one for the letter.
+2. Drop each PDF on its slot, or choose **Upload PDF**. If you built it from
+   LaTeX, add the `.tex` source too.
+3. If the employer sets conditions, such as a required reference, add them under
+   **Requirements** and mark the ones that must be settled first as **Blocking**.
 4. When both documents are stored and nothing blocks the application, the page
-   says it is **Ready** and Today lists it under **Ready to apply**.
-5. Choose **Download CV and letter**, then **Open the posting** and apply on the
-   employer's site.
-6. Back in Openings, choose **Mark applied**. You have six seconds to **Undo**.
-   The next Ready application opens.
+   becomes the **Ready** page and Today lists it under **Ready to apply**.
+5. Choose **Download CV + Letter**, then **Apply on employer's site**.
+6. Back in Openings, choose **Mark applied**. **Undo** is offered, and the next
+   Ready application opens.
 
-![The review page: the posting, the CV and the letter with their PDFs, and Mark applied](../images/review.png)
+![The Ready page: before you send, the posting, the CV and the letter, and Mark applied](../images/review.png)
 
 When the employer answers, choose **Record reply**, say what happened and give the
 date. After the no-reply period (30 days unless you change it in

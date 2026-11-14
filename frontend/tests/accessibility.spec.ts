@@ -1,14 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { test, expect, type Page } from "./fixtures";
-import {
-  call,
-  go,
-  isPhone,
-  ownerSession,
-  syntheticTex,
-  upload,
-  type Cookies,
-} from "./session";
+import { call, go, isPhone, ownerSession, type Cookies } from "./session";
 
 // Automated accessibility checks (axe) on every screen, in both themes; the
 // Playwright projects supply the desktop and the narrow width. The budget: no
@@ -228,99 +220,59 @@ for (const theme of ["light", "dark"]) {
       expect(await findings(page, "jobs-bulk")).toEqual([]);
     });
 
-    test("the review page, each of its tabs and the response form have no serious accessibility finding", async ({
+    test("the application page in each stage, its dialogs and the list's bulk bar have no serious accessibility finding", async ({
       page,
     }) => {
       test.setTimeout(90000);
       await page.context().addCookies(cookies);
       await go(page, "today");
-      const api = (path: string) =>
-        page.evaluate(
-          (path) => fetch("/api/v1" + path).then((response) => response.json()),
-          path,
-        );
-      const ready = (
-        await api("/applications?stage=ready&sort=deadline&limit=1")
-      ).items[0];
-      const sent = (await api("/applications?stage=interview&limit=1"))
-        .items[0];
-      for (const [id, tab] of [
-        [ready.id, "answers"],
-        [ready.id, "requirements"],
-        [ready.id, "documents"],
-        [ready.id, "details"],
-        [sent.id, "timeline"],
-      ]) {
-        await go(page, `applications/${id}?tab=${tab}`);
+      const first = async (query: string) =>
+        (await call(page, `/applications?${query}&limit=1`)).items[0].id;
+      const pages = [
+        ["ready", await first("stage=ready&sort=deadline")],
+        ["shortlisted", await first("stage=shortlisted&needs=documents")],
+        ["interview", await first("stage=interview&q=Research")],
+        ["closed", await first("stage=closed&outcome=rejected")],
+      ];
+      for (const [stage, id] of pages) {
+        await go(page, `applications/${id}`);
+        await expect(page.locator(".ui-skeleton")).toHaveCount(0);
         await settled(page);
-        expect(await findings(page, `review-${tab}`)).toEqual([]);
+        expect(await findings(page, `application-${stage}`)).toEqual([]);
       }
-      // The pane switch on a phone, and the documents in a revision.
-      await go(page, `applications/${ready.id}?tab=documents`);
-      await settled(page);
-      await page
-        .getByRole("list", { name: "Document revisions" })
-        .getByRole("button", { name: /^Open/ })
-        .first()
-        .click();
-      await settled(page);
-      expect(await findings(page, "review-revision")).toEqual([]);
-      // A CV revision compared with the one it replaces.
-      const job = await call(page, "/jobs", "POST", {
-        title: `Compared CV ${test.info().project.name} ${Date.now()}`,
-        company: "Example Labs",
-        posting: "Build reliable services with a small team.",
-      });
-      const application = await call(page, "/applications", "POST", {
-        job_id: job.id,
-      });
-      let previous = null;
-      for (const wording of ["First wording.", "Second wording."]) {
-        previous = await call(page, "/documents", "POST", {
-          application_id: application.id,
-          kind: "cv",
-          title: "CV",
-          previous_id: previous?.id ?? null,
-        });
-        // Sources only: Chromium's PDF viewer would keep the network busy.
-        await upload(
-          page,
-          "document",
-          previous.id,
-          "cv.tex",
-          syntheticTex(`${wording}\n\nA kept line.`),
-          "application/x-tex",
-        );
-      }
-      await go(page, `applications/${application.id}?tab=documents`);
-      await settled(page);
-      await page
-        .getByRole("list", { name: "Document revisions" })
-        .getByRole("button", { name: /^Open/ })
-        .first()
-        .click();
-      await page
-        .getByRole("button", { name: "Compare with revision 1" })
-        .click();
-      await expect(
-        page.getByRole("list", { name: "Changes since revision 1" }),
-      ).toBeVisible();
-      expect(await findings(page, "review-comparison")).toEqual([]);
-      // The form that records an employer reply, under its row.
-      await go(page, "applications?stage=interview");
-      await settled(page);
+      // The Record reply dialog, and a stage's menu.
+      await go(page, `applications/${pages[2][1]}`);
       await page
         .getByRole("button", { name: /^Record reply/ })
-        .first()
+        .filter({ visible: true })
         .click();
-      await expect(page.locator("form.respond")).toBeVisible();
-      expect(await findings(page, "respond")).toEqual([]);
-      // Selected rows with the bulk actions.
-      await page.locator(".grid-row input[type=checkbox]").nth(1).check();
+      await expect(page.locator("dialog[open]")).toBeVisible();
+      expect(await findings(page, "record-reply")).toEqual([]);
+      await page.keyboard.press("Escape");
+      await page
+        .getByRole("button", { name: "More actions" })
+        .filter({ visible: true })
+        .click();
       await expect(
-        page.getByRole("group", { name: "Selected applications" }),
+        page
+          .getByRole("menu", { name: "Application actions" })
+          .filter({ visible: true }),
       ).toBeVisible();
-      expect(await findings(page, "bulk")).toEqual([]);
+      expect(await findings(page, "application-menu")).toEqual([]);
+      await page.keyboard.press("Escape");
+      // Selected rows with the bulk bar (a desktop pattern).
+      if (!isPhone(page)) {
+        await go(page, "applications?stage=applied");
+        await settled(page);
+        await page
+          .locator(".ui-list [data-row-id]")
+          .first()
+          .click({ modifiers: ["ControlOrMeta"] });
+        await expect(
+          page.getByRole("toolbar", { name: "1 selected" }),
+        ).toBeVisible();
+        expect(await findings(page, "applications-bulk")).toEqual([]);
+      }
     });
 
     test("the shell: the More menu, the account menu, the palette, Add job and the shortcuts have no serious accessibility finding", async ({

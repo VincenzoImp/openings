@@ -298,19 +298,17 @@ test("the schedule line sets one interval and pauses every check", async ({
   await expect
     .poll(async () => (await call(page, "/collection")).enabled)
     .toBe(true);
-  // Check all now queues every source that is on. (The seeded sources are
-  // records without a query, which the server refuses to run.)
-  const run: { action?: string; items?: unknown[] }[] = [];
-  await page.route("**/api/v1/sources/bulk", (route) => {
-    run.push(route.request().postDataJSON());
-    return route.fulfill({
-      json: { items: [], total: 0, succeeded: 0, failed: 0 },
-    });
-  });
+  // Check all now queues every source that is on. Two seeded searches are
+  // old records without a query: the server refuses them, and the toast says
+  // so instead of claiming they run.
   await page.getByRole("button", { name: "Check all now" }).click();
-  await expect(toast(page)).toContainText(/Checking \d+ sources now/);
-  expect(run[0]).toMatchObject({ action: "run" });
-  expect(run[0].items).toHaveLength(items.length);
+  await expect(toast(page)).toContainText(
+    "Checking 2 sources now; 2 sources could not be checked: The saved search configuration is invalid",
+  );
+  const runs = (await call(page, "/collection/runs?limit=50")).items as {
+    state: string;
+  }[];
+  expect(runs.filter((run) => run.state === "queued")).toHaveLength(2);
 });
 
 test("keyboard: move through sources, edit with e, keep a draft on Esc", async ({

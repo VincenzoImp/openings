@@ -221,7 +221,10 @@
   }
 
   @container app (max-width: 719px) {
+    /* The phone's top bar carries the title. Said here too, so the order in
+       which split stylesheets load cannot show the header again. */
     .ui-page-header {
+      display: none;
       padding: var(--s-3) var(--s-4) 0;
     }
     .ui-props {
