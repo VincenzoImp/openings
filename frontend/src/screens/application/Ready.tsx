@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   CalendarDays,
   ChevronLeft,
@@ -32,6 +32,31 @@ import type { PageContext } from "./Page";
 import { Answers, PostingText, Requirements } from "./Sections";
 
 type Pane = "check" | "posting" | Kind;
+/**
+ * How the review shows: three panes side by side from 1200 px, one pane at
+ * a time behind tabs below that (the check above them), and on a phone the
+ * check is a tab too.
+ */
+type Layout = "side" | "tabs" | "phone";
+const layoutOf = (width: number): Layout =>
+  width < 720 ? "phone" : width < 1200 ? "tabs" : "side";
+
+/** The layout for the width of the page, followed as it changes. */
+function useLayout() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [layout, setLayout] = useState<Layout>("side");
+  useLayoutEffect(() => {
+    const page = ref.current?.parentElement;
+    if (!page) return;
+    const measure = () => setLayout(layoutOf(page.clientWidth));
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(page);
+    return () => observer.disconnect();
+  }, []);
+  return { ref, layout };
+}
 
 /** "2 of 5 ready · Next: Data Engineer · Orbit →", with [ and ]. */
 function QueuePlace({ queue, id }: { queue: ApplicationRow[]; id: string }) {
@@ -150,7 +175,11 @@ export function ReadyView({
   const current = useCurrentDocuments(app.id);
   const toast = useToast();
   const [day, setDay] = useState(isoDay());
-  const [pane, setPane] = useState<Pane>("check");
+  const [chosen, setPane] = useState<Pane>("check");
+  const { ref, layout } = useLayout();
+  // Beside the panes or above the tabs the check is always shown; a pane is.
+  const pane: Pane =
+    layout !== "phone" && chosen === "check" ? "posting" : chosen;
   const mark = () => onMarkApplied(day === isoDay() ? undefined : day);
   const kinds = (["cv", "letter"] as Kind[]).filter(
     (kind) => current[kind] || (app.required_documents ?? []).includes(kind),
@@ -238,7 +267,7 @@ export function ReadyView({
     </section>
   );
   const panes: { id: Pane; label: string }[] = [
-    { id: "check", label: "Check" },
+    ...(layout === "phone" ? [{ id: "check" as Pane, label: "Check" }] : []),
     { id: "posting", label: "Posting" },
     ...kinds.map((kind) => ({ id: kind, label: KIND_LABEL[kind] })),
   ];
@@ -275,22 +304,27 @@ export function ReadyView({
         <MarkApplied busy={busy} day={day} onDay={setDay} onMark={mark} />,
       )}
       <QueuePlace queue={queue} id={app.id} />
-      <Tabs
-        className="apg-tabs"
-        label="Shown part"
-        idPrefix="apg"
-        value={pane}
-        onChange={(id) => setPane(id as Pane)}
-        items={panes}
-      />
+      {layout === "tabs" && <div className="apg-ready-check">{check}</div>}
+      {layout !== "side" && (
+        <Tabs
+          className="apg-tabs"
+          label="Shown part"
+          idPrefix="apg"
+          value={pane}
+          onChange={(id) => setPane(id as Pane)}
+          items={panes}
+        />
+      )}
       <div
+        ref={ref}
         className="apg-ready"
         id="apg-panel"
         data-pane={pane}
+        data-layout={layout}
         role="group"
         aria-label="Application to send"
       >
-        <div className="apg-ready-check">{check}</div>
+        {layout !== "tabs" && <div className="apg-ready-check">{check}</div>}
         <div className="apg-panes" data-count={kinds.length + 1}>
           <section
             className="apg-pane"

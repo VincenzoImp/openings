@@ -95,6 +95,13 @@ export function Requirements({
   const toast = useToast();
   const [text, setText] = useState("");
   const [blocking, setBlocking] = useState(false);
+  // The new requirement's field appears on intent, not at rest (P4).
+  const [adding, setAdding] = useState(false);
+  const stopAdding = () => {
+    setAdding(false);
+    setText("");
+    setBlocking(false);
+  };
   const items = app.requirements ?? [];
   const save = (next: Requirement[], done?: () => void) =>
     update.mutate(
@@ -186,9 +193,27 @@ export function Requirements({
           ))}
         </ul>
       )}
-      {editable && (
+      {editable && !adding && (
+        <Button
+          size="sm"
+          variant="ghost"
+          icon={Plus}
+          className="ap-req-open"
+          onClick={() => setAdding(true)}
+        >
+          Add requirement
+        </Button>
+      )}
+      {editable && adding && (
         <form
           className="ap-req-add"
+          data-unguarded=""
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.preventDefault();
+              stopAdding();
+            }
+          }}
           onSubmit={(event) => {
             event.preventDefault();
             if (!text.trim()) return;
@@ -203,16 +228,14 @@ export function Requirements({
                   resolved: false,
                 } as Requirement,
               ],
-              () => {
-                setText("");
-                setBlocking(false);
-              },
+              stopAdding,
             );
           }}
         >
           <Input
             aria-label="New requirement"
-            placeholder="Add a requirement"
+            placeholder="What the employer asks for"
+            autoFocus
             value={text}
             maxLength={2000}
             onChange={(event) => setText(event.target.value)}
@@ -229,6 +252,9 @@ export function Requirements({
             disabled={!text.trim() || update.isPending}
           >
             Add
+          </Button>
+          <Button size="sm" variant="ghost" onClick={stopAdding}>
+            Cancel
           </Button>
         </form>
       )}
