@@ -16,4 +16,3 @@ export const outcomeLabels: Record<string, string> = {
   not_pursued: "Not pursued",
   no_response: "No reply",
 };
-

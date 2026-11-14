@@ -12,6 +12,7 @@ import { Field, Input } from "../../ui/Field";
 import { Icon } from "../../ui/Icon";
 import { isTyping } from "../../ui/keys";
 import { Popover } from "../../ui/Menu";
+import { Skeleton } from "../../ui/Page";
 import { ActionBar } from "../../ui/Split";
 import { Tabs } from "../../ui/Tabs";
 import { useToast } from "../../ui/Toast";
@@ -104,7 +105,9 @@ function MarkApplied({
             {...props}
             icon={CalendarDays}
             label={
-              day === today ? "Sent today: change the day" : `Sent ${shortDay(day)}: change the day`
+              day === today
+                ? "Sent today: change the day"
+                : `Sent ${shortDay(day)}: change the day`
             }
           />
         )}
@@ -155,9 +158,15 @@ export function ReadyView({
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey)
+      if (
+        event.defaultPrevented ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.altKey
+      )
         return;
-      if (document.querySelector("dialog[open], [popover]:popover-open")) return;
+      if (document.querySelector("dialog[open], [popover]:popover-open"))
+        return;
       if (event.key === "Enter" && event.shiftKey) {
         if (isTyping(event.target)) return;
         event.preventDefault();
@@ -246,7 +255,16 @@ export function ReadyView({
         {revision ? (
           <RevisionView revision={revision} kind={kind} />
         ) : (
-          <div className="ap-well ap-well-loading" />
+          <div className="ap-well ap-well-loading">
+            {current.loading ? (
+              <>
+                <Skeleton width="60%" />
+                <Skeleton width="40%" />
+              </>
+            ) : (
+              <p className="ap-pdf-missing">No {KIND_LABEL[kind]} uploaded.</p>
+            )}
+          </div>
         )}
       </section>
     );
@@ -274,9 +292,18 @@ export function ReadyView({
       >
         <div className="apg-ready-check">{check}</div>
         <div className="apg-panes" data-count={kinds.length + 1}>
-          <section className="apg-pane" data-pane="posting" aria-label="Posting">
+          <section
+            className="apg-pane"
+            data-pane="posting"
+            aria-label="Posting"
+          >
             <h2 className="apg-pane-title">Posting</h2>
-            <div className="apg-pane-scroll" tabIndex={0} role="group" aria-label="Posting text">
+            <div
+              className="apg-pane-scroll"
+              tabIndex={0}
+              role="group"
+              aria-label="Posting text"
+            >
               <PostingText text={job.posting} />
             </div>
           </section>

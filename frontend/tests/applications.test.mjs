@@ -198,10 +198,7 @@ test("sent and closed applications lead with a status line", () => {
     "Rejected on 2 Nov after interview",
   );
   assert.equal(
-    model.closedSummary(
-      app({ status: "closed", outcome: "not_pursued" }),
-      now,
-    ),
+    model.closedSummary(app({ status: "closed", outcome: "not_pursued" }), now),
     "Not pursued · never sent",
   );
 });
@@ -281,10 +278,9 @@ test("the list's filters live in its address, defaults left out", () => {
   );
   assert.equal(filters.passes(row({}), read("source=Indeed"), now), false);
   assert.deepEqual(
-    filters.filterChips(read("waiting=1&outcome=rejected"), 45).map((chip) => [
-      chip.field,
-      chip.value,
-    ]),
+    filters
+      .filterChips(read("waiting=1&outcome=rejected"), 45)
+      .map((chip) => [chip.field, chip.value]),
     [
       ["Waiting", "no reply for over 45 days"],
       ["Outcome", "Rejected"],

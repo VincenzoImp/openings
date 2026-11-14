@@ -1,12 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { test, expect, type Page } from "./fixtures";
-import {
-  call,
-  go,
-  isPhone,
-  ownerSession,
-  type Cookies,
-} from "./session";
+import { call, go, isPhone, ownerSession, type Cookies } from "./session";
 
 // Automated accessibility checks (axe) on every screen, in both themes; the
 // Playwright projects supply the desktop and the narrow width. The budget: no
@@ -254,7 +248,7 @@ for (const theme of ["light", "dark"]) {
       // The Record reply dialog, and a stage's menu.
       await go(page, `applications/${pages[2][1]}`);
       await page
-        .getByRole("button", { name: "Record reply", exact: true })
+        .getByRole("button", { name: /^Record reply/ })
         .filter({ visible: true })
         .click();
       await expect(page.locator("dialog[open]")).toBeVisible();
@@ -265,7 +259,9 @@ for (const theme of ["light", "dark"]) {
         .filter({ visible: true })
         .click();
       await expect(
-        page.getByRole("menu", { name: "Application actions" }).filter({ visible: true }),
+        page
+          .getByRole("menu", { name: "Application actions" })
+          .filter({ visible: true }),
       ).toBeVisible();
       expect(await findings(page, "application-menu")).toEqual([]);
       await page.keyboard.press("Escape");
@@ -277,7 +273,9 @@ for (const theme of ["light", "dark"]) {
           .locator(".ui-list [data-row-id]")
           .first()
           .click({ modifiers: ["ControlOrMeta"] });
-        await expect(page.getByRole("toolbar", { name: "1 selected" })).toBeVisible();
+        await expect(
+          page.getByRole("toolbar", { name: "1 selected" }),
+        ).toBeVisible();
         expect(await findings(page, "applications-bulk")).toEqual([]);
       }
     });

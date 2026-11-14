@@ -140,7 +140,9 @@ test("five Ready applications are sent from Today with five Mark applied and no 
     .toEqual(["shortlisted", null, true]);
   // The keyboard: ⇧↵ marks it applied again.
   await page.locator("body").press("Shift+Enter");
-  await expect(page.getByRole("heading", { name: /^All sent —/ })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: /^All sent —/ }),
+  ).toBeVisible();
   expect((await read(page, queue[4].id)).status).toBe("applied");
 });
 
@@ -151,7 +153,13 @@ test("an error on Mark applied leaves the page in place", async ({ page }) => {
     route.request().method() === "PATCH"
       ? route.fulfill({
           status: 409,
-          json: { error: { code: "conflict", status: 409, message: "Changed elsewhere." } },
+          json: {
+            error: {
+              code: "conflict",
+              status: 409,
+              message: "Changed elsewhere.",
+            },
+          },
         })
       : route.continue(),
   );
@@ -170,7 +178,9 @@ test("without LaTeX: a PDF CV and letter uploaded on the page make it Ready", as
   const app = await make(page, title);
   expect(app.missing).toEqual(["cv", "letter"]);
   await go(page, `applications/${app.id}`);
-  await expect(page.getByRole("heading", { name: "What's missing" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "What's missing" }),
+  ).toBeVisible();
   for (const [name, file] of [
     ["CV", "cv.pdf"],
     ["Letter", "letter.pdf"],
@@ -223,7 +233,9 @@ test("Record reply records the reply and moves the stage by its kind", async ({
     await expect(line).toContainText(/^Applied/);
     const fold = page.viewportSize()!.height;
     expect((await line.boundingBox())!.y).toBeLessThan(fold);
-    expect((await visible(page, "Record reply").boundingBox())!.y).toBeLessThan(fold);
+    expect((await visible(page, "Record reply").boundingBox())!.y).toBeLessThan(
+      fold,
+    );
     await expect(page.locator(".ap-drop")).toHaveCount(0);
     await visible(page, "Record reply").click();
     const form = dialog(page);
@@ -250,23 +262,36 @@ test("close as no reply from the page with Undo, and in bulk from the list", asy
     appliedDaysAgo: 60,
   });
   await go(page, `applications/${single.id}`);
-  await page.getByRole("button", { name: "More actions" }).filter({ visible: true }).click();
+  await page
+    .getByRole("button", { name: "More actions" })
+    .filter({ visible: true })
+    .click();
   await page.getByRole("menuitem", { name: "Close as no reply" }).click();
   await expect(toast(page)).toContainText("Closed as no reply");
   await expect
     .poll(async () => (await read(page, single.id)).outcome)
     .toBe("no_response");
   await toast(page).getByRole("button", { name: /Undo/ }).click();
-  await expect.poll(async () => (await read(page, single.id)).status).toBe("applied");
+  await expect
+    .poll(async () => (await read(page, single.id)).status)
+    .toBe("applied");
 
-  const first = await make(page, `${prefix} one`, { status: "applied", appliedDaysAgo: 50 });
-  const second = await make(page, `${prefix} two`, { status: "applied", appliedDaysAgo: 55 });
+  const first = await make(page, `${prefix} one`, {
+    status: "applied",
+    appliedDaysAgo: 50,
+  });
+  const second = await make(page, `${prefix} two`, {
+    status: "applied",
+    appliedDaysAgo: 55,
+  });
   await go(page, `applications?stage=applied&q=${encodeURIComponent(prefix)}`);
   const rows = page.locator(".ui-list [data-row-id]");
   await expect(rows).toHaveCount(3);
   // Content at rest: no row shows a button.
   await page.mouse.move(0, 0);
-  await expect(page.locator(".ui-row button").filter({ visible: true })).toHaveCount(0);
+  await expect(
+    page.locator(".ui-row button").filter({ visible: true }),
+  ).toHaveCount(0);
   await rows.first().click({ modifiers: ["ControlOrMeta"] });
   await rows.nth(1).click({ modifiers: ["ControlOrMeta"] });
   const bar = page.getByRole("toolbar", { name: "2 selected" });
@@ -279,7 +304,9 @@ test("close as no reply from the page with Undo, and in bulk from the list", asy
   await bar.getByRole("button", { name: "Close as no reply" }).click();
   await expect(toast(page)).toContainText("Closed 2 as no reply");
   const closed = await Promise.all(
-    [first, second, single].map(async (app) => (await read(page, app.id)).outcome ?? null),
+    [first, second, single].map(
+      async (app) => (await read(page, app.id)).outcome ?? null,
+    ),
   );
   expect(closed.filter((value) => value === "no_response")).toHaveLength(2);
 });
@@ -289,7 +316,9 @@ test("the list starts with what needs action and opens the page; Stats has its n
 }) => {
   await go(page, "applications");
   const list = page.getByRole("region", { name: "Applications" });
-  await expect(list.getByRole("heading", { name: /^Ready to send/ })).toBeVisible();
+  await expect(
+    list.getByRole("heading", { name: /^Ready to send/ }),
+  ).toBeVisible();
   const row = list.locator("[data-row-id]").first();
   const box = (await row.boundingBox())!;
   expect(box.y).toBeLessThanOrEqual(isPhone(page) ? 220 : 300);
@@ -302,7 +331,9 @@ test("the list starts with what needs action and opens the page; Stats has its n
   await expect(page).toHaveURL(/#applications\/[^?]+$/);
   await go(page, "applications?section=stats");
   await expect(page.getByText("Reply rate")).toBeVisible();
-  await expect(page.getByRole("list", { name: "Funnel" }).getByRole("listitem")).toHaveCount(4);
+  await expect(
+    page.getByRole("list", { name: "Funnel" }).getByRole("listitem"),
+  ).toHaveCount(4);
   await page.getByRole("radio", { name: "All time" }).click();
   await expect(page).toHaveURL(/period=all/);
   await expect(page.getByText("Median days to a reply")).toBeVisible();

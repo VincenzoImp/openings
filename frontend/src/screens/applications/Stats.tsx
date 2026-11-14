@@ -50,8 +50,8 @@ export function StatsView({ period }: { period: Period }) {
   if (!data.applied)
     return (
       <EmptyState icon={ChartNoAxesColumn} title="Nothing sent in this period">
-        Stats count the applications you marked applied. Choose a longer
-        period, or send one first.
+        Stats count the applications you marked applied. Choose a longer period,
+        or send one first.
       </EmptyState>
     );
   const funnel = data.funnel.map((step) => ({

@@ -86,13 +86,16 @@ export function BulkActions({
       ]);
       onClear();
       const versions = versionsOf(result);
-      report(result, `Closed ${result.succeeded} as ${OUTCOMES[value].toLowerCase()}`, () =>
-        reopen(
-          items
-            .filter((app) => versions.has(app.id))
-            .map((app) => ({ ...app, version: versions.get(app.id)! })),
-          true,
-        ),
+      report(
+        result,
+        `Closed ${result.succeeded} as ${OUTCOMES[value].toLowerCase()}`,
+        () =>
+          reopen(
+            items
+              .filter((app) => versions.has(app.id))
+              .map((app) => ({ ...app, version: versions.get(app.id)! })),
+            true,
+          ),
       );
     } catch (error) {
       toast.show({ message: errorText(error), tone: "error" });
@@ -152,7 +155,8 @@ export function BulkActions({
         message: `${message}; ${result.failed} could not be changed`,
         tone: "error",
       });
-    else toast.show({ message, action: { label: "Undo", undo: true, run: undo } });
+    else
+      toast.show({ message, action: { label: "Undo", undo: true, run: undo } });
   }
 
   const busy = bulk.isPending || setPriorities.isPending;

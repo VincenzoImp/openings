@@ -103,7 +103,9 @@ test("the Applications list of 200 rows is interactive in under 300 ms", async (
   );
   // The rows are real and usable: the first page of 200 is drawn at once.
   expect(
-    await page.locator(".ui-list[aria-label=Applications] [data-row-id]").count(),
+    await page
+      .locator(".ui-list[aria-label=Applications] [data-row-id]")
+      .count(),
   ).toBeGreaterThanOrEqual(200);
   expect(time).toBeLessThan(BUDGET_MS);
 });

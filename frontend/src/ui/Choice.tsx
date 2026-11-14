@@ -50,7 +50,9 @@ export function Choice<T extends string>({
           />
           <span className="ui-choice-text">
             <span>{option.label}</span>
-            {option.hint && <span className="ui-field-hint">{option.hint}</span>}
+            {option.hint && (
+              <span className="ui-field-hint">{option.hint}</span>
+            )}
           </span>
         </label>
       ))}
