@@ -4,7 +4,8 @@ import { api, call, type Schema } from "../../api/client";
 import type { operations } from "../../api/schema";
 import { useApiMutation } from "../../query/mutation";
 import { POLL_MS } from "../../query/query";
-import { localDay, type Row } from "./model";
+import { isoDay } from "../../ui/format";
+import { type Row } from "./model";
 
 type Query = NonNullable<
   operations["applications_list"]["parameters"]["query"]
@@ -41,7 +42,7 @@ export function useToday() {
   });
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
-  const since = localDay(yesterday);
+  const since = isoDay(yesterday);
   const newJobs = useQuery({
     queryKey: ["jobs", "list", { triage: "new", limit: 3, sort: "newest" }],
     refetchInterval: POLL_MS,

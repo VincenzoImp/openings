@@ -92,6 +92,10 @@
     --s-12: 48px;
     --s-16: 64px;
     --pane-pad: 24px;
+    /* Every screen's content starts at the pane padding, left-aligned under
+       its title; a reading column (Today, Preferences, the CV, an
+       application) is at most this wide. Lists and panes take the width. */
+    --content: 760px;
 
     /* Sizes */
     --control-h: 32px;

@@ -1,6 +1,7 @@
 import { CircleCheck } from "lucide-react";
 import { useProfile, useSetup } from "../../query/setup";
 import { Icon } from "../../ui/Icon";
+import { NO_REPLY_DAYS } from "../applications/days";
 import { LoadError } from "../../ui/LoadError";
 import { SkeletonRows } from "../../ui/Page";
 import { Checklist } from "./Checklist";
@@ -43,13 +44,17 @@ export default function Today() {
     deadlines: deadlines.length,
     newJobs: jobs?.total ?? 0,
   });
-  const settled = !today.loading && setup.loaded;
+  // A failed read settles too: its error shows, the rest is drawn.
+  const settled = !today.loading && (setup.loaded || !!setup.error);
+  const error = today.error ?? setup.error;
+  // The checklist only from facts that were read.
+  const unfinished = setup.loaded && !setup.finished;
   // An unfinished workspace without applications has nothing else to show.
-  const onlySetup = settled && !setup.finished && applications === 0;
+  const onlySetup = settled && unfinished && applications === 0;
   // An all-clear only when every list was read: never over a failure.
   const caughtUp =
     settled &&
-    !today.error &&
+    !error &&
     !ready?.total &&
     !attention.length &&
     !waiting?.total &&
@@ -66,16 +71,19 @@ export default function Today() {
               <span>Three steps and Openings is ready for you.</span>
             ) : (
               settled &&
-              !today.error &&
+              !error &&
               parts.length > 0 && <span>{parts.join(" · ")}</span>
             )}
           </p>
         </header>
-        {today.error && (
+        {error && (
           <LoadError
             what="some of today's lists"
-            error={today.error}
-            retry={today.retry}
+            error={error}
+            retry={() => {
+              today.retry();
+              setup.retry();
+            }}
           />
         )}
         {!settled ? (
@@ -89,7 +97,7 @@ export default function Today() {
           </>
         ) : (
           <>
-            {!setup.finished && <Checklist setup={setup} compact />}
+            {unfinished && <Checklist setup={setup} compact />}
             {caughtUp && (
               <p className="today-caught-up">
                 <Icon icon={CircleCheck} />
@@ -101,7 +109,7 @@ export default function Today() {
             {waiting && waiting.total > 0 && (
               <Waiting
                 rows={waiting.items}
-                days={waiting.no_reply?.days ?? 30}
+                days={waiting.no_reply?.days ?? NO_REPLY_DAYS}
               />
             )}
             {jobs && jobs.total > 0 && (

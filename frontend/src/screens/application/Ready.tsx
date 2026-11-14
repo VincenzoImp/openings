@@ -18,7 +18,8 @@ import { Tabs } from "../../ui/Tabs";
 import { useToast } from "../../ui/Toast";
 import { jobOf, type ApplicationRow } from "../applications/data";
 import { errorText } from "../applications/dialogs";
-import { isoDay, queuePlace, shortDay } from "../applications/model";
+import { formatDay, isoDay } from "../../ui/format";
+import { queuePlace } from "../applications/model";
 import { pageHref } from "../applications/Row";
 import {
   KIND_LABEL,
@@ -132,7 +133,7 @@ function MarkApplied({
             label={
               day === today
                 ? "Sent today: change the day"
-                : `Sent ${shortDay(day)}: change the day`
+                : `Sent ${formatDay(day)}: change the day`
             }
           />
         )}
@@ -147,7 +148,7 @@ function MarkApplied({
         </Field>
       </Popover>
       {day !== today && (
-        <span className="apg-mark-day">Sent {shortDay(day)}</span>
+        <span className="apg-mark-day">Sent {formatDay(day)}</span>
       )}
     </span>
   );
@@ -185,8 +186,11 @@ export function ReadyView({
     (kind) => current[kind] || (app.required_documents ?? []).includes(kind),
   );
 
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
+  // The latest keys handler, bound once: the listener calls what this render
+  // knows (busy, the day, the queue) without rebinding on every render.
+  const onKey = useRef<(event: KeyboardEvent) => void>(() => {});
+  useLayoutEffect(() => {
+    onKey.current = (event) => {
       if (
         event.defaultPrevented ||
         event.metaKey ||
@@ -210,20 +214,22 @@ export function ReadyView({
       event.preventDefault();
       navigate(pageHref(to.id));
     };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
   });
+  useEffect(() => {
+    const listener = (event: KeyboardEvent) => onKey.current(event);
+    document.addEventListener("keydown", listener);
+    return () => document.removeEventListener("keydown", listener);
+  }, []);
 
-  const downloadBoth = async () => {
+  /** One PDF, named after the role; each its own download. */
+  const downloadPdf = async (kind: Kind) => {
+    const pdf = pdfOf(current[kind]);
+    if (!pdf) return;
     try {
-      for (const kind of kinds) {
-        const pdf = pdfOf(current[kind]);
-        if (pdf)
-          await downloadFile(
-            pdf,
-            `${KIND_LABEL[kind]} - ${[job.company, job.title].filter(Boolean).join(" - ")}.pdf`,
-          );
-      }
+      await downloadFile(
+        pdf,
+        `${KIND_LABEL[kind]} - ${[job.company, job.title].filter(Boolean).join(" - ")}.pdf`,
+      );
     } catch (error) {
       toast.show({ message: errorText(error), tone: "error" });
     }
@@ -248,10 +254,24 @@ export function ReadyView({
             <span className="ui-btn-label">Apply on employer's site</span>
           </a>
         )}
-        <Button icon={Download} onClick={() => void downloadBoth()}>
-          Download {kinds.map((kind) => KIND_LABEL[kind]).join(" + ")}
-        </Button>
+        {kinds.map((kind) => (
+          <Button
+            key={kind}
+            icon={Download}
+            disabled={!pdfOf(current[kind])}
+            onClick={() => void downloadPdf(kind)}
+          >
+            {KIND_LABEL[kind]} PDF
+          </Button>
+        ))}
       </div>
+      {layout === "phone" &&
+        open.length === 0 &&
+        (app.questions ?? []).length === 0 && (
+          <p className="apg-check-none">
+            Nothing open. Download the PDFs and apply on the employer's site.
+          </p>
+        )}
       {open.length > 0 && (
         <div className="apg-check-part">
           <h3 className="ap-sub-title">Open requirements</h3>

@@ -2,7 +2,6 @@ import { useState, type FormEvent } from "react";
 import {
   ArchiveRestore,
   Download,
-  Ellipsis,
   HardDrive,
   History,
   Trash2,
@@ -13,11 +12,10 @@ import { ConfirmDialog, Dialog } from "../../ui/Dialog";
 import { Field, Input } from "../../ui/Field";
 import { formatDay, formatFull } from "../../ui/format";
 import { Icon } from "../../ui/Icon";
-import { Menu } from "../../ui/Menu";
 import { SkeletonRows } from "../../ui/Page";
 import { useToast } from "../../ui/Toast";
 import { ago } from "../sources/model";
-import { bytes } from "./model";
+import { bytes, upgradeOf } from "./model";
 import {
   useBackups,
   useDeleteBackup,
@@ -239,43 +237,28 @@ function KeptCopies({
         <SettingsGroup title="Copies before upgrades">
           <p className="set-row-desc">
             Taken before each upgrade changed the database. Delete the ones you
-            no longer need.
+            no longer need; your workspace does not change.
           </p>
           <ul className="set-list" aria-label="Copies before upgrades">
             {copies.map((item) => (
               <li key={item.name} className="set-item">
                 <Icon icon={HardDrive} className="set-item-icon" />
                 <span className="set-item-text">
+                  <span className="set-item-title">{upgradeOf(item.name)}</span>
                   <span
-                    className="set-item-title"
+                    className="set-item-sub"
                     title={formatFull(item.created_at)}
                   >
-                    {formatDay(item.created_at)}
+                    {formatDay(item.created_at)} · {bytes(item.size_bytes)}
                   </span>
-                  <span className="set-item-sub">{bytes(item.size_bytes)}</span>
                 </span>
                 {downloadButton(item)}
-                <Menu
-                  label={`Actions for ${item.name}`}
-                  placement="bottom-end"
-                  items={[
-                    {
-                      id: "delete",
-                      label: "Delete…",
-                      icon: Trash2,
-                      danger: true,
-                      onSelect: () => setDeleting(item),
-                    },
-                  ]}
-                  trigger={(props) => (
-                    <IconButton
-                      {...props}
-                      icon={Ellipsis}
-                      label={`More actions for ${item.name}`}
-                      size="sm"
-                      tooltip="above"
-                    />
-                  )}
+                <IconButton
+                  icon={Trash2}
+                  label={`Delete ${item.name}`}
+                  size="sm"
+                  tooltip="above"
+                  onClick={() => setDeleting(item)}
                 />
               </li>
             ))}

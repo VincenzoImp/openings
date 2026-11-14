@@ -6,7 +6,9 @@ import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { api, call, transfer, type Schema } from "../../api/client";
 import { useApiMutation, useVersionedMutation } from "../../query/mutation";
 import { POLL_MS, type Resource } from "../../query/query";
-import { isoDay, type SortKey, type StageFilter } from "./model";
+import { isoDay } from "../../ui/format";
+import { NO_REPLY_DAYS } from "./days";
+import { type SortKey, type StageFilter } from "./model";
 
 export type ApplicationRow = Schema<"ApplicationRow">;
 export type Application = Schema<"Application">;
@@ -110,7 +112,7 @@ export function useApplicationList(params: ListParams) {
     items,
     total: first?.total ?? 0,
     counts: first?.stage_counts ?? {},
-    noReplyDays: first?.no_reply?.days ?? 45,
+    noReplyDays: first?.no_reply?.days ?? NO_REPLY_DAYS,
   };
 }
 
@@ -130,7 +132,7 @@ export function useReadyQueue() {
   return {
     ...query,
     queue: query.data?.items ?? [],
-    noReplyDays: query.data?.no_reply?.days ?? 45,
+    noReplyDays: query.data?.no_reply?.days ?? NO_REPLY_DAYS,
   };
 }
 
@@ -295,6 +297,11 @@ export function useBulk() {
 export function useDeleteApplication() {
   return useApiMutation({
     touches: TOUCHES,
+    drops: ({ id }) => [
+      ["applications", "one", id],
+      ["applications", "timeline", id],
+      ["documents", "list", id],
+    ],
     mutationFn: ({ id, version }: { id: string; version: number }) =>
       call(
         api.DELETE("/api/v1/applications/{application_id}", {
@@ -310,6 +317,10 @@ export function useDeleteApplication() {
 export function useDeleteRevision() {
   return useApiMutation({
     touches: TOUCHES,
+    drops: ({ id }) => [
+      ["documents", "one", id],
+      ["documents", "comparison", id],
+    ],
     mutationFn: ({ id, version }: { id: string; version: number }) =>
       call(
         api.DELETE("/api/v1/documents/{document_id}", {

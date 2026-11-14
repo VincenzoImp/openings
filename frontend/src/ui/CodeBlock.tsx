@@ -44,7 +44,10 @@ export function CodeBlock({
   className?: string;
 }) {
   return (
-    <div className={cx("ui-code", className)} data-inline={inline || undefined}>
+    <div
+      className={cx("ui-snippet", className)}
+      data-inline={inline || undefined}
+    >
       <pre role="region" aria-label={label} tabIndex={0}>
         <code>{code}</code>
       </pre>
@@ -53,7 +56,7 @@ export function CodeBlock({
         label={`Copy ${label.toLowerCase()}`}
         size="sm"
         tooltip="above"
-        className="ui-code-copy"
+        className="ui-snippet-copy"
         onClick={async () => {
           const ok = await copyText(code);
           onCopied?.(ok);

@@ -39,6 +39,8 @@ test("future moments read Today, Tomorrow, then the day", () => {
 
 test("dates accept ISO strings, never show them, and mark invalid ones", () => {
   assert.equal(formatDay("2026-11-13T10:00:00", NOW), "13 Nov");
+  // A date-only value is that local day, in every time zone.
+  assert.equal(formatDay("2026-12-14", NOW), "14 Dec");
   assert.equal(formatDate("not a date", NOW), EMPTY);
   assert.equal(
     formatFull(new Date(2026, 10, 13, 14, 5)),

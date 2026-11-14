@@ -24,17 +24,37 @@ const DAY = 24 * HOUR;
 /** The empty value: a dash in text-3, or the field is omitted. */
 export const EMPTY = "—";
 
+/** A moment; a date-only "2026-11-12" is that local day, not UTC midnight. */
 function toDate(value: Date | string | number) {
-  return value instanceof Date ? value : new Date(value);
+  if (value instanceof Date) return value;
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [year, month, date] = value.split("-").map(Number);
+    return new Date(year, month - 1, date);
+  }
+  return new Date(value);
 }
-function startOfDay(date: Date) {
+
+/** The local calendar day of a moment or of "2026-11-12", at midnight. */
+export function dayOf(value: Date | string | number) {
+  const date = toDate(value);
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
-/** Whole calendar days from `now` to `date` (negative in the past). */
-function calendarDays(date: Date, now: Date) {
-  return Math.round(
-    (startOfDay(date).getTime() - startOfDay(now).getTime()) / DAY,
-  );
+
+/** "2026-11-14": the local calendar day, as the API takes dates. */
+export function isoDay(date = new Date()) {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+/** Whole calendar days from one day to another (negative when earlier). */
+export function daysBetween(
+  from: Date | string | number,
+  to: Date | string | number,
+) {
+  return Math.round((dayOf(to).getTime() - dayOf(from).getTime()) / DAY);
 }
 
 /** "13 Nov", or "13 Nov 2025" when the year is not the current one. */
@@ -56,7 +76,7 @@ export function formatDate(value: Date | string | number, now = new Date()) {
   const date = toDate(value);
   if (Number.isNaN(date.getTime())) return EMPTY;
   const diff = now.getTime() - date.getTime();
-  const days = calendarDays(date, now);
+  const days = daysBetween(now, date);
   if (diff < 0) {
     if (days === 0) return "Today";
     if (days === 1) return "Tomorrow";

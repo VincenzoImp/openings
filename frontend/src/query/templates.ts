@@ -93,6 +93,10 @@ export function useUpdateTemplate(
 export function useDeleteTemplate() {
   return useApiMutation({
     touches: ["templates", "files"],
+    drops: (template) => [
+      templateKeys.one(template.id),
+      templateKeys.files(template.id),
+    ],
     mutationFn: (template: Template) =>
       call(
         api.DELETE("/api/v1/templates/{template_id}", {

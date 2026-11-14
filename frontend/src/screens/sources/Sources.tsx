@@ -194,7 +194,7 @@ export default function SourcesScreen() {
                 Add a search
               </Button>
               <Button onClick={() => open({ kind: "company" })}>
-                Add a company page
+                Add a company careers page
               </Button>
             </>
           }

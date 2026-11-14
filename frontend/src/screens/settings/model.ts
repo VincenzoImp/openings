@@ -15,6 +15,16 @@ export function sectionOf(value: string | null): SectionId | null {
   return SECTIONS.find((section) => section.id === value)?.id ?? null;
 }
 
+/**
+ * What a copy kept before an upgrade was taken before, from its file name
+ * ("openings.pre-0.24.sqlite"): "Before 0.24".
+ */
+export function upgradeOf(name: string) {
+  const match = name.match(/\.pre-(.+?)(?:-\d{8}T\d{6}Z)?\.sqlite$/);
+  if (!match) return "Before an upgrade";
+  return `Before ${match[1].replace(/^schema-?(\d+)$/, "schema $1")}`;
+}
+
 /** Bytes as people read them: "912 KB", "1.4 MB", "136 GB". */
 export function bytes(value: number | null | undefined) {
   if (value == null || !Number.isFinite(value)) return "—";
