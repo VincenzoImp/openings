@@ -7,6 +7,7 @@ import { Button } from "../../ui/Button";
 import { ConfirmDialog, Drawer } from "../../ui/Dialog";
 import { Checkbox, Field, Input, Select } from "../../ui/Field";
 import { Callout } from "../../ui/Page";
+import { CountrySelect } from "./CountrySelect";
 import { useToast } from "../../ui/Toast";
 import {
   KIND_LABELS,
@@ -14,6 +15,7 @@ import {
   POSTED_WITHIN,
   SITES,
   capitalize,
+  countryIn,
   detectBoard,
   kindOf,
   shortUrl,
@@ -57,7 +59,9 @@ function draftOf(
     name: source?.name ?? "",
     query: text(config.query),
     location: text(config.location),
-    country: source ? text(config.country) : country,
+    country: source
+      ? text(config.country)
+      : country || countryIn(text(config.location)),
     sites: Array.isArray(config.providers)
       ? (config.providers as string[])
       : ["linkedin", "indeed"],
@@ -81,8 +85,7 @@ function problems(draft: Draft, board: boolean) {
       draft.sites.some((site) => NATIONAL_SITES.includes(site)) &&
       !draft.country.trim()
     )
-      found.country =
-        "Indeed and Glassdoor search one country's site. Add a country, such as switzerland.";
+      found.country = "Indeed and Glassdoor need a country.";
   } else if (!(board && !draft.url.trim()) && !httpUrl(draft.url))
     found.url =
       draft.kind === "feed"
@@ -511,22 +514,25 @@ function SearchFields({
         <Field
           label="Country"
           optional={!national}
+          required={national}
           error={errors.country}
           hint={
             national
-              ? "Indeed and Glassdoor search this country's site."
+              ? "Indeed and Glassdoor need a country."
               : "Only Indeed and Glassdoor use it."
           }
         >
-          <Input
+          <CountrySelect
             value={draft.country}
-            maxLength={100}
-            placeholder="switzerland"
-            onChange={(event) => set("country", event.target.value)}
+            required={national}
+            onChange={(value) => set("country", value)}
           />
         </Field>
       </div>
-      <fieldset className="src-sites" aria-describedby="src-sites-note">
+      <fieldset
+        className="src-sites"
+        aria-describedby={errors.sites ? "src-sites-note" : undefined}
+      >
         <legend className="ui-field-label">Job sites</legend>
         <div className="src-sites-options">
           {SITES.map(([id, label]) => (
@@ -545,13 +551,9 @@ function SearchFields({
             />
           ))}
         </div>
-        {errors.sites ? (
+        {errors.sites && (
           <p className="ui-field-error" id="src-sites-note">
             {errors.sites}
-          </p>
-        ) : (
-          <p className="ui-field-hint" id="src-sites-note">
-            Each site is asked through the shared request limits.
           </p>
         )}
       </fieldset>
@@ -662,7 +664,7 @@ function TestResults({
       )}
       {preview && (
         <p className="src-test-note">
-          A test saves nothing. Saved, the source is checked on the schedule.
+          Test shows what this source finds; nothing is saved.
         </p>
       )}
     </section>
