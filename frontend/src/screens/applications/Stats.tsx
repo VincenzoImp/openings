@@ -1,5 +1,6 @@
 import { ChartNoAxesColumn } from "lucide-react";
 import { formatNumber } from "../../ui/format";
+import { LoadError } from "../../ui/LoadError";
 import { EmptyState, Skeleton } from "../../ui/Page";
 import { Table } from "../../ui/Table";
 import { useStats, type Period } from "./data";
@@ -28,11 +29,15 @@ const FUNNEL: Record<string, string> = {
 export function StatsView({ period }: { period: Period }) {
   const stats = useStats(period);
   const data = stats.data;
-  if (stats.isError)
+  if (stats.isError && !data)
     return (
-      <EmptyState icon={ChartNoAxesColumn} title="Stats could not be read">
-        Check the connection; they are read again on their own.
-      </EmptyState>
+      <div className="ap-stats">
+        <LoadError
+          what="the stats"
+          error={stats.error}
+          retry={() => void stats.refetch()}
+        />
+      </div>
     );
   if (!data)
     return (
@@ -91,6 +96,9 @@ export function StatsView({ period }: { period: Period }) {
         <h2 className="ap-section-title" id="ap-funnel-title">
           From applied to offer
         </h2>
+        <p className="ap-caption ap-funnel-note">
+          A reply is any answer: a rejection, an interview or an offer.
+        </p>
         <ol className="ap-funnel" aria-label="Funnel">
           {funnel.map((step) => (
             <li key={step.stage}>

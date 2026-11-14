@@ -143,15 +143,6 @@
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
-  .set-owner {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    color: var(--text-3);
-    font: var(--t-xs);
-    font-weight: var(--w-regular);
-    letter-spacing: 0;
-  }
   .set-group {
     display: flex;
     flex-direction: column;

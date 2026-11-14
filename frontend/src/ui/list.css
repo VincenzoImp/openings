@@ -107,6 +107,21 @@
     color: var(--text-3);
     letter-spacing: 0;
   }
+  /* The first row of a group has the sticky group header above it: its
+     action tooltips open below, where nothing covers them. */
+  .ui-list-rows > .ui-row:first-child .ui-icon-btn[data-tip="above"]::after {
+    top: calc(100% + 6px);
+    bottom: auto;
+    transform: translate(-50%, -2px);
+  }
+  .ui-list-rows
+    > .ui-row:first-child
+    .ui-icon-btn[data-tip="above"]:is(:hover, :focus-visible)::after {
+    transform: translate(-50%, 0);
+  }
+  .ui-row:is(:hover, :focus-within) .ui-row-end {
+    z-index: 2;
+  }
   .ui-row-end {
     grid-column: 4;
     grid-row: 1;

@@ -61,7 +61,10 @@ const searchSource = (search: Search) => ({
   config: {
     query: search.query,
     location: search.location,
-    ...(search.country ? { country: search.country } : {}),
+    // Without a country only LinkedIn can be searched (it goes by location).
+    ...(search.country
+      ? { country: search.country }
+      : { providers: ["linkedin" as const] }),
   },
 });
 

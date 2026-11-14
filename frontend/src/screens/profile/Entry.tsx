@@ -479,6 +479,7 @@ export function EntryForm({
         <Field label="Title" error={checked ? titleError : undefined}>
           <Input
             name="title"
+            data-autofocus=""
             value={draft.title}
             maxLength={300}
             onChange={set("title")}

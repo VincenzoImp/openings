@@ -99,9 +99,20 @@ function subLine(job: JobSummary, view: View) {
       .filter(Boolean)
       .join(" · ");
   }
-  return [job.company, job.location, sourceLabel(job)]
-    .filter(Boolean)
-    .join(" · ");
+  const where = [job.company, job.location].filter(Boolean).join(" · ");
+  const source = sourceLabel(job);
+  if (!source) return where;
+  // Where the list is narrow the source is left out (the detail shows it),
+  // so company and place stay readable.
+  return (
+    <>
+      {where}
+      <span className="jobs-row-source">
+        {where ? " · " : ""}
+        {source}
+      </span>
+    </>
+  );
 }
 
 /** The actions a row offers on hover and by swipe, by its state. */
@@ -165,6 +176,8 @@ export function JobList({
   footer?: ReactNode;
 }) {
   const groups = groupRows(rows, view);
+  // The hint offers only the decisions the selected row can take.
+  const triage = (rows.find((job) => job.id === activeId) ?? rows[0])?.triage;
   const row = (job: JobSummary) => {
     const stage = view.section === "all" ? stageOf(job) : null;
     const { actions, swipe } = rowActions(job, on);
@@ -213,17 +226,17 @@ export function JobList({
       {footer}
       <p className="jobs-hint" aria-hidden="true">
         <Kbd>j</Kbd> <Kbd>k</Kbd>
-        {view.section === "dismissed" ? (
+        {triage === "dismissed" ? (
           <>
             {" "}
             · <Kbd>r</Kbd> restore
           </>
-        ) : (
+        ) : triage === "new" ? (
           <>
             {" "}
             · <Kbd>s</Kbd> shortlist · <Kbd>d</Kbd> dismiss
           </>
-        )}{" "}
+        ) : null}{" "}
         · <Kbd>z</Kbd> undo · <Kbd>x</Kbd> select
       </p>
     </div>

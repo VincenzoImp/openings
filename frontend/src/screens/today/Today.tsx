@@ -1,8 +1,8 @@
-import { CircleAlert, CircleCheck } from "lucide-react";
+import { CircleCheck } from "lucide-react";
 import { useProfile, useSetup } from "../../query/setup";
-import { Button } from "../../ui/Button";
 import { Icon } from "../../ui/Icon";
-import { Callout, SkeletonRows } from "../../ui/Page";
+import { LoadError } from "../../ui/LoadError";
+import { SkeletonRows } from "../../ui/Page";
 import { Checklist } from "./Checklist";
 import { useToday } from "./data";
 import { dueThisWeek, greeting, needsAttention, summaryParts } from "./model";
@@ -46,8 +46,10 @@ export default function Today() {
   const settled = !today.loading && setup.loaded;
   // An unfinished workspace without applications has nothing else to show.
   const onlySetup = settled && !setup.finished && applications === 0;
+  // An all-clear only when every list was read: never over a failure.
   const caughtUp =
     settled &&
+    !today.error &&
     !ready?.total &&
     !attention.length &&
     !waiting?.total &&
@@ -63,23 +65,18 @@ export default function Today() {
             {onlySetup ? (
               <span>Three steps and Openings is ready for you.</span>
             ) : (
-              settled && parts.length > 0 && <span>{parts.join(" · ")}</span>
+              settled &&
+              !today.error &&
+              parts.length > 0 && <span>{parts.join(" · ")}</span>
             )}
           </p>
         </header>
         {today.error && (
-          <div role="alert">
-            <Callout
-              icon={CircleAlert}
-              tone="danger"
-              title="Some of today's lists could not be loaded."
-              actions={
-                <Button size="sm" onClick={today.retry}>
-                  Try again
-                </Button>
-              }
-            />
-          </div>
+          <LoadError
+            what="some of today's lists"
+            error={today.error}
+            retry={today.retry}
+          />
         )}
         {!settled ? (
           <SkeletonRows rows={5} />
@@ -112,7 +109,9 @@ export default function Today() {
             )}
           </>
         )}
-        {settled && applications > 0 && <Stages counts={counts} />}
+        {settled && !today.ready.error && applications > 0 && (
+          <Stages counts={counts} />
+        )}
       </div>
     </div>
   );

@@ -210,3 +210,24 @@ export async function fitsViewport(page: Page) {
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
     .toBeLessThanOrEqual(width);
 }
+
+/**
+ * A block's Edit or … button. At rest a phone shows the CV as text: a tap
+ * on the block shows its actions first.
+ */
+export async function blockButton(page: Page, name: string) {
+  const button = page.getByRole("button", {
+    name,
+    exact: true,
+    includeHidden: true,
+  });
+  if (isPhone(page)) {
+    await button
+      .locator(
+        "xpath=ancestor::div[contains(concat(' ', @class, ' '), ' pf-block ')][1]",
+      )
+      .click({ position: { x: 4, y: 4 } });
+    await expect(button).toBeVisible();
+  }
+  await button.click();
+}

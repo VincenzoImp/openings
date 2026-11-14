@@ -5,6 +5,7 @@
   .apg {
     display: flex;
     flex-direction: column;
+    flex: 1 0 auto;
     min-width: 0;
     padding-bottom: var(--s-12);
   }
@@ -27,7 +28,33 @@
     border-bottom: 1px solid var(--border);
   }
   .apg-head .ui-page-header {
+    padding-top: 0;
     padding-bottom: 0;
+  }
+  .apg-back {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-1);
+    align-self: flex-start;
+    margin: var(--s-4) 0 0 calc(var(--pane-pad) - 4px);
+    padding: 2px 4px;
+    border-radius: var(--r-md);
+    color: var(--text-2);
+    font: var(--t-sm);
+  }
+  .apg-back:hover {
+    color: var(--text);
+    text-decoration: none;
+  }
+  .apg-back .ui-icon {
+    color: var(--text-3);
+  }
+  .apg-phone-title {
+    display: none;
+  }
+  .apg-error {
+    padding: var(--s-5) var(--pane-pad);
+    max-width: 720px;
   }
   .apg-meta {
     display: flex;
@@ -74,7 +101,7 @@
     font: var(--t-sm);
   }
   .apg-skeleton {
-    padding: var(--s-5) var(--pane-pad);
+    padding: var(--s-2) var(--pane-pad) 0;
   }
   .apg-panes-skeleton {
     display: grid;
@@ -157,107 +184,59 @@
   .apg-side {
     display: none;
   }
-  .ap-checklist {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--s-2) var(--s-6);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    font: var(--t-sm);
-  }
-  .ap-checklist li {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--s-1-5);
-  }
-  .ap-checklist li > span:first-of-type {
-    font-weight: var(--w-medium);
-  }
-  .ap-checklist [data-state="done"] .ui-icon {
-    color: var(--success);
-  }
-  .ap-checklist [data-state="missing"] .ui-icon {
-    color: var(--warning);
-  }
-  .ap-checklist [data-state="not_needed"] .ui-icon {
-    color: var(--text-3);
-  }
   .apg-slots {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--s-4);
-    margin-top: var(--s-6);
-  }
-  .apg-slots[data-count="1"] {
-    grid-template-columns: minmax(0, 1fr);
-    max-width: 560px;
+    display: flex;
+    flex-direction: column;
+    border-top: 1px solid var(--border);
   }
   .ap-slot {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-    border: 1px solid var(--border);
-    border-radius: var(--r-xl);
-    overflow: hidden;
+    border-bottom: 1px solid var(--border);
+    transition: background-color var(--d-fast) var(--ease);
   }
-  .ap-slot-head {
+  /* The outline shows only while a file is over the row. */
+  .ap-slot[data-over] {
+    outline: 1.5px dashed var(--accent);
+    outline-offset: -2px;
+    border-radius: var(--r-md);
+    background: var(--accent-soft);
+  }
+  .ap-slot-row {
     display: flex;
     align-items: center;
-    gap: var(--s-2);
-    min-height: 44px;
-    padding: 0 var(--s-2) 0 14px;
-    border-bottom: 1px solid var(--border);
+    gap: var(--s-3);
+    min-height: 60px;
+    padding: var(--s-2) 0;
   }
-  .ap-slot-head h3 {
-    font: var(--t-sm);
-    font-weight: var(--w-semibold);
+  .ap-slot-icon {
+    color: var(--text-3);
   }
-  .ap-slot-meta {
+  .ap-slot-row[data-empty] .ap-slot-icon {
+    color: var(--warning);
+  }
+  .ap-slot-text {
     flex: 1;
     min-width: 0;
-    overflow: hidden;
+  }
+  .ap-slot-text h3 {
+    font: var(--t-sm);
+    font-weight: var(--w-medium);
+  }
+  .ap-slot-meta {
+    margin-top: 2px;
     color: var(--text-3);
     font: var(--t-xs);
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
   }
-  .ap-slot[data-empty] .ap-slot-head {
-    border-bottom: 0;
+  .ap-hint-touch {
+    display: none;
   }
-  .ap-slot-body {
-    display: flex;
-    flex-direction: column;
-    height: 440px;
-  }
-  .ap-drop {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: var(--s-3);
-    min-height: 200px;
-    margin: 0 var(--s-3) var(--s-3);
-    padding: var(--s-6) var(--s-4);
-    border: 1.5px dashed var(--border-strong);
-    border-radius: var(--r-lg);
-    background: var(--bg-subtle);
-    color: var(--text-2);
-    font: var(--t-sm);
-    text-align: center;
-    transition:
-      border-color var(--d-fast) var(--ease),
-      background-color var(--d-fast) var(--ease);
-  }
-  .ap-drop > .ui-icon {
-    color: var(--text-3);
-  }
-  .ap-drop p {
-    max-width: 34ch;
-  }
-  .ap-drop[data-over] {
-    border-color: var(--accent);
-    background: var(--accent-soft);
+  @media (pointer: coarse) {
+    .ap-hint-drop {
+      display: none;
+    }
+    .ap-hint-touch {
+      display: inline;
+    }
   }
 
   /* Documents: a revision on a well */
@@ -301,18 +280,20 @@
     font: var(--t-sm);
     text-align: center;
   }
-  .ap-paper {
-    width: min(100% - 24px, 72ch);
-    margin: 44px auto var(--s-4);
-    padding: 28px 32px;
-    border: 1px solid var(--border);
-    border-radius: var(--r-sm);
+  .ap-well[data-text] {
     background: var(--bg);
-    box-shadow: var(--shadow-xs);
+  }
+  .ap-paper {
+    width: min(100%, 72ch);
+    padding: 52px var(--s-5) var(--s-6);
     color: var(--text);
-    font: 12.5px/1.65 var(--font);
+    font: 13.5px/1.65 var(--font);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
+  }
+  /* In a pane the PDF/Text toggle sits in the title bar, not over the text. */
+  .apg-pane .ap-paper {
+    padding-top: var(--s-4);
   }
   .ap-versions {
     margin: 0;
@@ -408,6 +389,10 @@
     gap: var(--s-2) var(--s-3);
     margin-top: var(--s-2);
   }
+  .ap-req-open {
+    margin-top: var(--s-1);
+    margin-left: -10px;
+  }
   .ap-req-add .ui-input {
     flex: 1 1 240px;
     max-width: 440px;
@@ -468,6 +453,24 @@
     white-space: nowrap;
   }
   .apg-tabs {
+    padding: var(--s-2) var(--pane-pad) 0;
+  }
+  .apg > .apg-ready-check {
+    padding: var(--s-4) var(--pane-pad) 0;
+  }
+  .apg-ready[data-layout="tabs"] .apg-panes {
+    grid-template-columns: minmax(0, 1fr);
+    height: max(520px, calc(100dvh - 260px));
+  }
+  .apg-ready[data-layout="tabs"] .apg-pane-title {
+    display: none;
+  }
+  .apg-ready[data-layout="tabs"]:not([data-pane="posting"])
+    .apg-pane[data-pane="posting"],
+  .apg-ready[data-layout="tabs"]:not([data-pane="cv"])
+    .apg-pane[data-pane="cv"],
+  .apg-ready[data-layout="tabs"]:not([data-pane="letter"])
+    .apg-pane[data-pane="letter"] {
     display: none;
   }
   .apg-ready {
@@ -558,11 +561,6 @@
     display: flex;
     flex-direction: column;
     gap: var(--s-4);
-  }
-  .ap-note-add {
-    display: flex;
-    gap: var(--s-2);
-    max-width: 560px;
   }
   .ap-events {
     position: relative;
@@ -664,33 +662,27 @@
       display: none;
     }
   }
-  @container app (max-width: 1100px) {
-    .apg-panes {
-      height: max(520px, calc(100dvh - 100px));
-    }
-  }
-  /* Under 960 px the three panes stack. */
-  @container app (max-width: 959px) {
-    .apg-panes {
-      grid-template-columns: minmax(0, 1fr);
-      height: auto;
-    }
-    .apg-pane {
-      height: 70dvh;
-      min-height: 420px;
-    }
-    .apg-check {
-      grid-template-columns: minmax(0, 1fr);
-    }
-    .apg-check-links {
-      justify-content: flex-start;
-    }
-  }
-
   /* Phone: the bottom bar carries the primary; Ready shows one part at a time. */
   @container app (max-width: 719px) {
+    /* The action bar closes the page: no room below it. */
+    .apg:has(.ui-actionbar) {
+      padding-bottom: 0;
+    }
     .apg-head {
       padding-top: var(--s-3);
+    }
+    .apg-back {
+      display: none;
+    }
+    .apg-phone-title {
+      display: block;
+      padding: 0 var(--s-4);
+      font: var(--t-lg);
+      font-weight: var(--w-semibold);
+      overflow-wrap: anywhere;
+    }
+    .apg-error {
+      padding: var(--s-4);
     }
     .apg-meta {
       padding: 0 var(--s-4);
@@ -698,15 +690,17 @@
     .apg-actions {
       display: none;
     }
-    .apg-main,
-    .apg-follow {
+    .apg-main {
       padding: 0 var(--s-4);
     }
-    .apg-slots {
-      grid-template-columns: minmax(0, 1fr);
+    .apg-follow {
+      padding: var(--s-4) var(--s-4) 0;
     }
-    .ap-slot-body {
-      height: 60dvh;
+    .ap-hint-drop {
+      display: none;
+    }
+    .ap-hint-touch {
+      display: inline;
     }
     .apg-queue {
       padding: var(--s-1) var(--s-4) var(--s-1) var(--s-2);
@@ -715,7 +709,6 @@
       display: none;
     }
     .apg-tabs {
-      display: flex;
       padding: var(--s-2) var(--s-4) 0;
     }
     .apg-ready {

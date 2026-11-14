@@ -1,13 +1,13 @@
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { test, expect, type Page } from "./fixtures";
-import { call, go, ownerSession } from "./session";
+import { blockButton, call, go, ownerSession } from "./session";
 
 // Images of every screen of the seeded workspace for visual review, not a
 // pixel comparison: `npm run screenshots` writes them to frontend/screenshots/
 // (desktop 1440×1000 and mobile 390×844, light and dark), and CI uploads them
 // as the `screenshots` artifact of a pull request that changes the dashboard.
-// `npm run screenshots -- --docs` writes the light desktop images the user
+// `npm run screenshots -- --docs` writes the light images the user
 // documentation embeds to docs/images/ instead. A new screen or a key state
 // (empty, populated, dialog open) gets one line in SCREENS.
 type Screen = {
@@ -20,6 +20,8 @@ type Screen = {
   open?: (page: Page) => Promise<void>;
   /** The file name under docs/images, for an image the docs embed. */
   docs?: string;
+  /** The same for the phone image. Docs images show the viewport only. */
+  docsMobile?: string;
   signedOut?: boolean;
   /** Prepare the page before the screen is opened (a replaced response). */
   before?: (page: Page) => Promise<void>;
@@ -126,7 +128,7 @@ const SOURCES_AND_SETTINGS: Screen[] = [
       const editor = page.getByRole("dialog", { name: "Add a source" });
       await editor.getByLabel("Keywords").fill("data engineer");
       await editor.getByLabel(/^Location/).fill("Zurich");
-      await editor.getByLabel("Country").fill("switzerland");
+      await editor.getByLabel("Country").selectOption("switzerland");
       await editor.getByRole("button", { name: "Test" }).click();
       await expect(editor.getByText("14 jobs found")).toBeVisible();
     },
@@ -166,9 +168,7 @@ const SOURCES_AND_SETTINGS: Screen[] = [
 ];
 /** Open the editor of the entry with this title on the Profile. */
 const editEntry = (title: string) => async (page: Page) => {
-  await page
-    .getByRole("button", { name: `Edit ${title}`, exact: true })
-    .click();
+  await blockButton(page, `Edit ${title}`);
   await expect(page.locator("form.pf-entry-form")).toBeVisible();
 };
 
@@ -341,7 +341,7 @@ const SCREENS: Screen[] = [
       await expect(page.locator("dialog[open]")).toBeVisible();
     },
   },
-  { name: "jobs", route: "jobs", docs: "jobs" },
+  { name: "jobs", route: "jobs", docs: "jobs", docsMobile: "jobs-mobile" },
   {
     name: "jobs-selected",
     route: async (page) =>
@@ -395,7 +395,7 @@ const SCREENS: Screen[] = [
     sheet: true,
     route: "profile",
     open: async (page) => {
-      await page.getByRole("button", { name: "Edit header" }).click();
+      await blockButton(page, "Edit header");
       await page.getByLabel("Headline").fill("Senior data engineer, energy");
     },
   },
@@ -514,7 +514,12 @@ const VIEWPORTS = {
 };
 const THEMES = ["light", "dark"] as const;
 
-async function capture(page: Page, screen: Screen, path: string) {
+async function capture(
+  page: Page,
+  screen: Screen,
+  path: string,
+  viewportOnly = false,
+) {
   if (!screen.signedOut) await page.context().addCookies(ownerSession());
   // Open a page of the app first, so a route can read the workspace.
   await page.goto("/");
@@ -526,26 +531,27 @@ async function capture(page: Page, screen: Screen, path: string) {
     await expect(page.locator("input[name=password]")).toBeVisible();
   else await go(page, route);
   await page.waitForLoadState("networkidle");
-  await expect(page.locator(".loading")).toHaveCount(0);
+  await expect(page.locator(".ui-skeleton-rows")).toHaveCount(0);
   await screen.open?.(page);
   // The shell fills the viewport and its content scrolls inside it. For a
   // full-page image the frame grows with the content instead: the sidebar
   // spans the whole height and the phone's bars sit above and below it.
-  await page.addStyleTag({ content: FULL_PAGE });
-  const fullPage = !(screen.sheet && (page.viewportSize()?.width ?? 0) < 720);
+  if (!viewportOnly) await page.addStyleTag({ content: FULL_PAGE });
+  const fullPage =
+    !viewportOnly && !(screen.sheet && (page.viewportSize()?.width ?? 0) < 720);
   await page.screenshot({ path, fullPage, animations: "disabled" });
 }
 
 const FULL_PAGE = `
   .ui-app { height: auto; min-height: 100dvh; }
   .ui-app-grid { min-height: 100dvh; }
-  .ui-app-content { overflow: visible; flex: none; }
+  .ui-app-content { overflow: visible; flex: 1 0 auto; }
   .ui-app-side { height: auto; }
 `;
 
 for (const [size, viewport] of Object.entries(VIEWPORTS))
   for (const theme of THEMES) {
-    if (DOCS && (size !== "desktop" || theme !== "light")) continue;
+    if (DOCS && theme !== "light") continue;
     test.describe(`${size} ${theme}`, () => {
       test.use({ viewport });
       test.beforeEach(async ({ page }) => {
@@ -556,17 +562,18 @@ for (const [size, viewport] of Object.entries(VIEWPORTS))
         }, theme);
       });
       for (const screen of SCREENS) {
-        if (DOCS && !screen.docs) continue;
+        const docs = size === "desktop" ? screen.docs : screen.docsMobile;
+        if (DOCS && !docs) continue;
         test(screen.name, async ({ page }) => {
           const path = DOCS
-            ? join(ROOT, "docs/images", `${screen.docs}.png`)
+            ? join(ROOT, "docs/images", `${docs}.png`)
             : join(
                 ROOT,
                 "frontend/screenshots",
                 `${size}-${theme}`,
                 `${screen.name}.png`,
               );
-          await capture(page, screen, path);
+          await capture(page, screen, path, DOCS);
         });
       }
       // The design system gallery (ui.html), which the dashboard never serves.

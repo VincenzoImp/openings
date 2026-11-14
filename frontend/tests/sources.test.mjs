@@ -60,7 +60,7 @@ test("what a source searches leaves out empty parts and never shows quotes", () 
     describe(source({ kind: "greenhouse", config: { board: "northstar" } }), {
       greenhouse: "Greenhouse",
     }),
-    "Greenhouse · northstar",
+    "Greenhouse",
   );
   assert.equal(
     describe(source({ kind: "rss", url: "https://example.test/jobs.rss" })),

@@ -75,16 +75,17 @@ test("first run: about you, a search and a job, a CV and the example template, t
     !before.includes("fr"),
   );
 
-  // Step 2: the search starts from step 1, and is saved; one job by its link.
+  // Step 2: the search starts from step 1; "Save and continue" saves it and
+  // adds one job by its link.
   await expect(current(page)).toContainText("Find jobs");
   await noAgentText(page);
   await expect(page.getByLabel("Keywords")).toHaveValue(roles);
   await expect(page.getByLabel("Location")).toHaveValue("Zurich or remote");
-  await page.getByLabel("Country").fill("switzerland");
-  await page.getByRole("button", { name: "Save search" }).click();
-  await expect(page.locator(".setup-done")).toContainText(
-    `Saved the search “${roles} in Zurich or remote”.`,
-  );
+  await page.getByLabel("Country").selectOption("switzerland");
+  const link = `https://jobs.example.test/${Date.now()}`;
+  await page.getByLabel(/^Link/).fill(link);
+  await next(page, "Save and continue").click();
+  await expect(current(page)).toContainText("Your CV");
   const source = (
     await call(page, "/sources?summary=false&limit=200")
   ).items.find(
@@ -95,22 +96,11 @@ test("first run: about you, a search and a job, a CV and the example template, t
     location: "Zurich or remote",
     country: "switzerland",
   });
-  const link = `https://jobs.example.test/${Date.now()}`;
-  await page.getByLabel("Posting address").fill(link);
-  await page
-    .locator("#content")
-    .getByRole("button", { name: "Add job" })
-    .click();
-  await expect(page.getByText(/^Added “/)).toBeVisible();
   expect(
     (await call(page, `/jobs/resolve?url=${encodeURIComponent(link)}`)).items,
   ).toHaveLength(1);
-  // Something was added: the step continues instead of being skipped.
-  await expect(next(page, "Skip")).toHaveCount(0);
-  await next(page).click();
 
   // Step 3: pasted CV text read into entries, and the example template.
-  await expect(current(page)).toContainText("Your CV");
   await noAgentText(page);
   const entries = (await call(page, "/career/knowledge?limit=1")).total;
   await page
@@ -161,8 +151,19 @@ test("first run with skipping: Find jobs and Your CV are skipped, Back returns",
   await next(page, "Back").click();
   await expect(page).toHaveURL(/#setup\?step=about$/);
   await next(page).click();
+  // With nothing filled in there is only Continue; Skip leaves a search unsaved.
+  await page.getByLabel("Keywords").fill("");
+  await expect(next(page, "Skip")).toHaveCount(0);
+  await expect(next(page)).toBeVisible();
+  await page.getByLabel("Keywords").fill("synthetic search left unsaved");
   await next(page, "Skip").click();
   await expect(page).toHaveURL(/#setup\?step=cv$/);
+  expect(
+    (await call(page, "/sources?summary=false&limit=200")).items.some(
+      (item: { config: { query?: string } }) =>
+        item.config.query === "synthetic search left unsaved",
+    ),
+  ).toBe(false);
   await next(page, "Skip").click();
   await expect(page).toHaveURL(/#setup\?step=done$/);
   await next(page, "Go to Today").click();

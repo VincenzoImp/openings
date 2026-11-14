@@ -70,16 +70,27 @@ export function formatDate(value: Date | string | number, now = new Date()) {
   return formatDay(date, now);
 }
 
+/** The time of day on the 24-hour clock: "14:05". */
+export function formatTime(value: Date | string | number) {
+  const date = toDate(value);
+  if (Number.isNaN(date.getTime())) return EMPTY;
+  return `${String(date.getHours()).padStart(2, "0")}:${String(
+    date.getMinutes(),
+  ).padStart(2, "0")}`;
+}
+
 /** The full moment for a tooltip: "Fri 13 Nov 2026, 14:05". */
 export function formatFull(value: Date | string | number) {
   const date = toDate(value);
   if (Number.isNaN(date.getTime())) return EMPTY;
-  const time = `${String(date.getHours()).padStart(2, "0")}:${String(
-    date.getMinutes(),
-  ).padStart(2, "0")}`;
   return `${WEEKDAYS[date.getDay()]} ${date.getDate()} ${
     MONTHS[date.getMonth()]
-  } ${date.getFullYear()}, ${time}`;
+  } ${date.getFullYear()}, ${formatTime(date)}`;
+}
+
+/** A count with its noun: "1 job", "3 jobs", "2 entries". */
+export function plural(count: number, one: string, many = `${one}s`) {
+  return `${formatNumber(count)} ${count === 1 ? one : many}`;
 }
 
 const numbers = new Intl.NumberFormat("en-GB", { maximumFractionDigits: 1 });

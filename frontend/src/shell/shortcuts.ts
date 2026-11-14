@@ -74,4 +74,15 @@ export const SHEET: { title: string; items: [string[], string][] }[] = [
       [["⌘", "Z"], "Undo"],
     ],
   },
+  {
+    title: "Jobs",
+    items: [
+      [["s"], "Shortlist"],
+      [["d"], "Dismiss"],
+      [["r"], "Restore a dismissed job"],
+      [["e"], "Correct details"],
+      [["o"], "Open the posting"],
+      [["z"], "Undo the last decision"],
+    ],
+  },
 ];

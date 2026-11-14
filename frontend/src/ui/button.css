@@ -189,6 +189,31 @@
     }
   }
 
+  /* On a phone or a touch screen every button takes at least 44 × 44 px of
+     touch, whatever its drawn size: the target grows, the look does not. */
+  @container app (max-width: 719px) {
+    .ui-btn::before {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: max(100%, var(--touch));
+      height: max(100%, var(--touch));
+      transform: translate(-50%, -50%);
+    }
+  }
+  @media (pointer: coarse) {
+    .ui-btn::before {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: max(100%, var(--touch));
+      height: max(100%, var(--touch));
+      transform: translate(-50%, -50%);
+    }
+  }
+
   /* Focus wins over every variant's resting shadow. */
   .ui-btn[data-variant]:focus-visible {
     box-shadow: var(--focus-ring);

@@ -27,7 +27,8 @@ import {
   useWorkspaceInfo,
   type TokenRow,
 } from "./queries";
-import { OwnerOnly, SettingsSection } from "./Rows";
+import { SettingsSection } from "./Rows";
+import { LoadError } from "../../ui/LoadError";
 
 /**
  * Connecting an agent in three numbered steps: a token, the agent's MCP
@@ -43,7 +44,7 @@ export function Agents() {
       lead="Openings has no AI of its own; nothing happens until you ask your agent."
     >
       <ol className="set-steps">
-        <Step number={1} title="Create a token" note={owner && <OwnerOnly />}>
+        <Step number={1} title="Create a token">
           {owner ? (
             <Tokens />
           ) : (
@@ -103,9 +104,11 @@ export function Tokens() {
       {tokens.isPending ? (
         <SkeletonRows rows={2} />
       ) : tokens.isError ? (
-        <p className="set-row-desc set-danger" role="alert">
-          The tokens could not be read. {tokens.error.message}
-        </p>
+        <LoadError
+          what="the tokens"
+          error={tokens.error}
+          retry={() => void tokens.refetch()}
+        />
       ) : tokens.data.length ? (
         <ul className="set-list" aria-label="API tokens">
           {tokens.data.map((token) => (
@@ -371,9 +374,11 @@ function AskList() {
   if (skills.isPending) return <SkeletonRows rows={3} />;
   if (skills.isError)
     return (
-      <p className="set-row-desc set-danger" role="alert">
-        The list could not be read. {skills.error.message}
-      </p>
+      <LoadError
+        what="the list"
+        error={skills.error}
+        retry={() => void skills.refetch()}
+      />
     );
   if (!skills.data.length)
     return (

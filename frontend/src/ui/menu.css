@@ -121,4 +121,10 @@
       font-size: 14px;
     }
   }
+  @container app (max-width: 719px) {
+    .ui-menu-item {
+      height: var(--touch);
+      font-size: 14px;
+    }
+  }
 }

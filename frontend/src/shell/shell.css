@@ -29,6 +29,8 @@
     flex-direction: column;
     flex: 1;
     min-height: 0;
+    /* A touch target's invisible margin never widens the page. */
+    overflow-x: clip;
   }
   .shell-loading {
     padding: var(--s-6);
@@ -156,17 +158,13 @@
     flex-direction: column;
     gap: var(--s-4);
   }
-  .shell-disclosure summary {
+  /* In a dialog the disclosure is a quiet option, not a section. */
+  .shell-disclosure > .ui-disclosure-summary {
     width: max-content;
-    border-radius: var(--r-sm);
     color: var(--text-2);
     font: var(--t-sm);
     font-weight: var(--w-medium);
-    cursor: pointer;
-  }
-  .shell-disclosure summary:focus-visible {
-    outline: none;
-    box-shadow: var(--focus-ring);
+    letter-spacing: 0;
   }
   .shell-addjob-details {
     display: flex;

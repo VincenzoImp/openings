@@ -1,10 +1,9 @@
 import { Suspense, lazy, useCallback, useEffect, useState } from "react";
-import { api as legacy, setCsrf as setLegacyCsrf, type Session } from "./api";
 import { api, call, setCsrf } from "./api/client";
 import { queryClient } from "./query/query";
-import { ErrorBanner, Loading } from "./design";
 import { href, navigate } from "./shell/router";
 import { Shell } from "./shell/Shell";
+import type { Session } from "./shell/Auth";
 
 // Signing in is needed once per session: its code loads only then.
 const Auth = lazy(() =>
@@ -13,12 +12,9 @@ const Auth = lazy(() =>
 const AuthFrame = lazy(() =>
   import("./shell/Auth").then((module) => ({ default: module.AuthFrame })),
 );
-
-/** Both clients send the session's CSRF token until the old one is gone. */
-function shareToken(token: string) {
-  setCsrf(token);
-  setLegacyCsrf(token);
-}
+const AuthError = lazy(() =>
+  import("./shell/Auth").then((module) => ({ default: module.AuthError })),
+);
 
 /** Session bootstrap: the sign-in screen, or the workspace shell. */
 export default function App() {
@@ -27,8 +23,8 @@ export default function App() {
   const bootstrap = useCallback(async () => {
     try {
       setError(null);
-      const result = await legacy<Session>("/auth/session");
-      shareToken(result.csrf_token || "");
+      const result = (await call(api.GET("/api/v1/auth/session"))) as Session;
+      setCsrf(result.csrf_token || "");
       setSession(result);
     } catch (e) {
       setError(
@@ -39,7 +35,7 @@ export default function App() {
   useEffect(() => {
     void bootstrap();
     const expired = () => {
-      shareToken("");
+      setCsrf("");
       queryClient.clear();
       setSession({ configured: true, authenticated: false });
     };
@@ -54,17 +50,14 @@ export default function App() {
         return bootstrap();
       });
   }, [bootstrap]);
-  const waiting = (
-    <main className="auth">
-      <Loading />
-    </main>
-  );
+  // The page stays blank for the moment the session takes to read.
+  const waiting = <main className="auth" aria-busy="true" />;
   if (error)
     return (
       <Suspense fallback={waiting}>
         <AuthFrame>
           <h1>Unable to load the workspace</h1>
-          <ErrorBanner message={error} retry={bootstrap} />
+          <AuthError message={error} retry={bootstrap} />
         </AuthFrame>
       </Suspense>
     );
@@ -77,7 +70,7 @@ export default function App() {
           onSuccess={(value) => {
             // A new installation starts with the first-run guide.
             if (!session.configured) navigate(href("setup"), { replace: true });
-            shareToken(value.csrf_token || "");
+            setCsrf(value.csrf_token || "");
             setSession(value);
           }}
         />

@@ -6,13 +6,6 @@
     margin: 0 auto;
     padding-bottom: var(--s-16);
   }
-  .prefs-lede {
-    margin: var(--s-1) 0 0;
-    padding: 0 var(--pane-pad);
-    color: var(--text-3);
-    font: var(--t-sm);
-    letter-spacing: 0;
-  }
   .prefs-state {
     padding: var(--s-6) var(--pane-pad);
   }
@@ -398,14 +391,10 @@
   }
 
   @container app (max-width: 719px) {
-    .prefs-lede,
     .prefs-state,
     .prefs-doc {
       padding-left: var(--s-4);
       padding-right: var(--s-4);
-    }
-    .prefs-lede {
-      padding-top: var(--s-3);
     }
     .prefs-doc {
       gap: var(--s-8);

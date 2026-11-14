@@ -12,32 +12,17 @@ import {
   useMemo,
   useRef,
   useState,
-  useSyncExternalStore,
   type FormEvent,
   type KeyboardEvent,
   type ReactNode,
 } from "react";
 import { MoreHorizontal, Pencil } from "lucide-react";
 import { Button, IconButton } from "../../ui/Button";
+import { usePhone } from "../../ui/ActionSheet";
 import { Menu, type MenuEntry } from "../../ui/Menu";
 import { LeaveDialog, SaveBar, useUnloadGuard } from "../../ui/ReadEdit";
 import { isModKey } from "../../ui/keys";
 import { addLeaveGuard } from "../../shell/router";
-
-const PHONE = "(max-width: 719px)";
-
-/** Whether the dashboard has its phone layout. */
-export function usePhone() {
-  return useSyncExternalStore(
-    (listener) => {
-      const media = matchMedia(PHONE);
-      media.addEventListener("change", listener);
-      return () => media.removeEventListener("change", listener);
-    },
-    () => matchMedia(PHONE).matches,
-    () => false,
-  );
-}
 
 interface Editing {
   /** The open block, or null. */
@@ -135,7 +120,8 @@ export function ReadBlock({
   children: ReactNode;
 }) {
   return (
-    <div className={`pf-block ${className ?? ""}`}>
+    // Focusable by a tap, so a phone shows the block's actions on intent.
+    <div className={`pf-block ${className ?? ""}`} tabIndex={-1}>
       {children}
       <div className="pf-block-actions">
         <Button
@@ -208,14 +194,18 @@ export function EditBlock({
   };
   const cancel = () => editing.request(null);
 
-  // The first field takes focus when the block opens.
+  // The field marked data-autofocus, or else the first, takes focus when the
+  // block opens.
   const formRef = useCallback((form: HTMLFormElement | null) => {
     if (!form || !first.current) return;
     first.current = false;
     requestAnimationFrame(() =>
-      form
-        .querySelector<HTMLElement>("input:not([type=file]), textarea, select")
-        ?.focus(),
+      (
+        form.querySelector<HTMLElement>("[data-autofocus]") ??
+        form.querySelector<HTMLElement>(
+          "input:not([type=file]), textarea, select",
+        )
+      )?.focus(),
     );
   }, []);
 

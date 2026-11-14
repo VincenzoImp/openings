@@ -417,7 +417,7 @@ for (const width of [360, 390, 600, 719, 720, 1024, 1280, 1600])
       ["templates", "Templates"],
       ["templates?tab=source", "Templates"],
       ["templates?tab=limits", "Templates"],
-      ["sources", "Job sources"],
+      ["sources", "Sources"],
       ["settings", "Settings"],
       ["settings?section=agents", "Settings"],
       ["settings?section=data", "Settings"],
@@ -425,7 +425,7 @@ for (const width of [360, 390, 600, 719, 720, 1024, 1280, 1600])
     ]) {
       await page.goto("/#" + route);
       await expect(heading(page)).toHaveText(title);
-      await expect(page.locator(".loading")).toHaveCount(0);
+      await expect(page.locator(".ui-skeleton-rows")).toHaveCount(0);
       await page.waitForLoadState("networkidle");
       const [page_, content] = await page.evaluate(() => {
         const box = document.getElementById("content")!;

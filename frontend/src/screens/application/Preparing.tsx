@@ -1,10 +1,9 @@
 import { useRef } from "react";
-import { Check, Circle, Minus, Upload } from "lucide-react";
+import { Upload } from "lucide-react";
 import { Button } from "../../ui/Button";
-import { Icon } from "../../ui/Icon";
 import { ActionBar } from "../../ui/Split";
 import { jobOf } from "../applications/data";
-import { checklist, firstMissing } from "../applications/model";
+import { firstMissing } from "../applications/model";
 import {
   DocumentSlot,
   KIND_LABEL,
@@ -23,11 +22,9 @@ import {
   Section,
 } from "./Sections";
 
-const STATE_ICON = { done: Check, missing: Circle, not_needed: Minus };
-
 /**
- * Shortlisted, preparing: what is missing before Ready, the slots of the
- * required documents, the requirements and the form's answers. The primary
+ * Shortlisted, preparing: the required documents, the requirements and the
+ * form's answers. What is missing is said once, in the head; the primary
  * action settles the first missing item; once nothing is, the page is Ready.
  */
 export function Preparing({ context }: { context: PageContext }) {
@@ -40,14 +37,13 @@ export function Preparing({ context }: { context: PageContext }) {
   };
   const requirements = useRef<HTMLDivElement>(null);
   const first = firstMissing(app);
-  const items = checklist(app);
   const resolve = () => {
     requirements.current?.scrollIntoView({ block: "center" });
     requirements.current
       ?.querySelector<HTMLInputElement>("input[type=checkbox]:not(:checked)")
       ?.focus();
   };
-  const primary =
+  const action =
     first === "cv" || first === "letter" ? (
       <Button
         variant="primary"
@@ -55,7 +51,7 @@ export function Preparing({ context }: { context: PageContext }) {
         disabled={uploaders[first].busy}
         onClick={uploaders[first].open}
       >
-        Upload {first === "cv" ? "CV" : "letter"}
+        Upload {KIND_LABEL[first]}
       </Button>
     ) : first === "requirement" ? (
       <Button variant="primary" onClick={resolve}>
@@ -65,37 +61,26 @@ export function Preparing({ context }: { context: PageContext }) {
   const posting = jobOf(app).posting;
   return (
     <>
-      {context.header(primary)}
+      {context.header(action)}
       <div className="apg-prep">
         <div className="apg-main">
-          <Section id="missing" title="What's missing">
-            <ul className="ap-checklist">
-              {items.map((item) => (
-                <li key={item.key} data-state={item.state}>
-                  <Icon icon={STATE_ICON[item.state]} size="sm" />
-                  <span>{item.label}</span>
-                  <span className="ap-muted">
-                    {item.state === "not_needed"
-                      ? "not needed"
-                      : (item.detail ??
-                        (item.state === "done" ? "uploaded" : "missing"))}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </Section>
-          <div className="apg-slots" data-count={required.length}>
-            {required.map((kind) => (
-              <DocumentSlot
-                key={kind}
-                kind={kind}
-                revision={current[kind]}
-                revisions={current.revisions}
-                loading={current.loading}
-                uploader={uploaders[kind]}
-              />
-            ))}
-          </div>
+          {required.length > 0 && (
+            <Section id="documents" title="Documents">
+              <div className="apg-slots">
+                {required.map((kind) => (
+                  <DocumentSlot
+                    key={kind}
+                    kind={kind}
+                    primary={kind === first}
+                    revision={current[kind]}
+                    revisions={current.revisions}
+                    loading={current.loading}
+                    uploader={uploaders[kind]}
+                  />
+                ))}
+              </div>
+            </Section>
+          )}
           <div ref={requirements}>
             <Section id="requirements" title="Requirements">
               <Requirements app={app} />
@@ -121,24 +106,7 @@ export function Preparing({ context }: { context: PageContext }) {
           <PostingText text={posting} />
         </aside>
       </div>
-      {primary && (
-        <ActionBar>
-          {first === "cv" || first === "letter" ? (
-            <Button
-              variant="primary"
-              icon={Upload}
-              disabled={uploaders[first].busy}
-              onClick={uploaders[first].open}
-            >
-              Upload {KIND_LABEL[first]}
-            </Button>
-          ) : (
-            <Button variant="primary" onClick={resolve}>
-              Resolve requirements
-            </Button>
-          )}
-        </ActionBar>
-      )}
+      {action && <ActionBar>{action}</ActionBar>}
     </>
   );
 }

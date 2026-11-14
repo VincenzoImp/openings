@@ -13,7 +13,6 @@ import { ROUTES, type RouteId } from "./routes";
 // One module per screen, loaded when it is first opened (or when the pointer
 // reaches its navigation item). A module default-exports a component without
 // props; it reads its address with useRoute() and its data with Query hooks.
-// A screen issue replaces one loader's target and nothing else.
 type Module = Promise<{ default: ComponentType }>;
 export const LOADERS: Record<RouteId, () => Module> = {
   today: () => import("../screens/today/Today"),
@@ -38,10 +37,6 @@ export function preload(id: RouteId) {
     // The screen reports the failure when it is opened.
   });
 }
-
-// The screens built before the design system keep their own frame until
-// their issue rebuilds them (#222–#227); a rebuilt screen leaves this list.
-const LEGACY = new Set<RouteId>([]);
 
 /**
  * A screen whose code or first render fails says so and offers a reload; a
@@ -83,7 +78,6 @@ class Boundary extends Component<
 export function Screen({ id }: { id: RouteId }) {
   const View = SCREENS[id];
   const name = ROUTES[id].title;
-  const body = <View />;
   return (
     <Boundary key={id} name={name}>
       <Suspense
@@ -93,15 +87,9 @@ export function Screen({ id }: { id: RouteId }) {
           </div>
         }
       >
-        {LEGACY.has(id) ? (
-          <div className="legacy-screen" data-screen={id}>
-            {body}
-          </div>
-        ) : (
-          <div className="shell-screen" data-screen={id}>
-            {body}
-          </div>
-        )}
+        <div className="shell-screen" data-screen={id}>
+          <View />
+        </div>
       </Suspense>
     </Boundary>
   );

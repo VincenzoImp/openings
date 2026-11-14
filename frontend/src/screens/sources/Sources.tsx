@@ -5,7 +5,7 @@ import { TopBarActions, useTitle } from "../../shell/context";
 import { Button, IconButton } from "../../ui/Button";
 import { ConfirmDialog, Dialog } from "../../ui/Dialog";
 import { Select } from "../../ui/Field";
-import { formatFull } from "../../ui/format";
+import { formatFull, plural } from "../../ui/format";
 import { listIndex, plainKey } from "../../ui/keys";
 import { Menu } from "../../ui/Menu";
 import {
@@ -42,6 +42,7 @@ import { RecentChecks } from "./RecentChecks";
 import { SourceEditor } from "./SourceEditor";
 import { SourceRow, type SourceActions } from "./SourceRow";
 import "./sources.css";
+import { LoadError } from "../../ui/LoadError";
 
 /** Row letters: e edits, c checks now, p pauses or resumes. */
 const SHORTCUTS: Record<string, "edit" | "check" | "toggle"> = {
@@ -65,7 +66,7 @@ type Editing = {
  * sit collapsed at the bottom.
  */
 export default function SourcesScreen() {
-  useTitle("Job sources");
+  useTitle("Sources");
   const sources = useSources();
   const labels = useKindLabels();
   const toast = useToast();
@@ -154,7 +155,7 @@ export default function SourcesScreen() {
   return (
     <div className="src-screen">
       <PageHeader
-        title="Job sources"
+        title="Sources"
         action={
           list.length > 0 && (
             <Button icon={Plus} onClick={() => open({ kind: "search" })}>
@@ -175,17 +176,11 @@ export default function SourcesScreen() {
       {sources.isPending ? (
         <SkeletonRows rows={4} />
       ) : sources.isError ? (
-        <EmptyState
-          icon={Radar}
-          title="Job sources could not be read"
-          actions={
-            <Button variant="primary" onClick={() => void sources.refetch()}>
-              Try again
-            </Button>
-          }
-        >
-          {sources.error.message}
-        </EmptyState>
+        <LoadError
+          what="your job sources"
+          error={sources.error}
+          retry={() => void sources.refetch()}
+        />
       ) : list.length === 0 ? (
         <EmptyState
           icon={Radar}
@@ -447,13 +442,11 @@ function ScheduleLine({
 
 /** What Check all now did: how many it queued, and what it could not. */
 function checkAllMessage(result: Schema<"BatchResult">) {
-  const plural = (count: number) =>
-    `${count} ${count === 1 ? "source" : "sources"}`;
   if (!result.failed)
-    return { message: `Checking ${plural(result.succeeded)} now` };
+    return { message: `Checking ${plural(result.succeeded, "source")} now` };
   const reason = result.items.find((item) => !item.ok)?.error?.message;
   return {
-    message: `Checking ${plural(result.succeeded)} now; ${plural(result.failed)} could not be checked${reason ? `: ${reason}` : "."}`,
+    message: `Checking ${plural(result.succeeded, "source")} now; ${plural(result.failed, "source")} could not be checked${reason ? `: ${reason}` : "."}`,
     tone: "error" as const,
   };
 }

@@ -65,10 +65,11 @@ def test_stats_count_sent_applications_replies_and_the_funnel(workspace):
 
     recent = stats.stats(StatsQuery(period="90d"))
     assert recent["since"] == (datetime.now(UTC) - timedelta(days=90)).date().isoformat()
-    assert (recent["applied"], recent["replied"], recent["interviews"]) == (3, 2, 2)
-    assert (recent["reply_rate"], recent["interview_rate"]) == (0.6667, 0.6667)
+    # An interview is a reply, recorded or not.
+    assert (recent["applied"], recent["replied"], recent["interviews"]) == (3, 3, 2)
+    assert (recent["reply_rate"], recent["interview_rate"]) == (1.0, 0.6667)
     assert recent["median_days_to_reply"] == 6
-    assert [step["count"] for step in recent["funnel"]] == [3, 2, 2, 1]
+    assert [step["count"] for step in recent["funnel"]] == [3, 3, 2, 1]
     year = stats.stats(StatsQuery(period="12m"))
     assert (year["applied"], year["median_days_to_reply"]) == (4, 4)
     every = stats.stats(StatsQuery(period="all"))
@@ -145,3 +146,18 @@ def test_sources_list_counts_what_each_source_found(app, client):
 @pytest.mark.parametrize("period", ["90d", "12m", "all"])
 def test_every_period_is_accepted(workspace, period):
     assert StatsService(workspace).stats(StatsQuery(period=period))["period"] == period
+
+
+def test_every_stage_past_applied_is_a_reply_and_the_funnel_never_grows(workspace):
+    stats = StatsService(workspace)
+    sent(workspace)  # no answer yet
+    sent(workspace, status="interview")  # moved to Interview without a recorded reply
+    sent(workspace, status="offer")
+    _, rejected = sent(workspace, status="closed")
+    with workspace.db.transaction() as conn:
+        conn.execute("UPDATE applications SET outcome='rejected' WHERE id=?", (rejected["id"],))
+    result = stats.stats()
+    counts = [step["count"] for step in result["funnel"]]
+    assert counts == [4, 3, 2, 1]
+    assert counts == sorted(counts, reverse=True)
+    assert result["reply_rate"] >= result["interview_rate"]
