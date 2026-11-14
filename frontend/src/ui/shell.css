@@ -259,8 +259,9 @@
     .ui-app-grid {
       grid-template-columns: minmax(0, 1fr);
     }
+    /* Scoped, so it wins whatever order the chunks' stylesheets load in. */
     .ui-app-side,
-    .ui-page-header {
+    .ui-app-content .ui-page-header {
       display: none;
     }
     .ui-topbar {

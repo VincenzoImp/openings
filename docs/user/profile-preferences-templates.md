@@ -69,12 +69,15 @@ not cover a case.
 | **Writing rules** | How CVs and letters are written | "Never volunteer weaknesses or missing skills." |
 | **Working with me** | Instructions the agent follows | "Never contact an employer for me." |
 
-Each statement is plain text (Markdown allowed, up to 2,000 characters), and a
-section holds up to 200. **Edit** a statement in place, **+ Add** one, reorder with
-the arrows, and delete from the `...` menu. A writing rule applies to **All**
-documents, the **CV** or the **Letter**. If the section changed in another session
-while you were editing, the page shows the latest list and keeps your text; save
-again.
+Each statement is a line of plain text (up to 2,000 characters), and a section
+holds up to 200. Point at a line for **Edit**, which edits it in place, and `...`,
+with **Move to** another section and **Delete** (with Undo). **+ Add** writes a new
+line; Enter saves it and opens the next. Drag a line's handle, or press Alt+↑/↓,
+to reorder. A writing rule applies to **All** documents, the **CV** or the
+**Letter**. An empty section shows two grey examples. If the section changed in
+another session, the page says so and keeps your text.
+
+![Preferences, each section as lines of text](../images/preferences.png)
 
 Writing rules live only here: a template keeps its layout, guidance and limits.
 Working with me is the one place for standing instructions to your agent. Synthetic
@@ -84,29 +87,29 @@ examples are in [`examples/preferences.json`](../../examples/preferences.json).
 
 Two values are typed, because Openings uses them itself:
 
-- **Languages I speak:** the Jobs filter **Hide jobs requiring languages I don't
-  speak** uses it. It only filters; it never dismisses a job.
+- **Languages I speak:** the link **Hide new jobs that require another language**
+  opens that Jobs filter and says how many new jobs it would hide. It only
+  filters; it never dismisses a job.
 - **Count an application as no reply after [30] days:** from 1 to 365. See
   [Applications](applications.md#replies).
 
 ## Templates
 
 A **template** is a CV or letter layout your agent fills with your facts and
-writing rules. Choose **Add a template** to paste LaTeX source or load a `.tex`
-file. Each has four tabs:
+writing rules. Start from the example CV or letter (the synthetic `cv.tex` and
+`letter.tex` in `examples/`), or upload a `.tex` file. Each has four tabs:
 
-- **Source:** the LaTeX.
-- **Guidance:** notes for the agent, and limits: **Pages**, **Bullets per entry**
-  and **Bullet length**. Any other key, such as `engine` or `date_format`, is free
-  text.
-- **Assets:** files the source needs, such as a class file or a logo.
-- **Preview:** a sample of the layout.
+- **Preview:** a sample PDF you upload under Files.
+- **Source:** the LaTeX, with line numbers; **Edit source** to change it.
+- **Files:** what the source needs, such as fonts, images or a class file.
+- **Limits:** **Pages**, **Bullets per entry** and **Bullet length**. Other rules,
+  such as `engine`, and the template's guidance are set through the API.
 
-Mark one template per kind as the **default**. A one-page engineering CV and a
-longer research CV can both exist. The templates in `examples/` (`cv.tex`,
-`letter.tex`) are synthetic starting points.
+Mark one template per kind as the **default**; the `...` menu renames,
+duplicates, downloads the source or deletes it permanently. A one-page
+engineering CV and a longer research CV can both exist.
 
-![Templates, listed by kind, with the source of one open](../images/templates.png)
+![Templates, listed by kind, with one open on Preview](../images/templates.png)
 
 Openings never compiles LaTeX. Your agent compiles on its own machine and uploads
 the PDF. If you write your own documents, you need no template.
