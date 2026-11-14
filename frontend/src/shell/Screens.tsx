@@ -23,7 +23,7 @@ export const LOADERS: Record<RouteId, () => Module> = {
   profile: () => import("../pages/Career"),
   preferences: () => import("../pages/Preferences"),
   templates: () => import("../pages/Templates"),
-  sources: () => import("../pages/Collection"),
+  sources: () => import("../pages/Sources"),
   settings: () => import("../pages/Settings"),
   setup: () => import("../pages/Setup"),
 };
@@ -49,8 +49,6 @@ const LEGACY = new Set<RouteId>([
   "profile",
   "preferences",
   "templates",
-  "sources",
-  "settings",
   "setup",
 ]);
 

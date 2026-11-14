@@ -1,0 +1,381 @@
+/* Job sources: the schedule line, the source rows, Recent checks and the
+   source editor. */
+@layer screens {
+  .src-screen {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    padding-bottom: var(--s-12);
+  }
+  .src-danger {
+    color: var(--danger);
+  }
+
+  /* "Checked every [6 h] · next check 14:00 · Check all now" */
+  .src-topline {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-2) var(--s-3);
+    min-height: var(--detail-bar-h);
+    padding: var(--s-2) var(--s-4) var(--s-2) var(--pane-pad);
+    border-bottom: 1px solid var(--border);
+    color: var(--text-2);
+    font: var(--t-sm);
+    letter-spacing: 0;
+  }
+  .src-topline-text {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-1) var(--s-2);
+    flex: 1 1 auto;
+    min-width: 0;
+    font-variant-numeric: tabular-nums;
+  }
+  .src-topline-tools {
+    display: flex;
+    align-items: center;
+    gap: var(--s-1);
+    margin-left: auto;
+  }
+  .src-interval {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-2);
+  }
+  .src-interval .ui-select {
+    width: auto;
+  }
+  .src-interval .ui-input {
+    width: auto;
+    height: var(--control-h-sm);
+    padding-right: 28px;
+    font: var(--t-sm);
+    font-weight: var(--w-medium);
+  }
+
+  /* A source: icon, then name, what it searches and its status, with the
+     counts (or, on hover and focus, the actions) at the end. */
+  .src-rows {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .src-row {
+    position: relative;
+    display: grid;
+    grid-template-columns: 16px minmax(0, 1fr) auto;
+    grid-template-areas:
+      "icon name end"
+      "icon what end"
+      "icon status end";
+    column-gap: var(--s-3);
+    align-items: center;
+    padding: var(--s-3) var(--s-4) var(--s-3) var(--pane-pad);
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+    transition: background-color var(--d-fast) var(--ease);
+  }
+  .src-row:hover {
+    background: var(--hover);
+  }
+  .src-row-icon {
+    grid-area: icon;
+    align-self: start;
+    display: grid;
+    place-items: center;
+    height: 18px;
+    color: var(--text-3);
+  }
+  .src-row-open {
+    grid-area: name;
+    justify-self: start;
+    max-width: 100%;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--text);
+    font: 500 13.5px/18px var(--font);
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  /* The whole row opens the source; Details and the actions sit above. */
+  .src-row-open::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+  }
+  .src-row-open:focus-visible {
+    outline: none;
+  }
+  .src-row-open:focus-visible::after {
+    box-shadow: var(--focus-inset);
+  }
+  .src-row-flag {
+    color: var(--text-3);
+    font-weight: var(--w-regular);
+  }
+  .src-row-what,
+  .src-row-status,
+  .src-row-counts {
+    min-width: 0;
+    font: var(--t-xs);
+    letter-spacing: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .src-row-what {
+    grid-area: what;
+    color: var(--text-2);
+  }
+  .src-row-status {
+    grid-area: status;
+    color: var(--text-3);
+    font-variant-numeric: tabular-nums;
+  }
+  .src-row-counts {
+    grid-area: end;
+    justify-self: end;
+    padding-left: var(--s-4);
+    color: var(--text-3);
+    font-variant-numeric: tabular-nums;
+  }
+  .src-row-actions {
+    grid-area: end;
+    justify-self: end;
+    position: relative;
+    z-index: 1;
+    display: none;
+    gap: var(--s-1);
+    padding-left: var(--s-4);
+  }
+  .src-row:is(:hover, :focus-within) .src-row-actions,
+  .src-row:has([aria-expanded="true"]) .src-row-actions {
+    display: flex;
+  }
+  .src-row:is(:hover, :focus-within) .src-row-counts,
+  .src-row:has([aria-expanded="true"]) .src-row-counts {
+    visibility: hidden;
+  }
+  .src-link {
+    position: relative;
+    z-index: 1;
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-sm);
+    background: none;
+    color: var(--accent-text);
+    font: inherit;
+    font-weight: var(--w-medium);
+    cursor: pointer;
+  }
+  .src-link:hover {
+    text-decoration: underline;
+  }
+  .src-link:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+  }
+  /* Paused: greyed; the one red line of a failing source stays readable. */
+  .src-row[data-paused] .src-row-open,
+  .src-row[data-paused] .src-row-what {
+    color: var(--text-3);
+  }
+
+  /* Recent checks */
+  .src-checks {
+    margin: var(--s-6) var(--s-4) 0 var(--pane-pad);
+  }
+  .src-checks-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--border);
+  }
+  .src-check {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    min-height: var(--row);
+    padding: var(--s-2) 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .src-check-text {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+  }
+  .src-check-name {
+    font: var(--t-sm);
+    font-weight: var(--w-medium);
+    letter-spacing: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .src-check-line {
+    color: var(--text-3);
+    font: var(--t-xs);
+    letter-spacing: 0;
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+  }
+  .src-checks-empty {
+    max-width: var(--measure);
+    color: var(--text-2);
+    font: var(--t-sm);
+    letter-spacing: 0;
+  }
+
+  /* Last check details */
+  .src-details-error {
+    padding: var(--s-3);
+    border-radius: var(--r-lg);
+    background: var(--danger-soft);
+    color: var(--danger);
+    font: var(--t-sm);
+    letter-spacing: 0;
+    overflow-wrap: anywhere;
+  }
+  .src-details-note {
+    color: var(--text-3);
+    font: var(--t-xs);
+    letter-spacing: 0;
+  }
+
+  /* The source editor (a drawer, full screen on a phone) */
+  .src-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+  }
+  .src-form-kind {
+    color: var(--text-2);
+    font: var(--t-sm);
+    font-weight: var(--w-medium);
+    letter-spacing: 0;
+  }
+  .src-kind {
+    align-self: flex-start;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+  .src-form-pair {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+    gap: var(--s-4);
+  }
+  .src-sites {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1-5);
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  .src-sites legend {
+    padding: 0;
+    margin-bottom: var(--s-1-5);
+  }
+  .src-sites-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2) var(--s-5);
+  }
+  .src-editor-spacer {
+    flex: 1;
+  }
+  .src-test {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    padding-top: var(--s-4);
+    border-top: 1px solid var(--border);
+  }
+  .src-test-title {
+    font: var(--t-md);
+    font-weight: var(--w-semibold);
+    letter-spacing: var(--tr-md);
+  }
+  .src-test-note {
+    color: var(--text-3);
+    font: var(--t-xs);
+    letter-spacing: 0;
+  }
+  .src-test-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--border);
+  }
+  .src-test-list li {
+    display: flex;
+    flex-direction: column;
+    padding: var(--s-2) 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .src-test-job {
+    font: 500 13px/18px var(--font);
+    overflow-wrap: anywhere;
+  }
+  .src-test-where {
+    color: var(--text-3);
+    font: var(--t-xs);
+    letter-spacing: 0;
+  }
+
+  @container app (max-width: 719px) {
+    .src-topline {
+      padding-left: var(--s-4);
+    }
+    .src-row {
+      grid-template-areas:
+        "icon name end"
+        "icon what end"
+        "icon status end"
+        "icon counts end";
+      padding: var(--s-3) var(--s-2) var(--s-3) var(--s-4);
+    }
+    .src-row:hover {
+      background: var(--bg);
+    }
+    .src-row-counts {
+      grid-area: counts;
+      justify-self: start;
+      padding-left: 0;
+      visibility: visible !important;
+    }
+    .src-row-what,
+    .src-row-status {
+      white-space: normal;
+    }
+    /* Touch: no hover, so `…` stays, at full touch size. */
+    .src-row-actions {
+      display: flex;
+      padding-left: var(--s-2);
+    }
+    .src-row-actions > .ui-icon-btn:not(.src-row-more) {
+      display: none;
+    }
+    .src-row-more {
+      width: var(--touch);
+      height: var(--touch);
+    }
+    .src-checks {
+      margin-left: var(--s-4);
+    }
+  }
+  /* The drawer sits in the top layer, outside the app's container. */
+  @media (max-width: 719px) {
+    .src-editor .ui-modal-foot {
+      flex-wrap: wrap;
+    }
+  }
+}
