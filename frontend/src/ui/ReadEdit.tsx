@@ -140,6 +140,7 @@ export function ReadEdit({
           id={`${id}-form`}
           className="ui-readedit-form"
           noValidate
+          data-unguarded=""
           onSubmit={(event: FormEvent) => {
             event.preventDefault();
             save();
