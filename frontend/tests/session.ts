@@ -22,8 +22,23 @@ export function ownerSession(): Cookies {
 /** Open a hash route and wait for its screen. */
 export async function go(page: Page, hash: string) {
   await page.goto("/#" + hash);
-  await expect(page.locator(".main h1")).toBeVisible();
+  // The screen's own h1 is drawn once its code and first data are in; on a
+  // phone the top bar shows the title instead, so it is only attached.
+  await expect(
+    page.locator("#content [data-screen] h1").first(),
+  ).toBeAttached();
+  await expect(heading(page)).toBeVisible();
 }
+
+/**
+ * The screen's title: the page's own h1 on wide screens, the phone's top
+ * bar on narrow ones (each hides the other).
+ */
+export const heading = (page: Page) => page.locator("h1:visible");
+
+/** The shell's phone layout: the top and bottom bars, no sidebar. */
+export const isPhone = (page: Page) =>
+  (page.viewportSize()?.width ?? 1440) < 720;
 
 /** The narrow layout: bottom bar instead of the sidebar. */
 export const isNarrow = (page: Page) =>

@@ -3,9 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#ebe8e0" />
+    <meta name="theme-color" content="#ffffff" />
     <meta name="color-scheme" content="light dark" />
     <title>Openings — Your job search workspace</title>
+    <!-- The cascade layers in their order, before any stylesheet: the build
+         splits the CSS per chunk, and the first mention of a layer fixes its
+         place. The old stylesheet (legacy) goes in #228. -->
+    <style>
+      @layer reset, tokens, legacy, ui, screens;
+    </style>
   </head>
   <body>
     <div id="root"></div>

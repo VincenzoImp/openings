@@ -27,12 +27,32 @@ const SCREENS: Screen[] = [
   { name: "sign-in", route: "today", signedOut: true },
   { name: "setup", route: "setup?step=record", docs: "setup" },
   { name: "today", route: "today", docs: "today" },
+  {
+    name: "palette",
+    route: "today",
+    open: async (page) => {
+      await page.keyboard.press("/");
+      const palette = page.getByRole("dialog", { name: "Search and commands" });
+      await palette.getByRole("combobox").fill("engineer");
+      await expect(
+        palette.getByRole("group", { name: "Jobs" }).getByRole("option"),
+      ).not.toHaveCount(0);
+    },
+  },
+  {
+    name: "shortcuts",
+    route: "today",
+    open: async (page) => {
+      await page.keyboard.press("?");
+      await expect(page.locator("dialog[open]")).toBeVisible();
+    },
+  },
   { name: "applications", route: "applications", docs: "applications" },
   { name: "applications-stats", route: "applications?section=stats" },
   {
     name: "review",
     route: async (page) =>
-      `review?application=${await first(page, "/applications?stage=ready&limit=1")}`,
+      `applications/${await first(page, "/applications?stage=ready&limit=1")}`,
     docs: "review",
   },
   { name: "jobs", route: "jobs", docs: "jobs" },
@@ -56,10 +76,10 @@ const SCREENS: Screen[] = [
       await expect(page.locator("dialog[open]")).toBeVisible();
     },
   },
-  { name: "career", route: "career?section=knowledge", docs: "career" },
+  { name: "profile", route: "profile?section=knowledge", docs: "career" },
   { name: "preferences", route: "preferences", docs: "preferences" },
   { name: "templates", route: "templates", docs: "templates" },
-  { name: "collection", route: "collection", docs: "collection" },
+  { name: "sources", route: "sources", docs: "collection" },
   { name: "settings", route: "settings" },
   { name: "skills", route: "settings?section=skills", docs: "skills" },
   { name: "backup", route: "settings?section=backup" },
@@ -85,8 +105,19 @@ async function capture(page: Page, screen: Screen, path: string) {
   await page.waitForLoadState("networkidle");
   await expect(page.locator(".loading")).toHaveCount(0);
   await screen.open?.(page);
+  // The shell fills the viewport and its content scrolls inside it. For a
+  // full-page image the frame grows with the content instead: the sidebar
+  // spans the whole height and the phone's bars sit above and below it.
+  await page.addStyleTag({ content: FULL_PAGE });
   await page.screenshot({ path, fullPage: true, animations: "disabled" });
 }
+
+const FULL_PAGE = `
+  .ui-app { height: auto; min-height: 100dvh; }
+  .ui-app-grid { min-height: 100dvh; }
+  .ui-app-content { overflow: visible; flex: none; }
+  .ui-app-side { height: auto; }
+`;
 
 for (const [size, viewport] of Object.entries(VIEWPORTS))
   for (const theme of THEMES) {

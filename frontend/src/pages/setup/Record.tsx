@@ -14,8 +14,8 @@ const STATE = {
 } as const;
 // Where each part of the record is kept in full.
 const LOOK: Partial<Record<ItemId, string>> = {
-  entries: "#career?section=knowledge",
-  claims: "#career?section=claims",
+  entries: "#profile?section=knowledge",
+  claims: "#profile?section=claims",
   templates: "#templates",
 };
 

@@ -36,6 +36,7 @@ import {
 import {
   ActionBar,
   AppFrame,
+  BulkBar,
   Avatar,
   BottomBar,
   BrandMark,
@@ -92,6 +93,7 @@ import {
   ToneText,
   ToastProvider,
   ToastView,
+  useSelection,
   useToast,
   applyTheme,
   readTheme,
@@ -206,6 +208,7 @@ function JobsDemo({
   const [selected, setSelected] = useState("j2");
   const [open, setOpen] = useState(false);
   const [hidden, setHidden] = useState<string[]>([]);
+  const picked = useSelection();
   const [chips, setChips] = useState<FilterChip[]>([
     { key: "workplace", field: "Workplace", value: "Remote" },
     { key: "location", field: "Location", value: "Zurich" },
@@ -224,6 +227,20 @@ function JobsDemo({
         label: "Undo",
         undo: true,
         run: () => setHidden((list) => list.filter((item) => item !== id)),
+      },
+    });
+  }
+  function dismissPicked() {
+    const ids = [...picked.ids];
+    setHidden((list) => [...list, ...ids]);
+    picked.clear();
+    toast.show({
+      message: `Dismissed ${ids.length} jobs`,
+      icon: EyeOff,
+      action: {
+        label: "Undo",
+        undo: true,
+        run: () => setHidden((list) => list.filter((id) => !ids.includes(id))),
       },
     });
   }
@@ -341,46 +358,57 @@ function JobsDemo({
           </Button>
         }
       />
-      <Toolbar
-        tools={
-          <>
-            <SearchBox />
-            <Menu
-              label="Filter"
-              items={filterMenu}
-              placement="bottom-end"
-              trigger={(props) => (
-                <Button {...props} variant="ghost" icon={ListFilter}>
-                  Filter
-                </Button>
-              )}
-            />
-            <Menu
-              label="Sort"
-              items={sortMenu}
-              placement="bottom-end"
-              trigger={(props) => (
-                <Button {...props} variant="ghost" icon={ArrowUpDown}>
-                  Newest
-                </Button>
-              )}
-            />
-          </>
-        }
-      >
-        <Tabs
-          label="Jobs"
-          idPrefix={preview ? "gx-jobs" : "jobs"}
-          value={tab}
-          onChange={setTab}
-          items={[
-            { id: "new", label: "New", count: 11 },
-            { id: "shortlist", label: "Shortlist", count: 6 },
-            { id: "dismissed", label: "Dismissed", count: 5 },
-            { id: "all", label: "All" },
-          ]}
-        />
-      </Toolbar>
+      {picked.ids.size ? (
+        <BulkBar count={picked.ids.size} onClear={picked.clear}>
+          <Button size="sm" icon={Bookmark}>
+            Shortlist
+          </Button>
+          <Button size="sm" variant="ghost" icon={X} onClick={dismissPicked}>
+            Dismiss
+          </Button>
+        </BulkBar>
+      ) : (
+        <Toolbar
+          tools={
+            <>
+              <SearchBox />
+              <Menu
+                label="Filter"
+                items={filterMenu}
+                placement="bottom-end"
+                trigger={(props) => (
+                  <Button {...props} variant="ghost" icon={ListFilter}>
+                    Filter
+                  </Button>
+                )}
+              />
+              <Menu
+                label="Sort"
+                items={sortMenu}
+                placement="bottom-end"
+                trigger={(props) => (
+                  <Button {...props} variant="ghost" icon={ArrowUpDown}>
+                    Newest
+                  </Button>
+                )}
+              />
+            </>
+          }
+        >
+          <Tabs
+            label="Jobs"
+            idPrefix={preview ? "gx-jobs" : "jobs"}
+            value={tab}
+            onChange={setTab}
+            items={[
+              { id: "new", label: "New", count: 11 },
+              { id: "shortlist", label: "Shortlist", count: 6 },
+              { id: "dismissed", label: "Dismissed", count: 5 },
+              { id: "all", label: "All" },
+            ]}
+          />
+        </Toolbar>
+      )}
       <FilterChips
         chips={chips}
         onRemove={(key) =>
@@ -408,6 +436,7 @@ function JobsDemo({
               }}
               onOpen={() => setOpen(true)}
               shortcuts={{ s: shortlist, d: dismiss }}
+              selection={picked}
             >
               {JOB_GROUPS.map((group) => {
                 const jobs = group.jobs.filter(
@@ -428,6 +457,18 @@ function JobsDemo({
                         title={item.title}
                         sub={`${item.company} · ${item.place}`}
                         meta={jobMeta(item)}
+                        swipe={{
+                          right: {
+                            label: "Shortlist",
+                            icon: Bookmark,
+                            onClick: () => shortlist(item.id),
+                          },
+                          left: {
+                            label: "Dismiss",
+                            icon: X,
+                            onClick: () => dismiss(item.id),
+                          },
+                        }}
                         actions={[
                           {
                             label: "Shortlist",

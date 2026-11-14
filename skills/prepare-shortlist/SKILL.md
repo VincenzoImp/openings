@@ -152,7 +152,7 @@ no blocking requirement is unresolved. Re-read the application: `ready` and
 left; fix that step. The server checks files and blocking requirements only:
 your content and layout checks come first. The application stays Shortlisted
 until the owner marks it applied. The owner finds it under **Ready to apply**
-on Today and opens its review page (`#review?application=APPLICATION_ID` in the
+on Today and opens its review page (`#applications/APPLICATION_ID` in the
 dashboard): the posting, CV and letter side by side, the requirements still
 open and the form questions without an answer. From there the owner downloads
 the PDFs, submits on the company site and chooses **Mark applied**. Point the

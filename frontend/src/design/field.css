@@ -6,7 +6,7 @@
 }
 .field > span,
 .field-label {
-  font-size: var(--t-sm);
+  font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--ink);
 }
@@ -64,13 +64,13 @@ select.input,
 .field .hint {
   margin: 0;
   color: var(--ink-3);
-  font-size: var(--t-xs);
+  font-size: var(--fs-xs);
   font-weight: 400;
   line-height: 1.5;
 }
 .field .error {
   color: var(--danger);
-  font-size: var(--t-xs);
+  font-size: var(--fs-xs);
 }
 
 /* On/off switch: <input type="checkbox" role="switch" class="switch">.

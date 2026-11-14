@@ -1,8 +1,16 @@
 import { test, expect, type Page } from "./fixtures";
-import { go, isNarrow, ownerSession, type Cookies } from "./session";
+import {
+  call,
+  go,
+  heading,
+  isPhone,
+  ownerSession,
+  type Cookies,
+} from "./session";
 
-// The shell: navigation groups, routes, the theme, screens
-// loaded on demand, and everything of it operated from the keyboard alone.
+// The shell: the sidebar and the phone's bars, the routes, the account menu
+// and the theme, the global keyboard, the ⌘K palette and Add job, and the
+// screens loaded on demand inside it.
 const cookies: Cookies = ownerSession();
 const errors = new WeakMap<Page, string[]>();
 test.beforeEach(async ({ page }) => {
@@ -15,29 +23,20 @@ test.afterEach(async ({ page }) => {
   expect(errors.get(page)).toEqual([]);
 });
 
-const focused = (page: Page) =>
-  page.evaluate(() => {
-    const el = document.activeElement as HTMLElement | null;
-    return el
-      ? `${el.tagName.toLowerCase()}${el.id ? "#" + el.id : ""}:${(
-          el.getAttribute("aria-label") ||
-          el.textContent ||
-          ""
-        )
-          .trim()
-          .slice(0, 40)}`
-      : "";
-  });
 const main = (page: Page) => page.locator("main#content");
-// Safari moves through links with Option+Tab; the other browsers with Tab.
-const tabKey = (page: Page) =>
-  page.context().browser()?.browserType().name() === "webkit"
-    ? "Alt+Tab"
-    : "Tab";
+const nav = (page: Page) =>
+  page.getByRole("navigation", { name: "Main" }).filter({ visible: true });
+const mod = (page: Page) =>
+  page.context().browser()?.browserType().name() === "webkit" ||
+  process.platform === "darwin"
+    ? "Meta"
+    : "Control";
 
-test("keyboard only: skip link, navigation and theme", async ({ page }) => {
-  // The first Tab reaches the skip link; Enter moves focus to the content.
-  await page.keyboard.press(tabKey(page));
+test("keyboard only: skip link, sidebar navigation and focus on the new screen", async ({
+  page,
+}) => {
+  test.skip(isPhone(page), "The sidebar exists on wide screens.");
+  await page.keyboard.press("Tab");
   await expect(
     page.getByRole("link", { name: "Skip to content" }),
   ).toBeFocused();
@@ -45,191 +44,324 @@ test("keyboard only: skip link, navigation and theme", async ({ page }) => {
   await expect(main(page)).toBeFocused();
   expect(page.url()).toContain("#today");
 
-  // Navigation by keyboard: focus the Applications link and press Enter.
-  const nav = page.getByRole("navigation", { name: "Main" });
-  await nav.getByRole("link", { name: /^Applications/ }).focus();
+  const applications = nav(page).getByRole("link", { name: /^Applications/ });
+  await applications.focus();
   await page.keyboard.press("Enter");
-  await expect(page.locator(".main h1")).toHaveText("Applications");
-  await expect(
-    nav.getByRole("link", { name: /^Applications/ }),
-  ).toHaveAttribute("aria-current", "page");
-  // A new screen takes focus, so reading continues at its content.
+  await expect(heading(page)).toHaveText("Applications");
+  await expect(applications).toHaveAttribute("aria-current", "page");
   await expect(main(page)).toBeFocused();
   await expect(page).toHaveTitle("Applications · Openings");
-
-  // Theme: the button says what it will do, keeps focus and is remembered.
-  const root = page.locator("html");
-  const before = await root.getAttribute("data-theme");
-  const other = before === "dark" ? "light" : "dark";
-  const theme = page.getByRole("button", { name: /^Theme:/ });
-  await theme.focus();
-  await expect(theme).toHaveAccessibleName(
-    `Theme: ${before}. Switch to ${other}`,
-  );
-  await page.keyboard.press("Enter");
-  await expect(root).toHaveAttribute("data-theme", other);
-  await expect(theme).toBeFocused();
-  await expect(theme).toHaveAccessibleName(
-    `Theme: ${other}. Switch to ${before}`,
-  );
-
-  // The top bar has no density control.
-  await expect(page.getByRole("button", { name: /^Density/ })).toHaveCount(0);
-
-  await page.reload();
-  await expect(page.locator(".main h1")).toHaveText("Applications");
-  await expect(root).toHaveAttribute("data-theme", other);
-  await expect(root).not.toHaveAttribute("data-density");
+  await expect(page).toHaveURL(/#applications$/);
 });
 
-test("keyboard only: the sidebar reaches every destination in its group", async ({
+test("the sidebar: brand, Add job, search, three groups with icons, the account", async ({
   page,
 }) => {
-  test.skip(isNarrow(page), "The sidebar exists on wide screens.");
-  const nav = page.getByRole("navigation", { name: "Main" });
-  await expect(nav.locator(".nav-group > .eyebrow")).toHaveText([
-    "Work",
-    "Library",
-    "System",
-  ]);
-  await expect(nav.getByRole("link")).toHaveText([
+  test.skip(isPhone(page), "The sidebar exists on wide screens.");
+  const sidebar = nav(page);
+  await expect(sidebar.getByRole("link")).toHaveText([
     /^Today/,
-    /^Applications/,
     /^Jobs/,
-    /^Career/,
+    /^Applications/,
+    /^Profile/,
     /^Preferences/,
     /^Templates/,
-    /^Collection/,
+    /^Sources/,
     /^Settings/,
   ]);
-  // Tab walks the links in order, starting after the brand.
-  await page.getByRole("link", { name: "Openings", exact: true }).focus();
-  const order: string[] = [];
-  for (let index = 0; index < 8; index++) {
-    await page.keyboard.press(tabKey(page));
-    order.push((await focused(page)).split(":")[1]);
-  }
-  expect(order.map((label) => label.replace(/\d.*$/, ""))).toEqual([
-    "Today",
-    "Applications",
-    "Jobs",
-    "Career",
-    "Preferences",
-    "Templates",
-    "Collection",
-    "Settings",
-  ]);
-  await page.keyboard.press("Enter");
-  await expect(page.locator(".main h1")).toHaveText("Settings");
-  await expect(main(page)).toBeFocused();
+  await expect(sidebar.getByRole("group")).toHaveCount(3);
+  await expect(sidebar.getByRole("group", { name: "You" })).toBeVisible();
+  await expect(sidebar.getByRole("group", { name: "Workspace" })).toBeVisible();
+  // Every item has an icon; nothing of the agent remains.
+  for (const link of await sidebar.getByRole("link").all())
+    await expect(link.locator("svg")).toHaveCount(1);
+  await expect(sidebar.getByText(/Activity|agent/i)).toHaveCount(0);
+  await expect(sidebar.getByRole("button", { name: "Add job" })).toBeVisible();
+  await expect(
+    sidebar.getByRole("button", { name: /^Search/ }),
+  ).toHaveAttribute("aria-keyshortcuts", "Meta+K Control+K /");
+  await expect(
+    sidebar.getByRole("button", { name: /^Alex Morgan|^You/ }),
+  ).toBeVisible();
+  // No desktop top bar: no Refresh, Theme or Density button at rest.
+  for (const name of [/^Refresh/, /^Theme/, /^Density/])
+    await expect(page.getByRole("button", { name })).toHaveCount(0);
 });
 
-test("keyboard only: More opens, keeps focus, closes with Escape and navigates", async ({
+test("the needs-you counts come from the workspace", async ({ page }) => {
+  const ready = (await call(page, "/applications?limit=1")).stage_counts.ready;
+  const fresh = (await call(page, "/jobs?triage=new&limit=1")).total;
+  const links = nav(page);
+  await expect(
+    links.getByRole("link", { name: /Applications/ }),
+  ).toHaveAccessibleName(
+    ready ? new RegExp(`${ready} ready applications`) : /^Applications$/,
+  );
+  await expect(links.getByRole("link", { name: /Jobs/ })).toHaveAccessibleName(
+    fresh ? new RegExp(`${fresh} new jobs`) : /^Jobs$/,
+  );
+  // A new job counts at once: the shell reads again after a write.
+  await page.keyboard.press("n");
+  const dialog = page.getByRole("dialog", { name: "Add a job" });
+  await dialog
+    .getByLabel("Address or posting text")
+    .fill(`Counted role ${test.info().project.name}\n\nA synthetic posting.`);
+  await dialog.getByRole("button", { name: "Add job" }).click();
+  await expect(links.getByRole("link", { name: /Jobs/ })).toHaveAccessibleName(
+    new RegExp(`${fresh + 1} new jobs`),
+  );
+});
+
+test("the account menu sets the theme, shows the shortcuts and signs out", async ({
   page,
 }) => {
-  test.skip(!isNarrow(page), "The bottom bar exists on narrow screens.");
-  const bar = page.getByRole("navigation", { name: "Main" });
+  test.skip(isPhone(page), "On a phone these are under More.");
+  const root = page.locator("html");
+  const account = nav(page).getByRole("button", { name: /Alex Morgan|You/ });
+  await account.click();
+  const menu = page.getByRole("menu", { name: "Account" });
+  await menu.getByRole("menuitemradio", { name: "Dark" }).click();
+  await expect(root).toHaveAttribute("data-theme", "dark");
+  await page.reload();
+  await expect(root).toHaveAttribute("data-theme", "dark");
+  await account.click();
+  await expect(
+    menu.getByRole("menuitemradio", { name: "Dark" }),
+  ).toHaveAttribute("aria-checked", "true");
+  await menu.getByRole("menuitemradio", { name: "Light" }).click();
+  await expect(root).toHaveAttribute("data-theme", "light");
+  // System follows the browser and forgets the choice.
+  await page.emulateMedia({ colorScheme: "dark" });
+  await account.click();
+  await menu.getByRole("menuitemradio", { name: "System" }).click();
+  await expect(root).toHaveAttribute("data-theme", "dark");
+  expect(
+    await page.evaluate(() => localStorage.getItem("openings-theme")),
+  ).toBeNull();
+  await page.emulateMedia({ colorScheme: "light" });
+  await expect(root).toHaveAttribute("data-theme", "light");
+
+  await account.click();
+  await menu.getByRole("menuitem", { name: "Keyboard shortcuts" }).click();
+  const sheet = page.getByRole("dialog", { name: "Keyboard shortcuts" });
+  await expect(sheet).toContainText("Go to Jobs");
+  await page.keyboard.press("Escape");
+  await expect(sheet).toBeHidden();
+  await expect(account).toBeFocused();
+
+  await account.click();
+  await menu.getByRole("menuitem", { name: "Sign out" }).click();
+  await expect(page.locator("input[name=password]")).toBeVisible();
+});
+
+test("the phone: top bar, bottom bar, More and a pushed page with a back chevron", async ({
+  page,
+}) => {
+  test.skip(!isPhone(page), "The bars exist on phones.");
+  const bar = nav(page);
+  // Icon above label; a needs-you count sits on the icon.
   await expect(bar.getByRole("link")).toHaveText([
-    /^Today/,
-    /^Applications/,
-    /^Jobs/,
-    /^Career/,
+    /Today$/,
+    /Jobs$/,
+    /Applications$/,
+    /Profile$/,
   ]);
-  const more = page.getByRole("button", { name: "More", exact: true });
-  await more.focus();
-  await page.keyboard.press("Enter");
-  await expect(more).toHaveAttribute("aria-expanded", "true");
-  const sheet = page.getByRole("dialog", { name: "More destinations" });
-  const links = sheet.getByRole("navigation", { name: "More" });
-  await expect(links.getByRole("link")).toHaveText([
+  const top = page.getByRole("banner");
+  await expect(top.getByRole("heading", { level: 1 })).toHaveText("Today");
+  await expect(top.getByRole("button", { name: "Search" })).toBeVisible();
+  await expect(top.getByRole("button", { name: "Add job" })).toBeVisible();
+
+  const more = bar.getByRole("button", { name: "More" });
+  await more.click();
+  const menu = page.getByRole("menu", { name: "More" });
+  await expect(menu.getByRole("menuitem")).toHaveText([
     "Preferences",
     "Templates",
-    "Collection",
+    "Sources",
     "Settings",
+    "Sign out",
   ]);
-  await expect(sheet.getByRole("link", { name: "Preferences" })).toBeFocused();
-  await expect(main(page)).toHaveAttribute("inert", "");
-  // Focus stays in the sheet in both directions: back from the first link to
-  // the last one, then forward.
-  await page.keyboard.press("Shift+Tab");
-  await expect(sheet.getByRole("link").last()).toBeFocused();
-  await page.keyboard.press("Tab");
-  await expect(sheet.getByRole("link", { name: "Preferences" })).toBeFocused();
-  // Escape closes it and focus returns to More.
-  await page.keyboard.press("Escape");
-  await expect(sheet).toHaveCount(0);
-  await expect(more).toBeFocused();
-  await expect(more).toHaveAttribute("aria-expanded", "false");
-  await expect(main(page)).not.toHaveAttribute("inert", "");
-  // Open again and go to Templates: the sheet closes, the screen takes focus
-  // and More is the current tab.
-  await page.keyboard.press("Enter");
-  await page.keyboard.press("Tab");
-  await expect(sheet.getByRole("link", { name: "Templates" })).toBeFocused();
-  await page.keyboard.press("Enter");
-  await expect(page.locator(".main h1")).toHaveText("Templates");
-  await expect(sheet).toHaveCount(0);
-  await expect(main(page)).toBeFocused();
-  await expect(more).toHaveAttribute("aria-current", "page");
+  await expect(menu.getByRole("menuitemradio")).toHaveText([
+    "System",
+    "Light",
+    "Dark",
+  ]);
+  await menu.getByRole("menuitem", { name: "Templates" }).click();
+  await expect(heading(page)).toHaveText("Templates");
+  await expect(more).toHaveAttribute("data-current", "true");
+
+  // A second-level page: its title and the way back.
+  const [application] = (await call(page, "/applications?stage=ready&limit=1"))
+    .items;
+  await go(page, `applications/${application.id}`);
+  await expect(heading(page)).toHaveText(application.job.title);
+  await top.getByRole("link", { name: "Back to Applications" }).click();
+  await expect(heading(page)).toHaveText("Applications");
   await expect(
     page.evaluate(() => document.documentElement.scrollWidth),
   ).resolves.toBeLessThanOrEqual(page.viewportSize()!.width);
 });
 
-test("each screen has one address; an unknown or retired one opens Today", async ({
+test("g and a letter go to a screen; ? shows the shortcuts; n adds a job", async ({
   page,
 }) => {
-  const [first] = (
-    await page.evaluate(() =>
-      fetch("/api/v1/applications?stage=applied&limit=1").then((response) =>
-        response.json(),
-      ),
-    )
-  ).items;
-  await go(page, `review?application=${first.id}&tab=timeline`);
-  await expect(page.locator(".main h1")).toHaveText(first.job.title);
-  await expect(page.getByRole("tab", { name: "Timeline" })).toHaveAttribute(
+  for (const [letter, title] of [
+    ["j", "Jobs"],
+    ["a", "Applications"],
+    ["p", "Profile"],
+    ["t", "Today"],
+  ]) {
+    await page.keyboard.press("g");
+    await page.keyboard.press(letter);
+    await expect(heading(page)).toHaveText(title);
+  }
+  await expect(page).toHaveURL(/#today$/);
+  await page.keyboard.press("?");
+  await expect(
+    page.getByRole("dialog", { name: "Keyboard shortcuts" }),
+  ).toBeVisible();
+  // Inside a dialog the shortcuts rest.
+  await page.keyboard.press("g");
+  await page.keyboard.press("j");
+  await expect(page).toHaveURL(/#today$/);
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("n");
+  const add = page.getByRole("dialog", { name: "Add a job" });
+  await expect(add).toBeVisible();
+  await expect(add.getByLabel("Address or posting text")).toBeFocused();
+  // Typing in a field is never a shortcut.
+  await page.keyboard.type("g j");
+  await expect(page).toHaveURL(/#today$/);
+  await page.keyboard.press("Escape");
+  await expect(add).toBeHidden();
+});
+
+test("⌘K and / open the palette: jobs, applications and commands", async ({
+  page,
+}) => {
+  const [job] = (await call(page, "/jobs?triage=new&limit=1")).items;
+  await page.keyboard.press(`${mod(page)}+k`);
+  const palette = page.getByRole("dialog", { name: "Search and commands" });
+  const input = palette.getByRole("combobox");
+  await expect(input).toBeFocused();
+  // Commands at rest; the first one is active.
+  await expect(palette.getByRole("option").first()).toHaveAttribute(
     "aria-selected",
     "true",
   );
-  // Names of earlier versions are no longer rewritten.
-  for (const route of ["overview", "inbox", "shortlist", "no-such-screen"]) {
-    await go(page, route);
-    await expect(page.locator(".main h1")).toHaveText("Today");
-    await expect(page).toHaveURL(new RegExp(`#${route}$`));
-  }
-  // The Activity page is gone: its address opens Today, and no link leads to it.
-  await go(page, "activity?section=runs");
-  await expect(page.locator(".main h1")).toHaveText("Today");
+  await input.fill(job.title);
+  const hit = palette
+    .getByRole("group", { name: "Jobs" })
+    .getByRole("option", { name: new RegExp(job.title) })
+    .first();
+  await expect(hit).toBeVisible();
+  await hit.click();
+  await expect(palette).toBeHidden();
+  await expect(page).toHaveURL(new RegExp(`#jobs\\?job=${job.id}$`));
+
+  // An application by its company, opened with the keyboard.
+  const [application] = (await call(page, "/applications?stage=ready&limit=1"))
+    .items;
+  await page.keyboard.press("Escape");
+  await main(page).focus();
+  await page.keyboard.press("/");
+  await expect(input).toBeFocused();
+  await input.fill(application.job.title);
   await expect(
-    page.getByRole("navigation", { name: "Main" }).getByRole("link", {
-      name: /^Activity/,
-    }),
-  ).toHaveCount(0);
+    palette.getByRole("group", { name: "Applications" }).getByRole("option"),
+  ).not.toHaveCount(0);
+  // Move to the application with the arrows and open it.
+  const applicationIndex = await palette
+    .getByRole("option")
+    .evaluateAll(
+      (all, title) =>
+        all.findIndex(
+          (option) =>
+            option.closest("[role=group]")?.getAttribute("aria-label") ===
+              "Applications" && !!option.textContent?.startsWith(title),
+        ),
+      application.job.title,
+    );
+  expect(applicationIndex).toBeGreaterThanOrEqual(0);
+  for (let index = 0; index < applicationIndex; index++)
+    await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(new RegExp(`#applications/${application.id}$`));
+  await expect(heading(page)).toHaveText(application.job.title);
+
+  // A command: go to Settings.
+  await page.keyboard.press(`${mod(page)}+k`);
+  await input.fill("Go to Settings");
+  await page.keyboard.press("Enter");
+  await expect(heading(page)).toHaveText("Settings");
+  // Nothing matches: the palette says so.
+  await page.keyboard.press(`${mod(page)}+k`);
+  await input.fill("zzzz no such thing");
+  await expect(palette.getByRole("status")).toContainText("Nothing matches");
+  await page.keyboard.press("Escape");
+  await expect(palette).toBeHidden();
 });
 
-test("navigation counts come from the workspace", async ({ page }) => {
-  const api = (path: string) =>
-    page.evaluate(
-      (path) => fetch("/api/v1" + path).then((response) => response.json()),
-      path,
-    );
-  const ready = (await api("/applications?limit=1")).stage_counts.ready;
-  const applications = page
-    .getByRole("navigation", { name: "Main" })
-    .getByRole("link", { name: /^Applications/ });
-  if (ready)
-    await expect(applications).toHaveAccessibleName(
-      // Browsers differ on a space before the comma of the hidden count.
-      new RegExp(`^Applications ?, ${ready} application`),
-    );
-  else await expect(applications.locator(".count")).toHaveCount(0);
-  const fresh = (await api("/jobs?triage=new&limit=1")).total;
+test("Add job: one field, optional details, the job opens", async ({
+  page,
+}) => {
+  const title = `Shell added role ${test.info().project.name}`;
+  if (isPhone(page))
+    await page
+      .getByRole("banner")
+      .getByRole("button", { name: "Add job" })
+      .click();
+  else await nav(page).getByRole("button", { name: "Add job" }).click();
+  const dialog = page.getByRole("dialog", { name: "Add a job" });
+  const submit = dialog.getByRole("button", { name: "Add job" });
+  await expect(submit).toBeDisabled();
+  await dialog
+    .getByLabel("Address or posting text")
+    .fill("We build synthetic data tools. You write Python every day.");
+  await dialog.getByText("More details").click();
+  await dialog.getByLabel("Role").fill(title);
+  await dialog.getByLabel("Company").fill("Example Labs");
+  await submit.click();
+  await expect(dialog).toBeHidden();
+  await expect(page).toHaveURL(/#jobs\?job=/);
+  const id = new URL(page.url()).hash.split("job=")[1];
+  const job = await call(page, `/jobs/${id}`);
+  expect(job.title).toBe(title);
+  expect(job.company).toBe("Example Labs");
+  expect(job.posting).toContain("synthetic data tools");
   await expect(
-    page
-      .getByRole("navigation", { name: "Main" })
-      .getByRole("link", { name: /^Jobs/ }),
-  ).toHaveAccessibleName(new RegExp(`^Jobs ?, ${fresh} new jobs?$`));
+    page.getByRole("status").filter({ hasText: `Added “${title}”` }),
+  ).toBeVisible();
+
+  // An address already in the workspace is named before adding it again.
+  const known = (await call(page, "/jobs?limit=20")).items.find(
+    (item: { url: string }) => /^https?:\/\//.test(item.url),
+  );
+  test.skip(!known, "The seeded workspace has a job with an address.");
+  await page.keyboard.press("n");
+  await dialog.getByLabel("Address or posting text").fill(known.url);
+  await dialog.getByLabel("Address or posting text").blur();
+  await expect(dialog.getByText("Already in your workspace")).toBeVisible();
+  await dialog.getByRole("button", { name: "Open it" }).click();
+  await expect(page).toHaveURL(new RegExp(`#jobs\\?job=${known.id}$`));
+});
+
+test("each screen has one address; an unknown or retired one opens Today", async ({
+  page,
+}) => {
+  for (const route of [
+    "overview",
+    "inbox",
+    "career",
+    "collection",
+    "activity?section=runs",
+    `review?application=x`,
+    "no-such-screen",
+  ]) {
+    await page.goto("/#" + route);
+    await expect(heading(page)).toHaveText("Today");
+    await expect(page).toHaveURL(/#today$/);
+  }
 });
 
 test("a screen that fails to load offers a reload", async ({ page }) => {
@@ -244,15 +376,15 @@ test("a screen that fails to load offers a reload", async ({ page }) => {
   await page
     .getByRole("button", { name: "Reload the dashboard", exact: true })
     .click();
-  await expect(page.locator(".main h1")).toHaveText("Templates");
+  await expect(heading(page)).toHaveText("Templates");
   await expect(
     page.getByRole("region", { name: "Templates by kind" }),
   ).toBeVisible();
 });
 
 // One test per width, so the workers share them.
-for (const width of [360, 390, 600, 860, 861, 1024, 1280, 1600])
-  test(`no horizontal page scroll at ${width} px on every screen`, async ({
+for (const width of [360, 390, 600, 719, 720, 1024, 1280, 1600])
+  test(`no horizontal scroll at ${width} px on every screen`, async ({
     page,
   }) => {
     test.skip(
@@ -260,48 +392,50 @@ for (const width of [360, 390, 600, 860, 861, 1024, 1280, 1600])
       "Widths are set by the test; one project is enough.",
     );
     test.setTimeout(60000);
-    const api = (path: string) =>
-      page.evaluate(
-        (path) => fetch("/api/v1" + path).then((response) => response.json()),
-        path,
-      );
-    const ready = (await api("/applications?stage=ready&limit=1")).items[0];
-    const sent = (await api("/applications?stage=interview&limit=1")).items[0];
+    const ready = (await call(page, "/applications?stage=ready&limit=1"))
+      .items[0];
+    const sent = (await call(page, "/applications?stage=interview&limit=1"))
+      .items[0];
     // A job with every kind of signal: a likely duplicate of a job in progress.
-    const flagged = (await api("/jobs?signal=likely_duplicate&limit=1"))
+    const flagged = (await call(page, "/jobs?signal=likely_duplicate&limit=1"))
       .items[0];
     await page.setViewportSize({ width, height: 900 });
     for (const [route, title] of [
       ["today", "Today"],
       ["applications", "Applications"],
       ["applications?section=stats", "Applications"],
-      [`review?application=${ready.id}`, ready.job.title],
-      [`review?application=${sent.id}&tab=timeline`, sent.job.title],
-      [`review?application=${ready.id}&tab=details`, ready.job.title],
+      [`applications/${ready.id}`, ready.job.title],
+      [`applications/${sent.id}?tab=timeline`, sent.job.title],
+      [`applications/${ready.id}?tab=details`, ready.job.title],
       ["jobs", "Jobs"],
       [`jobs?job=${flagged.id}`, "Jobs"],
       ["jobs?section=dismissed", "Jobs"],
       ["jobs?section=all", "Jobs"],
-      ["career?section=knowledge", "Career"],
-      ["career?section=claims", "Career"],
+      ["profile?section=knowledge", "Profile"],
+      ["profile?section=claims", "Profile"],
       ["preferences", "Preferences"],
       ["templates", "Templates"],
       ["templates?section=rules", "Templates"],
-      ["collection", "Collection"],
-      ["collection?section=runs", "Collection"],
-      ["collection?section=providers", "Collection"],
+      ["sources", "Sources"],
+      ["sources?section=runs", "Sources"],
+      ["sources?section=providers", "Sources"],
       ["settings", "Settings"],
       ["settings?section=skills", "Settings"],
       ["settings?section=backup", "Settings"],
       ["settings?section=workspace", "Settings"],
     ]) {
       await page.goto("/#" + route);
-      await expect(page.locator(".main h1")).toHaveText(title);
+      await expect(heading(page)).toHaveText(title);
       await expect(page.locator(".loading")).toHaveCount(0);
       await page.waitForLoadState("networkidle");
-      expect(
-        await page.evaluate(() => document.documentElement.scrollWidth),
-        `${route} at ${width}px`,
-      ).toBeLessThanOrEqual(width);
+      const [page_, content] = await page.evaluate(() => {
+        const box = document.getElementById("content")!;
+        return [
+          document.documentElement.scrollWidth,
+          box.scrollWidth - box.clientWidth,
+        ];
+      });
+      expect(page_, `${route} at ${width}px`).toBeLessThanOrEqual(width);
+      expect(content, `${route} content at ${width}px`).toBeLessThanOrEqual(0);
     }
   });

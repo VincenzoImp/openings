@@ -63,7 +63,7 @@ export default function CareerPage() {
   );
   return (
     <>
-      <PageHead title="Career">
+      <PageHead title="Profile">
         Who you are and what you have done. Documents may only state what is
         recorded and approved here.
       </PageHead>

@@ -7,6 +7,7 @@ export * from "./Button";
 export * from "./cx";
 export * from "./Dialog";
 export * from "./Field";
+export * from "./gestures";
 export * from "./format";
 export * from "./Icon";
 export * from "./keys";

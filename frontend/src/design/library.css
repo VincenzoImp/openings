@@ -37,7 +37,7 @@
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--surface);
-  font-size: var(--t-sm);
+  font-size: var(--fs-sm);
   overflow-wrap: anywhere;
 }
 .statements li.editing,
@@ -66,7 +66,7 @@
   align-items: center;
   gap: var(--s3);
   width: 100%;
-  min-height: var(--row);
+  min-height: var(--row-min);
   padding: 0 var(--s4);
   border: 0;
   border-top: 1px solid var(--line);
@@ -136,7 +136,7 @@ fieldset.field {
 fieldset.field > legend {
   padding: 0;
   margin-bottom: var(--s1);
-  font-size: var(--t-sm);
+  font-size: var(--fs-sm);
   font-weight: 600;
 }
 
@@ -153,7 +153,7 @@ fieldset.field > legend {
 }
 .kv-head {
   color: var(--ink-2);
-  font-size: var(--t-xs);
+  font-size: var(--fs-xs);
   font-weight: 600;
 }
 .kv-head > :last-child {
@@ -184,7 +184,7 @@ fieldset.field > legend {
 }
 .kv-error {
   color: var(--danger);
-  font-size: var(--t-sm);
+  font-size: var(--fs-sm);
 }
 .kv .kv {
   width: 100%;
@@ -196,7 +196,7 @@ fieldset.field > legend {
   gap: var(--s1);
   margin: 0;
   padding: 0;
-  font-size: var(--t-sm);
+  font-size: var(--fs-sm);
   overflow-wrap: anywhere;
 }
 ol.tree {
@@ -228,13 +228,13 @@ dl.tree > div {
   padding: var(--s2) var(--s4);
   border-bottom: 1px solid var(--line);
   color: var(--ink-2);
-  font-size: var(--t-xs);
+  font-size: var(--fs-xs);
   font-weight: 600;
   text-align: left;
   white-space: nowrap;
 }
 .datatable td {
-  height: var(--row);
+  height: var(--row-min);
   padding: var(--s2) var(--s4);
   border-top: 1px solid var(--line);
 }
@@ -247,7 +247,7 @@ dl.tree > div {
 }
 .datatable .meta {
   color: var(--ink-2);
-  font-size: var(--t-sm);
+  font-size: var(--fs-sm);
 }
 .datatable .actions {
   text-align: right;
@@ -278,7 +278,7 @@ dl.tree > div {
   border-radius: var(--radius-sm);
   background: var(--surface);
   color: var(--ink);
-  font: var(--t-sm) / 1.6 var(--mono);
+  font: var(--fs-sm) / 1.6 var(--mono);
   white-space: pre;
   overflow: auto;
   tab-size: 2;
@@ -464,7 +464,7 @@ img.frame {
   .datatable.stack td[data-label]::before {
     content: attr(data-label) ": ";
     color: var(--ink-2);
-    font-size: var(--t-sm);
+    font-size: var(--fs-sm);
   }
 }
 

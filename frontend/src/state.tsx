@@ -474,7 +474,12 @@ export function useFormProtection() {
     const mark = (event: Event) => {
       const target = event.target as HTMLElement;
       const form = target.closest("form");
-      if (form && !form.hasAttribute("data-filter-form")) {
+      // Filters and the shell's own forms (Add job) keep no draft to protect.
+      if (
+        form &&
+        !form.hasAttribute("data-filter-form") &&
+        !form.hasAttribute("data-unguarded")
+      ) {
         form.dataset.dirty = "true";
         form.dataset.editRevision = String(
           Number(form.dataset.editRevision || 0) + 1,
