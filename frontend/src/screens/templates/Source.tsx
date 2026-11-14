@@ -8,7 +8,7 @@ import {
   isModKey,
   useToast,
 } from "../../ui";
-import { CodeEditor, CodeView } from "../../ui/CodeView";
+import { CodeEditor, CodeView } from "../../ui";
 import { ConflictNotice } from "../../query/ConflictNotice";
 import { isConflict } from "../../query/mutation";
 import { useUpdateTemplate, type Template } from "../../query/templates";

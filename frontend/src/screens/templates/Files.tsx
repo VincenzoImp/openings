@@ -25,7 +25,7 @@ import {
   SkeletonRows,
   useToast,
 } from "../../ui";
-import { SheetMenu, usePhone } from "../../ui/ActionSheet";
+import { SheetMenu, usePhone } from "../../ui";
 import {
   fileBytes,
   useDeleteFile,

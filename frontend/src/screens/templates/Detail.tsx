@@ -26,7 +26,7 @@ import {
   Tabs,
   useToast,
 } from "../../ui";
-import { SheetMenu } from "../../ui/ActionSheet";
+import { SheetMenu } from "../../ui";
 import {
   useDeleteTemplate,
   useDuplicateTemplate,

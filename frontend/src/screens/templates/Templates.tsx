@@ -23,18 +23,18 @@ import {
   SplitPane,
   useToast,
   type MenuEntry,
-} from "../ui";
-import { SheetMenu } from "../ui/ActionSheet";
-import { TopBarActions } from "../shell/context";
-import { addLeaveGuard, href, navigate, useRoute } from "../shell/router";
+} from "../../ui";
+import { SheetMenu } from "../../ui";
+import { TopBarActions } from "../../shell/context";
+import { addLeaveGuard, href, navigate, useRoute } from "../../shell/router";
 import {
   useCreateTemplate,
   useTemplates,
   type NewTemplate,
   type Template,
-} from "../query/templates";
-import { TemplateDetail } from "./templates/Detail";
-import { DefaultMark } from "./templates/Mark";
+} from "../../query/templates";
+import { TemplateDetail } from "./Detail";
+import { DefaultMark } from "./Mark";
 import {
   KINDS,
   changedText,
@@ -42,9 +42,9 @@ import {
   nameOfFile,
   tabOf,
   type Tab,
-} from "./templates/model";
-import { EXAMPLE_CV, EXAMPLE_LETTER } from "./templates/starters";
-import "./templates/templates.css";
+} from "./model";
+import { EXAMPLE_CV, EXAMPLE_LETTER } from "./starters";
+import "./templates.css";
 
 const byDefaultThenName = (a: Template, b: Template) =>
   Number(b.is_default) - Number(a.is_default) ||

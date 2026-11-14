@@ -2,9 +2,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 // Node strips the types of these modules; none of them uses React.
-const model = await import("../src/pages/templates/model.ts");
-const starters = await import("../src/pages/templates/starters.ts");
-const preferences = await import("../src/pages/preferences/model.ts");
+const model = await import("../src/screens/templates/model.ts");
+const starters = await import("../src/screens/templates/starters.ts");
+const preferences = await import("../src/screens/preferences/model.ts");
 
 const example = (name) =>
   readFileSync(new URL(`../../examples/${name}`, import.meta.url), "utf8");
