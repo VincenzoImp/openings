@@ -210,19 +210,19 @@ test("mobile applications, templates and stats stay usable inside the viewport",
     .toBeLessThanOrEqual(390);
   await go(page, "templates");
   // One pane at a time: the list first, the chosen template after a tap.
-  const list = page.getByRole("region", { name: "Templates by kind" });
+  const list = page.getByRole("region", { name: "Templates", exact: true });
   await expect(list).toBeVisible();
-  await expect(page.locator("#template-title")).toBeHidden();
-  await list
-    .getByRole("button", { name: "Synthetic CV 01", exact: true })
-    .click();
+  await expect(page.locator(".tpl-title")).toBeHidden();
+  await list.getByRole("button", { name: /^Synthetic CV 01\b/ }).click();
   await expect(
     page.getByRole("heading", { name: "Synthetic CV 01", exact: true }),
   ).toBeVisible();
-  await expect(list).toBeHidden();
+  await expect(
+    page.getByRole("button", { name: "Back to templates" }),
+  ).toBeVisible();
   expect(
     await page
-      .locator("#template-title")
+      .locator(".tpl-title")
       .evaluate((element) => element.getBoundingClientRect().top),
   ).toBeLessThan(844);
   await expect
