@@ -98,13 +98,13 @@ by hand.
 
 | Setting | Default and range |
 |---|---|
-| Query | Required. One search per query and place. |
+| Keywords | Required. One search per query and place. |
 | Location | Empty. Use a place the portal knows. |
 | Country | Empty. Indeed and Glassdoor need one, such as `switzerland` or `uk`; LinkedIn uses the location alone. |
-| Portals | All three; choose the ones you want. |
-| Result limit | 20 per portal per check, 1 to 50. Known jobs count. |
-| Age window | 72 hours, 1 to 8760. |
-| Remote only, job type | Off, any. |
+| Job sites | All three; choose the ones you want. |
+| Posted within | 72 hours, 1 to 8760. |
+| Result limit (REST and MCP: `results_wanted`) | 20 per portal per check, 1 to 50. Known jobs count. |
+| Remote only, job type (REST and MCP: `is_remote`, `job_type`) | Off, any. |
 
 A query and a result limit do not guarantee complete coverage: portals sort by
 relevance, round age filters and sometimes return incomplete results.
@@ -112,12 +112,13 @@ relevance, round age filters and sometimes return incomplete results.
 ### Company careers pages and feeds
 
 Paste the careers page or feed URL; the form names the detected service, and
-**Test** confirms it. The
-result limit is 100 matching jobs per check (1 to 2000). Optional filters keep
-matching **titles** and **locations** and skip **excluded role terms** such as
-`sales`; any matching term in a group is enough, and unknown locations stay
-visible for review. Lever pages have a region (`global` or `eu`). Careers pages and
-feeds can hold undated jobs, so the age window does not apply to them.
+**Test** confirms it. The result limit is 100 matching jobs per check (1 to 2000,
+`max_results` over REST and MCP). **Title must include** keeps matching titles and
+**Title must not include** skips terms such as `sales`; any matching term is
+enough. Over REST and MCP, `filters.locations` also keeps matching places, and
+unknown locations stay visible for review. Lever pages have a region (`global` or
+`eu`). Careers pages and feeds can hold undated jobs, so **Posted within** does not
+apply to them.
 
 ### Schedule
 
@@ -129,8 +130,8 @@ waits one interval after enabling; use **Check now** to collect now. Missed slot
 merge instead of queueing. Pausing every automatic check keeps the settings;
 checks already queued continue until **Stop** under Recent checks.
 
-Over REST and MCP a check can change the age window or result limit for that check
-only, and several sources can be enabled, paused, run, changed or deleted
+Over REST and MCP a check can change `hours_old`, `results_wanted` or `max_results`
+for that check only (`overrides`), and several sources can be enabled, paused, run, changed or deleted
 together. Deleting a source keeps the jobs it found.
 
 ### Checks and counts
@@ -154,7 +155,8 @@ paused, and the minimum time between two requests to it (5 seconds by default),
 saved when you leave the field. Every request respects it: tests, job links,
 scheduled and manual checks, redirects and detail pages. When a site answers
 "too many requests" (HTTP 429), Openings pauses requests to it until the time the
-site names; the pause survives restarts.
+site names; the pause survives restarts. REST and MCP can lift it early with
+`clear_cooldown`.
 A login page is reported as blocked. A portal can still block requests or change
 its pages; paste the posting when a page cannot be read.
 

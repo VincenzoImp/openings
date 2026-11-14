@@ -5,11 +5,15 @@ lines and the architecture guide at most 150. Every relative link and image reso
 the changelog's too, and every image in docs/images is embedded. The MCP endpoint is
 spelled `/mcp/`, and no earlier vocabulary appears outside the changelog: not in the
 docs, nor in the skills and the agent workspace's instructions, where only a quoted
-phrase of the owner may use an earlier word.
+phrase of the owner may use an earlier word. Every route the pages name is served, and
+every operation they name exists: an MCP tool where agents read it.
 """
 
 import re
 from pathlib import Path
+
+from openings.interfaces import OPERATIONS, TRANSPORT_ONLY
+from openings.interfaces.operation import OWNER
 
 ROOT = Path(__file__).resolve().parents[2]
 USER_DOCS = sorted((ROOT / "docs" / "user").glob("*.md"))
@@ -110,3 +114,48 @@ def test_one_vocabulary_and_the_mcp_endpoint_with_its_slash():
 def test_agents_read_the_same_vocabulary():
     found = vocabulary(AGENT_PAGES, lambda page: QUOTED.sub("", page.read_text()))
     assert not found, found
+
+
+# A route as the pages write it: `PATCH /jobs/{job_id}`, or any `/api/v1/...` path.
+ROUTE = re.compile(r"\b(GET|POST|PUT|PATCH|DELETE) (/[\w/{}.-]*)|/api/v1(/[\w/{}.-]*)")
+SERVED = [
+    *((method, path) for op in OPERATIONS for method, path in op.routes),
+    *((method, path) for method, path, _ in TRANSPORT_ONLY),
+]
+TOOLS = {op.name for op in OPERATIONS if op.access != OWNER and not op.covered_by}
+RESOURCES = {op.name.split("_")[0] for op in OPERATIONS}
+VERBS = {op.name.rsplit("_", 1)[1] for op in OPERATIONS}
+
+
+def served(method, path):
+    """Whether a route is served; a `{...}` segment of the route matches any value."""
+    want = path.removeprefix("/api/v1").rstrip("/").split("/")
+    for verb, route in SERVED:
+        have = route.rstrip("/").split("/")
+        if (
+            method in (None, verb)
+            and len(have) == len(want)
+            and all(h == w or h.startswith("{") for h, w in zip(have, want, strict=True))
+        ):
+            return True
+    return False
+
+
+def test_every_route_named_is_served():
+    unknown = []
+    for page in [*PAGES, *AGENT_PAGES]:
+        for method, path, api_path in ROUTE.findall(page.read_text()):
+            if not served(method or None, path or api_path):
+                unknown.append(f"{page.relative_to(ROOT)}: {method} {path or api_path}")
+    assert not unknown, unknown
+
+
+def test_every_operation_named_exists_and_agents_read_only_tools():
+    unknown = []
+    for page in [*PAGES, *AGENT_PAGES]:
+        names = set(re.findall(r"`([a-z]+(?:_[a-z]+)+)`", page.read_text()))
+        known = TOOLS if page in AGENT_PAGES else {op.name for op in OPERATIONS}
+        for name in names - known:
+            if name.split("_")[0] in RESOURCES and name.rsplit("_", 1)[1] in VERBS:
+                unknown.append(f"{page.relative_to(ROOT)}: {name}")
+    assert not unknown, unknown
