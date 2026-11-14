@@ -97,7 +97,14 @@ export function RevisionDialog({
         setPdfDone(true);
       }
     }, "Revision saved.");
-    if (ok) onClose();
+    if (ok) {
+      // Reads that arrived while this form was still unsaved kept their old
+      // data; read the documents and the application again now that it is saved.
+      window.dispatchEvent(
+        new CustomEvent("openings:changed", { detail: "/documents" }),
+      );
+      onClose();
+    }
   }
   const locked = !!created;
   return (
