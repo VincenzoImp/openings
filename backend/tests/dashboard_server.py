@@ -172,7 +172,7 @@ def seed_library(app, agent):
             ):
                 career.create_claim(
                     ClaimCreate(
-                        knowledge_id=entry["id"],
+                        career_id=entry["id"],
                         text=text,
                         approved=bool(approved),
                         always_include=bool(always),
@@ -234,7 +234,7 @@ def seed(path, jobs=60, applications=53):
             )
             career.create_claim(
                 ClaimCreate(
-                    knowledge_id=evidence["id"],
+                    career_id=evidence["id"],
                     text=f"Synthetic claim {index:02d}",
                     approved=True,
                 )

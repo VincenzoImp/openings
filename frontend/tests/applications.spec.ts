@@ -185,7 +185,7 @@ test("keyboard only: a ready application is reviewed from Today and marked appli
   const sent = await call(page, `/applications/${application.id}`);
   expect(sent.applied_at).toBeTruthy();
   // Mark applied stays in the timeline.
-  const history = await call(page, `/applications/${application.id}/events`);
+  const history = await call(page, `/changes?application_id=${application.id}`);
   expect(history.items.map((event: any) => event.kind)).toContain(
     "application_updated",
   );
