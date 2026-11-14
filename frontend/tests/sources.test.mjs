@@ -99,7 +99,7 @@ test("a source's status: checking, failed, checked with what was new, paused", (
         finished_at: hoursAgo(30).toISOString(),
       },
     }).text,
-    "Paused · Checked yesterday · nothing new",
+    "Checked yesterday · nothing new",
   );
   assert.equal(status({}).text, "Not checked yet");
   assert.equal(status({ automatic_collection: false }).failed, true);
@@ -241,7 +241,7 @@ test("Settings: sections, sizes, access, snippets and request limits", () => {
   assert.equal(settings.ACCESS.agent.label, "Agent");
   assert.match(
     settings.connectSnippet("claude", "https://openings.example.test/"),
-    /^claude mcp add --transport http openings https:\/\/openings\.example\.test\/mcp/,
+    /^claude mcp add --transport http openings https:\/\/openings\.example\.test\/mcp\/ /,
   );
   assert.match(
     settings.connectSnippet("codex", "https://openings.example.test"),

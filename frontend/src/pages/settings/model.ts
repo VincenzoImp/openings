@@ -55,7 +55,7 @@ export type ClientId = (typeof CLIENTS)[number]["id"];
 
 /** How an agent adds Openings: its MCP address and the token's variable. */
 export function connectSnippet(client: ClientId, origin: string) {
-  const endpoint = `${origin.replace(/\/$/, "")}/mcp`;
+  const endpoint = `${origin.replace(/\/$/, "")}/mcp/`;
   if (client === "codex")
     return `# ~/.codex/config.toml\n[mcp_servers.openings]\nurl = "${endpoint}"\nbearer_token_env_var = "OPENINGS_TOKEN"`;
   return `claude mcp add --transport http openings ${endpoint} \\\n  --header 'Authorization: Bearer \${OPENINGS_TOKEN}'`;
