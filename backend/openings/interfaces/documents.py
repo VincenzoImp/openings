@@ -5,21 +5,18 @@ from typing import Annotated
 from fastapi import Query, Request
 from mcp.types import ToolAnnotations
 
-from ..common import encode
 from ..documents import (
-    ContextCreate,
     DocumentCreate,
     DocumentService,
     UploadReservation,
 )
-from ..documents.models import ContextQuery, DocumentQuery, FileQuery, StalenessQuery
+from ..documents.models import DocumentQuery, FileQuery
 from .registry import (
     REQUIRED,
     Exemption,
     Operation,
     Param,
     Route,
-    Surface,
     Tool,
     bind_mcp,
     bind_rest,
@@ -43,39 +40,6 @@ DELETE = ToolAnnotations(
 EXPECTED_VERSION = Param("expected_version", int, rest=(Annotated[int, Query(ge=1)], REQUIRED))
 
 OPERATIONS = (
-    Operation(
-        "contexts.list",
-        "contexts",
-        "list",
-        "Applications and documents",
-        "List/filter compact frozen-context metadata",
-        params=(query_model(ContextQuery),),
-        call=lambda s, value: s.list_contexts(**(value or ContextQuery()).model_dump()),
-        rest=(Route("GET", "/contexts", "list_contexts"),),
-        tool=Tool(LOOKUP, DocumentService.list_contexts.__doc__),
-    ),
-    Operation(
-        "contexts.create",
-        "contexts",
-        "create",
-        "Applications and documents",
-        "Prepare an immutable context for external generation",
-        params=(Param("value", ContextCreate),),
-        call=lambda s, value: s.prepare_context(value),
-        rest=(Route("POST", "/contexts", "prepare_context", status_code=201),),
-        tool=Tool(ADD, method="prepare_context"),
-    ),
-    Operation(
-        "contexts.read",
-        "contexts",
-        "get",
-        "Applications and documents",
-        "Read full frozen context and signature",
-        params=(Param("context_id", str),),
-        call=lambda s, context_id: s.get_context(context_id),
-        rest=(Route("GET", "/contexts/{context_id}", "get_context"),),
-        tool=Tool(LOOKUP, method="get_context"),
-    ),
     Operation(
         "documents.list",
         "documents",
@@ -122,28 +86,6 @@ OPERATIONS = (
         call=lambda s, document_id, other_id: s.compare_documents(document_id, other_id),
         rest=(Route("GET", "/documents/{document_id}/comparison", "compare_documents"),),
         tool=Tool(LOOKUP, method="compare_documents"),
-    ),
-    Operation(
-        "applications.staleness_list",
-        "staleness",
-        "list",
-        "Applications and documents",
-        "List attempts whose current revisions use outdated inputs",
-        params=(query_model(StalenessQuery),),
-        call=lambda s, value: s.list_staleness(**(value or StalenessQuery()).model_dump()),
-        rest=(Route("GET", "/staleness", "list_staleness"),),
-        tool=Tool(LOOKUP, DocumentService.list_staleness.__doc__),
-    ),
-    Operation(
-        "applications.staleness",
-        "staleness",
-        "get",
-        "Applications and documents",
-        "Report whether an attempt's current revisions use outdated inputs",
-        params=(Param("application_id", str),),
-        call=lambda s, application_id: s.application_staleness(application_id),
-        rest=(Route("GET", "/applications/{application_id}/staleness", "application_staleness"),),
-        tool=Tool(LOOKUP, method="application_staleness"),
     ),
     Operation(
         "documents.delete",
@@ -231,14 +173,13 @@ OPERATIONS = (
 EXEMPTIONS = (
     Exemption(
         "immutable.records",
-        "Frozen contexts and lifecycle history have no arbitrary PATCH/DELETE. Document content changes create revisions; a complete revision (its PDF stored) stays immutable. Context deletion is scoped to deleting the owning application/job.",
+        "Lifecycle history has no arbitrary PATCH/DELETE. Document content changes create revisions; a complete revision (its PDF stored) stays immutable.",
     ),
     Exemption(
         "binary.transfers",
         "Logical file actions are equivalent across interfaces; raw HTTP bytes use scoped grants rather than base64 MCP payloads. Backup/export use their own scoped operational grants.",
     ),
 )
-SURFACES = (Surface("resource", "openings://contexts/{context_id}"),)
 
 
 def register_api(router, documents: DocumentService):
@@ -256,8 +197,3 @@ def register_api(router, documents: DocumentService):
 
 def register_mcp(mcp, documents: DocumentService):
     bind_mcp(mcp, OPERATIONS, documents)
-
-    @mcp.resource("openings://contexts/{context_id}")
-    def context_resource(context_id: str) -> str:
-        """Read an immutable application context, including stored template instructions."""
-        return encode(documents.get_context(context_id))

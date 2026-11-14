@@ -187,6 +187,84 @@ NOT_ARCHIVED_214 = {
 }
 
 
+# #215 Frozen contexts, snapshots and staleness: ``contexts``, ``context_inputs``,
+# ``context_parts``, ``snapshot_parts`` and ``snapshot_list_items`` leave the schema
+# with ``files.context_id``, ``documents.context_id`` and ``documents.legacy_content``.
+# The archive keeps each context with its frame and the hashes of its parts
+# (``contexts``), each snapshot part once by hash (``snapshot_parts``), each context
+# file without its bytes (``context_files``) and the legacy content of each document
+# (``legacy_content``). A context file is a frozen copy of a Career or template file:
+# its row is not copied, and a blob only context files referenced is dropped (its
+# bytes stay in the pre-upgrade copy). Documents keep their files and cited ids.
+CONTEXT_ONLY_BLOB_215 = (
+    "(EXISTS(SELECT 1 FROM old.snapshot_parts p WHERE p.blob={blob}) OR EXISTS(SELECT 1 "
+    "FROM old.files f WHERE f.sha256={blob} AND f.context_id IS NOT NULL)) AND NOT EXISTS("
+    "SELECT 1 FROM old.files f WHERE f.sha256={blob} AND f.context_id IS NULL)"
+)
+CONTEXT_ONLY_BYTES_215 = (
+    "SELECT total(length(b.content)) FROM old.blobs b WHERE "
+    + CONTEXT_ONLY_BLOB_215.format(blob="b.sha256")
+)
+SECTIONS_215 = (
+    # Each context: its record, frame and inputs, and its parts in order by hash.
+    Section(
+        "contexts",
+        "SELECT c.*,i.created_at AS inputs_created_at,i.profile_version AS "
+        "inputs_profile_version,i.instructions_version AS inputs_instructions_version,"
+        "i.templates AS inputs_templates,i.knowledge AS inputs_knowledge,i.claims AS "
+        "inputs_claims,i.policy AS inputs_policy,i.parts AS inputs_parts,(SELECT "
+        "json_group_array(json_object('position',r.position,'kind',r.kind,'hash',r.hash,"
+        "'file_id',r.file_id,'file_created_at',r.file_created_at)) FROM (SELECT cp.position,"
+        "p.kind,p.hash,cp.file_id,cp.file_created_at FROM old.context_parts cp JOIN "
+        "old.snapshot_parts p ON p.id=cp.part_id WHERE cp.context_id=c.id ORDER BY "
+        "cp.position) r) AS parts FROM old.contexts c LEFT JOIN old.context_inputs i ON "
+        "i.context_id=c.id ORDER BY c.created_at,c.id",
+        tables=("contexts", "context_inputs", "context_parts"),
+    ),
+    # Each part once: a list part names the hashes of its items in order.
+    Section(
+        "snapshot_parts",
+        "SELECT p.hash,p.kind,p.content,p.blob,CASE WHEN p.kind='list' THEN (SELECT "
+        "json_group_array(h) FROM (SELECT t.hash AS h FROM old.snapshot_list_items i JOIN "
+        "old.snapshot_parts t ON t.id=i.part_id WHERE i.list_id=p.id ORDER BY i.position)) "
+        "END AS items FROM old.snapshot_parts p ORDER BY p.id",
+        tables=("snapshot_parts", "snapshot_list_items"),
+    ),
+    # Context files without their bytes: rendered from parts, or rows of files.
+    Section(
+        "context_files",
+        "SELECT cp.context_id,cp.file_id AS id,p.blob AS sha256,json_extract(p.content,"
+        "'$.path') AS name,json_extract(p.content,'$.media_type') AS media_type,"
+        "json_extract(p.content,'$.size') AS size,coalesce(cp.file_created_at,c.created_at) "
+        "AS created_at FROM old.context_parts cp JOIN old.snapshot_parts p ON p.id=cp.part_id "
+        "JOIN old.contexts c ON c.id=cp.context_id WHERE cp.file_id IS NOT NULL "
+        "UNION ALL SELECT context_id,id,sha256,name,media_type,size,created_at FROM old.files "
+        "WHERE context_id IS NOT NULL ORDER BY 1,2",
+    ),
+    Section(
+        "legacy_content",
+        "SELECT id,legacy_content FROM old.documents WHERE legacy_content IS NOT NULL ORDER BY id",
+        shape="map",
+    ),
+)
+NOT_ARCHIVED_215 = {
+    "documents.legacy_content": "in the archive section legacy_content",
+    "files.context_id": "in the archive section context_files",
+}
+
+
+def _log_context_bytes(conn):
+    """Log the bytes of the blobs only context files referenced (not copied)."""
+    dropped = conn.execute(CONTEXT_ONLY_BYTES_215).fetchone()[0]
+    if dropped:
+        LOG.warning(
+            "The upgrade leaves out %d bytes of files only frozen contexts used; they remain "
+            "in the pre-upgrade copy.",
+            int(dropped),
+        )
+    return {}
+
+
 # Every schema-15 table, parents before the tables that reference them.
 TABLES = (
     # #213: the general instructions become Writing rules (``PREFERENCE_SECTIONS``).
@@ -233,18 +311,15 @@ TABLES = (
             "kind": KIND_214,
         },
     ),
-    Table("contexts"),
-    Table("context_inputs"),
+    # #215: frozen contexts leave the schema (archived); so do their files and the
+    # bytes only they referenced (kept in the pre-upgrade copy).
     Table("documents", columns=DOCUMENTS_214),
-    Table("blobs"),
-    Table("files"),
+    Table("blobs", where=f"NOT ({CONTEXT_ONLY_BLOB_215.format(blob='o.sha256')})"),
+    Table("files", where="o.context_id IS NULL"),
     Table("transfer_grants"),
     Table("collection_runs"),
     Table("tasks"),
     Table("providers"),
-    Table("snapshot_parts"),
-    Table("snapshot_list_items"),
-    Table("context_parts"),
     Table("preference_sections", fresh=True),
     # #209: who recorded a reply becomes an actor label.
     Table(
@@ -273,8 +348,6 @@ JSON_REPAIRS = {
     "knowledge": _repairs(metadata="'{}'"),
     "claims": _repairs(metadata="'{}'"),
     "templates": _repairs(rules="'{}'"),
-    "contexts": _repairs(frame="'[]'"),
-    "context_inputs": _repairs(templates="'[]'", knowledge="'[]'", claims="'[]'", parts="NULL"),
     "documents": _repairs(content="'{}'"),
     "transfer_grants": _repairs(payload="'{}'"),
     "tasks": _repairs(payload="'{}'", result="'{}'"),
@@ -285,10 +358,10 @@ JSON_REPAIRS = {
 # ``repaired_json`` (stored texts that were not JSON) and ``dropped_tables``
 # (every row of a schema-14 table nothing copies or archives). Each removal adds
 # its section here with the tables it archives whole.
-SECTIONS = (*SECTIONS_214,)
+SECTIONS = (*SECTIONS_214, *SECTIONS_215)
 
 # Dropped columns not written to ``dropped_columns``, each with the reason.
-NOT_ARCHIVED = {**NOT_ARCHIVED_214}
+NOT_ARCHIVED = {**NOT_ARCHIVED_214, **NOT_ARCHIVED_215}
 
 # --- #213 Preferences replace Policy -------------------------------------------------
 #
@@ -660,7 +733,7 @@ def _archive_ready_marks(conn):
 
 
 FOLDS_214 = (_start_shortlisted, _archive_ready_marks)
-FOLDS = (fold_preferences, fold_claim_fields, *FOLDS_214)
+FOLDS = (fold_preferences, fold_claim_fields, *FOLDS_214, _log_context_bytes)
 
 # Values the upgrade must keep: (what, query over schema 15, query over schema 14).
 INVARIANTS = (
@@ -710,9 +783,22 @@ INVARIANTS = (
         "SELECT count(*) FROM old.claims WHERE default_in_cv=1",
     ),
     (
+        # #215: without the bytes only frozen contexts referenced.
         "bytes of stored files",
         "SELECT total(length(content)) FROM main.blobs",
-        "SELECT total(length(content)) FROM old.blobs",
+        f"SELECT total(length(content))-({CONTEXT_ONLY_BYTES_215}) FROM old.blobs",
+    ),
+    # #215
+    (
+        "document revisions, their files and cited ids",
+        (
+            "SELECT count(*)||' '||total(length(claim_ids)+length(knowledge_ids))||' '||(SELECT "
+            "count(*) FROM main.files WHERE document_id IS NOT NULL) FROM main.documents"
+        ),
+        (
+            "SELECT count(*)||' '||total(length(claim_ids)+length(knowledge_ids))||' '||(SELECT "
+            "count(*) FROM old.files WHERE document_id IS NOT NULL) FROM old.documents"
+        ),
     ),
 )
 

@@ -177,8 +177,6 @@ export function documentState(app: Application): Label[] {
   }
   const missing = missingText(app);
   if (missing) lines.push({ text: missing, tone: "attention" });
-  if (app.status === "shortlisted" && app.stale_inputs?.length)
-    lines.push({ text: "Inputs changed", tone: "attention" });
   return lines;
 }
 const capital = (text: string) => text[0].toUpperCase() + text.slice(1);

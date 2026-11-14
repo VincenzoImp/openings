@@ -77,22 +77,16 @@ and record why. Compile and check the
 full PDF and extracted text, then update the template source, rules, guidance and
 assets together with the expected version.
 
-Existing applications keep their frozen contexts. After the change, list stale applications
-with `staleness_list` (REST `GET /staleness`); each report names the
-changed Profile part, Preferences statement (of `facts` or `writing`, added
-or removed), template, entry or claim and the affected revisions. Only what
-documents use counts: Profile metadata, the other Preferences sections,
-template names, entry and claim order, claim selection fields, free-form
-metadata and spacing never make an application stale, and a writing rule scoped
-to the CV or the letter concerns that document only. Contexts prepared before
-0.24 froze no Preferences, so Preferences changes are not compared for them
-(`comparison.preferences: "not_frozen"`).
-Propagate the change to applications the owner has not yet submitted when it improves
-them: prepare a new context with the same deliberate selections, save new
-revisions linked with `previous_id`, check them like new work, keep earlier
-revisions and report each updated application. Re-run `staleness_get` to confirm
-the new leaves are current. Leave an application stale when the change does not matter to
-it, and say so in the report.
+Existing revisions never change. After the change, list Shortlisted applications
+(`applications_list` with `stage: "shortlisted"`) and their current revisions
+(`documents_list`), and find those whose documents use the changed Profile part,
+Preferences statement, template, entry or claim (each revision names the
+`claim_ids` and `knowledge_ids` it cites). Propagate the change to applications
+the owner has not yet submitted when it improves them: read the live records
+again, save new revisions linked with `previous_id`, check them like new work,
+keep earlier revisions and report each updated application. Leave an
+application unchanged when the change does not matter to it, and say so in the
+report.
 
 Report what you did in the chat,
 listing every record version changed.

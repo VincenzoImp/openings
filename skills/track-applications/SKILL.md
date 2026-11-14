@@ -3,7 +3,7 @@ name: track-applications
 title: Track your applications
 summary: Review what is Ready, follow-ups, employer replies and outcomes, and record the progress you report.
 example: Which of my applications need attention this week?
-description: Review the Openings application pipeline - what is Ready and its priority, stale or expired postings, follow-ups, employer replies, no-reply closures and stats - and record owner-reported progress without submitting anything.
+description: Review the Openings application pipeline - what is Ready and its priority, expired postings, follow-ups, employer replies, no-reply closures and stats - and record owner-reported progress without submitting anything.
 compatibility: Requires access to the Openings MCP server or REST API, as described in the openings-workspace skill.
 ---
 
@@ -32,21 +32,17 @@ current complete revision (its PDF stored) and no blocking requirement is
 unresolved; otherwise `missing` names what is left (`cv`, `letter`,
 `requirement:<id>`). Read the Ready ones with `stage: "ready"` and the ones
 missing a document with `needs: "documents"`. Ready does not check content,
-sources or staleness. For each Shortlisted application, read its current CV and
+sources or later changes to the records. For each Shortlisted application, read its current CV and
 letter leaves and files, its `requirements` and its job posting. Classify:
 
 - **ready**: Ready, and the current leaves still pass the
   [Prepare Shortlist](../prepare-shortlist/SKILL.md) checks;
 - **incomplete**: a required document or its PDF is missing;
 - **blocked**: an employer requirement or open question needs the owner;
-- **stale**: the frozen context predates a change to a part its documents use:
-  the Profile header or summary, a Facts about me or Writing rules statement, a
-  template or Career (`staleness_list` names each changed part), or the
-  posting changed after preparation;
 - **expired**: the posting is closed or past its deadline.
 
-Check stale and expired cases against current records before reporting them.
-A Ready application that is stale or expired stays Ready until someone acts:
+Check expired cases against current records before reporting them.
+A Ready application that is expired stays Ready until someone acts:
 report it first, so the owner does not apply with the current documents by
 mistake. The application's timeline (`timeline_get` with `application_id`)
 holds its notes and its job's; read the pinned note first, it is the owner's

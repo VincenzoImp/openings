@@ -1,15 +1,14 @@
-"""DocumentService: upload limits, composed with contexts, revisions and files."""
+"""DocumentService: upload limits, composed with revisions and files."""
 
 from __future__ import annotations
 
 import asyncio
 
-from .contexts import ContextOperations
 from .files import FileOperations
 from .revisions import RevisionOperations
 
 
-class DocumentService(ContextOperations, RevisionOperations, FileOperations):
+class DocumentService(RevisionOperations, FileOperations):
     def __init__(self, workspace, max_file_bytes: int = 20 * 1024 * 1024):
         self.workspace = workspace
         self.db = workspace.db

@@ -1,4 +1,4 @@
-"""Career categories use the same archive and frozen context through REST and MCP."""
+"""Career categories behave the same through REST and MCP, and revisions cite them."""
 
 import json
 
@@ -9,7 +9,7 @@ from openings.app import create_app
 
 
 @pytest.mark.parametrize("transport", ["rest", "mcp"])
-def test_awards_and_publications_survive_import_filtering_and_frozen_context(tmp_path, transport):
+def test_awards_and_publications_survive_import_filtering_and_citation(tmp_path, transport):
     app = create_app(tmp_path / f"categories-{transport}.sqlite", start_worker=False)
     app.state.auth.setup("synthetic-password")
     token = app.state.auth.create_token("Synthetic category client")["token"]
@@ -89,12 +89,6 @@ def test_awards_and_publications_survive_import_filtering_and_frozen_context(tmp
             )
             assert all(read[key] == value for key, value in entry.items())
 
-        template = call(
-            "templates_create",
-            "POST",
-            "/templates",
-            {"value": {"name": "Example CV", "tex": "Synthetic template", "is_default": True}},
-        )
         job = call(
             "jobs_create",
             "POST",
@@ -104,18 +98,21 @@ def test_awards_and_publications_survive_import_filtering_and_frozen_context(tmp
         application = call(
             "applications_create", "POST", "/applications", {"value": {"job_id": job["id"]}}
         )
-        context = call(
-            "contexts_create",
+        cited = [record["id"] for record in created + imported["items"]]
+        document = call(
+            "documents_create",
             "POST",
-            "/contexts",
-            {"value": {"application_id": application["id"], "template_id": template["id"]}},
+            "/documents",
+            {
+                "value": {
+                    "application_id": application["id"],
+                    "kind": "other",
+                    "content": {"text": "Synthetic notes."},
+                    "knowledge_ids": cited,
+                }
+            },
         )
-        frozen = {row["id"]: row for row in context["payload"]["knowledge"]}
-        assert len(frozen) == 4
-        assert {row["kind"] for row in frozen.values()} == {"award", "publication"}
-        for record in created + imported["items"]:
-            assert frozen[record["id"]]["narrative"] == record["narrative"]
-            assert frozen[record["id"]]["metadata"] == record["metadata"]
+        assert document["knowledge_ids"] == cited
 
         award = created[0]
         changed = call(
@@ -132,14 +129,14 @@ def test_awards_and_publications_survive_import_filtering_and_frozen_context(tmp
             },
         )
         assert changed["kind"] == "publication"
+        # The revision keeps citing the entry by id.
         saved = call(
-            "contexts_get",
+            "documents_get",
             "GET",
-            f"/contexts/{context['id']}",
-            {"context_id": context["id"]},
+            f"/documents/{document['id']}",
+            {"document_id": document["id"]},
         )
-        retained = next(row for row in saved["payload"]["knowledge"] if row["id"] == award["id"])
-        assert retained["kind"] == "award" and retained["narrative"] == award["narrative"]
+        assert saved["knowledge_ids"] == cited
 
         invalid = {"kind": "unsupported", "title": "Invalid category"}
         if transport == "rest":

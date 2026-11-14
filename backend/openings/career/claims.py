@@ -150,7 +150,7 @@ class ClaimOperations:
         return self.get_claim(claim_id)
 
     def delete_claim(self, claim_id: str, expected_version: int) -> dict:
-        """Permanently delete a reusable claim; existing application snapshots remain unchanged."""
+        """Permanently delete a reusable claim; document revisions keep the ids they cite."""
         with self.db.transaction() as conn:
             row = _get(conn, "claims", claim_id, "Claim")
             check_version(row, expected_version)

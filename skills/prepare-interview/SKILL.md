@@ -24,7 +24,7 @@ answer the owner did not give. Report what you did in the chat.
 ## Read the application as sent
 
 Read the job posting, the application's current CV and letter leaves (the versions
-the employer saw), their frozen context, the application's timeline
+the employer saw) with the claims and Career entries they cite, the application's timeline
 (`timeline_get` with `application_id`: its pinned note, other notes and events,
 with its job's), the
 current Profile and the relevant Career entries. Ask the owner for the interview

@@ -6,12 +6,11 @@ import math
 from .. import events
 from ..actors import current_actor
 from ..common import check_version, new_id, now
-from ..db import encode
+from ..db import collect_unused, encode
 from ..errors import DomainError, conflict, missing
 from ..idempotency import fingerprint, remember, replay
 from ..models import ApplicationInput, ApplicationPatch
 from ..outcomes import today
-from ..snapshots import collect_unused
 from .readiness import canonical_documents
 
 # Columns stored as JSON text.
@@ -41,15 +40,15 @@ class ApplicationChanges:
     def remove_application(self, connection, row, collect=True):
         """Delete one application row with its owned records and grants, recording it."""
         application_id = row["id"]
-        owned = "SELECT id FROM documents WHERE application_id=? UNION SELECT id FROM contexts WHERE application_id=?"
-        owned_files = "SELECT id FROM all_files WHERE document_id IN (SELECT id FROM documents WHERE application_id=?) OR context_id IN (SELECT id FROM contexts WHERE application_id=?)"
+        owned = "SELECT id FROM documents WHERE application_id=?"
+        owned_files = "SELECT id FROM files WHERE document_id IN (SELECT id FROM documents WHERE application_id=?)"
         connection.execute(
             "DELETE FROM transfer_grants WHERE json_extract(payload,'$.owner_id') IN ("
             + owned
             + ") OR json_extract(payload,'$.file_id') IN ("
             + owned_files
             + ")",
-            (application_id,) * 4,
+            (application_id,) * 2,
         )
         connection.execute("DELETE FROM applications WHERE id=?", (application_id,))
         if collect:

@@ -38,14 +38,7 @@ const NONE: TimelinePage = {
   offset: 0,
 };
 // A note, a pin or an employer reply changes what the timeline shows.
-const SCOPES = [
-  "jobs",
-  "applications",
-  "notes",
-  "documents",
-  "contexts",
-  "files",
-];
+const SCOPES = ["jobs", "applications", "notes", "documents", "files"];
 const TITLES: Record<string, string> = {
   job_added: "Collected",
   job_refreshed: "Posting refreshed by its source",
@@ -69,7 +62,6 @@ const TITLES: Record<string, string> = {
   note_unpinned: "Note unpinned",
   document_created: "Document revision saved",
   document_reviewed: "Document revision approved",
-  context_prepared: "Frozen copy of your record prepared",
 };
 const REPLIES: Record<ReplyKind, string> = {
   rejection: "Rejection",

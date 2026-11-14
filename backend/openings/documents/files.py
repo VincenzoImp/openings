@@ -41,8 +41,6 @@ class FileOperations:
         if owner_type not in OWNER_COLUMNS:
             raise DomainError(422, "owner_type", "Unsupported file owner type.")
         row = _get(conn, OWNER_TABLES[owner_type], owner_id, "File owner")
-        if writable and owner_type == "context":
-            conflict("Frozen context files are immutable.")
         if (
             writable
             and owner_type == "document"
@@ -57,7 +55,7 @@ class FileOperations:
             )
         if owner_type == "job":
             return row, row["id"]
-        if owner_type in {"document", "context"}:
+        if owner_type == "document":
             application = _get(conn, "applications", row["application_id"], "Application")
             return row, application["job_id"]
         return row, None
@@ -79,7 +77,7 @@ class FileOperations:
 
     def get_file(self, file_id: str) -> dict:
         """Read immutable file metadata and its authenticated content URL, not binary bytes."""
-        row = self.db.one("SELECT * FROM all_files WHERE id=?", (file_id,))
+        row = self.db.one("SELECT * FROM files WHERE id=?", (file_id,))
         if not row:
             missing("File")
         return self._file_record(row)
@@ -95,7 +93,7 @@ class FileOperations:
         media_type: str = "",
         application_id: str = "",
     ) -> dict:
-        """List file metadata by owner, name/media type or application context/revisions. Metadata is always compact, including with summary=true; fetch bytes through a scoped HTTP transfer."""
+        """List file metadata by owner, name/media type or application revisions. Metadata is always compact, including with summary=true; fetch bytes through a scoped HTTP transfer."""
         _page(limit, offset)
         if owner_id and not owner_type:
             raise DomainError(422, "file_owner", "Provide owner_type when filtering by owner_id.")
@@ -115,18 +113,16 @@ class FileOperations:
             where.append("media_type=?")
             params.append(media_type)
         if application_id:
-            where.append(
-                "(document_id IN (SELECT id FROM documents WHERE application_id=?) OR context_id IN (SELECT id FROM contexts WHERE application_id=?))"
-            )
-            params.extend([application_id, application_id])
+            where.append("document_id IN (SELECT id FROM documents WHERE application_id=?)")
+            params.append(application_id)
         clause = " WHERE " + " AND ".join(where) if where else ""
         rows = self.db.all(
-            f"SELECT * FROM all_files{clause} ORDER BY created_at,name,id LIMIT ? OFFSET ?",
+            f"SELECT * FROM files{clause} ORDER BY created_at,name,id LIMIT ? OFFSET ?",
             (*params, limit, offset),
         )
         return {
             "items": [self._file_record(row) for row in rows],
-            "total": self.db.one(f"SELECT COUNT(*) AS n FROM all_files{clause}", params)["n"],
+            "total": self.db.one(f"SELECT COUNT(*) AS n FROM files{clause}", params)["n"],
             "limit": limit,
             "offset": offset,
         }
@@ -184,7 +180,7 @@ class FileOperations:
     def reserve_download(self, file_id: str) -> dict:
         """Obtain a short-lived GET transfer for one existing file; resolve its URL against this workspace origin."""
         with self.db.transaction() as conn:
-            row = _get(conn, "all_files", file_id, "File")
+            row = _get(conn, "files", file_id, "File")
             descriptor = self._file_record(row)
             _, job_id = self._owner(conn, descriptor["owner_type"], descriptor["owner_id"])
             return self._new_grant(
@@ -347,7 +343,7 @@ class FileOperations:
         )
 
     def file_response(self, file_id: str, inline: bool = True):
-        row = self.db.one("SELECT * FROM all_files WHERE id=?", (file_id,))
+        row = self.db.one("SELECT * FROM files WHERE id=?", (file_id,))
         if not row:
             missing("File")
         media_type = row["media_type"].split(";", 1)[0]
@@ -388,14 +384,14 @@ class FileOperations:
         return self.file_response(payload["file_id"], inline=False)
 
     def delete_file(self, file_id: str, expected_version: int) -> dict:
-        """Permanently delete a live Career entry, template or job asset, with its expected_version (a file's version is always 1). Context and revision files are immutable: delete the revision instead."""
+        """Permanently delete a live Career entry, template or job asset, with its expected_version (a file's version is always 1). Revision files are immutable: delete the revision instead."""
         with self.db.transaction() as conn:
-            row = _get(conn, "all_files", file_id, "File")
+            row = _get(conn, "files", file_id, "File")
             descriptor = self._file_record(row)
             check_version(descriptor, expected_version)
-            if descriptor["owner_type"] in {"document", "context"}:
+            if descriptor["owner_type"] == "document":
                 conflict(
-                    "Revision/context files are immutable. Delete the entire document or create a new revision."
+                    "Revision files are immutable. Delete the entire document or create a new revision."
                 )
             conn.execute("DELETE FROM files WHERE id=?", (file_id,))
             self._file_event(

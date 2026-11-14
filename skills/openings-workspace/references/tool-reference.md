@@ -13,23 +13,24 @@ Step-by-step MCP/REST sequences behind the workflow skills: [Prepare Shortlist](
    attempt (shortlisting a job starts one in stage Shortlisted), or start one
    with `applications_create` and an idempotency key, which also shortlists the
    job. A separate later attempt requires the previous one to be closed. Retain the attempt ID for subsequent writes.
-2. Read profile, Preferences (`preferences_get`), detailed career entries,
-   approved claims with their typed selection fields and selected templates. Summary lists help discovery; fetch the full records
+2. Read the live records: `applications_get` (with its `pinned_note`),
+   `jobs_get`, `profile_get`, `preferences_get`, detailed Career entries
+   (`knowledge_list`), approved claims with their typed selection fields
+   (`claims_list`) and the selected templates (`templates_list`,
+   `templates_get`). Summary lists help discovery; fetch the full records
    before writing. Ask for missing facts and keep qualifications accurate.
-3. Call `contexts_create` with the application, selected templates
-   and relevant evidence/claims. Omitted selections use available defaults. Use
-   an idempotency key for retries. Retain the context ID/signature and read its
-   frozen payload or returned `openings://contexts/...` resource.
-4. Write CV, letter and answers from that snapshot. Approved claims provide
+3. Select the templates, entries and claims the documents will use. Select
+   claims only from selected entries.
+4. Write CV, letter and answers from those records. Approved claims provide
    reusable wording; detailed evidence can support accurate new wording. Follow
-   the frozen Writing rules and facts, template guidance, application
-   instructions and answer limits.
-5. Download frozen assets through `files_reserve_download`, resolving relative
+   the Writing rules and facts, template guidance, the pinned note and answer
+   limits.
+5. Download template assets through `files_reserve_download`, resolving relative
    URLs against the workspace origin. Compile externally and check page count,
    extracted text and layout. If a compiler is unavailable, report the missing
    PDF: a revision without its PDF stays incomplete.
 6. Create the revision with `documents_create` once its PDF has passed the
-   checks, keeping application/context ownership and citing `claim_ids` and
+   checks, keeping application ownership and citing `claim_ids` and
    `knowledge_ids`. A CV or letter takes no `content`: give `pdf` (safe relative
    name, exact size, optional SHA-256) and, optionally, the TeX source inline as
    `source` or as `source_file`. PUT the raw bytes to each returned `uploads`
@@ -42,15 +43,12 @@ Step-by-step MCP/REST sequences behind the workflow skills: [Prepare Shortlist](
 
 A PDF does not record submission. A revision is complete and immutable once its
 PDF is stored; a change needs a new revision using `previous_id` and its own
-files; `documents_compare` shows what changed. Prepare a new context when
+files; `documents_compare` shows what changed. Read the records again when
 updated source knowledge is needed.
 
 Application list/detail `preparation` counts describe current revision leaves
 and how many are complete; with `ready` and `missing` they are not a submission
-or quality guarantee. Read the exact document/files before relying on them. Context summaries include frozen labels
-and evidence/claim counts for discovery. Select claims only from selected entries;
-omitting selections uses defaults, while explicit empty evidence/claim lists
-include none. Updating questions preserves compatible live answers; incompatible
+or quality guarantee. Read the exact document/files before relying on them. Updating questions preserves compatible live answers; incompatible
 answers reject the update unless deliberately changed or removed in `answers`.
 
 ## Preferences
@@ -242,8 +240,7 @@ with `limit` and `offset`. REST serves the same entries at
 
 An application's standing guidance is its pinned note: `applications_get`
 returns it as `pinned_note`; write it with `notes_create` (`application_id`,
-`pinned: true`), `notes_update` and `notes_pin`. A frozen context carries the
-pinned note as `application.note` and `instructions.application_note`.
+`pinned: true`), `notes_update` and `notes_pin`.
 
 ## Scripting and transfers
 
