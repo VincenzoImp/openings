@@ -417,7 +417,7 @@ for (const width of [360, 390, 600, 719, 720, 1024, 1280, 1600])
       ["templates", "Templates"],
       ["templates?tab=source", "Templates"],
       ["templates?tab=limits", "Templates"],
-      ["sources", "Job sources"],
+      ["sources", "Sources"],
       ["settings", "Settings"],
       ["settings?section=agents", "Settings"],
       ["settings?section=data", "Settings"],

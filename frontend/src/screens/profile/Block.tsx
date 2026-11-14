@@ -194,14 +194,18 @@ export function EditBlock({
   };
   const cancel = () => editing.request(null);
 
-  // The first field takes focus when the block opens.
+  // The field marked data-autofocus, or else the first, takes focus when the
+  // block opens.
   const formRef = useCallback((form: HTMLFormElement | null) => {
     if (!form || !first.current) return;
     first.current = false;
     requestAnimationFrame(() =>
-      form
-        .querySelector<HTMLElement>("input:not([type=file]), textarea, select")
-        ?.focus(),
+      (
+        form.querySelector<HTMLElement>("[data-autofocus]") ??
+        form.querySelector<HTMLElement>(
+          "input:not([type=file]), textarea, select",
+        )
+      )?.focus(),
     );
   }, []);
 

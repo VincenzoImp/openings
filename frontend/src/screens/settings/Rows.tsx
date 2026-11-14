@@ -1,6 +1,4 @@
 import { useId, type ReactNode } from "react";
-import { Lock } from "lucide-react";
-import { Icon } from "../../ui/Icon";
 
 /** A section of Settings: its heading, an optional one-line lead, its rows. */
 export function SettingsSection({
@@ -70,21 +68,5 @@ export function SettingRow({
       </div>
       {control && <div className="set-row-control">{control}</div>}
     </div>
-  );
-}
-
-/**
- * Marks what needs owner authority: this dashboard and a full-access token
- * may use it; an agent token is refused, and no MCP tool offers it.
- */
-export function OwnerOnly() {
-  return (
-    <span
-      className="set-owner"
-      title="An agent token is refused here, and no MCP tool offers it."
-    >
-      <Icon icon={Lock} size="sm" />
-      Owner only
-    </span>
   );
 }
