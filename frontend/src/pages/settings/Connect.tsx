@@ -4,7 +4,7 @@ import { CodeBlock, SegmentedControl } from "../../design";
 import { useWorkspace } from "../../state";
 
 const GUIDE =
-  "https://github.com/VincenzoImp/openings/blob/main/docs/user/agent-operated.md";
+  "https://github.com/VincenzoImp/openings/blob/main/docs/user/agents.md";
 
 function snippets(endpoint: string): Record<string, string> {
   return {
@@ -30,7 +30,7 @@ function snippets(endpoint: string): Record<string, string> {
 export function Connect({ origin }: { origin: string }) {
   const { notify } = useWorkspace();
   const [client, setClient] = useState("claude-code");
-  const endpoint = `${origin}/mcp`;
+  const endpoint = `${origin}/mcp/`;
   const snippet = snippets(endpoint)[client];
   const copy = (value: string, what: string) =>
     copyText(value)
@@ -111,7 +111,7 @@ export function Connect({ origin }: { origin: string }) {
             target="_blank"
             rel="noreferrer"
           >
-            Agent-operated job search guide
+            Work with an agent
           </a>
         </div>
       </div>

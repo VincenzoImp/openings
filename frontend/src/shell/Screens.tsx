@@ -20,7 +20,7 @@ export const LOADERS: Record<RouteId, () => Module> = {
   jobs: () => import("../screens/jobs/Jobs"),
   applications: () => import("../pages/Applications"),
   application: () => import("../pages/Review"),
-  profile: () => import("../pages/Career"),
+  profile: () => import("../screens/profile/Profile"),
   preferences: () => import("../pages/Preferences"),
   templates: () => import("../pages/Templates"),
   sources: () => import("../pages/Collection"),
@@ -44,7 +44,6 @@ export function preload(id: RouteId) {
 const LEGACY = new Set<RouteId>([
   "applications",
   "application",
-  "profile",
   "preferences",
   "templates",
   "sources",

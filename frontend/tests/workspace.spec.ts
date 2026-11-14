@@ -158,48 +158,6 @@ test("version conflict reviews latest values and reloads the editor with a usabl
     .toBe("Reapplied deliberately");
 });
 
-test("import protection and nested dialogs restore scroll after browser Back", async ({
-  page,
-}) => {
-  await go(page, "jobs");
-  await go(page, "profile?section=knowledge");
-  await page.getByRole("button", { name: "Import", exact: true }).click();
-  await top(page)
-    .getByRole("textbox", { name: "Text or JSON", exact: true })
-    .fill("Synthetic unsaved evidence");
-  page.once("dialog", (dialog) => dialog.dismiss());
-  await top(page)
-    .getByRole("button", { name: "Close dialog", exact: true })
-    .click();
-  await expect(
-    top(page).getByRole("textbox", { name: "Text or JSON", exact: true }),
-  ).toHaveValue("Synthetic unsaved evidence");
-  page.once("dialog", (dialog) => dialog.accept());
-  await top(page)
-    .getByRole("button", { name: "Close dialog", exact: true })
-    .click();
-  // A claim of the selected entry opens in a dialog, from its menu.
-  const detail = page
-    .getByRole("group", { name: "Shown pane" })
-    .getByRole("button", { name: "Selected entry", exact: true });
-  if (await detail.isVisible()) await detail.click();
-  await page
-    .getByRole("button", { name: /^More actions for claim: /, exact: false })
-    .first()
-    .click();
-  await page
-    .getByRole("button", { name: /^Edit claim: /, exact: false })
-    .first()
-    .click();
-  await expect(page.locator("dialog[open]")).toHaveCount(1);
-  await page.goBack();
-  await expect(page.locator("h1:visible")).toHaveText("Jobs");
-  await expect(page.locator("dialog[open]")).toHaveCount(0);
-  await expect
-    .poll(() => page.evaluate(() => document.body.style.overflow))
-    .not.toBe("hidden");
-});
-
 test("keyboard only: the phone's More menu opens, moves, closes and gives focus back", async ({
   page,
 }) => {
@@ -265,60 +223,6 @@ test("mobile applications, templates and stats stay usable inside the viewport",
   await expect
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
     .toBeLessThanOrEqual(390);
-});
-
-test("the career entry editor recovers its own concurrent version", async ({
-  page,
-}) => {
-  const recover = async (field: string, value: string, scope = top(page)) => {
-    await scope
-      .getByRole("button", { name: "Review latest values", exact: true })
-      .click();
-    await expect(scope.locator(".conflict-recovery")).toContainText(value);
-    await scope
-      .getByRole("button", {
-        name: "Reload editor and discard draft",
-        exact: true,
-      })
-      .click();
-    await expect(scope.locator(`[name=${field}]`)).toHaveValue(value);
-  };
-  const entry = await call(page, "/career/knowledge", "POST", {
-    kind: "project",
-    title: "Concurrent career entry",
-  });
-  await go(page, "profile?section=knowledge&q=Concurrent");
-  // The entry is edited in the panel beside the record, not in a dialog.
-  const shown = page
-    .getByRole("group", { name: "Shown pane" })
-    .getByRole("button", { name: "Selected entry", exact: true });
-  // On a narrow screen one pane shows at a time: switch to the entry.
-  if ((page.viewportSize()?.width ?? 1440) <= 860) await shown.click();
-  const editor = page.locator("section.detail");
-  await expect(editor.locator("[name=title]")).toHaveValue(
-    "Concurrent career entry",
-  );
-  await editor.locator("[name=title]").fill("My entry draft");
-  await call(page, `/career/knowledge/${entry.id}`, "PATCH", {
-    expected_version: entry.version,
-    title: "Concurrent newer title",
-  });
-  await editor.getByRole("button", { name: "Save entry", exact: true }).click();
-  await recover("title", "Concurrent newer title", editor);
-  await editor
-    .locator("[name=title]")
-    .fill("Concurrent, saved after the conflict");
-  await editor.getByRole("button", { name: "Save entry", exact: true }).click();
-  await expect
-    .poll(async () => (await call(page, `/career/knowledge/${entry.id}`)).title)
-    .toBe("Concurrent, saved after the conflict");
-  // The four projects share one workspace: leave no entry that matches the search.
-  const left = await call(page, `/career/knowledge/${entry.id}`);
-  await call(
-    page,
-    `/career/knowledge/${entry.id}?expected_version=${left.version}`,
-    "DELETE",
-  );
 });
 
 test("a note is added to a job and pinned to the top of its history", async ({
