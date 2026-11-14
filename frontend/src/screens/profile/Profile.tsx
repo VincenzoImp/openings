@@ -3,7 +3,7 @@
 // whole record; one block is changed on purpose (Edit → Save or Cancel).
 // Desktop has an "On this page" rail; a phone has a Jump to menu.
 import { useState, type ReactNode } from "react";
-import { List, Plus, RotateCw, Upload, UserRound } from "lucide-react";
+import { List, Plus, Upload, UserRound } from "lucide-react";
 import { Button, IconButton } from "../../ui/Button";
 import { Menu } from "../../ui/Menu";
 import { EmptyState, PageHeader, Skeleton } from "../../ui/Page";
@@ -24,6 +24,7 @@ import { HeaderBlock, SummaryBlock } from "./Header";
 import { ImportDialog } from "./ImportDialog";
 import { SECTIONS, allSkills, sectionOf } from "./model";
 import "./profile.css";
+import { LoadError } from "../../ui/LoadError";
 
 const SHOWN = 8;
 
@@ -82,20 +83,11 @@ function ProfileScreen() {
   let body: ReactNode;
   if (failed)
     body = (
-      <EmptyState
-        icon={RotateCw}
-        title="The profile could not be read"
-        actions={
-          <Button
-            variant="primary"
-            onClick={() => queries.forEach((query) => void query.refetch())}
-          >
-            Try again
-          </Button>
-        }
-      >
-        {failed.message}
-      </EmptyState>
+      <LoadError
+        what="your profile"
+        error={failed}
+        retry={() => queries.forEach((query) => void query.refetch())}
+      />
     );
   else if (loading)
     body = (

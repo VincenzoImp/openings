@@ -26,6 +26,7 @@ import {
   type KeptBackup,
 } from "./queries";
 import { OwnerOnly, SettingRow, SettingsGroup, SettingsSection } from "./Rows";
+import { LoadError } from "../../ui/LoadError";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -170,9 +171,11 @@ function KeptCopies({
   if (kept.isPending) return <SkeletonRows rows={3} />;
   if (kept.isError)
     return (
-      <p className="set-row-desc set-danger" role="alert">
-        The kept backups could not be read. {kept.error.message}
-      </p>
+      <LoadError
+        what="the kept backups"
+        error={kept.error}
+        retry={() => void kept.refetch()}
+      />
     );
   const { items, schedule } = kept.data;
   const daily = items.filter((item) => item.kind === "scheduled");
