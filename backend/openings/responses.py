@@ -40,7 +40,7 @@ class Deleted(Out):
 class TransferGrant(Out):
     """A one-shot grant: send the request to ``url`` with ``headers`` before it expires."""
 
-    url: str
+    url: str = Field(description="Absolute, on the workspace's public origin.")
     method: str
     headers: dict[str, str]
     curl: str | None = Field(default=None, description="The same request as a shell line.")

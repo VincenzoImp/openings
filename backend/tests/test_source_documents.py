@@ -1,13 +1,18 @@
 """A CV or letter revision's TeX source and the PDF built from it; text derived from the source."""
 
 import hashlib
+import re
+from pathlib import Path
 
 import pytest
 
-from document_fixtures import PDF, tex, upload
+from document_fixtures import PDF, tex, text_pdf, upload
 from openings.documents import DocumentCreate
+from openings.documents.pdf import pdf_text
 from openings.documents.text import derive_text, revision_text, tokens
 from openings.errors import DomainError
+
+EXAMPLES = Path(__file__).resolve().parents[2] / "examples"
 
 SOURCE = r"""\documentclass{article}
 \usepackage{hyperref}
@@ -192,6 +197,38 @@ def test_derived_text_reads_as_the_pdf_prints_it():
     assert revision_text([]) is None
     assert revision_text([("b.tex", "Second."), ("a.tex", "First.")]) == "First.\n\nSecond."
     assert tokens(r"Stra\ss e \v{S}koda na\"{\i}ve") == ["strasse", "skoda", "naive"]
+
+
+GLUE = r"""\documentclass{article}
+\begin{document}
+\section*{Experience}\vspace{-2pt plus 1pt}
+\begin{itemize}\setlength\itemsep{0pt plus .4pt}\itemsep=0pt plus .4pt
+  \item Of\-fice work, efﬁcient ﬂows\vskip 2pt plus 1pt minus 1pt
+  \item Kerned\kern-.5em text\hspace*{\fill}end \parskip 0pt plus .4pt
+\end{itemize}
+\setlength{\parskip}{0.5\baselineskip plus 2pt}\addvspace{4pt plus 2pt}
+\titlespacing*{\section}{0pt}{8pt plus 2pt}{4pt}
+Done in 2021 with 3 people.
+\end{document}
+"""
+
+
+def test_derived_text_has_no_spacing_glue_or_ligatures_and_templates_build_anywhere():
+    # Lengths and glue of spacing commands are layout, not text; numbers in text stay.
+    assert derive_text(GLUE) == (
+        "Experience\n• Office work, efficient flows\n• Kerned text end\nDone in 2021 with 3 people."
+    )
+    # A PDF's text layer gives ligatures (here StandardEncoding's fi and fl) as letters.
+    assert pdf_text(text_pdf("e\xaecient \xafows")) == "eficient flows"
+    for name in ("cv.tex", "letter.tex"):
+        source = (EXAMPLES / name).read_text()
+        text = derive_text(source)
+        assert text.startswith("Alex Example\n") and "pt" not in text.split()
+        assert not re.search(r"\b(?:plus|minus)\b|\d(?:pt|em)\b|[\ufb00-\ufb06]", text)
+        # pdfTeX-only primitives are guarded, so pdflatex and Tectonic (XeTeX) both build.
+        guarded = re.sub(r"\\ifpdftex\b.*?\\fi\b", "", source, flags=re.DOTALL)
+        assert "\\ifpdftex" in source
+        assert not re.search(r"glyphtounicode|\\pdf[a-z]+", guarded), name
 
 
 def reserve(client, document_id, name, data, media_type, source_sha256=None):
