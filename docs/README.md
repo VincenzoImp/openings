@@ -1,29 +1,24 @@
 # Openings documentation
 
-Use the dashboard by hand, REST for scripts, or MCP with your external agent. All
-three work with the same jobs, career knowledge, documents and collection settings.
+Use the dashboard by hand, REST for scripts, or MCP with your own agent. All three
+work on the same workspace. New here? Read the [README](../README.md), then
+[Getting started](user/getting-started.md).
 
-| I want to… | Guide |
+| I want to... | Read |
 |---|---|
-| Install Openings and add a first job | [Setup and first use](user/getting-started.md) |
-| Search portals or follow chosen companies | [Collection](user/sources.md) |
-| Organize experience, skills and reusable wording | [Profile, career entries and highlights](user/career.md) |
-| State what I want, what I rule out, my writing rules and the facts employers ask about | [Preferences](user/preferences.md) |
-| Prepare a CV, letter or form answers | [Application documents](user/applications.md) |
-| Plan deadlines, priorities and employer requirements | [Plan and track requirements](user/applications.md#plan-and-track-requirements) |
-| Close, reopen or delete several applications, or merge repeated vacancies | [Keep, dismiss or delete](user/applications.md#keep-dismiss-or-delete) |
-| Let an AI agent run and improve my search | [Agent-operated job search](user/agent-operated.md) |
-| Connect an AI agent | [Agents and MCP](user/agents.md) |
-| Give an agent a ready workspace with the operating mandate | [Operator workspace template](../examples/operator-workspace/README.md) |
-| Read the workflow skills agents follow | [Skills](../skills/) |
+| Understand the concepts and the daily loop | [How it works](user/how-it-works.md) |
+| Install Openings and make my first application | [Getting started](user/getting-started.md) |
+| Review jobs, handle duplicates or set up searches | [Jobs and sources](user/jobs-and-sources.md) |
+| Prepare, send and track applications | [Applications](user/applications.md) |
+| Fill in my profile, Preferences and templates | [Profile, Preferences and Templates](user/profile-preferences-templates.md) |
+| Let an AI agent help, and review what it did | [Work with an agent](user/agents.md) |
 | Write scripts | [REST API](user/api.md) |
-| Move, restore, upgrade or operate a workspace | [Operations](user/operations.md) |
-| Set the server's environment variables | [Configuration](user/configuration.md) |
+| Back up, restore, upgrade or open Openings to other devices | [Operations](user/operations.md) |
+| Set environment variables | [Configuration](user/configuration.md) |
 | Run from source or contribute | [Contributing](../CONTRIBUTING.md) and [Architecture](developer/architecture.md) |
 | Report a vulnerability | [Security policy](../SECURITY.md) |
-| See what changed in each release | [Changelog](../CHANGELOG.md) |
+| See what changed | [Changelog](../CHANGELOG.md) |
 
-The running server publishes REST reference at `/api/docs` and schemas at
-`/api/openapi.json`. MCP clients discover the corresponding tools and inputs.
-Authenticated `/api/v1/capabilities` lists each operation's MCP name, REST route
-and access.
+The running server publishes the reference for every operation at `/api/docs` and
+its schema at `/api/openapi.json`; MCP clients read the tools and their inputs from
+the server. The pages here do not repeat them.
