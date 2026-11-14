@@ -1,9 +1,17 @@
 // Size budgets of the built dashboard. Reads the Vite manifest of
 // `npm run build`, prints a table and exits with 1 when a budget is exceeded.
 //
-//   first screen   JavaScript needed to show the home screen       110 kB
-//   later screen   JavaScript a screen adds to what is loaded       40 kB
-//   stylesheet     every stylesheet of the dashboard together       15 kB
+//   first screen   JavaScript needed to show the home screen        85 kB
+//                  (React, Query and the shell included)
+//   lazy chunk     JavaScript a screen or an overlay adds           30 kB
+//   all JS         every script the dashboard can load             160 kB
+//   stylesheet     every stylesheet of the dashboard together       20 kB
+//
+// Interim: the first screen still carries the old data layer and component
+// helpers (src/state.tsx, src/api.ts, src/design) that Today and the other
+// old screens need, and the old screens weigh on all JS. Until they are
+// rebuilt (#222–#227) the budgets are 120 kB and 210 kB; #228 deletes the old
+// code and sets them back to 85 kB and 160 kB.
 //
 // Sizes are gzip (level 9) in kB of 1000 bytes, as Vite reports them. The
 // design system gallery (ui.html) is not part of the dashboard: its size is
@@ -12,7 +20,12 @@ import { readFileSync } from "node:fs";
 import { gzipSync } from "node:zlib";
 
 const KB = 1000;
-const BUDGET = { first: 110 * KB, later: 40 * KB, css: 15 * KB };
+const BUDGET = {
+  first: 120 * KB, // 85 kB once #228 deletes the old screens' code
+  later: 30 * KB,
+  all: 210 * KB, // 160 kB once #228 deletes the old screens' code
+  css: 20 * KB,
+};
 const HOME = "src/pages/Today.tsx";
 
 const dist = new URL("../dist/", import.meta.url);
@@ -80,11 +93,20 @@ const screens = [...dashboard]
 for (const key of screens) {
   const own = scripts(closure(key)).filter((file) => !firstFiles.has(file));
   add(
-    `Screen ${key.replace(/^src\/pages\//, "").replace(/\.tsx$/, "")}`,
+    key.startsWith("src/pages/")
+      ? `Screen ${key.replace(/^src\/pages\//, "").replace(/\.tsx$/, "")}`
+      : `Chunk ${key.replace(/^src\//, "").replace(/\.tsx?$/, "")}`,
     total(own),
     BUDGET.later,
   );
 }
+const everything = new Set(scripts(dashboard));
+add(
+  "All JavaScript",
+  total([...everything]),
+  BUDGET.all,
+  `${everything.size} files`,
+);
 const styles = new Set(
   [...dashboard].flatMap((key) => manifest[key].css || []),
 );

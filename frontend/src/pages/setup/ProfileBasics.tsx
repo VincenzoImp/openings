@@ -81,7 +81,7 @@ export function ProfileBasics({
         <Button variant="primary" size="sm" disabled={pending}>
           Save the profile
         </Button>
-        <a className="btn quiet sm" href="#career">
+        <a className="btn quiet sm" href="#profile">
           The whole profile in Career
         </a>
       </div>

@@ -19,7 +19,7 @@ const tabOf = (value: string) =>
 /**
  * Where new jobs come from: saved searches and company boards with their
  * schedules, the runs and tasks that collected, and the request gate of each
- * provider. `#collection?section=…` opens a tab; its filters are in the
+ * provider. `#sources?section=…` opens a tab; its filters are in the
  * address too.
  */
 export default function CollectionPage() {
@@ -31,7 +31,7 @@ export default function CollectionPage() {
     history.replaceState(
       null,
       "",
-      next === "sources" ? "#collection" : `#collection?section=${next}`,
+      next === "sources" ? "#sources" : `#sources?section=${next}`,
     );
     window.dispatchEvent(new PopStateEvent("popstate"));
   };
@@ -43,7 +43,7 @@ export default function CollectionPage() {
   return (
     <>
       <PageHead
-        title="Collection"
+        title="Sources"
         actions={
           <>
             <Button onClick={() => add("board")}>Add a company board</Button>

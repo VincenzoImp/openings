@@ -137,7 +137,7 @@ export function SourceRow({
         <LastRun source={source} />
         {run && (
           <div className="meta">
-            <a href={`#collection?section=runs&source_id=${source.id}`}>
+            <a href={`#sources?section=runs&source_id=${source.id}`}>
               Runs of {isSearch(source) ? "this search" : "this board"}
             </a>
           </div>

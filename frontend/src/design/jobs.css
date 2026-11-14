@@ -64,7 +64,7 @@
   gap: var(--s3);
 }
 .job-detail > header h2 {
-  font: 400 var(--t-xl) / 1.2 var(--serif);
+  font: 600 var(--fs-xl) / 1.2 var(--font);
 }
 .detail-section {
   padding: var(--s4);

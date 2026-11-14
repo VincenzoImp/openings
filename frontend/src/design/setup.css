@@ -77,7 +77,7 @@
 .checklist .step-mark {
   width: 24px;
   height: 24px;
-  font-size: var(--t-xs);
+  font-size: var(--fs-xs);
 }
 .checklist .inline-form {
   grid-column: 2 / -1;

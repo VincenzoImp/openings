@@ -1,15 +1,20 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { QueryClientProvider } from "@tanstack/react-query";
 import App from "./App";
+import { queryClient } from "./data/query";
 import { WorkspaceProvider } from "./state";
-import { applyStoredPreferences } from "./shell/preferences";
+import { applyStoredTheme } from "./shell/theme";
+import "./ui/base.css";
 import "./design/index.css";
 
-applyStoredPreferences();
+applyStoredTheme();
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <WorkspaceProvider>
-      <App />
-    </WorkspaceProvider>
+    <QueryClientProvider client={queryClient}>
+      <WorkspaceProvider>
+        <App />
+      </WorkspaceProvider>
+    </QueryClientProvider>
   </React.StrictMode>,
 );

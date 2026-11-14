@@ -7,12 +7,11 @@ html {
   font-size: 16px;
   color: var(--ink);
   background: var(--bg);
-  color-scheme: light;
   -webkit-text-size-adjust: 100%;
 }
 body {
   margin: 0;
-  font-size: var(--t-md);
+  font-size: var(--fs-md);
   line-height: 1.5;
 }
 h1,
@@ -22,15 +21,15 @@ p {
   margin: 0;
 }
 h1 {
-  font: 400 var(--t-2xl) / 1.15 var(--serif);
+  font: 600 var(--fs-2xl) / 1.15 var(--font);
   letter-spacing: -0.01em;
 }
 h2 {
-  font-size: var(--t-lg);
+  font-size: var(--fs-lg);
   font-weight: 600;
 }
 h3 {
-  font-size: var(--t-md);
+  font-size: var(--fs-md);
   font-weight: 600;
 }
 a {
@@ -43,9 +42,12 @@ textarea {
   font: inherit;
   color: inherit;
 }
-:focus-visible {
+/* The old screens, the sign-in card and the old toast; the shell and the
+   design system draw their own focus ring. */
+:where(.legacy-screen, .auth, .toast) :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+  box-shadow: none;
 }
 [hidden] {
   display: none !important;
@@ -63,10 +65,10 @@ input[type="radio"] {
 }
 .caption {
   color: var(--ink-3);
-  font-size: var(--t-xs);
+  font-size: var(--fs-xs);
 }
 .eyebrow {
-  font-size: var(--t-xs);
+  font-size: var(--fs-xs);
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;

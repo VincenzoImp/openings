@@ -1,52 +1,67 @@
-import { Component, Suspense, lazy, type ReactNode } from "react";
-import { Button, ErrorBanner, Loading } from "../design";
-import { SCREENS } from "./routes";
+import {
+  Component,
+  Suspense,
+  lazy,
+  type ComponentType,
+  type ReactNode,
+} from "react";
+import { RotateCw } from "lucide-react";
+import { Button } from "../ui/Button";
+import { EmptyState, SkeletonRows } from "../ui/Page";
+import { ROUTES, type RouteId } from "./routes";
 
-// Each screen is its own chunk, loaded when it is first opened (or when the
-// pointer or focus reaches its navigation link). The first screen's JavaScript
-// stays within the budget checked by scripts/budget.mjs.
-const loaders = {
+// One module per screen, loaded when it is first opened (or when the pointer
+// reaches its navigation item). A module default-exports a component without
+// props; it reads its address with useRoute() and its data with Query hooks.
+// A screen issue replaces one loader's target and nothing else.
+type Module = Promise<{ default: ComponentType }>;
+export const LOADERS: Record<RouteId, () => Module> = {
   today: () => import("../pages/Today"),
   jobs: () => import("../pages/Jobs"),
   applications: () => import("../pages/Applications"),
-  review: () => import("../pages/Review"),
-  collection: () => import("../pages/Collection"),
-  career: () => import("../pages/Career"),
+  application: () => import("../pages/Review"),
+  profile: () => import("../pages/Career"),
   preferences: () => import("../pages/Preferences"),
   templates: () => import("../pages/Templates"),
+  sources: () => import("../pages/Collection"),
   settings: () => import("../pages/Settings"),
   setup: () => import("../pages/Setup"),
 };
 
+const SCREENS = Object.fromEntries(
+  Object.entries(LOADERS).map(([id, load]) => [id, lazy(load)]),
+) as unknown as Record<RouteId, ComponentType>;
+
 /** Start loading a screen's code before it is opened. */
-export function preloadScreen(route: string) {
-  if (route in loaders)
-    void loaders[route as keyof typeof loaders]().catch(() => {
-      // The screen reports the failure itself when it is opened.
-    });
+export function preload(id: RouteId) {
+  void LOADERS[id]().catch(() => {
+    // The screen reports the failure when it is opened.
+  });
 }
 
-export const TodayPage = lazy(loaders.today);
-export const CollectionPage = lazy(loaders.collection);
-export const CareerPage = lazy(loaders.career);
-export const PreferencesPage = lazy(loaders.preferences);
-export const TemplatesPage = lazy(loaders.templates);
-export const SettingsPage = lazy(loaders.settings);
-export const JobsPage = lazy(loaders.jobs);
-export const ApplicationsPage = lazy(loaders.applications);
-export const ReviewPage = lazy(loaders.review);
-export const SetupPage = lazy(loaders.setup);
+// The screens built before the design system keep their own frame until
+// their issue rebuilds them (#222–#227); a rebuilt screen leaves this list.
+const LEGACY = new Set<RouteId>([
+  "today",
+  "jobs",
+  "applications",
+  "application",
+  "profile",
+  "preferences",
+  "templates",
+  "sources",
+  "settings",
+  "setup",
+]);
 
-interface BoundaryProps {
-  /** What failed, for the message: "Applications". */
-  name: string;
-  children: ReactNode;
-}
 /**
  * A screen whose code or first render fails says so and offers a reload; a
  * new dashboard version replaces the files an open tab still points to.
  */
-class ScreenBoundary extends Component<BoundaryProps, { failed: boolean }> {
+class Boundary extends Component<
+  { name: string; children: ReactNode },
+  { failed: boolean }
+> {
   state = { failed: false };
   static getDerivedStateFromError() {
     return { failed: true };
@@ -57,33 +72,48 @@ class ScreenBoundary extends Component<BoundaryProps, { failed: boolean }> {
   render() {
     if (!this.state.failed) return this.props.children;
     return (
-      <div className="stack">
-        <h1>{this.props.name}</h1>
-        <ErrorBanner
-          message={`${this.props.name} could not be loaded. The dashboard may have been updated, or the connection was interrupted.`}
-        />
-        <Button variant="primary" onClick={() => location.reload()}>
-          Reload the dashboard
-        </Button>
+      <div role="alert" className="shell-failed">
+        <EmptyState
+          icon={RotateCw}
+          title={`${this.props.name} could not be loaded`}
+          actions={
+            <Button variant="primary" onClick={() => location.reload()}>
+              Reload the dashboard
+            </Button>
+          }
+        >
+          The dashboard may have been updated, or the connection was
+          interrupted.
+        </EmptyState>
       </div>
     );
   }
 }
 
-/** The frame of a routed screen: loading state and failure with a reload. */
-export function Screen({
-  route,
-  children,
-}: {
-  route: string;
-  children: ReactNode;
-}) {
-  const name = SCREENS[route] || "This screen";
+/** The routed screen: loading skeleton, failure with a reload, its frame. */
+export function Screen({ id }: { id: RouteId }) {
+  const View = SCREENS[id];
+  const name = ROUTES[id].title;
+  const body = <View />;
   return (
-    <ScreenBoundary key={route} name={name}>
-      <Suspense fallback={<Loading label={`Loading ${name}…`} />}>
-        {children}
+    <Boundary key={id} name={name}>
+      <Suspense
+        fallback={
+          <div className="shell-loading">
+            <SkeletonRows rows={6} />
+          </div>
+        }
+      >
+        {LEGACY.has(id) ? (
+          <div className="legacy-screen" data-screen={id}>
+            {body}
+          </div>
+        ) : (
+          <div className="shell-screen" data-screen={id}>
+            {body}
+          </div>
+        )}
       </Suspense>
-    </ScreenBoundary>
+    </Boundary>
   );
 }

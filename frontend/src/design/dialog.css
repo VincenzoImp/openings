@@ -33,7 +33,7 @@
   flex: 1;
   min-width: 0;
   margin: 6px 0 0;
-  font: 400 var(--t-xl) / 1.25 var(--serif);
+  font: 600 var(--fs-xl) / 1.25 var(--font);
   letter-spacing: -0.01em;
   overflow-wrap: anywhere;
 }
@@ -94,7 +94,7 @@
     min-width: 0;
   }
   /* Room for the bottom bar plus the fixed action bar above it. */
-  .main:has(.sticky-actions) {
-    padding-bottom: calc(var(--tabbar) + 80px + env(safe-area-inset-bottom));
+  .legacy-screen:has(.sticky-actions) {
+    padding-bottom: 80px;
   }
 }
