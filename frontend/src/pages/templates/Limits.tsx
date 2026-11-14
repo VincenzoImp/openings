@@ -1,9 +1,5 @@
 import { useEffect, useState } from "react";
-import { Field, Input } from "../../ui/Field";
-import { EMPTY } from "../../ui/format";
-import { Properties } from "../../ui/Page";
-import { ReadEdit } from "../../ui/ReadEdit";
-import { useToast } from "../../ui/Toast";
+import { Field, Input, EMPTY, Properties, ReadEdit, useToast } from "../../ui";
 import { ConflictNotice } from "../../query/ConflictNotice";
 import { isConflict } from "../../query/mutation";
 import { useUpdateTemplate, type Template } from "../../query/templates";

@@ -1,5 +1,5 @@
 import { CircleCheck } from "lucide-react";
-import { Icon } from "../../ui/Icon";
+import { Icon } from "../../ui";
 
 /** The one style of "Default", in the list and in the detail. */
 export function DefaultMark({ kind }: { kind?: string }) {

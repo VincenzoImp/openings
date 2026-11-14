@@ -1,8 +1,5 @@
 import { ExternalLink, FileSearch, Upload } from "lucide-react";
-import { Button } from "../../ui/Button";
-import { formatDay } from "../../ui/format";
-import { Icon } from "../../ui/Icon";
-import { EmptyState, SkeletonRows } from "../../ui/Page";
+import { Button, formatDay, Icon, EmptyState, SkeletonRows } from "../../ui";
 import { useTemplateFiles, type Template } from "../../query/templates";
 import { useFilePicker } from "./Files";
 import { isPdf } from "./model";

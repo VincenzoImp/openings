@@ -11,6 +11,8 @@
     min-height: 0;
     height: auto;
     border-top: 1px solid var(--border);
+    /* The panes scroll; the closed drawer's offset never widens the page. */
+    overflow: hidden;
   }
   .tpl-note {
     margin: var(--s-1) 0 var(--s-4);

@@ -1,10 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { ArrowRight, EyeOff, Pencil, Plus, X } from "lucide-react";
-import { Button } from "../../ui/Button";
-import { Tag } from "../../ui/Badge";
-import { Select } from "../../ui/Field";
-import { Icon } from "../../ui/Icon";
-import { useToast } from "../../ui/Toast";
+import { Button, Tag, Select, Icon, useToast } from "../../ui";
 import { isConflict } from "../../query/mutation";
 import {
   useSaveSettings,

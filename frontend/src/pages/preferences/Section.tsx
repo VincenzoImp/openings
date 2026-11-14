@@ -7,8 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import { Plus } from "lucide-react";
-import { Button } from "../../ui/Button";
-import { Tag } from "../../ui/Badge";
+import { Button, Tag } from "../../ui";
 import { ConflictNotice } from "../../query/ConflictNotice";
 import type { SectionName, Statement } from "../../query/preferences";
 import { Line, LineEditor } from "./Line";
