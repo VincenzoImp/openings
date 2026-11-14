@@ -52,6 +52,7 @@ def _examples():
 
 
 def register_transport(app, router, public_url):
+    """Add the hand-written routes to ``router`` under ``API_PREFIX`` and ``/health``."""
     workspace, auth = app.state.workspace, app.state.auth
 
     def signed_in(request, password, setup=False):
@@ -67,7 +68,7 @@ def register_transport(app, router, public_url):
         )
         return response
 
-    @router.get("/auth/session", tags=["workspace"], openapi_extra={"security": []})
+    @router.get(API_PREFIX + "/auth/session", tags=["workspace"], openapi_extra={"security": []})
     def session(request: Request):
         """Read the browser session state and its CSRF token."""
         state = auth.session(request)
@@ -77,24 +78,24 @@ def register_transport(app, router, public_url):
             "csrf_token": state["csrf"] if state else None,
         }
 
-    @router.post("/auth/setup", tags=["workspace"], openapi_extra={"security": []})
+    @router.post(API_PREFIX + "/auth/setup", tags=["workspace"], openapi_extra={"security": []})
     def setup(request: Request, value: PasswordInput):
         """Set the owner password once and sign the browser in."""
         return signed_in(request, value.password, True)
 
-    @router.post("/auth/login", tags=["workspace"], openapi_extra={"security": []})
+    @router.post(API_PREFIX + "/auth/login", tags=["workspace"], openapi_extra={"security": []})
     def login(request: Request, value: PasswordInput):
         """Sign the browser in with the owner password."""
         return signed_in(request, value.password)
 
-    @router.post("/auth/logout", tags=["workspace"])
+    @router.post(API_PREFIX + "/auth/logout", tags=["workspace"])
     def logout():
         """Sign out every browser session; API and MCP tokens stay valid."""
         response = JSONResponse(auth.logout())
         response.delete_cookie(COOKIE, path="/")
         return response
 
-    @router.get("/capabilities", tags=["workspace"])
+    @router.get(API_PREFIX + "/capabilities", tags=["workspace"])
     def capabilities():
         """Read the version, schema, this token's kind and each operation's route and access."""
         actor = current_actor()
@@ -106,7 +107,7 @@ def register_transport(app, router, public_url):
             "operations": capability_entries(),
         }
 
-    @router.get("/backup", tags=["workspace"], response_class=FileResponse)
+    @router.get(API_PREFIX + "/backup", tags=["workspace"], response_class=FileResponse)
     def backup():
         """Download a consistent SQLite backup with file bytes.
 
@@ -121,7 +122,9 @@ def register_transport(app, router, public_url):
             background=BackgroundTask(workspace.db.remove_temp, name),
         )
 
-    @router.post("/backup/restore", tags=["owner"], openapi_extra={"x-openings-access": "owner"})
+    @router.post(
+        API_PREFIX + "/backup/restore", tags=["owner"], openapi_extra={"x-openings-access": "owner"}
+    )
     async def restore(request: Request):
         """Replace the workspace data with a SQLite backup (owner only).
 
@@ -131,7 +134,7 @@ def register_transport(app, router, public_url):
         return await restore_upload(workspace, request.headers, request.stream())
 
     @router.get(
-        "/backups/{name}",
+        API_PREFIX + "/backups/{name}",
         tags=["owner"],
         response_class=FileResponse,
         openapi_extra={"x-openings-access": "owner"},
@@ -142,13 +145,15 @@ def register_transport(app, router, public_url):
         _, path = backups.find(workspace.db, name)
         return FileResponse(path, media_type="application/vnd.sqlite3", filename=path.name)
 
-    @router.get("/export", tags=["owner"], openapi_extra={"x-openings-access": "owner"})
+    @router.get(
+        API_PREFIX + "/export", tags=["owner"], openapi_extra={"x-openings-access": "owner"}
+    )
     def export():
         """Download the workspace records as JSON, without file bytes or credentials (owner only)."""
         require_owner("export the records")
         return RecordsResponse(export_records(workspace.db))
 
-    @router.get("/examples", tags=["workspace"])
+    @router.get(API_PREFIX + "/examples", tags=["workspace"])
     def examples():
         """List the shipped example files."""
         directory = _examples()
@@ -160,7 +165,7 @@ def register_transport(app, router, public_url):
             ]
         }
 
-    @router.get("/examples/{name}", tags=["workspace"], response_class=FileResponse)
+    @router.get(API_PREFIX + "/examples/{name}", tags=["workspace"], response_class=FileResponse)
     def example_file(name: str):
         """Download a shipped example file."""
         path = _examples() / name
@@ -168,7 +173,7 @@ def register_transport(app, router, public_url):
             raise DomainError(404, "not_found", "Example not found.")
         return FileResponse(path, filename=name)
 
-    @router.put("/transfers", tags=["files"], openapi_extra={"security": []})
+    @router.put(API_PREFIX + "/transfers", tags=["files"], openapi_extra={"security": []})
     async def upload(request: Request):
         """Upload raw file bytes with a grant.
 
@@ -177,17 +182,17 @@ def register_transport(app, router, public_url):
         """
         return await app.state.documents.upload(request)
 
-    @router.get("/transfers", tags=["files"], openapi_extra={"security": []})
+    @router.get(API_PREFIX + "/transfers", tags=["files"], openapi_extra={"security": []})
     def download(request: Request):
         """Download raw file bytes with a grant (X-Transfer-Token)."""
         return app.state.documents.download(request)
 
-    @router.get("/files/{file_id}/content", tags=["files"])
+    @router.get(API_PREFIX + "/files/{file_id}/content", tags=["files"])
     def file_content(file_id: str, inline: bool = True):
         """Read a file's bytes; inline=false downloads it."""
         return app.state.documents.file_response(file_id, inline)
 
-    @router.get("/skills/{name}/files/{path:path}", tags=["workspace"])
+    @router.get(API_PREFIX + "/skills/{name}/files/{path:path}", tags=["workspace"])
     def skill_file(name: str, path: str):
         """Read a skill's reference file by path, as skills_get with path."""
         return read_skill(app.state.skills, name, path)
@@ -213,7 +218,9 @@ def register_transport(app, router, public_url):
     for item in ROUTES:
         for route in item.routes:
             method, path = route.split(" ", 1)
-            router.add_api_route(path, _gone(item), methods=[method], include_in_schema=False)
+            router.add_api_route(
+                API_PREFIX + path, _gone(item), methods=[method], include_in_schema=False
+            )
 
 
 def _gone(item):

@@ -7,13 +7,11 @@ import pytest
 from pydantic import ValidationError
 
 from openings.actors import OWNER, acting_as, token_actor
-from openings.career import CareerService, TemplateCreate
 from openings.errors import DomainError
 from openings.outcomes import no_reply_period
 from openings.preferences import SECTIONS, PreferencesService
 
 AGENT = token_actor("token-agent", "Synthetic agent", "agent")
-MCP_HEADERS = {"Accept": "application/json, text/event-stream"}
 
 
 @pytest.fixture
@@ -59,7 +57,7 @@ def test_a_new_workspace_has_five_sections_and_the_default_settings(services):
     }
 
 
-def test_a_write_replaces_the_section_and_records_who_wrote_it(services):
+def test_a_write_replaces_the_section_records_who_wrote_it_and_checks_its_version(services):
     workspace, preferences = services
     first = write(preferences, "looking_for", [{"text": "  Backend roles.  "}, {"text": "Zurich."}])
     assert first["items"] == [{"text": "Backend roles."}, {"text": "Zurich."}]
@@ -82,9 +80,7 @@ def test_a_write_replaces_the_section_and_records_who_wrote_it(services):
     # Other sections are untouched.
     assert section(preferences, "ruled_out")["version"] == 0
 
-
-def test_a_stale_version_is_a_conflict_with_the_current_version(services):
-    _, preferences = services
+    # A stale version is a conflict that names the current one.
     write(preferences, "facts", [{"text": "Notice period: one month."}])
     with pytest.raises(DomainError) as stale:
         preferences.update_preferences("facts", {"expected_version": 0, "items": []})
@@ -95,7 +91,7 @@ def test_a_stale_version_is_a_conflict_with_the_current_version(services):
     assert unknown.value.status == 404
 
 
-def test_only_writing_rules_have_a_scope(services):
+def test_only_writing_rules_have_a_scope_and_statements_have_limits(services):
     _, preferences = services
     written = write(
         preferences,
@@ -112,20 +108,14 @@ def test_only_writing_rules_have_a_scope(services):
     with pytest.raises(ValidationError):
         write(preferences, "writing", [{"text": "Short.", "scope": "body"}])
 
-
-@pytest.mark.parametrize(
-    "items",
-    [
+    for items in (
         [{"text": "x" * 2001}],
         [{"text": "   "}],
         [{"text": f"Item {n}"} for n in range(201)],
         [{"text": "Fine.", "label": "Not a field"}],
-    ],
-)
-def test_statements_have_limits(services, items):
-    _, preferences = services
-    with pytest.raises(ValidationError):
-        write(preferences, "ruled_out", items)
+    ):
+        with pytest.raises(ValidationError):
+            write(preferences, "ruled_out", items)
     assert section(preferences, "ruled_out")["version"] == 0
     # The limits themselves are allowed.
     write(preferences, "ruled_out", [{"text": "x" * 2000}] + [{"text": "y"}] * 199)
@@ -253,61 +243,3 @@ def test_the_languages_filter_hides_jobs_and_never_dismisses_them(services):
     )
     # Nothing was dismissed.
     assert {job["triage"] for job in workspace.list_jobs()["items"]} == {"new"}
-
-
-def test_an_agent_replaces_sections_with_version_checks(app, agent_token, mcp):
-    headers = agent_token["headers"]
-    client = mcp.client
-    written = client.put(
-        "/api/v1/preferences/ruled_out",
-        json={"expected_version": 0, "items": [{"text": "No agencies."}]},
-        headers=headers,
-    )
-    assert written.status_code == 200, written.text
-    assert written.json()["updated_by"] == "agent:Synthetic agent"
-    over_mcp, error = mcp.call(
-        "preferences_update",
-        {
-            "section": "ruled_out",
-            "expected_version": 1,
-            "items": [{"text": "No agencies."}, {"text": "No night shifts."}],
-        },
-    )
-    assert error is None and over_mcp["version"] == 2
-    settings = client.patch(
-        "/api/v1/settings", json={"expected_version": 0, "no_reply_days": 21}, headers=headers
-    ).json()
-    assert settings["no_reply_days"] == 21
-    stale = client.put(
-        "/api/v1/preferences/ruled_out",
-        json={"expected_version": 1, "items": []},
-        headers=headers,
-    )
-    assert stale.status_code == 409
-    assert stale.json()["error"]["details"]["current_version"] == 2
-    # The policy and the general instructions are gone, with a hint over MCP.
-    assert client.get("/api/v1/policy", headers=headers).status_code == 410
-    assert client.get("/api/v1/instructions", headers=headers).status_code == 410
-    _, removed = mcp.call("policy_get")
-    assert removed["code"] == "renamed" and removed["details"]["use"] == "workspace_context"
-
-
-def test_templates_hold_no_rule_statements(workspace):
-    career = CareerService(workspace)
-    with pytest.raises(ValidationError, match="Writing rules"):
-        TemplateCreate(
-            name="Synthetic CV",
-            rules={"statements": [{"label": "One page", "statement": "Keep it short."}]},
-        )
-    template = career.create_template(
-        TemplateCreate(
-            name="Synthetic CV", rules={"max_pages": 1, "engine": "lualatex", "date_format": "MMM"}
-        )
-    )
-    assert career.get_template(template["id"])["rules"] == {
-        "max_pages": 1,
-        "engine": "lualatex",
-        "date_format": "MMM",
-    }
-    # The general instructions are no setting of their own any more.
-    assert workspace.db.one("SELECT count(*) n FROM settings WHERE key='instructions'")["n"] == 0

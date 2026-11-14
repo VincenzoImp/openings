@@ -1,16 +1,13 @@
 """Application summaries describe exact current revisions across interfaces."""
 
 import pytest
-from fastapi.testclient import TestClient
 
 from document_fixtures import attach
-from openings.app import create_app
 from openings.documents import DocumentCreate
 from openings.errors import DomainError
 
 
-def test_preparation_counts_current_revisions_and_complete_ones(tmp_path):
-    app = create_app(tmp_path / "preparation.sqlite", start_worker=False)
+def test_preparation_counts_current_revisions_and_complete_ones(app, client):
     workspace, documents = app.state.workspace, app.state.documents
     job = workspace.ingest_job({"title": "Synthetic engineer", "posting": "Build services."})
     application = workspace.create_application({"job_id": job["id"]})
@@ -21,37 +18,34 @@ def test_preparation_counts_current_revisions_and_complete_ones(tmp_path):
             title="CV",
         )
     )
-    with TestClient(app) as client:
-        session = client.post("/api/v1/auth/setup", json={"password": "synthetic-password"}).json()
-        client.headers["X-CSRF-Token"] = session["csrf_token"]
 
-        def current():
-            detail = workspace.get_application(application["id"])["preparation"]
-            assert client.get("/api/v1/applications").json()["items"][0]["preparation"] == detail
-            return detail
+    def current():
+        detail = workspace.get_application(application["id"])["preparation"]
+        assert client.get("/api/v1/applications").json()["items"][0]["preparation"] == detail
+        return detail
 
-        assert current() == [{"kind": "cv", "revisions": 1, "complete": 0}]
-        attach(documents, client.put, first["id"])
-        assert current()[0]["complete"] == 1
-        first = documents.get_document(first["id"])
-        second = documents.create_document(
-            DocumentCreate(
-                application_id=application["id"],
-                kind="cv",
-                title="Revised CV",
-                previous_id=first["id"],
-            )
+    assert current() == [{"kind": "cv", "revisions": 1, "complete": 0}]
+    attach(documents, client.put, first["id"])
+    assert current()[0]["complete"] == 1
+    first = documents.get_document(first["id"])
+    second = documents.create_document(
+        DocumentCreate(
+            application_id=application["id"],
+            kind="cv",
+            title="Revised CV",
+            previous_id=first["id"],
         )
-        # The new revision is current and incomplete; its parent's PDF does not count.
-        assert current() == [{"kind": "cv", "revisions": 1, "complete": 0}]
-        assert workspace.get_application(application["id"])["status"] == "shortlisted"
-        documents.delete_document(second["id"], second["version"])
-        assert current()[0]["complete"] == 1
+    )
+    # The new revision is current and incomplete; its parent's PDF does not count.
+    assert current() == [{"kind": "cv", "revisions": 1, "complete": 0}]
+    assert workspace.get_application(application["id"])["status"] == "shortlisted"
+    documents.delete_document(second["id"], second["version"])
+    assert current()[0]["complete"] == 1
 
 
-def test_question_edits_retain_compatible_answers_and_reject_invalid_changes_atomically(tmp_path):
-    app = create_app(tmp_path / "answers.sqlite", start_worker=False)
-    workspace = app.state.workspace
+def test_question_edits_retain_compatible_answers_and_reject_invalid_changes_atomically(
+    workspace,
+):
     job = workspace.ingest_job({"title": "Synthetic role", "posting": "Build reliable services."})
     questions = [
         {"id": "text", "label": "Motivation", "type": "text", "max_length": 30},

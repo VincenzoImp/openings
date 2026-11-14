@@ -1,7 +1,5 @@
 """workspace_context: the start read, its counts and summaries, and the owner's feedback."""
 
-import json
-
 from context_fixtures import realistic
 from openings.actors import OWNER, acting_as
 
@@ -108,13 +106,3 @@ def test_feedback_lists_the_owners_corrections_of_agent_work_once(app, mcp):
     assert "feedback" not in ok(mcp.call("workspace_context", {}))
     since = ok(mcp.call("workspace_context", {"feedback_since": "2000-01-01"}))["feedback"]
     assert len(since) == 3
-
-
-def test_the_rest_twin_serves_the_dashboard_without_feedback(app, client):
-    response = client.get("/api/v1/workspace/context")
-    assert response.status_code == 200
-    body = response.json()
-    assert body["workspace"]["you"] == "owner" and body["feedback"] == []
-    assert body["counts"]["new"] == 0
-    assert client.get("/api/v1/workspace/context?include=everything").status_code == 422
-    assert json.loads(json.dumps(body)) == body

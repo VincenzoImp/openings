@@ -122,20 +122,26 @@ def titles(workspace):
     return sorted(job["title"] for job in workspace.list_jobs()["items"])
 
 
-def test_transient_failures_back_off_then_fail_without_sleeping(lane, clock, monkeypatch):
+def test_transient_failures_back_off_then_fail_and_invalid_configuration_fails_once(
+    lane, clock, monkeypatch
+):
     _, service, worker = lane
     source = make_source(service)
     task = service.queue_collection(source["id"])
-    attempts = []
+    invalid = service.queue_collection(make_source(service, board="invalid")["id"])
+    attempts = {"example": [], "invalid": []}
 
     def feed(source):
-        attempts.append(clock.elapsed)
+        board = source["config"]["board"]
+        attempts[board].append(clock.elapsed)
+        if board == "invalid":
+            raise DomainError(422, "invalid_board", "This board does not exist.")
         raise DomainError(502, "source_http", "The source returned HTTP 503.")
 
     patch_discovery(monkeypatch, "fetch_postings", feed)
     stopping = collect(worker, clock, idle=200)
     # The first retry waits 15 seconds, the second 60; the third failure is final.
-    assert attempts == [0, 15, 75]
+    assert attempts["example"] == [0, 15, 75]
     assert set(stopping.waits) == {1}
     failed = service.get_task(task["id"])
     assert failed["state"] == "failed" and failed["attempts"] == 3
@@ -147,22 +153,10 @@ def test_transient_failures_back_off_then_fail_without_sleeping(lane, clock, mon
         "failed",
     ]
     assert service.get_source(source["id"])["last_error"] == "The source returned HTTP 503."
-
-
-def test_invalid_configuration_fails_once_without_retry(lane, clock, monkeypatch):
-    _, service, worker = lane
-    task = service.queue_collection(make_source(service)["id"])
-    attempts = []
-
-    def feed(source):
-        attempts.append(clock.elapsed)
-        raise DomainError(422, "invalid_board", "This board does not exist.")
-
-    patch_discovery(monkeypatch, "fetch_postings", feed)
-    collect(worker, clock, idle=200)
-    failed = service.get_task(task["id"])
-    assert attempts == [0]
-    assert failed["state"] == "failed" and failed["result"]["failure_attempts"] == 1
+    # An invalid configuration fails at once, without a retry.
+    assert len(attempts["invalid"]) == 1
+    refused = service.get_task(invalid["id"])
+    assert refused["state"] == "failed" and refused["result"]["failure_attempts"] == 1
 
 
 def test_counts_accumulate_across_a_provider_wait_and_a_retry(lane, clock, monkeypatch):
@@ -394,7 +388,7 @@ class Stub:
             raise RuntimeError("database is locked")
 
 
-def test_heartbeat_survives_an_error_and_ends_once_the_lease_is_lost(caplog):
+def test_heartbeat_survives_an_error_ends_with_the_lease_and_never_starts_stopped_work(caplog):
     stub = Stub()
     stub.run_task = lambda task, owner: stub.ran.append(stub.lost.wait(5))
     worker = Worker(None, stub)
@@ -406,13 +400,12 @@ def test_heartbeat_survives_an_error_and_ends_once_the_lease_is_lost(caplog):
     assert stub.beats == [("task", "owner")] * 2
     assert "Task heartbeat failed" in caplog.text
 
-
-def test_a_stopping_lane_does_not_start_claimed_work():
-    stub = Stub()
+    # A stopping lane does not start claimed work.
+    idle = Stub()
     stopping = threading.Event()
     stopping.set()
-    Worker(None, stub)._run({"id": "task"}, "owner", stopping)
-    assert stub.ran == [] and stub.beats == []
+    Worker(None, idle)._run({"id": "task"}, "owner", stopping)
+    assert idle.ran == [] and idle.beats == []
 
 
 def test_lanes_survive_a_failed_cycle(clock, caplog):

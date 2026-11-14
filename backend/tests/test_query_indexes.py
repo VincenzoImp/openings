@@ -2,9 +2,6 @@
 
 import sqlite3
 
-import pytest
-
-from openings.app import create_app
 from openings.discovery.sources import SOURCE_COUNTS
 
 QUERIES = [
@@ -37,13 +34,11 @@ QUERIES = [
 ]
 
 
-@pytest.mark.parametrize(("sql", "table"), QUERIES)
-def test_query_does_not_scan_table(tmp_path, sql, table):
-    path = tmp_path / "indexes.sqlite"
-    create_app(path, start_worker=False)
-    with sqlite3.connect(path) as conn:
-        plan = conn.execute("EXPLAIN QUERY PLAN " + sql, ("x",) * sql.count("?")).fetchall()
-    details = [row[-1] for row in plan]
-    full_scans = [d for d in details if d.startswith(f"SCAN {table}") and "USING" not in d]
-    assert not full_scans, details
-    assert not any("TEMP B-TREE" in detail for detail in details), details
+def test_queries_do_not_scan_their_table(database_path):
+    with sqlite3.connect(database_path) as conn:
+        for sql, table in QUERIES:
+            plan = conn.execute("EXPLAIN QUERY PLAN " + sql, ("x",) * sql.count("?")).fetchall()
+            details = [row[-1] for row in plan]
+            full_scans = [d for d in details if d.startswith(f"SCAN {table}") and "USING" not in d]
+            assert not full_scans, (sql, details)
+            assert not any("TEMP B-TREE" in detail for detail in details), (sql, details)

@@ -66,7 +66,7 @@ def runtime(service, provider="manual"):
     return service.providers.get(provider)["runtime"]
 
 
-async def test_redirects_are_followed_one_gated_request_per_hop(web):
+async def test_redirects_are_gated_per_hop_and_stop_at_another_provider_or_a_loop(web):
     web.routes = {
         PAGE: httpx.Response(302, headers={"location": "/jobs/1/view"}),
         PAGE + "/view": httpx.Response(303, headers={"location": "https://jobs.example.test/1"}),
@@ -79,9 +79,9 @@ async def test_redirects_are_followed_one_gated_request_per_hop(web):
     assert web.calls == [PAGE, PAGE + "/view", "https://jobs.example.test/1"]
     assert runtime(web)["total_requests"] == 3
 
-
-async def test_redirect_into_another_provider_stops_before_that_request(web):
+    # A redirect into another provider stops before that provider's request.
     target = "https://www.linkedin.com/jobs/view/7"
+    web.calls.clear()
     web.routes = {PAGE: httpx.Response(301, headers={"location": target})}
     result = await read_posting(PAGE, web)
     assert result["metadata"]["extraction"] == "needs_text"
@@ -89,21 +89,21 @@ async def test_redirect_into_another_provider_stops_before_that_request(web):
     assert web.calls == [PAGE]
     assert runtime(web, "linkedin")["total_requests"] == 0
 
-
-async def test_redirect_loops_and_empty_redirects_stay_incomplete(web):
+    # Loops and redirects without a location stay incomplete.
+    web.calls.clear()
     web.routes = {
         PAGE: httpx.Response(302, headers={"location": PAGE}),
         PAGE + "/blank": httpx.Response(302),
     }
     looped = await read_posting(PAGE, web)
     assert looped["metadata"]["extraction"] == "needs_text" and "posting" not in looped
-    assert web.calls == [PAGE] * 5 and runtime(web)["total_requests"] == 5
+    assert web.calls == [PAGE] * 5 and runtime(web)["total_requests"] == 3 + 1 + 5
     blank = await read_posting(PAGE + "/blank", web)
     assert blank["metadata"]["extraction"] == "needs_text"
     assert web.calls[5:] == [PAGE + "/blank"]
 
 
-async def test_oversized_pages_are_refused_and_long_fields_are_bounded(web):
+async def test_pages_are_bounded_and_decoded_before_extraction(web):
     padding = "<!-- " + "x" * 2_000_000 + " -->"
     web.routes = {
         PAGE: httpx.Response(200, text=page(job()) + padding),
@@ -137,8 +137,7 @@ async def test_oversized_pages_are_refused_and_long_fields_are_bounded(web):
         200_000,
     ]
 
-
-async def test_page_encodings_are_decoded_before_extraction(web):
+    # Escaped, UTF-8, BOM, Latin-1 and UTF-16 pages read alike.
     node = job(
         title="Ingénieur·e plateforme",
         description="&lt;p&gt;Zürich &amp;amp; Genève&lt;/p&gt;&lt;p&gt;Größe: 12 Personen&lt;/p&gt;",
@@ -161,7 +160,7 @@ async def test_page_encodings_are_decoded_before_extraction(web):
         assert result["location"] == "Zürich, CH", url
 
 
-async def test_timeouts_are_recorded_by_the_gate_and_leave_the_job_incomplete(web):
+async def test_timeouts_are_recorded_by_the_gate_and_an_ats_timeout_falls_back(web):
     web.routes = {
         PAGE: httpx.ReadTimeout("The read timed out."),
         PAGE + "/connect": httpx.ConnectTimeout("The connection timed out."),
@@ -172,16 +171,16 @@ async def test_timeouts_are_recorded_by_the_gate_and_leave_the_job_incomplete(we
         assert runtime(web)["last_error"] == error and runtime(web)["last_status"] is None
     assert runtime(web)["total_requests"] == 2
 
-
-async def test_ats_timeout_falls_back_to_the_page_under_the_same_provider_gate(web):
+    # An ATS API timeout falls back to the page under the same provider gate.
     url = "https://boards.greenhouse.io/example/jobs/42"
     api = "https://boards-api.greenhouse.io/v1/boards/example/jobs/42"
+    web.calls.clear()
     web.routes = {api: httpx.ReadTimeout("slow"), url: httpx.Response(200, text=page(job()))}
     result = await read_posting(url, web)
     assert result["metadata"]["extraction"] == "jobposting-jsonld"
     assert web.calls == [api, url]
     assert runtime(web, "greenhouse")["total_requests"] == 2
-    assert runtime(web)["total_requests"] == 0
+    assert runtime(web)["total_requests"] == 2
 
     web.routes[api] = httpx.Response(200, content=b"<html>maintenance</html>")
     assert (await read_posting(url, web))["metadata"]["extraction"] == "jobposting-jsonld"
@@ -217,7 +216,7 @@ async def test_complete_input_fills_only_missing_fields(web):
     assert web.calls == [PAGE]
 
 
-def test_ats_urls_map_to_public_api_endpoints():
+def test_ats_urls_map_to_public_api_endpoints_and_payloads_to_postings():
     assert ats_endpoint("https://job-boards.greenhouse.io/acme co/jobs/12/apply") == (
         "greenhouse",
         "https://boards-api.greenhouse.io/v1/boards/acme%20co/jobs/12",
@@ -242,8 +241,7 @@ def test_ats_urls_map_to_public_api_endpoints():
     ):
         assert ats_endpoint(url) is None
 
-
-def test_ats_payloads_become_plain_postings():
+    # Their payloads become plain postings.
     greenhouse = ats_posting(
         "greenhouse",
         json.dumps(

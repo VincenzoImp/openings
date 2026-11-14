@@ -3,11 +3,9 @@
 import sqlite3
 
 import pytest
-from fastapi.testclient import TestClient
 
-from document_fixtures import bare_api
 from openings.db import Database
-from openings.documents import DocumentCreate, DocumentService, UploadReservation
+from openings.documents import DocumentCreate, UploadReservation
 from openings.errors import DomainError
 from openings.operations import restore_database
 from openings.workspace import Workspace
@@ -37,72 +35,64 @@ def test_source_identity_keeps_dismissal_across_url_changes_and_detects_conflict
     assert workspace.ingest_job(value)["id"] != first["id"]
 
 
-@pytest.mark.parametrize("version", [1, 4])
-def test_unsupported_formats_are_rejected_without_modifying_the_database(tmp_path, version):
-    archive = tmp_path / "unsupported.sqlite"
-    with sqlite3.connect(archive) as connection:
-        connection.execute(f"PRAGMA user_version={version}")
-        connection.execute("CREATE TABLE marker(value TEXT)")
-        connection.execute("INSERT INTO marker VALUES('preserve')")
-    original = archive.read_bytes()
-    with pytest.raises(DomainError, match="older than 0.23"):
-        Database(archive)
+def test_unsupported_formats_are_rejected_without_modifying_the_database(tmp_path):
     target = Workspace(tmp_path / "current.sqlite")
     job = target.ingest_job({"posting": "Build APIs"})
-    with pytest.raises(DomainError) as error:
-        restore_database(target, archive)
-    assert error.value.code == "backup_version"
-    assert archive.read_bytes() == original
-    assert target.get_job(job["id"])["posting"] == "Build APIs"
+    for version in (1, 4):
+        archive = tmp_path / f"unsupported-{version}.sqlite"
+        with sqlite3.connect(archive) as connection:
+            connection.execute(f"PRAGMA user_version={version}")
+            connection.execute("CREATE TABLE marker(value TEXT)")
+            connection.execute("INSERT INTO marker VALUES('preserve')")
+        original = archive.read_bytes()
+        with pytest.raises(DomainError, match="older than 0.23"):
+            Database(archive)
+        with pytest.raises(DomainError) as error:
+            restore_database(target, archive)
+        assert error.value.code == "backup_version"
+        assert archive.read_bytes() == original
+        assert target.get_job(job["id"])["posting"] == "Build APIs"
 
 
-def test_parallel_upload_grants_remain_valid_until_a_revision_is_complete(tmp_path):
-    workspace = Workspace(tmp_path / "review.sqlite")
-    documents = DocumentService(workspace)
+def test_parallel_upload_grants_remain_valid_until_a_revision_is_complete(app, client):
+    workspace, documents = app.state.workspace, app.state.documents
     job = workspace.ingest_job({"posting": "Build APIs"})
     application = workspace.create_application({"job_id": job["id"]})
     doc = documents.create_document(DocumentCreate(application_id=application["id"], kind="other"))
-    api = bare_api(workspace, documents=documents)
     grants = [
         documents.reserve_upload(
             UploadReservation(owner_type="document", owner_id=doc["id"], name=name, size=3)
         )
         for name in ("cv.tex", "cv.txt", "late.txt")
     ]
-    with TestClient(api) as client:
-        for grant in grants[:2]:
-            assert (
-                client.put(grant["url"], headers=grant["headers"], content=b"abc").status_code
-                == 200
-            )
-        current = documents.get_document(doc["id"])
-        assert current["version"] == 3 and len(current["files"]) == 2
-        # The identical completed transfer is a retry, not another mutation.
-        assert (
-            client.put(grants[0]["url"], headers=grants[0]["headers"], content=b"abc").status_code
-            == 200
+    for grant in grants[:2]:
+        assert client.put(grant["url"], headers=grant["headers"], content=b"abc").status_code == 200
+    current = documents.get_document(doc["id"])
+    assert current["version"] == 3 and len(current["files"]) == 2
+    # The identical completed transfer is a retry, not another mutation.
+    assert (
+        client.put(grants[0]["url"], headers=grants[0]["headers"], content=b"abc").status_code
+        == 200
+    )
+    assert documents.get_document(doc["id"])["version"] == 3
+    # A file of another kind of revision may still be added.
+    assert (
+        client.put(grants[2]["url"], headers=grants[2]["headers"], content=b"abc").status_code
+        == 200
+    )
+    assert len(documents.get_document(doc["id"])["files"]) == 3
+    # A CV is complete once its PDF is stored: a grant reserved before is refused.
+    cv = documents.create_document(
+        DocumentCreate(
+            application_id=application["id"], kind="cv", pdf={"name": "cv.pdf", "size": 8}
         )
-        assert documents.get_document(doc["id"])["version"] == 3
-        # A file of another kind of revision may still be added.
-        assert (
-            client.put(grants[2]["url"], headers=grants[2]["headers"], content=b"abc").status_code
-            == 200
-        )
-        assert len(documents.get_document(doc["id"])["files"]) == 3
-        # A CV is complete once its PDF is stored: a grant reserved before is refused.
-        cv = documents.create_document(
-            DocumentCreate(
-                application_id=application["id"], kind="cv", pdf={"name": "cv.pdf", "size": 8}
-            )
-        )
-        late = documents.reserve_upload(
-            UploadReservation(owner_type="document", owner_id=cv["id"], name="photo.png", size=3)
-        )
-        pdf = cv["uploads"]["pdf"]
-        assert (
-            client.put(pdf["url"], headers=pdf["headers"], content=b"%PDF-1.4").status_code == 200
-        )
-        assert documents.get_document(cv["id"])["complete"]
-        refused = client.put(late["url"], headers=late["headers"], content=b"abc")
-        assert refused.status_code == 409 and refused.json()["error"]["code"] == "revision_complete"
-        assert len(documents.get_document(cv["id"])["files"]) == 1
+    )
+    late = documents.reserve_upload(
+        UploadReservation(owner_type="document", owner_id=cv["id"], name="photo.png", size=3)
+    )
+    pdf = cv["uploads"]["pdf"]
+    assert client.put(pdf["url"], headers=pdf["headers"], content=b"%PDF-1.4").status_code == 200
+    assert documents.get_document(cv["id"])["complete"]
+    refused = client.put(late["url"], headers=late["headers"], content=b"abc")
+    assert refused.status_code == 409 and refused.json()["error"]["code"] == "revision_complete"
+    assert len(documents.get_document(cv["id"])["files"]) == 1

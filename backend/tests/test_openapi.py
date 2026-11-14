@@ -2,19 +2,22 @@
 
 import inspect
 import json
-import subprocess
-import sys
+import re
 
 from openapi_spec_validator import validate
 from pydantic import BaseModel
 
 from openings.interfaces import OPERATIONS
-from openings.openapi import EXAMPLES
+from openings.openapi import EXAMPLES, main
+from openings.removed import ROUTES
 
 
-def test_the_schema_validates_and_documents_every_operation(app):
-    schema = app.openapi()
+def test_the_printed_schema_validates_and_documents_every_operation(capsys):
+    # `python -m openings.openapi` (api:check) prints the schema without a server.
+    main()
+    schema = json.loads(capsys.readouterr().out)
     validate(schema)
+    assert schema["paths"]["/api/v1/jobs"]["get"]["operationId"] == "jobs_list"
     assert schema["components"]["securitySchemes"]["bearerAuth"]["scheme"] == "bearer"
     assert {"bearerAuth": []} in schema["security"]
     tags = {tag["name"] for tag in schema["tags"]}
@@ -46,19 +49,14 @@ def test_the_schema_validates_and_documents_every_operation(app):
     assert "conflict" in error["description"] and "removed" in error["description"]
 
 
-def test_the_module_prints_the_schema_without_a_server():
-    output = subprocess.run(
-        [sys.executable, "-m", "openings.openapi"], capture_output=True, check=True, text=True
-    ).stdout
-    assert json.loads(output)["paths"]["/api/v1/jobs"]["get"]["operationId"] == "jobs_list"
-
-
-def test_a_removed_route_is_gone_with_its_replacement(client):
-    response = client.get("/api/v1/policy")
-    assert response.status_code == 410
-    error = response.json()["error"]
-    assert error["code"] == "removed" and "preferences" in error["details"]["use"]
-    assert client.post("/api/v1/runs", json={}).status_code == 410
+def test_every_removed_route_is_gone_with_its_replacement(client):
+    for item in ROUTES:
+        for route in item.routes:
+            method, path = route.split(" ", 1)
+            response = client.request(method, "/api/v1" + re.sub(r"\{[^}]+\}", "x", path))
+            assert response.status_code == 410, route
+            error = response.json()["error"]
+            assert error["code"] == "removed" and error["details"]["use"] == item.use, route
 
 
 def test_request_examples_are_valid_requests():

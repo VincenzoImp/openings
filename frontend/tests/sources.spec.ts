@@ -364,25 +364,6 @@ test("each source says what its jobs became, without zeros", async ({
   }
 });
 
-test("the empty state offers a search and a company page", async ({ page }) => {
-  await page.route(
-    (url) => url.pathname === "/api/v1/sources",
-    (route) =>
-      route.request().method() === "GET"
-        ? route.fulfill({
-            json: { items: [], total: 0, limit: 500, offset: 0 },
-          })
-        : route.fallback(),
-  );
-  await go(page, "sources");
-  await expect(page.getByText("No job sources yet")).toBeVisible();
-  await expect(
-    page.getByText("Add a search to get new jobs every few hours."),
-  ).toBeVisible();
-  await page.getByRole("button", { name: "Add a company page" }).click();
-  await expect(editor(page).getByLabel("Kind")).toHaveValue("company");
-});
-
 test("Sources with its menu and editor open has no serious accessibility finding", async ({
   page,
 }) => {

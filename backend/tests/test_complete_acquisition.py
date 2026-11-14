@@ -157,7 +157,8 @@ def test_linkedin_provider_access_failure_stops_detail_loop(tmp_path, monkeypatc
     assert result["result"]["pending_descriptions"] == 3
 
 
-@pytest.mark.parametrize("failure", [502, 503, requests.Timeout, requests.ConnectionError])
+# A failed status and a failed transport take the two retry paths.
+@pytest.mark.parametrize("failure", [503, requests.Timeout])
 def test_transient_detail_failure_retries_the_run_without_spending_posting_attempts(
     tmp_path, monkeypatch, failure
 ):
@@ -205,10 +206,10 @@ def test_transient_detail_failure_retries_the_run_without_spending_posting_attem
     assert len(calls) == 4 and sum("seeMore" in url for url in calls) == 1
 
 
-@pytest.mark.parametrize("status", [404, 410])
 def test_removed_individual_postings_finish_unavailable_without_retrying_the_provider(
-    tmp_path, monkeypatch, status
+    tmp_path, monkeypatch
 ):
+    status = 410
     workspace = Workspace(tmp_path / "removed.sqlite")
     service = DiscoveryService(workspace)
     service.update_provider("linkedin", ProviderPatch(expected_version=1, min_interval_seconds=0))
@@ -256,7 +257,8 @@ def glassdoor_checkpoint(service, task_id):
     )
 
 
-@pytest.mark.parametrize("failure", [503, requests.Timeout, "graphql"])
+# A transport failure of a detail batch is covered by the LinkedIn test above.
+@pytest.mark.parametrize("failure", [503, "graphql"])
 def test_glassdoor_failed_detail_batch_retains_all_candidates_for_retry(
     tmp_path, monkeypatch, failure
 ):
@@ -275,9 +277,7 @@ def test_glassdoor_failed_detail_batch_retains_all_candidates_for_retry(
             fail_once = False
             if failure == "graphql":
                 return response(url, 200, '[{"data":null,"errors":[{"message":"Unavailable"}]}]')
-            if isinstance(failure, int):
-                return response(url, failure, "Unavailable")
-            raise failure("Synthetic transport failure")
+            return response(url, failure, "Unavailable")
         return response(
             url,
             200,

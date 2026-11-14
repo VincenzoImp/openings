@@ -9,8 +9,12 @@ from openings.discovery.feeds import html_text
 from openings.errors import DomainError
 
 
-@pytest.mark.parametrize("state_key", ["pageData", "initialState"])
-def test_joincom_embedded_pages_preserve_jobs_and_bound_detail_requests(state_key):
+def test_joincom_embedded_pages_preserve_jobs_and_bound_detail_requests():
+    for state_key in ("pageData", "initialState"):
+        check_layout(state_key)
+
+
+def check_layout(state_key):
     base = "https://join.com/companies/example"
     calls = []
     listing = {

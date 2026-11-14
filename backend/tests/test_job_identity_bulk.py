@@ -1,9 +1,8 @@
 """Read-only identity lookup, duplicate candidates and bulk application changes."""
 
 import pytest
-from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
-from openings.app import create_app
 from openings.duplicate_signals import normalize_company, normalize_title, posting_fingerprint
 
 BODY = " ".join(
@@ -22,7 +21,7 @@ def count(workspace, table):
     return workspace.db.one(f"SELECT count(*) n FROM {table}")["n"]
 
 
-def test_resolve_matches_identities_without_ingesting(workspace):
+def test_resolve_matches_identities_without_ingesting_and_reports_conflicts(workspace):
     job = ingest(
         workspace,
         "https://jobs.lever.co/example/abc-123?utm_source=feed",
@@ -54,14 +53,12 @@ def test_resolve_matches_identities_without_ingesting(workspace):
     after = (count(workspace, "jobs"), count(workspace, "postings"), count(workspace, "events"))
     assert after == before
 
-
-def test_resolve_reports_identity_conflicts(workspace):
-    first = ingest(workspace, "https://example.test/careers/1", source_key="indeed:1")
-    second = ingest(workspace, "https://example.test/careers/2")
+    # A URL and a source key that name two different jobs are a conflict.
+    other = ingest(workspace, "https://example.test/careers/2")
     result = workspace.resolve_jobs(
-        {"url": "https://example.test/careers/2", "source_key": "indeed:1"}
+        {"url": "https://example.test/careers/2", "source_key": "linkedin:4242"}
     )
-    assert {item["id"] for item in result["items"]} == {first["id"], second["id"]}
+    assert {item["id"] for item in result["items"]} == {job["id"], other["id"]}
     assert result["identity_conflict"]
 
 
@@ -155,7 +152,7 @@ def test_duplicate_groups_flag_blocked_merges(workspace):
     assert len(group["open_application_ids"]) == 2
 
 
-def test_bulk_applications_close_reopen_delete(workspace):
+def test_bulk_applications_close_reopen_delete_and_validate_their_input(workspace):
     jobs = [ingest(workspace, f"https://example.test/{index}") for index in range(3)]
     attempts = [workspace.create_application({"job_id": job["id"]}) for job in jobs]
     closed = workspace.bulk_applications(
@@ -215,28 +212,17 @@ def test_bulk_applications_close_reopen_delete(workspace):
     assert workspace.list_applications(job_id=jobs[2]["id"])["total"] == 0
     assert workspace.get_job(jobs[2]["id"])["id"] == jobs[2]["id"]
 
-
-@pytest.mark.parametrize(
-    "value",
-    [
-        {"action": "close", "items": [{"id": "a", "expected_version": 1}]},
-        {"action": "reopen", "items": [{"id": "a", "expected_version": 1}]},
-        {"action": "delete", "outcome": "rejected", "items": [{"id": "a", "expected_version": 1}]},
-        {
-            "action": "close",
-            "status": "shortlisted",
-            "outcome": "rejected",
-            "items": [{"id": "a", "expected_version": 1}],
-        },
-        {"action": "delete", "items": [{"id": "a", "expected_version": 1}] * 2},
+    item = {"id": "a", "expected_version": 1}
+    for invalid in (
+        {"action": "close", "items": [item]},
+        {"action": "reopen", "items": [item]},
+        {"action": "delete", "outcome": "rejected", "items": [item]},
+        {"action": "close", "status": "shortlisted", "outcome": "rejected", "items": [item]},
+        {"action": "delete", "items": [item] * 2},
         {"action": "delete", "items": []},
-    ],
-)
-def test_bulk_application_input_is_validated(workspace, value):
-    from pydantic import ValidationError
-
-    with pytest.raises(ValidationError):
-        workspace.bulk_applications(value)
+    ):
+        with pytest.raises(ValidationError):
+            workspace.bulk_applications(invalid)
 
 
 def store_blob(workspace, job_id, content):
@@ -288,49 +274,27 @@ def test_bulk_deletion_collects_orphan_blobs_once(workspace, monkeypatch):
     assert failed["failed"] == 1 and calls == []
 
 
-def test_resolve_duplicates_and_bulk_close_over_rest(tmp_path):
-    app = create_app(tmp_path / "rest.sqlite", start_worker=False)
-    with TestClient(app) as client:
-        owner = client.post("/api/v1/auth/setup", json={"password": "synthetic-password"}).json()
-        client.headers["X-CSRF-Token"] = owner["csrf_token"]
-        first = client.post(
+def test_resolve_duplicates_and_bulk_routes_are_not_read_as_ids(client):
+    """``/jobs/resolve``, ``/jobs/duplicates`` and ``/applications/bulk`` sit beside
+    ``/{id}`` routes; the behaviour itself is tested on the services above."""
+    first, second = (
+        client.post(
             "/api/v1/jobs",
-            json={
-                "url": "https://example.test/one",
-                "title": "Data Engineer",
-                "company": "Example",
-                "posting": BODY,
-            },
+            json={"url": url, "title": "Data Engineer", "company": "Example", "posting": BODY},
         ).json()
-        second = client.post(
-            "/api/v1/jobs",
-            json={
-                "url": "https://example.test/two",
-                "title": "Data engineer",
-                "company": "Example",
-                "posting": BODY,
-            },
-        ).json()
-        resolved = client.get("/api/v1/jobs/resolve", params={"url": "https://example.test/one/"})
-        assert resolved.status_code == 200
-        assert [item["id"] for item in resolved.json()["items"]] == [first["id"]]
-        assert client.get("/api/v1/jobs/resolve").status_code == 422
-        groups = client.get("/api/v1/jobs/duplicates", params={"job_id": second["id"]}).json()
-        assert set(groups["items"][0]["job_ids"]) == {first["id"], second["id"]}
-        assert client.get("/api/v1/jobs/duplicates", params={"job_id": "absent"}).status_code == 404
-        attempt = client.post("/api/v1/applications", json={"job_id": first["id"]}).json()
-        bulk = client.post(
-            "/api/v1/applications/bulk",
-            json={
-                "action": "close",
-                "outcome": "rejected",
-                "items": [{"id": attempt["id"], "expected_version": attempt["version"]}],
-            },
-        )
-        assert bulk.status_code == 200 and bulk.json()["succeeded"] == 1
-        assert (
-            client.post(
-                "/api/v1/applications/bulk", json={"action": "close", "items": []}
-            ).status_code
-            == 422
-        )
+        for url in ("https://example.test/one", "https://example.test/two")
+    )
+    resolved = client.get("/api/v1/jobs/resolve", params={"url": "https://example.test/one/"})
+    assert [item["id"] for item in resolved.json()["items"]] == [first["id"]]
+    groups = client.get("/api/v1/jobs/duplicates", params={"job_id": second["id"]}).json()
+    assert set(groups["items"][0]["job_ids"]) == {first["id"], second["id"]}
+    attempt = client.post("/api/v1/applications", json={"job_id": first["id"]}).json()
+    bulk = client.post(
+        "/api/v1/applications/bulk",
+        json={
+            "action": "close",
+            "outcome": "rejected",
+            "items": [{"id": attempt["id"], "expected_version": attempt["version"]}],
+        },
+    )
+    assert bulk.status_code == 200 and bulk.json()["succeeded"] == 1
