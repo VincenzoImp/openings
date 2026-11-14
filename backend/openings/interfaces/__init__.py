@@ -1,41 +1,18 @@
-"""REST routes and MCP tools, one module per area, bound to the shared services.
+"""REST routes and MCP tools: one typed function per operation (``operation.py``), by area,
+and the hand-written transport routes (``transport.py``)."""
 
-Each area module declares its operations (``OPERATIONS``), and may declare
-transport exemptions (``EXEMPTIONS``) and hand-registered MCP resources or
-prompts (``SURFACES``). ``catalog`` collects them for ``/api/v1/capabilities``
-and the interface tests.
-"""
+from . import career, core, discovery, documents, preferences, system
+from .operation import OPERATIONS, bind_mcp, bind_rest
+from .transport import TRANSPORT_ONLY, register_prompts, register_transport
 
-from . import (
-    career,
-    core,
-    discovery,
-    documents,
-    events,
-    preferences,
-    skills,
-    stats,
-    system,
-)
+AREAS = (core, career, documents, discovery, preferences, system)
 
-AREAS = (
-    system,
-    core,
-    skills,
-    career,
-    documents,
-    discovery,
-    events,
-    preferences,
-    stats,
-)
-
-
-def catalog():
-    """Every declared operation, exemption and surface, by area in registration order."""
-    operations, exemptions, surfaces = [], [], []
-    for area in AREAS:
-        operations.extend(area.OPERATIONS)
-        exemptions.extend(getattr(area, "EXEMPTIONS", ()))
-        surfaces.extend(getattr(area, "SURFACES", ()))
-    return operations, exemptions, surfaces
+__all__ = [
+    "AREAS",
+    "OPERATIONS",
+    "TRANSPORT_ONLY",
+    "bind_mcp",
+    "bind_rest",
+    "register_prompts",
+    "register_transport",
+]

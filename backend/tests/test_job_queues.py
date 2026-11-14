@@ -86,14 +86,7 @@ async def test_rest_mcp_triage_filters_before_totals_facets_and_pagination(tmp_p
         assert result["total"] == 2 and result["items"][0]["title"] == "C role"
         mcp = await app.state.mcp.call_tool(
             "jobs_list",
-            {
-                "value": {
-                    "triage": "shortlisted",
-                    "sort": "title",
-                    "limit": 1,
-                    "offset": 1,
-                }
-            },
+            {"triage": "shortlisted", "sort": "title", "limit": 1, "offset": 1},
         )
         structured = json.loads(mcp.content[0].text)
         assert structured == result

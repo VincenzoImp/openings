@@ -68,7 +68,7 @@ def test_skills_over_rest_and_mcp(tmp_path, monkeypatch):
         assert reference.status_code == 200
         removed = "/api/v1/skills/openings-workspace/files/references/run-report.md"
         assert client.get(removed, headers=rest).status_code == 404
-        assert client.get("/api/v1/skills/review-inbox/notes", headers=rest).status_code == 404
+        assert client.get("/api/v1/skills/review-inbox/notes", headers=rest).status_code == 410
         assert client.get("/api/v1/skills/nope", headers=rest).status_code == 404
 
         result = rpc(

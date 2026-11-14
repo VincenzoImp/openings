@@ -2,7 +2,12 @@
 
 Base path: **`/api/v1`**. The running server exposes interactive reference at
 `/api/docs` and schemas at `/api/openapi.json`; those schemas are authoritative
-for fields. All normal data operations require an owner session or bearer token.
+for fields. Every operation has a summary, a description, tags by resource, its
+response model and its error responses; `operationId` is the MCP tool name, and
+`x-openings-access: owner` marks the owner-only routes, which are not MCP tools.
+`uv run python -m openings.openapi` prints the same document without a server.
+All normal data operations require an owner session or bearer token
+(`Authorization: Bearer <token>`, the `bearerAuth` scheme).
 
 Create a token in **Settings** and store it outside source control. A token is
 an **owner** token (full access) or an **agent** token, which is refused with
@@ -87,8 +92,10 @@ Application list/detail records include `preparation`: per-kind counts of curren
 revision leaves (`revisions`) and of complete ones, their PDF stored
 (`complete`). A new revision inherits no files. These counts do not certify
 content quality or submission.
-A version conflict returns HTTP 409 with the stored version, for example
-`{"error":{"code":"conflict","message":"…","details":{"current_version":4}}}`;
+Every error has one shape, the `Error` model:
+`{"error":{"code":"…","status":409,"message":"…","details":…}}`. A version
+conflict returns HTTP 409 with the stored version and the record, for example
+`{"error":{"code":"conflict","status":409,"message":"…","details":{"current_version":4,"id":"…"}}}`;
 reload before editing again. This includes settings records (profile,
 Preferences sections, settings, collection switch) and per-item errors from
 `/jobs/bulk` and `/sources/bulk`. MCP tool errors carry the same `code`, `status`,
@@ -253,8 +260,10 @@ revision for changed input.
 
 The authenticated `/capabilities` list gives the version, the schema, the
 caller's `token_kind` and, for each operation, its MCP `name`, its main REST
-`method` and `path` (relative to `api_base`) and `access: "owner"` when an agent
-token may not call it. OpenAPI and MCP `tools/list` are the full contract. Lists
+`method` and `path` (relative to `api_base`) and its `access`: `read`, `write`,
+`destructive` or `owner` (an agent token may not call it, and it is not an MCP
+tool). A route removed in 0.24 answers `410 Gone` with `details.use` naming its
+replacement. OpenAPI and MCP `tools/list` are the full contract. Lists
 support server filters; `/jobs/bulk`, `/applications/bulk` and `/sources/bulk`
 accept at most 200 versioned items and return per-item outcomes. Application `stage_counts` span all matching
 attempts, independent of pagination. Career nonnullable PATCH fields reject explicit null:
@@ -396,7 +405,9 @@ nothing is merged automatically.
 `reopen` takes `status` (`shortlisted`, `applied`, `interview` or `offer`) and only
 applies to Closed attempts; `delete` takes neither field. Closing with
 `no_response` applies only to sent attempts; list them first with
-`GET /applications?needs=reply_overdue`. Each result item has `ok` and either
+`GET /applications?needs=reply_overdue`. Every batch returns one `BatchResult`:
+`batch_id` (the change log's batch of the changes) and one item per selected
+record, in request order, with `index`, `id`, `ok`, the new `version` and either
 `result` or `error`.
 
 ## Collection recipes

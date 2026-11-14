@@ -417,7 +417,7 @@ def test_free_space_not_a_fixed_number_decides_and_the_variable_only_lowers_it(
     assert restored.status_code == 200, restored.text
 
 
-def test_storage_reads_the_same_over_rest_and_mcp(tmp_path, monkeypatch):
+def test_storage_reports_retention_and_the_restore_limit(tmp_path, monkeypatch):
     monkeypatch.setenv("OPENINGS_RETENTION_DAYS", "45")
     app, client = signed_in(tmp_path)
     disk(monkeypatch, 9000 * MIB)
@@ -425,18 +425,5 @@ def test_storage_reads_the_same_over_rest_and_mcp(tmp_path, monkeypatch):
     headers = {"Authorization": "Bearer " + token}
     with client:
         rest = client.get("/api/v1/workspace", headers=headers).json()["storage"]
-        response = client.post(
-            "/mcp",
-            headers={**MCP_HEADERS, **headers},
-            json={
-                "jsonrpc": "2.0",
-                "id": 1,
-                "method": "tools/call",
-                "params": {"name": "workspace_info", "arguments": {}},
-            },
-        )
-    result = response.json()["result"]
-    info = result.get("structuredContent") or json.loads(result["content"][0]["text"])
-    assert info["storage"] == rest
     assert rest["retention_days"] == 45 and rest["database_bytes"] > 0
     assert rest["restore_limit_bytes"] == restore_limit(9000 * MIB, rest["database_bytes"])

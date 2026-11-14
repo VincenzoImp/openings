@@ -1,8 +1,5 @@
 """Duplicate candidates: labelled benchmark, signals, confidence tiers and one-job scoring."""
 
-import asyncio
-import json
-
 import pytest
 from fastapi.testclient import TestClient
 
@@ -442,7 +439,7 @@ def test_features_are_read_again_only_for_changed_jobs(tmp_path, monkeypatch):
     assert merged["reasons"]["conflicts"] == ["location"]
 
 
-def test_confidence_is_the_same_over_service_rest_and_mcp(tmp_path):
+def test_confidence_tiers_and_filter_over_rest(tmp_path):
     app = create_app(tmp_path / "rest.sqlite", start_worker=False)
     with TestClient(app) as client:
         owner = client.post("/api/v1/auth/setup", json={"password": "synthetic-password"}).json()
@@ -482,16 +479,7 @@ def test_confidence_is_the_same_over_service_rest_and_mcp(tmp_path):
         parameters = schema["paths"]["/api/v1/jobs/duplicates"]["get"]["parameters"]
         assert "min_confidence" in {parameter["name"] for parameter in parameters}
 
-    async def call(arguments):
-        result = await app.state.mcp.call_tool("jobs_duplicates", arguments)
-        return json.loads(result.content[0].text)
-
-    assert asyncio.run(call({})) == default
-    assert asyncio.run(call({"value": {"min_confidence": 0}})) == everything
     assert app.state.workspace.duplicate_jobs({"min_confidence": 0.85}) == high
-    tools = asyncio.run(app.state.mcp.list_tools())
-    tool = next(tool for tool in tools if tool.name == "jobs_duplicates")
-    assert "min_confidence" in json.dumps(tool.input_schema)
 
 
 def test_a_background_warm_up_spares_the_first_request(tmp_path, monkeypatch):

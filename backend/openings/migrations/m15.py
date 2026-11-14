@@ -514,6 +514,42 @@ def _paragraphs(text):
     return [part.strip() for part in re.split(r"\n\s*\n", text or "") if part.strip()]
 
 
+# A Preferences item holds at most this many characters (preferences.MAX_TEXT).
+PREFERENCE_ITEM_LIMIT = 2000
+# Where a long text may be split, coarsest first: paragraphs, sentences, words.
+_BOUNDARIES = (r"(\n\s*\n)", r"(?<=[.!?…;:])(\s+)", r"(\s+)")
+
+
+def split_text(text, limit=PREFERENCE_ITEM_LIMIT, level=0):
+    """``text`` in order, in pieces of at most ``limit`` characters.
+
+    Whole paragraphs are kept together where they fit, else whole sentences, else
+    whole words, joined by the whitespace that separated them; only a single word
+    longer than ``limit`` is cut. Nothing is left out but the space between pieces.
+    """
+    text = text.strip()
+    if len(text) <= limit:
+        return [text] if text else []
+    if level == len(_BOUNDARIES):
+        return [text[start : start + limit] for start in range(0, len(text), limit)]
+    pieces, separator = [], ""
+    for index, token in enumerate(re.split(_BOUNDARIES[level], text)):
+        if index % 2:
+            separator = token
+            continue
+        for number, piece in enumerate(split_text(token, limit, level + 1)):
+            if number == 0 and pieces and len(pieces[-1]) + len(separator) + len(piece) <= limit:
+                pieces[-1] += separator + piece
+            else:
+                pieces.append(piece)
+    return pieces
+
+
+def _split_items(items):
+    """Items whose text is longer than the limit become several items of the same scope."""
+    return [{**item, "text": piece} for item in items for piece in split_text(item["text"])]
+
+
 def _decision_target(item, rule, no_reply, languages):
     """Where a decision item goes; a language rule adds its languages to ``languages``."""
     condition = rule.get("condition") or {}
@@ -552,8 +588,9 @@ def _template_rules(conn):
     return result
 
 
-def fold_preferences(conn):
-    """Fill ``preference_sections`` and the ``workspace`` setting from schema 14."""
+def preference_statements(conn):
+    """The statements of each section from schema 14, before splitting, and the
+    no-reply item and spoken languages that become settings."""
     sections = {name: [] for name in ("looking_for", "ruled_out", "facts", "writing")}
     no_reply, languages = None, []
     conn.row_factory = sqlite3.Row
@@ -593,13 +630,19 @@ def fold_preferences(conn):
         sections["writing"] += _template_rules(conn)
     finally:
         conn.row_factory = None
+    return sections, no_reply, languages
+
+
+def fold_preferences(conn):
+    """Fill ``preference_sections`` and the ``workspace`` setting from schema 14."""
+    sections, no_reply, languages = preference_statements(conn)
     stamp = datetime.now(UTC).isoformat(timespec="microseconds")
     for name, values in sections.items():
         if values:
             conn.execute(
                 "UPDATE main.preference_sections SET items=?,version=1,updated_at=?,"
                 "updated_by='system' WHERE section=?",
-                (_dump(values), stamp, name),
+                (_dump(_split_items(values)), stamp, name),
             )
     setting = {}
     if no_reply:
@@ -853,18 +896,10 @@ NOT_ARCHIVED = {
     "responses.created_by_kind": _KEPT_AS_LABEL,
     "responses.updated_by_kind": _KEPT_AS_LABEL,
 }
-PREFERENCE_ITEM_LIMIT = 2000
 
 
 def _day(stamp):
     return (stamp or "")[:10]
-
-
-def _item_text(text):
-    """A Preferences item holds at most 2,000 characters; the archive keeps the whole text."""
-    if len(text) <= PREFERENCE_ITEM_LIMIT:
-        return text
-    return text[: PREFERENCE_ITEM_LIMIT - 1].rstrip() + "…"
 
 
 def _question_text(row):
@@ -908,7 +943,7 @@ def _append_items(conn, section, texts, stamp):
     conn.execute(
         "UPDATE main.preference_sections SET items=?,version=max(version,1),updated_at=?,"
         "updated_by='system' WHERE section=?",
-        (_dump(current + [{"text": _item_text(text)} for text in texts]), stamp, section),
+        (_dump(current + _split_items([{"text": text} for text in texts])), stamp, section),
     )
 
 
@@ -1420,6 +1455,13 @@ def _verify(source, target, archive, report):
             actual = conn.execute(f'SELECT count(*) FROM main."{name}"').fetchone()[0]
             if actual != expected:
                 failures.append(f"{name} has {actual} rows instead of {expected}")
+        long = conn.execute(
+            "SELECT count(*) FROM main.preference_sections s, json_each(s.items) i "
+            "WHERE length(json_extract(i.value,'$.text'))>?",
+            (PREFERENCE_ITEM_LIMIT,),
+        ).fetchone()[0]
+        if long:
+            failures.append(f"{long} Preferences items are longer than {PREFERENCE_ITEM_LIMIT}")
         for what, after, earlier in INVARIANTS:
             values = conn.execute(after).fetchone()[0], conn.execute(earlier).fetchone()[0]
             if values[0] != values[1]:

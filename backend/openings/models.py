@@ -3,7 +3,7 @@ from datetime import UTC, date, datetime, timedelta
 from typing import Annotated, Any, Literal
 from urllib.parse import urlsplit
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class Input(BaseModel):
@@ -193,6 +193,49 @@ def past_day(value):
     return value
 
 
+def normalized_date(value, *, end=False):
+    if not value:
+        return value
+    try:
+        # The replacement also accepts some malformed inputs; keep validation unchanged.
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))  # noqa: FURB162
+    except ValueError as error:
+        raise ValueError("Use an ISO8601 date or timestamp.") from error
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    if end and len(value) == 10:
+        parsed += timedelta(days=1, microseconds=-1)
+    return parsed.astimezone(UTC).isoformat(timespec="microseconds")
+
+
+def not_blank(value):
+    value = value.strip()
+    if not value:
+        raise ValueError("Write some text; a blank value is left out.")
+    return value
+
+
+# Shared field types: validation runs once per type instead of once per model.
+Day = Annotated[str, AfterValidator(valid_deadline)]  # YYYY-MM-DD
+PastDay = Annotated[str, AfterValidator(past_day)]  # YYYY-MM-DD, not in the future
+Since = Annotated[str, AfterValidator(normalized_date)]  # a date or timestamp, from its start
+Until = Annotated[str, AfterValidator(lambda value: normalized_date(value, end=True))]
+NonBlank = Annotated[str, AfterValidator(not_blank)]  # stripped, not empty
+
+
+class SubjectRef(Input):
+    """A filter by changed record: subject_id needs its subject_type."""
+
+    subject_type: str | None = Field(default=None, max_length=50)
+    subject_id: str | None = Field(default=None, max_length=100)
+
+    @model_validator(mode="after")
+    def whole_reference(self):
+        if self.subject_id is not None and self.subject_type is None:
+            raise ValueError("Provide subject_type when filtering by subject_id.")
+        return self
+
+
 # How an application ended: hired (accepted), turned down by the employer (rejected),
 # stopped by the owner (not_pursued) or no answer within the no-reply period (no_response).
 Outcome = Literal["accepted", "rejected", "not_pursued", "no_response"]
@@ -217,14 +260,9 @@ class ApplicationInput(Input):
     required_documents: list[DocumentKindRequired] = required_documents_field(["cv", "letter"])
     questions: list[Question] = Field(default_factory=list, max_length=100)
     priority: Priority | None = None
-    deadline: str | None = Field(default=None, description="Closing date as YYYY-MM-DD.")
+    deadline: Day | None = Field(default=None, description="Closing date as YYYY-MM-DD.")
     requirements: list[Requirement] = Field(default_factory=list, max_length=100)
     idempotency_key: str | None = Field(default=None, min_length=1, max_length=200)
-
-    @field_validator("deadline")
-    @classmethod
-    def valid_deadline(cls, value):
-        return valid_deadline(value)
 
 
 class ReplyChange(Input):
@@ -239,17 +277,12 @@ class ReplyChange(Input):
         default=None,
         description="interview (an invitation), rejection, offer or other (any other answer). Required for a new reply.",
     )
-    date: str | None = Field(
+    date: PastDay | None = Field(
         default=None,
         description="The day it arrived (YYYY-MM-DD, not in the future); today (UTC) for a new reply when omitted.",
     )
     note: str | None = Field(default=None, max_length=2000)
     remove: bool = Field(default=False, description="With id: delete a reply recorded by mistake.")
-
-    @field_validator("date")
-    @classmethod
-    def valid_day(cls, value):
-        return past_day(value)
 
     @model_validator(mode="after")
     def valid_change(self):
@@ -274,7 +307,7 @@ class ApplicationPatch(Versioned):
     applied_at: str | None = None
     required_documents: list[DocumentKindRequired] | None = required_documents_field(None)
     priority: Priority | None = None
-    deadline: str | None = Field(
+    deadline: Day | None = Field(
         default=None, description="Closing date as YYYY-MM-DD; null clears it."
     )
     requirements: list[Requirement] | None = Field(
@@ -282,7 +315,7 @@ class ApplicationPatch(Versioned):
         max_length=100,
         description="Replaces the whole requirement list; include existing ids to keep them.",
     )
-    concluded_on: str | None = Field(
+    concluded_on: PastDay | None = Field(
         default=None,
         description="With outcome no_response: the day it was concluded that no reply will come (YYYY-MM-DD, not in the future); today (UTC) when omitted.",
     )
@@ -295,16 +328,6 @@ class ApplicationPatch(Versioned):
     @classmethod
     def valid_applied_date(cls, value):
         return normalized_date(value)
-
-    @field_validator("concluded_on")
-    @classmethod
-    def valid_past_day(cls, value):
-        return past_day(value)
-
-    @field_validator("deadline")
-    @classmethod
-    def valid_deadline(cls, value):
-        return valid_deadline(value)
 
     @model_validator(mode="after")
     def reject_null_fields(self):
@@ -344,17 +367,12 @@ class TimelineQuery(Input):
         default=None,
         description="Only the entries of the job itself (job) or of its applications (application). An application's timeline includes its job's entries unless scope=application.",
     )
-    since: str | None = Field(default=None, description="Only entries at or after this time.")
-    until: str | None = Field(
+    since: Since | None = Field(default=None, description="Only entries at or after this time.")
+    until: Until | None = Field(
         default=None, description="Only entries at or before this time (a date includes its day)."
     )
     limit: int = Field(default=50, ge=1, le=200)
     offset: int = Field(default=0, ge=0)
-
-    @field_validator("since", "until")
-    @classmethod
-    def valid_date(cls, value, info):
-        return normalized_date(value, end=info.field_name == "until")
 
 
 class BulkItem(Versioned):
@@ -425,21 +443,6 @@ class DuplicateQuery(Input):
     offset: int = Field(default=0, ge=0)
 
 
-def normalized_date(value, *, end=False):
-    if not value:
-        return value
-    try:
-        # The replacement also accepts some malformed inputs; keep validation unchanged.
-        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))  # noqa: FURB162
-    except ValueError as error:
-        raise ValueError("Use an ISO8601 date or timestamp.") from error
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=UTC)
-    if end and len(value) == 10:
-        parsed += timedelta(days=1, microseconds=-1)
-    return parsed.astimezone(UTC).isoformat(timespec="microseconds")
-
-
 class JobQuery(Input):
     q: str = Field(default="", max_length=1000)
     triage: Literal["new", "shortlisted", "dismissed", "active"] | None = Field(
@@ -452,8 +455,8 @@ class JobQuery(Input):
     remote: bool | None = None
     complete: bool | None = None
     job_type: str | None = Field(default=None, max_length=100)
-    created_since: str | None = None
-    created_until: str | None = None
+    created_since: Since | None = None
+    created_until: Until | None = None
     signal: (
         Literal["likely_duplicate", "no_longer_listed", "language_required", "pending"] | None
     ) = Field(
@@ -486,7 +489,7 @@ class JobQuery(Input):
         max_length=100,
         description="Only jobs changed by one REST request or MCP tool call (its batch_id, as events_list and histories show it). Restore an agent's dismissals with jobs_bulk action inbox.",
     )
-    since: str | None = Field(
+    since: Since | None = Field(
         default=None, description="Only jobs dismissed at or after this time."
     )
     hide_unspoken_required: bool | None = Field(
@@ -506,11 +509,6 @@ class JobQuery(Input):
         default=False,
         description="Also return counts: jobs by triage (new, shortlisted, dismissed, all) and dismissed jobs by who dismissed them, for the same search, company, location, source, date and signal filters.",
     )
-
-    @field_validator("created_since", "created_until", "since")
-    @classmethod
-    def valid_date(cls, value, info):
-        return normalized_date(value, end=info.field_name == "created_until")
 
     @model_validator(mode="after")
     def valid_range(self):
@@ -534,10 +532,10 @@ class ApplicationQuery(Input):
     )
     outcome: Outcome | None = None
     company: str | None = Field(default=None, max_length=300)
-    applied_since: str | None = Field(
+    applied_since: Since | None = Field(
         default=None, description="Only applications recorded as applied at or after this time."
     )
-    applied_until: str | None = Field(
+    applied_until: Until | None = Field(
         default=None,
         description="Only applications recorded as applied at or before this time; with stage=applied, the ones still waiting for a reply.",
     )
@@ -553,8 +551,3 @@ class ApplicationQuery(Input):
     ] = "updated"
     limit: int = Field(default=100, ge=1, le=200)
     offset: int = Field(default=0, ge=0)
-
-    @field_validator("applied_since", "applied_until")
-    @classmethod
-    def valid_date(cls, value, info):
-        return normalized_date(value, end=info.field_name.endswith("_until"))

@@ -102,11 +102,17 @@ def test_interface_workflow_requires_explicit_outcomes_and_versioned_deletion(tm
 
         def call(tool, method, path, arguments, *, error=None):
             if transport == "rest":
+                # REST names the identifiers in the path and the rest in the body or query.
+                body = {
+                    k: v
+                    for k, v in arguments.items()
+                    if not (k.endswith("_id") and f"/{v}" in path)
+                }
                 response = client.request(
                     method,
                     "/api/v1" + path,
-                    params=arguments if method in ("GET", "DELETE") else None,
-                    json=arguments.get("value") if method in ("POST", "PATCH") else None,
+                    params=body if method in ("GET", "DELETE") else None,
+                    json=body if method in ("POST", "PATCH") else None,
                 )
                 if error:
                     assert response.status_code == error
@@ -134,49 +140,26 @@ def test_interface_workflow_requires_explicit_outcomes_and_versioned_deletion(tm
             "jobs_create",
             "POST",
             "/jobs",
-            {
-                "value": {
-                    "title": "Engineer",
-                    "company": "Example",
-                    "posting": "Build APIs.",
-                }
-            },
+            {"title": "Engineer", "company": "Example", "posting": "Build APIs."},
         )
         attempt = call(
             "applications_create",
             "POST",
             "/applications",
-            {
-                "value": {
-                    "job_id": job["id"],
-                    "priority": 2,
-                    "idempotency_key": "start",
-                }
-            },
+            {"job_id": job["id"], "priority": 2, "idempotency_key": "start"},
         )
         retry = call(
             "applications_create",
             "POST",
             "/applications",
-            {
-                "value": {
-                    "job_id": job["id"],
-                    "priority": 2,
-                    "idempotency_key": "start",
-                }
-            },
+            {"job_id": job["id"], "priority": 2, "idempotency_key": "start"},
         )
         assert retry["id"] == attempt["id"]
         call(
             "applications_create",
             "POST",
             "/applications",
-            {
-                "value": {
-                    "job_id": job["id"],
-                    "priority": 5,
-                }
-            },
+            {"job_id": job["id"], "priority": 5},
             error=409,
         )
         assert client.get(f"/api/v1/applications/{attempt['id']}").json()["priority"] == 2
@@ -184,11 +167,7 @@ def test_interface_workflow_requires_explicit_outcomes_and_versioned_deletion(tm
             "applications_list",
             "GET",
             "/applications",
-            {
-                "value": {"job_id": job["id"]},
-            }
-            if transport == "mcp"
-            else {"job_id": job["id"]},
+            {"job_id": job["id"]},
         )
         assert listed["total"] == 1 and listed["stage_counts"]["shortlisted"] == 1
 
@@ -199,10 +178,8 @@ def test_interface_workflow_requires_explicit_outcomes_and_versioned_deletion(tm
             path,
             {
                 "application_id": attempt["id"],
-                "value": {
-                    "expected_version": attempt["version"],
-                    "status": "applied",
-                },
+                "expected_version": attempt["version"],
+                "status": "applied",
             },
         )
         assert attempt["applied_at"]
@@ -212,10 +189,8 @@ def test_interface_workflow_requires_explicit_outcomes_and_versioned_deletion(tm
             path,
             {
                 "application_id": attempt["id"],
-                "value": {
-                    "expected_version": attempt["version"],
-                    "applied_at": None,
-                },
+                "expected_version": attempt["version"],
+                "applied_at": None,
             },
         )
         assert attempt["applied_at"] is None
@@ -225,10 +200,8 @@ def test_interface_workflow_requires_explicit_outcomes_and_versioned_deletion(tm
             path,
             {
                 "application_id": attempt["id"],
-                "value": {
-                    "expected_version": attempt["version"],
-                    "status": "closed",
-                },
+                "expected_version": attempt["version"],
+                "status": "closed",
             },
             error=422,
         )
@@ -238,11 +211,9 @@ def test_interface_workflow_requires_explicit_outcomes_and_versioned_deletion(tm
             path,
             {
                 "application_id": attempt["id"],
-                "value": {
-                    "expected_version": attempt["version"],
-                    "status": "closed",
-                    "outcome": "rejected",
-                },
+                "expected_version": attempt["version"],
+                "status": "closed",
+                "outcome": "rejected",
             },
         )
         attempt = call(
@@ -251,10 +222,8 @@ def test_interface_workflow_requires_explicit_outcomes_and_versioned_deletion(tm
             path,
             {
                 "application_id": attempt["id"],
-                "value": {
-                    "expected_version": attempt["version"],
-                    "priority": 1,
-                },
+                "expected_version": attempt["version"],
+                "priority": 1,
             },
         )
         assert attempt["outcome"] == "rejected"
@@ -265,7 +234,8 @@ def test_interface_workflow_requires_explicit_outcomes_and_versioned_deletion(tm
             path,
             {
                 "application_id": attempt["id"],
-                "value": {"expected_version": attempt["version"], "note": "Removed field"},
+                "expected_version": attempt["version"],
+                "note": "Removed field",
             },
             error=422,
         )

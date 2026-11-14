@@ -53,52 +53,31 @@ def refused_over_rest(response):
     return error
 
 
-def refused_over_mcp(result):
-    value, error = result
-    assert value is None
-    assert (error["code"], error["status"], error["details"]) == ("forbidden", 403, FORBIDDEN)
-    return error
-
-
-def test_an_agent_token_is_refused_owner_operations_on_rest_and_mcp(app, client):
+def test_an_agent_token_is_refused_owner_operations(app, client):
     auth = app.state.auth
     agent = auth.create_token("Synthetic agent", "agent")
     other = auth.create_token("Second synthetic agent", "agent")
     headers = bearer(agent)
-    pairs = [
-        (
-            client.post(
-                "/api/v1/auth/password", json={"password": "changed-password"}, headers=headers
-            ),
-            tool(
-                client, agent, "owner_password_update", {"value": {"password": "changed-password"}}
-            ),
+    for over_rest in (
+        client.post(
+            "/api/v1/auth/password", json={"password": "changed-password"}, headers=headers
         ),
-        (client.get("/api/v1/tokens", headers=headers), tool(client, agent, "tokens_list")),
-        (
-            client.post(
-                "/api/v1/tokens", json={"name": "Escalation", "kind": "owner"}, headers=headers
-            ),
-            tool(
-                client, agent, "tokens_create", {"value": {"name": "Escalation", "kind": "owner"}}
-            ),
+        client.get("/api/v1/tokens", headers=headers),
+        client.post(
+            "/api/v1/tokens", json={"name": "Escalation", "kind": "owner"}, headers=headers
         ),
-        (
-            client.delete(f"/api/v1/tokens/{other['id']}", headers=headers),
-            tool(client, agent, "tokens_revoke", {"token_id": other["id"]}),
+        client.delete(f"/api/v1/tokens/{other['id']}", headers=headers),
+        client.post(
+            "/api/v1/backup/restore",
+            content=b"SQLite format 3\x00",
+            headers={**headers, "Content-Type": "application/vnd.sqlite3"},
         ),
-        (
-            client.post(
-                "/api/v1/backup/restore",
-                content=b"SQLite format 3\x00",
-                headers={**headers, "Content-Type": "application/vnd.sqlite3"},
-            ),
-            tool(client, agent, "workspace_restore"),
-        ),
-    ]
-    for over_rest, over_mcp in pairs:
-        rest_error, mcp_error = refused_over_rest(over_rest), refused_over_mcp(over_mcp)
-        assert rest_error["message"] == mcp_error["message"]
+    ):
+        refused_over_rest(over_rest)
+    # Owner-only operations are not MCP tools; a call names the REST route.
+    for name in ("owner_password_update", "tokens_list", "tokens_revoke"):
+        _, error = tool(client, agent, name)
+        assert error["code"] == "owner_only" and "/api/v1/" in error["message"]
     # Nothing changed: the password and both tokens are as before.
     assert client.post("/api/v1/auth/login", json={"password": PASSWORD}).status_code == 200
     assert {item["name"] for item in auth.list_tokens()["items"]} == {
@@ -194,17 +173,15 @@ def test_an_owner_token_keeps_full_access_and_chooses_the_kind(app, client):
     owner = app.state.auth.create_token("Synthetic owner token", "owner")
     assert owner["kind"] == "owner"
     headers = bearer(owner)
-    # The kind defaults to the scoped agent on both interfaces, as in the dashboard.
+    # The kind defaults to the scoped agent, as in the dashboard.
     default = client.post("/api/v1/tokens", json={"name": "Agent on laptop"}, headers=headers)
-    script, error = tool(
-        client, owner, "tokens_create", {"value": {"name": "Script", "kind": "owner"}}
+    script = client.post(
+        "/api/v1/tokens", json={"name": "Script", "kind": "owner"}, headers=headers
     )
-    default = default.json()
-    assert error is None and (default["kind"], script["kind"]) == ("agent", "owner")
+    default, script = default.json(), script.json()
+    assert (default["kind"], script["kind"]) == ("agent", "owner")
     assert default["token"].startswith("op_")
-    listed, error = tool(client, owner, "tokens_list")
-    assert error is None
-    assert client.get("/api/v1/tokens", headers=headers).json() == listed
+    listed = client.get("/api/v1/tokens", headers=headers).json()
     assert {item["name"]: item["kind"] for item in listed["items"]} == {
         "Synthetic owner token": "owner",
         "Script": "owner",
@@ -216,15 +193,14 @@ def test_an_owner_token_keeps_full_access_and_chooses_the_kind(app, client):
     assert created["actor"] == "owner"
     for body in ({"name": "Invalid", "kind": "admin"}, {"name": "Invalid", "kind": None}):
         invalid = client.post("/api/v1/tokens", json=body, headers=headers)
-        _, error = tool(client, owner, "tokens_create", {"value": body})
         assert invalid.status_code == 422
-        assert invalid.json()["error"]["code"] == error["code"] == "validation"
+        assert invalid.json()["error"]["code"] == "validation"
     # The owner can run everything from an external session: revoke, change the password.
     assert client.delete(f"/api/v1/tokens/{default['id']}", headers=headers).status_code == 200
-    changed, error = tool(
-        client, owner, "owner_password_update", {"value": {"password": "changed-password"}}
-    )
-    assert error is None and changed["api_tokens_preserved"] is True
+    changed = client.post(
+        "/api/v1/auth/password", json={"password": "changed-password"}, headers=headers
+    ).json()
+    assert changed["api_tokens_preserved"] is True
     assert (
         client.post("/api/v1/auth/login", json={"password": "changed-password"}).status_code == 200
     )
@@ -235,8 +211,6 @@ def test_an_owner_token_keeps_full_access_and_chooses_the_kind(app, client):
         headers={**headers, "Content-Type": "application/vnd.sqlite3"},
     )
     assert restored.status_code == 200, restored.text
-    upload, error = tool(client, owner, "workspace_restore")
-    assert error is None and upload["url"] == "/api/v1/backup/restore"
 
 
 def test_the_owner_session_and_the_system_are_never_refused(app):

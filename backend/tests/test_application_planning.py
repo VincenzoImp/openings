@@ -210,7 +210,7 @@ def test_applications_filter_by_the_time_they_were_applied(tmp_path):
                 "method": "tools/call",
                 "params": {
                     "name": "applications_list",
-                    "arguments": {"value": {"applied_until": "2026-09-01"}},
+                    "arguments": {"applied_until": "2026-09-01"},
                 },
             },
         ).json()["result"]
@@ -232,11 +232,17 @@ def test_planning_fields_have_rest_and_mcp_parity(tmp_path, transport):
 
         def call(tool, method, path, arguments):
             if transport == "rest":
+                # REST names the identifiers in the path and the rest in the body or query.
+                body = {
+                    k: v
+                    for k, v in arguments.items()
+                    if not (k.endswith("_id") and f"/{v}" in path)
+                }
                 response = client.request(
                     method,
                     "/api/v1" + path,
-                    params=arguments.get("value") if method == "GET" else None,
-                    json=arguments.get("value") if method != "GET" else None,
+                    params=body if method == "GET" else None,
+                    json=body if method != "GET" else None,
                 )
                 return response.status_code, response.json()
             response = client.post(
@@ -258,14 +264,12 @@ def test_planning_fields_have_rest_and_mcp_parity(tmp_path, transport):
             "POST",
             "/applications",
             {
-                "value": {
-                    "job_id": job["id"],
-                    "priority": 2,
-                    "deadline": "2026-12-15",
-                    "requirements": [
-                        {"id": "ai", "kind": "authorship", "text": "No AI.", "blocking": True}
-                    ],
-                }
+                "job_id": job["id"],
+                "priority": 2,
+                "deadline": "2026-12-15",
+                "requirements": [
+                    {"id": "ai", "kind": "authorship", "text": "No AI.", "blocking": True}
+                ],
             },
         )
         assert status == 200 and created["missing"] == ["cv", "letter", "requirement:ai"]
@@ -275,11 +279,9 @@ def test_planning_fields_have_rest_and_mcp_parity(tmp_path, transport):
             f"/applications/{created['id']}",
             {
                 "application_id": created["id"],
-                "value": {
-                    "expected_version": created["version"],
-                    "requirements": [{**created["requirements"][0], "resolved": True}],
-                    "deadline": None,
-                },
+                "expected_version": created["version"],
+                "requirements": [{**created["requirements"][0], "resolved": True}],
+                "deadline": None,
             },
         )
         assert status == 200 and updated["missing"] == ["cv", "letter"]
@@ -290,7 +292,8 @@ def test_planning_fields_have_rest_and_mcp_parity(tmp_path, transport):
             f"/applications/{created['id']}",
             {
                 "application_id": created["id"],
-                "value": {"expected_version": updated["version"], "priority": 9},
+                "expected_version": updated["version"],
+                "priority": 9,
             },
         )
         assert status == 422
@@ -298,7 +301,7 @@ def test_planning_fields_have_rest_and_mcp_parity(tmp_path, transport):
             "applications_list",
             "GET",
             "/applications",
-            {"value": {"needs": "documents", "sort": "priority"}},
+            {"needs": "documents", "sort": "priority"},
         )
         assert status == 200 and listed["total"] == 1
         item = listed["items"][0]

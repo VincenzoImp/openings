@@ -1,6 +1,6 @@
 """Bulk changes of explicit, versioned jobs and applications with per-item results."""
 
-from ..common import check_version
+from ..common import batch_result, check_version
 from ..errors import DomainError, missing
 from ..models import ApplicationBulk, ApplicationPatch, JobBulk
 
@@ -33,13 +33,7 @@ class BulkChanges:
         finally:
             if deleting and any(result["ok"] for result in results):
                 self.db.collect_blobs()
-        succeeded = sum(item["ok"] for item in results)
-        return {
-            "items": results,
-            "total": len(results),
-            "succeeded": succeeded,
-            "failed": len(results) - succeeded,
-        }
+        return batch_result(results)
 
     def bulk_jobs(self, value):
         value = value if isinstance(value, JobBulk) else JobBulk.model_validate(value)

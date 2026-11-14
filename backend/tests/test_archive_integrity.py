@@ -3,14 +3,12 @@
 import sqlite3
 
 import pytest
-from fastapi import APIRouter, FastAPI
-from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
 
+from document_fixtures import bare_api
 from openings.db import Database
 from openings.documents import DocumentCreate, DocumentService, UploadReservation
 from openings.errors import DomainError
-from openings.interfaces.documents import register_api
 from openings.operations import restore_database
 from openings.workspace import Workspace
 
@@ -64,15 +62,7 @@ def test_parallel_upload_grants_remain_valid_until_a_revision_is_complete(tmp_pa
     job = workspace.ingest_job({"posting": "Build APIs"})
     application = workspace.create_application({"job_id": job["id"]})
     doc = documents.create_document(DocumentCreate(application_id=application["id"], kind="other"))
-    api = FastAPI()
-
-    @api.exception_handler(DomainError)
-    async def failure(request, error):
-        return JSONResponse({"error": {"code": error.code}}, status_code=error.status)
-
-    router = APIRouter(prefix="/api/v1")
-    register_api(router, documents)
-    api.include_router(router)
+    api = bare_api(workspace, documents=documents)
     grants = [
         documents.reserve_upload(
             UploadReservation(owner_type="document", owner_id=doc["id"], name=name, size=3)

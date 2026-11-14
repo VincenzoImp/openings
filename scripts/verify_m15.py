@@ -115,10 +115,6 @@ PLANNED = (
         ),
     ),
     (
-        "policy items longer than 2000 characters as text",
-        "SELECT count(*) FROM policy_items WHERE length(label)+length(statement)+length(note)>1900",
-    ),
-    (
         "policy items per section above 200",
         (
             "SELECT count(*) FROM (SELECT section FROM policy_items GROUP BY section "
@@ -330,6 +326,19 @@ def aggregates(path):
         out["migration_archive_estimated_bytes"] = int(
             sum(m15._estimate(conn, s) for s in sections)
         )
+        # Preferences items hold at most 2,000 characters: a longer text becomes several.
+        limit = m15.PREFERENCE_ITEM_LIMIT
+        texts = [
+            item["text"] for items in m15.preference_statements(conn)[0].values() for item in items
+        ]
+        pieces = [m15.split_text(text) for text in texts if len(text) > limit]
+        out["preference_items_after_splitting"] = {
+            "texts longer than 2000 characters": len(pieces),
+            "items they become": sum(len(split) for split in pieces),
+            "items longer than 2000 characters after splitting": sum(
+                len(piece) > limit for split in pieces for piece in split
+            ),
+        }
     return out
 
 

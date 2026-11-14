@@ -7,21 +7,22 @@ mechanics, not personal selection or writing rules.
 ## Names and arguments
 
 - Every tool is named `<resource>_<verb>` (`jobs_get`, `applications_update`,
-  `profile_get`). Its arguments are the record ids a REST path names, flat;
-  `expected_version` of a delete, flat; and one `value`: the REST body of a
-  write, or the filters, `limit`, `offset` and options of a read.
+  `profile_get`). Its arguments are flat and named as in REST: the record ids
+  of the REST path beside the fields of the REST body of a write, or the
+  filters, `limit`, `offset` and options of a read. An unknown argument is
+  refused, never ignored.
 - Lists return summaries with `items`, `total`, `limit` and `offset`; pass
-  `value.summary: false` or read the single record for full content.
+  `summary: false` or read the single record for full content.
 - Every delete names the record's `expected_version`. Every create accepts an
   `idempotency_key`: a retry with the same key and request returns the record
   the first request created; the key with another request is `409 conflict`.
 
 ## Triage and applications
 
-- `GET /jobs?triage=new&limit=200&offset=0` and `jobs_list(value)` list a
+- `GET /jobs?triage=new&limit=200&offset=0` and `jobs_list(triage, limit, offset)` list a
   compact preview. `jobs_get` / `GET /jobs/{id}` supplies the full posting.
   Filter value lists (`facets`) appear only with `include_facets: true`.
-- `jobs_triage(job_id, value)` / `POST /jobs/{id}/triage` takes `triage` and
+- `jobs_triage(job_id, triage, expected_version)` / `POST /jobs/{id}/triage` takes `triage` and
   `expected_version`, and with `dismissed` an optional `reason` (at most 500
   characters) the owner reads beside the dismissal; `jobs_bulk` takes the same
   `reason` for its `dismissed` action. Values are `new`, `shortlisted` and
@@ -118,7 +119,7 @@ mechanics, not personal selection or writing rules.
   pass `status` with it. `reply: {id, kind?, date?, note?}` corrects one and
   `reply: {id, remove: true}` removes one; corrections never move the stage.
   `applications_get` lists `replies` and `last_reply`.
-- `applications_list(value: {needs: "reply_overdue"})` /
+- `applications_list(needs: "reply_overdue")` /
   `GET /applications?needs=reply_overdue` lists the Applied applications without
   a reply past the no-reply period. Closing one as `outcome: "no_response"` (with
   `concluded_on`) is manual, single or with `applications_bulk`; nothing closes
@@ -126,14 +127,14 @@ mechanics, not personal selection or writing rules.
 
 ## The change log
 
-- `events_list(value)` / `GET /events` reads the attributed change log. Each
+- `events_list(actor?, batch_id?, …)` / `GET /events` reads the attributed change log. Each
   change carries an `actor` label and the `batch_id` of the REST request or MCP
   tool call that wrote it.
 - Report what you did in the chat.
 
 ## Recover preparation from the database
 
-Use `applications_list(value: {stage: "shortlisted", limit: 200, offset: 0})` or
+Use `applications_list(stage: "shortlisted", limit: 200, offset: 0)` or
 `GET /applications?stage=shortlisted&limit=200&offset=0`, then paginate the
 stable read-only result. `needs: "documents"` keeps the ones missing a required
 document, `stage: "ready"` the Ready ones, and `sort: "deadline"` keeps deadline

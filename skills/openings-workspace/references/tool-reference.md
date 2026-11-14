@@ -187,7 +187,7 @@ without a reply sent before the no-reply cutoff; every list result
 has `no_reply` with `days`, `source` (`settings` or `default`) and `due`. The
 period comes from the setting `no_reply_days`, else 30.
 
-`stats_get(value)` / `GET /stats` takes `period` (`90d`, `12m` or `all`). It
+`stats_get(period)` / `GET /stats` takes `period` (`90d`, `12m` or `all`). It
 returns `applied`, `replied`, `reply_rate`, `interviews`, `interview_rate`,
 `median_days_to_reply`, the `funnel` (applied, replied, interview, offer) and
 `by_source` (replies per source, `null` unless two sources have five sent
@@ -245,19 +245,15 @@ returns it as `pinned_note`; write it with `notes_create` (`application_id`,
 ## Scripting and transfers
 
 Read `/api/openapi.json` for REST inputs under `/api/v1`. An MCP tool takes the
-record ids of its REST path and the `expected_version` of a delete as flat
-arguments and everything else in one `value` (the REST body or query string);
-discover the exact schemas. Use optimistic versions on every write and delete,
+record ids of its REST path and the fields of the REST body or query string as
+flat arguments with the same names; discover the exact schemas. Use optimistic versions on every write and delete,
 and an idempotency key on every create you may retry. Omit unchanged PATCH fields; clear text/lists/objects with empty
 values. Career dates also accept null to clear them.
 
-`workspace_export` returns readable JSON without file bytes. Scoped
-`workspace_backup` and `workspace_restore` move a portable SQLite snapshot
-when requested. Restore replaces workspace data while retaining destination
-authentication, recent provider request history and later cooldowns.
-`workspace_restore`, `tokens_list`, `tokens_create`, `tokens_revoke`,
-and `owner_password_update` need owner authority: an agent token gets
-`403 forbidden`. A backup downloaded with an agent token omits the owner
+`workspace_export` returns readable JSON without file bytes, and scoped
+`workspace_backup` a portable SQLite snapshot, when requested. Restoring a
+backup, API tokens and the owner password are the owner's: they are REST
+routes for the dashboard or an owner token, not MCP tools. A backup downloaded with an agent token omits the owner
 password hash, the session secret and the API tokens, and still restores
 completely. Keep transfer
 headers, credentials and personal data out of logs and repository examples.

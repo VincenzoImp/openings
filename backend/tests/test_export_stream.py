@@ -10,8 +10,8 @@ from fastapi.testclient import TestClient
 from starlette.requests import ClientDisconnect
 
 from openings.app import create_app
-from openings.interfaces.system import RecordsResponse
 from openings.models import JobInput
+from openings.transfers import RecordsResponse
 
 
 @pytest.fixture
