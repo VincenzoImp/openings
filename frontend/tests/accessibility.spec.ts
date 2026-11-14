@@ -13,7 +13,6 @@ const SCREENS = [
   "applications?stage=applied",
   "applications?section=stats",
   "jobs",
-  "jobs?section=shortlisted",
   "jobs?section=dismissed",
   "jobs?section=dismissed&dismissed_by=agent",
   "jobs?section=all",
@@ -175,47 +174,59 @@ for (const theme of ["light", "dark"]) {
       const flagged = (await api("/jobs?signal=likely_duplicate&limit=1"))
         .items[0];
       const dismissed = (await api("/jobs?triage=dismissed&limit=1")).items[0];
-      // A likely duplicate with every detail section open.
+      // A likely duplicate with its notes and history open.
       await go(page, `jobs?job=${flagged.id}`);
       await settled(page);
-      await expect(page.locator(".job-detail .duplicate")).toBeVisible();
-      for (const summary of await page
-        .locator(".job-detail details > summary")
-        .all())
-        await summary.click();
+      await expect(page.locator(".jobs-callout")).toBeVisible();
+      await page.getByText("Notes and history").click();
       await settled(page);
       expect(await findings(page, "job")).toEqual([]);
       await go(page, `jobs?section=dismissed&job=${dismissed.id}`);
       await settled(page);
       expect(await findings(page, "dismissed-job")).toEqual([]);
-      // Dismiss with a reason, merge, add a job.
+      // The … menu's dialogs: correct details, merge with another job.
       await go(page, `jobs?job=${flagged.id}`);
       await settled(page);
-      await page
-        .getByRole("group", { name: "Actions on this job" })
-        .getByRole("button", { name: "Dismiss…" })
-        .click();
+      const more = page
+        .getByRole("button", { name: "More actions" })
+        .filter({ visible: true });
+      await more.click();
+      await page.getByRole("menuitem", { name: /^Correct details/ }).click();
       await expect(page.locator("dialog[open]")).toBeVisible();
-      expect(await findings(page, "dismiss")).toEqual([]);
-      await page.keyboard.press("Escape");
+      expect(await findings(page, "correct")).toEqual([]);
       await page
-        .getByRole("button", { name: "Merge into one job", exact: true })
+        .locator("dialog[open]")
+        .getByRole("button", { name: "Cancel" })
         .click();
+      await expect(page.locator("dialog[open]")).toHaveCount(0);
+      await more.click();
+      await page.getByRole("menuitem", { name: /^Merge with another/ }).click();
       await expect(page.locator("dialog[open]")).toBeVisible();
       expect(await findings(page, "merge")).toEqual([]);
-      await page.keyboard.press("Escape");
-      await page.getByRole("button", { name: "Add a job" }).click();
-      await expect(
-        page.locator("dialog[open] textarea[name=posting]"),
-      ).toBeVisible();
-      expect(await findings(page, "add-job")).toEqual([]);
-      await page.keyboard.press("Escape");
-      // Selected rows with the bulk actions.
+      await page
+        .locator("dialog[open]")
+        .getByRole("button", { name: "Cancel" })
+        .click();
+      await expect(page.locator("dialog[open]")).toHaveCount(0);
+      // The list: the filters, then a dismissal's toast with its reason.
       await go(page, "jobs");
       await settled(page);
-      await page.locator(".job-list input[type=checkbox]").first().check();
+      if (isPhone(page))
+        await page.getByRole("button", { name: "Filter and sort" }).click();
+      else await page.getByRole("button", { name: "Filter" }).click();
+      await settled(page);
+      expect(await findings(page, "jobs-filter")).toEqual([]);
+      await page.keyboard.press("Escape");
+      await page.keyboard.press("d");
+      await page.getByRole("button", { name: "Add reason" }).click();
+      expect(await findings(page, "jobs-toast")).toEqual([]);
+      await page.keyboard.press("Escape");
+      // Selected rows with the bulk actions.
+      await page.locator(".jobs-list .ui-row-main").first().focus();
+      await page.keyboard.press("x");
+      await page.keyboard.press("Shift+J");
       await expect(
-        page.getByRole("group", { name: "Selected jobs" }),
+        page.getByRole("toolbar", { name: "2 selected" }),
       ).toBeVisible();
       expect(await findings(page, "jobs-bulk")).toEqual([]);
     });

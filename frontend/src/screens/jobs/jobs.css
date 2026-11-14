@@ -1,0 +1,486 @@
+/* Jobs: the page header, one toolbar row, the split list and detail at full
+   height, and the job pushed full screen on a phone. */
+@layer screens {
+  .jobs {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+  }
+  .jobs-panel {
+    position: relative;
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    /* The closed drawer waits just off the edge. */
+    overflow: clip;
+  }
+  .jobs-panel > .ui-split {
+    flex: 1;
+  }
+  .jobs-empty {
+    display: grid;
+    flex: 1;
+    place-items: center;
+    padding: var(--s-12) var(--s-4);
+  }
+  .jobs-error {
+    padding: var(--s-3) var(--pane-pad) 0;
+  }
+  .jobs-pane-loading,
+  .jobs-detail-loading {
+    padding: var(--s-6) var(--pane-pad);
+  }
+  .jobs-detail-loading {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-3);
+    padding: 0;
+  }
+
+  /* The list */
+  .jobs-list {
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
+  }
+  .jobs-list .ui-list {
+    flex: 1;
+  }
+  .jobs-list .ui-list-head .ui-count {
+    font-weight: var(--w-regular);
+  }
+  .jobs-signal {
+    display: inline-grid;
+    place-items: center;
+    color: var(--text-3);
+  }
+  .jobs-signal[data-tone="warning"] {
+    color: var(--warning);
+  }
+  .jobs-more {
+    display: flex;
+    justify-content: center;
+    padding: var(--s-3);
+    border-bottom: 1px solid var(--border);
+  }
+  .jobs-hint {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: var(--s-1);
+    flex-wrap: wrap;
+    padding: var(--s-2) var(--pane-pad);
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text-3);
+    font: var(--t-xs);
+    letter-spacing: 0;
+  }
+  .jobs-hint .ui-kbd {
+    margin: 0 1px;
+  }
+
+  /* The detail */
+  .jobs-title {
+    font: var(--t-2xl);
+    font-weight: var(--w-semibold);
+    letter-spacing: var(--tr-2xl);
+    overflow-wrap: anywhere;
+  }
+  .jobs-title:focus {
+    outline: none;
+  }
+  .jobs-title:focus-visible {
+    border-radius: var(--r-sm);
+    box-shadow: var(--focus-ring);
+  }
+  .jobs-detail .ui-metaline {
+    margin-top: var(--s-2);
+  }
+  .jobs-dismissal {
+    margin-top: var(--s-3);
+    color: var(--text-2);
+    font: var(--t-sm);
+    letter-spacing: 0;
+  }
+  .jobs-dismissal-reason {
+    color: var(--text);
+  }
+  .jobs-decision {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-2);
+    margin-top: var(--s-4);
+  }
+  .jobs-decision:empty {
+    display: none;
+  }
+  .jobs-decision .ui-status {
+    margin-left: var(--s-2);
+  }
+  .jobs-callout {
+    margin-top: var(--s-5);
+  }
+  .jobs-props {
+    margin-top: var(--s-6);
+  }
+  .jobs-props:has(.ui-props:empty) {
+    display: none;
+  }
+  .jobs-posting {
+    margin-top: var(--s-6);
+    padding-top: var(--s-6);
+    border-top: 1px solid var(--border);
+  }
+  .jobs-props:has(.ui-prop) + .jobs-posting {
+    padding-top: 0;
+    border-top: 0;
+  }
+  .jobs-posting .ui-prose p {
+    white-space: pre-line;
+  }
+  .jobs-posting-loading {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: var(--measure);
+  }
+  .jobs-muted {
+    color: var(--text-3);
+    font: var(--t-sm);
+    letter-spacing: 0;
+  }
+
+  /* Notes and history */
+  .jobs-history {
+    margin-top: var(--s-8);
+    border-top: 1px solid var(--border);
+  }
+  .jobs-history > summary {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    width: max-content;
+    min-height: 44px;
+    color: var(--text-2);
+    font: var(--t-sm);
+    font-weight: var(--w-medium);
+    letter-spacing: 0;
+    list-style: none;
+    cursor: pointer;
+  }
+  .jobs-history > summary::-webkit-details-marker {
+    display: none;
+  }
+  .jobs-history > summary:hover {
+    color: var(--text);
+  }
+  .jobs-history > summary:focus-visible {
+    outline: none;
+    border-radius: var(--r-sm);
+    box-shadow: var(--focus-ring);
+  }
+  .jobs-history-chevron {
+    transition: rotate var(--d-fast) var(--ease);
+  }
+  .jobs-history[open] .jobs-history-chevron {
+    rotate: 90deg;
+  }
+  .jobs-note {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    max-width: var(--measure);
+    margin-top: var(--s-2);
+  }
+  .jobs-note-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-3);
+    min-height: 28px;
+  }
+  .jobs-timeline {
+    display: flex;
+    flex-direction: column;
+    max-width: var(--measure);
+    margin: var(--s-4) 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .jobs-timeline > li {
+    padding: var(--s-2) 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .jobs-timeline > li:last-child {
+    border-bottom: 0;
+  }
+  .jobs-timeline-note {
+    display: flex;
+    gap: var(--s-2);
+    font: var(--t-sm);
+    letter-spacing: 0;
+    white-space: pre-line;
+  }
+  .jobs-pin {
+    flex: none;
+    margin-top: 2px;
+    color: var(--text-3);
+  }
+  .jobs-timeline-meta {
+    color: var(--text-3);
+    font: var(--t-xs);
+    letter-spacing: 0;
+  }
+  .jobs-timeline-reason {
+    display: block;
+    color: var(--text-2);
+  }
+  .jobs-timeline-event {
+    color: var(--text-2);
+    font-weight: var(--w-medium);
+  }
+
+  /* The posting link of the detail bar */
+  .jobs-posting-link {
+    text-decoration: none;
+  }
+  .jobs-posting-link:hover {
+    text-decoration: none;
+  }
+
+  /* Filters: menu items of fields, then of values */
+  .jobs-filter {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+    color: var(--text);
+  }
+  .ui-popover-panel:has(> .jobs-filter) {
+    width: min(320px, calc(100vw - 16px));
+    max-height: min(520px, calc(100dvh - 120px));
+    overflow-y: auto;
+    padding: var(--s-1);
+  }
+  .jobs-filter-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .jobs-filter-value {
+    max-width: 50%;
+    overflow: hidden;
+    color: var(--text-3);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .jobs-filter .ui-menu-item[aria-pressed="true"] {
+    font-weight: var(--w-medium);
+  }
+  .jobs-filter .ui-menu-item[aria-pressed] > .ui-icon {
+    color: var(--accent);
+  }
+  .jobs-filter-back {
+    color: var(--text-2);
+    font-weight: var(--w-medium);
+  }
+  .jobs-filter .ui-search {
+    margin: var(--s-1);
+  }
+  .jobs-filter-none {
+    padding: var(--s-2);
+    color: var(--text-3);
+  }
+  .jobs-filter-switch {
+    padding: var(--s-3) var(--s-2) var(--s-2);
+    border-top: 1px solid var(--border);
+  }
+
+  /* The reason typed in a dismissal's toast */
+  .jobs-reason {
+    display: flex;
+  }
+  .ui-toast .jobs-reason input {
+    width: 180px;
+    height: 28px;
+    padding: 0 var(--s-2);
+    border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
+    border-radius: var(--r-md);
+    background: transparent;
+    color: inherit;
+    font: var(--t-sm);
+  }
+  .ui-toast .jobs-reason input::placeholder {
+    color: inherit;
+    opacity: 0.65;
+  }
+  .ui-toast .jobs-reason input:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--accent);
+  }
+  a.ui-toast-action,
+  a.ui-toast-action:hover {
+    text-decoration: none;
+  }
+
+  /* Dialogs: the jobs to merge with, the sources of a job, the form */
+  .jobs-pick {
+    max-height: 280px;
+    overflow-y: auto;
+  }
+  .jobs-pick .ui-menu-item {
+    height: auto;
+    padding-block: var(--s-1-5);
+  }
+  .jobs-pick .ui-menu-item[aria-pressed="true"] {
+    background: var(--selected);
+  }
+  .jobs-pick-text {
+    display: flex;
+    flex-direction: column;
+  }
+  .jobs-pick-sub {
+    color: var(--text-3);
+    font: var(--t-xs);
+  }
+  .jobs-sources {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-3);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font: var(--t-sm);
+    letter-spacing: 0;
+  }
+  .jobs-sources a {
+    overflow-wrap: anywhere;
+    font: var(--t-xs);
+  }
+  .jobs-sources-name {
+    font-weight: var(--w-medium);
+  }
+  .jobs-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+    padding-bottom: var(--s-4);
+  }
+
+  /* Phone */
+  .jobs-phone-search {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    padding: var(--s-2) var(--s-2) var(--s-2) var(--s-4);
+    border-bottom: 1px solid var(--border);
+  }
+  .jobs-phone-search .ui-search {
+    flex: 1;
+    height: 36px;
+  }
+  .ui-modal.jobs-sheet {
+    width: 100%;
+    max-width: 100%;
+    max-height: 85dvh;
+    margin: auto 0 0;
+    border-radius: var(--r-xl) var(--r-xl) 0 0;
+  }
+  .ui-modal.jobs-sheet .ui-modal-foot .ui-btn {
+    flex: 1;
+    height: var(--touch);
+  }
+
+  @container app (max-width: 1023px) {
+    .jobs-hint {
+      display: none;
+    }
+    /* Beside the sidebar the tools keep to their icons. */
+    .jobs .ui-toolbar-tools .ui-search {
+      width: 140px;
+    }
+    .jobs .ui-toolbar-tools .ui-btn-label {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+  }
+  @container app (max-width: 719px) {
+    /* The phone's top bar carries the title. */
+    .jobs > .ui-page-header {
+      display: none;
+    }
+    /* The pushed job takes the whole screen: its own bar on top, its
+       decision at the bottom; the shell's bars step aside. */
+    .ui-app:has(.jobs[data-pushed]) .ui-topbar,
+    .ui-app:has(.jobs[data-pushed]) .ui-app-bottom,
+    .jobs[data-pushed] > :not(.jobs-panel, dialog) {
+      display: none;
+    }
+    /* The bulk bar stays on one line. */
+    .jobs .ui-bulkbar {
+      gap: var(--s-1);
+      padding: 0 var(--s-1) 0 var(--s-4);
+    }
+    .jobs .ui-bulkbar-count {
+      margin-right: var(--s-1);
+      white-space: nowrap;
+    }
+    .jobs .ui-bulkbar .ui-kbd {
+      display: none;
+    }
+    .jobs[data-pushed] .ui-detail-bar {
+      height: var(--bar-top);
+      padding-right: var(--s-1);
+    }
+    .jobs[data-pushed] .ui-detail-bar .ui-btn {
+      min-width: var(--touch);
+      height: var(--touch);
+    }
+    .jobs[data-pushed] .ui-detail-pos {
+      margin-left: 0;
+    }
+    .jobs-posting-link .ui-btn-label {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+    .jobs-decision > .ui-btn,
+    .jobs-decision > a.ui-btn {
+      display: none;
+    }
+    .jobs-decision:not(:has(.ui-status)) {
+      display: none;
+    }
+    .jobs-decision .ui-status {
+      margin-left: 0;
+    }
+    .jobs-title {
+      font-size: 20px;
+      line-height: 26px;
+    }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    @container app (max-width: 719px) {
+      .jobs[data-pushed] .ui-detail-body {
+        animation: jobs-slide var(--d-slow) var(--ease);
+      }
+    }
+  }
+  @keyframes jobs-slide {
+    from {
+      opacity: 0;
+      translate: 12px 0;
+    }
+  }
+}

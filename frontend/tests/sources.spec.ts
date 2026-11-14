@@ -340,6 +340,28 @@ test("keyboard: move through sources, edit with e, keep a draft on Esc", async (
   await expect(rows.nth(1)).toBeFocused();
 });
 
+test("each source says what its jobs became, without zeros", async ({
+  page,
+}) => {
+  await go(page, "sources");
+  const sources = (await call(page, "/sources?limit=500")).items as {
+    name: string;
+    counts: Record<string, number>;
+  }[];
+  const line = (counts: Record<string, number>) =>
+    ["found", "shortlisted", "applied"]
+      .filter((key) => counts[key] > 0)
+      .map((key) => `${counts[key]} ${key}`)
+      .join(" · ");
+  expect(sources.some((source) => line(source.counts))).toBe(true);
+  for (const source of sources) {
+    const counts = row(page, source.name).locator(".src-row-counts");
+    if (line(source.counts))
+      await expect(counts).toHaveText(line(source.counts));
+    else await expect(counts).toHaveCount(0);
+  }
+});
+
 test("the empty state offers a search and a company page", async ({ page }) => {
   await page.route(
     (url) => url.pathname === "/api/v1/sources",

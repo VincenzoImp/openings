@@ -2,35 +2,42 @@
 
 ## Review jobs
 
-**Jobs** has four tabs: **New**, **Shortlisted**, **Dismissed** and **All**. Select
-a job to read its posting, signals and timeline beside the list.
+**Jobs** has three tabs: **New**, **Dismissed** and **All**. Shortlisted jobs live
+in Applications; in **All** they show their stage. Select a job to read its
+posting, signals, notes and history beside the list. After each decision the
+next job is shown, and every decision can be undone from its toast or with `z`.
 
-- **Shortlist** starts the job's application (stage Shortlisted). Undoing it, by
-  moving the job back to New or dismissing it, removes that application only
-  while it is empty. Once it has documents, notes, replies, requirements or
-  answers, close the application instead.
-- **Dismiss...** sets the job aside with an optional reason (up to 500
-  characters). Dismissed jobs keep their identity and history, so later
-  collection does not bring them back as new. **Dismissed** shows the reason and
-  who dismissed it, and can filter **By agent**, **By you** or **By job sources**.
-  **Restore** returns a selection to New in one action.
-- **Forget this job permanently** removes the job, its identities and its
-  applications, documents and files. Collection can find it again. This cannot
-  be undone.
+- **Shortlist** (`s`) starts the job's application (stage Shortlisted). Undoing
+  it removes that application only while it is empty. Once it has documents,
+  notes, replies, requirements or answers, close the application instead.
+- **Dismiss** (`d`) sets the job aside at once; its toast offers **Add reason**
+  (up to 500 characters). Dismissed jobs keep their identity and history, so
+  later collection does not bring them back as new. **Dismissed** shows who
+  dismissed each job and why; the Filter menu narrows it to **You**,
+  **An agent** or **Job sources**. **Restore** (`r`) returns a job, or a
+  selection, to New.
+- **Forget permanently…** in the job's `…` menu removes the job, its identities
+  and its applications, notes and files after asking. Collection can find it
+  again. This cannot be undone.
 
 Closing an application never changes the job's tab. Deleting a job's last
-application returns the job to New. After each decision the next job is selected.
+application returns the job to New.
 
-Select several jobs (`x`, or shift-click for a range) to shortlist, dismiss,
-restore or forget up to 200 at once. Each job succeeds or fails on its own.
-`j` and `k` move through the list, Enter opens one, and `?` lists all shortcuts.
+The keyboard does it all: `j` and `k` (or the arrows) move, `s`, `d` and `r`
+decide, `z` undoes, `o` opens the posting, `e` corrects the details, Enter moves
+to the job, `/` searches and `?` lists every shortcut. Select several jobs (`x`,
+shift+`j`/`k`, or shift-click for a range) to shortlist, dismiss, restore or
+forget them at once; each job succeeds or fails on its own. On a phone a job
+opens full screen with **Dismiss** and **Shortlist** at the bottom; swipe a row
+right to shortlist it or left to dismiss it.
 
 ## Add or correct a job
 
-**Add a job** (or `n`) takes a URL, or a title, company and the full posting. A job
+**Add job** (or `n`) takes a URL, or a title, company and the full posting. A job
 already in the workspace is shown instead of a copy. When a page cannot be read, the
-job stays marked **Text incomplete** until you paste the posting under **Details**, **Correct the job**.
-Edits you make are kept when a source refreshes the job.
+job stays marked **Text incomplete** until you paste the posting with
+**Correct details** in the job's `…` menu. Edits you make are kept when a source
+refreshes the job.
 
 ## Signals and filters
 
@@ -52,12 +59,13 @@ language groups has none you speak, and the count of hidden jobs is shown.
 ## Duplicates
 
 A job that probably repeats an earlier one, such as one posting on several boards,
-shows **Is this the same vacancy?** with the earlier job and the reasons: the same
+shows **Possibly the same job as** the earlier job, with the reasons: the same
 apply link or requisition ID, the same text, or the same company, role and place,
 and anything against it, such as a different place or level. Choose **Merge into
 one job** to keep one job with both sources and timelines, or **Keep both** to
 record that they are different. The label does not come back. Nothing merges
-automatically. **Merge with another job...** under **Details** merges any two jobs.
+automatically. **Merge with another job…** in the job's `…` menu merges any two
+jobs.
 
 ## Sources
 
