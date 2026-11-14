@@ -31,6 +31,8 @@ def test_the_start_read_summarises_the_workspace(app, mcp):
     assert context["workspace"]["you"] == "agent:Synthetic agent"
     assert context["counts"]["new"] == 0 and context["counts"]["shortlisted"] == 6
     assert context["counts"]["missing_documents"] == 6
+    # The setup facts the dashboard's checklist reads.
+    assert context["counts"]["jobs"] >= 6 and context["counts"]["sources"] >= 0
     assert context["settings"]["collection"]["enabled"] is True
     assert context["profile"]["name"] == "Alex Example" and context["profile"]["version"] == 2
     assert set(context["preferences"]) == {
