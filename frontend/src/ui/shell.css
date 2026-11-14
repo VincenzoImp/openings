@@ -195,6 +195,15 @@
     display: flex;
     flex: none;
   }
+  /* Every screen's top-bar buttons are the same 44 px squares. */
+  .ui-topbar-actions .ui-icon-btn {
+    width: var(--touch);
+    height: var(--touch);
+  }
+  .ui-topbar-actions .ui-icon-btn .ui-icon {
+    width: 20px;
+    height: 20px;
+  }
 
   /* Phone: bottom bar */
   .ui-bottombar ul {

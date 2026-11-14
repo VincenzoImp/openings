@@ -198,7 +198,7 @@ export function Shell({ onSignOut }: { onSignOut: () => void }) {
             >
               <Sidebar
                 sections={sections}
-                current={route.def.nav}
+                current={route.def.nav ?? ""}
                 onAdd={() => setOverlay("add")}
                 onSearch={() => setOverlay("palette")}
                 account={account}
@@ -239,7 +239,7 @@ export function Shell({ onSignOut }: { onSignOut: () => void }) {
           bottomBar={
             <BottomBar
               items={bottom}
-              current={route.def.nav}
+              current={route.def.nav ?? ""}
               more={moreMenu(rest, account)}
             />
           }

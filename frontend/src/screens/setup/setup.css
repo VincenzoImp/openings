@@ -127,17 +127,10 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--s-4);
   }
-  .setup-inline {
+  .setup-jobs {
     display: flex;
-    align-items: flex-start;
-    gap: var(--s-2);
-  }
-  .setup-inline .ui-field {
-    flex: 1;
-    min-width: 0;
-  }
-  .setup-inline > .ui-btn {
-    margin-top: 24px;
+    flex-direction: column;
+    gap: var(--s-8);
   }
   .setup-block {
     display: flex;
