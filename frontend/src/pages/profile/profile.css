@@ -1,18 +1,16 @@
 /* Profile: a CV-like column (at most 760 px) with an "On this page" rail on
-   wide screens. Hierarchy by type and space; a block only gets a frame
+   wide screens. Hierarchy by type and space; a block gets a frame only
    while it is edited. */
 @layer screens {
-  .pf {
-    display: flex;
-    flex-direction: column;
-    min-height: 100%;
-  }
   .pf-body {
     padding: var(--s-4) var(--pane-pad) var(--s-16);
   }
+  .pf > .ui-page-header {
+    max-width: calc(968px + 2 * var(--pane-pad));
+  }
   .pf-layout {
     display: grid;
-    grid-template-columns: minmax(0, 760px) 168px;
+    grid-template-columns: minmax(0, 760px) 160px;
     gap: var(--s-12);
     align-items: start;
   }
@@ -25,52 +23,36 @@
   .pf-empty {
     margin-top: var(--s-12);
   }
-  .pf-visually-hidden {
+  .pf-hidden {
     position: absolute;
     width: 1px;
     height: 1px;
     overflow: hidden;
     clip-path: inset(50%);
-    white-space: nowrap;
   }
-
-  /* The rail */
   .pf-rail {
     position: sticky;
     top: var(--s-6);
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid var(--border);
     font: var(--t-sm);
-    letter-spacing: 0;
   }
-  .pf-rail-title {
-    margin: 0 0 var(--s-2);
+  .pf-rail p {
+    margin: 0 0 var(--s-2) var(--s-3);
     color: var(--text-3);
     font: var(--t-xs);
-    font-weight: var(--w-medium);
-  }
-  .pf-rail ul {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    border-left: 1px solid var(--border);
   }
   .pf-rail a {
-    display: block;
-    margin-left: -1px;
-    padding: 5px 0 5px var(--s-3);
-    border-left: 2px solid transparent;
+    padding: 5px var(--s-3);
     color: var(--text-3);
   }
   .pf-rail a:hover {
     color: var(--text);
     text-decoration: none;
   }
-  .pf-rail a[aria-current] {
-    border-left-color: var(--text);
-    color: var(--text);
-    font-weight: var(--w-medium);
-  }
 
-  /* Blocks: text at rest, Edit and … on hover or focus */
+  /* A block: text at rest, Edit and … on hover or focus */
   .pf-block {
     position: relative;
     margin: 0 calc(-1 * var(--s-4));
@@ -89,18 +71,11 @@
     display: flex;
     gap: var(--s-1);
     opacity: 0;
-    transition: opacity var(--d-fast) var(--ease);
   }
   .pf-block:hover > .pf-block-actions,
   .pf-block:focus-within > .pf-block-actions,
   .pf-block-actions:has([aria-expanded="true"]) {
     opacity: 1;
-  }
-  .pf-block-actions .ui-btn {
-    background: var(--bg-subtle);
-  }
-  .pf-block-actions .ui-btn:hover {
-    background: var(--hover);
   }
   .pf-block:hover .pf-entry-dates,
   .pf-block:focus-within .pf-entry-dates {
@@ -114,17 +89,10 @@
     gap: var(--s-4);
     padding-right: 72px;
   }
-  .pf-header .ui-avatar {
-    flex: none;
-    background: var(--hover);
-    color: var(--text-2);
-    font-weight: var(--w-semibold);
-  }
   .pf-header-names {
     min-width: 0;
   }
   .pf-name {
-    margin: 0;
     font: var(--t-3xl);
     font-weight: var(--w-semibold);
     letter-spacing: var(--tr-3xl);
@@ -135,7 +103,7 @@
     font-weight: var(--w-regular);
   }
   .pf-headline {
-    margin: 2px 0 0;
+    margin-top: 2px;
     color: var(--text-2);
     font: var(--t-lg);
   }
@@ -148,15 +116,12 @@
     list-style: none;
     color: var(--text-2);
     font: var(--t-sm);
-    letter-spacing: 0;
   }
   .pf-contacts li {
     display: inline-flex;
     align-items: center;
     gap: var(--s-1-5);
     min-width: 0;
-  }
-  .pf-contacts li > span {
     overflow-wrap: anywhere;
   }
   .pf-contacts .ui-icon {
@@ -164,85 +129,49 @@
     color: var(--text-3);
   }
   .pf-contacts a {
-    color: var(--text-2);
-  }
-  .pf-contacts a:hover {
-    color: var(--accent-text);
+    color: inherit;
   }
 
   /* Sections */
   .pf-section-head {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     gap: var(--s-3);
-  }
-  .pf-section-title {
-    display: flex;
-    align-items: baseline;
-    gap: var(--s-2);
-    margin: 0 0 var(--s-2);
-    padding-bottom: var(--s-2);
+    margin-bottom: var(--s-2);
+    padding-bottom: var(--s-1-5);
     border-bottom: 1px solid var(--border);
+  }
+  .pf-section-head h2 {
+    flex: 1;
     font: var(--t-lg);
     font-weight: var(--w-semibold);
     letter-spacing: var(--tr-xl);
-    flex: 1;
-    scroll-margin-top: var(--s-6);
-  }
-  .pf-section-head .pf-section-title {
-    margin: 0;
-  }
-  .pf-section-head {
-    margin-bottom: var(--s-2);
-    border-bottom: 1px solid var(--border);
-  }
-  .pf-section-head .pf-section-title {
-    border-bottom: 0;
-  }
-  .pf-section-head .ui-btn {
-    color: var(--text-3);
-    margin-bottom: var(--s-1);
-  }
-  .pf-section-head .ui-btn:hover {
-    color: var(--text);
-  }
-  .pf-section-title:focus {
     outline: none;
   }
+  .pf-section-head .ui-btn,
+  .pf-add-inline {
+    color: var(--text-3);
+  }
   .pf-count {
+    margin-left: var(--s-2);
     color: var(--text-3);
     font: var(--t-sm);
-    font-variant-numeric: tabular-nums;
   }
   .pf-none {
-    margin: var(--s-2) 0 0;
     color: var(--text-3);
     font: var(--t-sm);
-    letter-spacing: 0;
   }
-  .pf-add-inline {
-    margin-left: calc(-1 * var(--s-2));
-    color: var(--text-3);
-  }
+  .pf-add-inline,
   .pf-show-all {
-    margin: var(--s-1) 0 0 calc(-1 * var(--s-2));
-    color: var(--text-2);
+    margin-left: calc(-1 * var(--s-2));
   }
-  .pf-prose {
+  .pf-prose,
+  .pf-highlights {
     max-width: var(--measure);
     font: 14.5px/23px var(--font);
   }
-  .pf-prose p {
-    margin: 0;
-  }
   .pf-prose p + p {
     margin-top: var(--s-2);
-  }
-  .pf-entries {
-    display: flex;
-    flex-direction: column;
-    gap: var(--s-1);
   }
 
   /* An entry */
@@ -253,32 +182,19 @@
   }
   .pf-entry-title {
     flex: 1;
-    min-width: 0;
-    margin: 0;
     font: 15px/22px var(--font);
     font-weight: var(--w-semibold);
-    letter-spacing: -0.01em;
   }
   .pf-entry-dates {
-    flex: none;
     color: var(--text-3);
     font: var(--t-sm);
-    letter-spacing: 0;
-    font-variant-numeric: tabular-nums;
     white-space: nowrap;
-    transition: opacity var(--d-fast) var(--ease);
+    font-variant-numeric: tabular-nums;
   }
-  .pf-entry-sub {
-    margin: 1px 0 0;
+  .pf-entry-sub,
+  .pf-found-sub {
     color: var(--text-2);
     font: var(--t-sm);
-    letter-spacing: 0;
-  }
-  .pf-entry-kind {
-    color: var(--text-3);
-  }
-  .pf-entry-kind:not(:last-child)::after {
-    content: " · ";
   }
   .pf-entry-text {
     margin-top: var(--s-2);
@@ -287,7 +203,6 @@
     line-height: 22px;
   }
   .pf-highlights {
-    max-width: var(--measure);
     margin: var(--s-2) 0 0;
     padding-left: 18px;
     font: var(--t-md);
@@ -299,9 +214,6 @@
   .pf-highlights li::marker {
     color: var(--text-3);
   }
-  .pf-highlights li[data-unapproved] .pf-hl-text {
-    color: var(--text-2);
-  }
   .pf-star-mark {
     display: inline-flex;
     margin-left: var(--s-1-5);
@@ -312,37 +224,22 @@
   .pf-star[aria-pressed="true"] svg {
     fill: currentColor;
   }
-  .pf-hl-approval {
+  .pf-star[aria-pressed="true"] {
+    color: var(--text);
+  }
+  .pf-pending {
     display: inline-flex;
     align-items: center;
     gap: var(--s-2);
     margin-left: var(--s-2);
-    vertical-align: 1px;
-  }
-  .pf-hl-pending {
     color: var(--warning);
     font: var(--t-xs);
     font-weight: var(--w-medium);
   }
-  .pf-hl-approval .ui-btn {
+  .pf-pending .ui-btn {
     height: 24px;
   }
-  .pf-tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--s-1-5);
-    margin-top: var(--s-3);
-  }
-  .pf-more-tags {
-    cursor: pointer;
-    font-family: inherit;
-  }
-  .pf-more-tags:hover {
-    background: var(--hover);
-  }
-  .pf-all-skills {
-    margin-top: var(--s-1);
-  }
+  .pf-tags,
   .pf-files {
     display: flex;
     flex-wrap: wrap;
@@ -360,14 +257,12 @@
     padding: 0 var(--s-2) 0 10px;
     border: 1px solid var(--border-strong);
     border-radius: var(--r-full);
-    background: var(--bg);
     color: var(--text-2);
     font: var(--t-xs);
     font-weight: var(--w-medium);
   }
   a.pf-file:hover {
     background: var(--hover);
-    color: var(--text);
     text-decoration: none;
   }
   .pf-file-name {
@@ -377,11 +272,6 @@
   }
   .pf-file-size {
     color: var(--text-3);
-    font-weight: var(--w-regular);
-    font-variant-numeric: tabular-nums;
-  }
-  .pf-file[data-new] {
-    border-style: dashed;
   }
   .pf-file button,
   .pf-skill button {
@@ -389,24 +279,17 @@
     place-items: center;
     width: 20px;
     height: 20px;
-    margin-right: -4px;
     padding: 0;
     border: 0;
     border-radius: var(--r-full);
-    background: transparent;
+    background: none;
     color: var(--text-3);
     cursor: pointer;
-  }
-  .pf-file button:hover,
-  .pf-skill button:hover {
-    background: var(--hover);
-    color: var(--text);
   }
   .pf-lost {
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    margin-top: var(--s-2);
+    margin: var(--s-2) 0;
     overflow-wrap: anywhere;
   }
 
@@ -415,7 +298,6 @@
     margin: var(--s-1) calc(-1 * var(--s-4));
     border: 1px solid var(--border);
     border-radius: var(--r-xl);
-    background: var(--bg);
     box-shadow: var(--shadow-sm);
     overflow: clip;
   }
@@ -423,7 +305,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--s-5);
-    padding: var(--s-5) var(--s-5) var(--s-6);
+    padding: var(--s-5);
   }
   .pf-fields {
     display: grid;
@@ -441,9 +323,6 @@
     justify-content: flex-end;
     padding: 0 var(--s-3) var(--s-3);
   }
-  .pf-editing .ui-savebar {
-    border-radius: 0;
-  }
   .pf-form fieldset {
     min-width: 0;
     margin: 0;
@@ -454,7 +333,9 @@
     margin-bottom: var(--s-1-5);
     padding: 0;
   }
-  .pf-links {
+  .pf-links,
+  .pf-hl-edit,
+  .pf-files-edit {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
@@ -462,15 +343,10 @@
   }
   .pf-link-row {
     display: grid;
-    grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.3fr) auto;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) auto;
     gap: var(--s-2);
     width: 100%;
   }
-  .pf-links > .ui-btn,
-  .pf-hl-edit > .ui-btn {
-    margin-left: calc(-1 * var(--s-2));
-  }
-
   .pf-dates-row {
     display: flex;
     flex-wrap: wrap;
@@ -478,8 +354,7 @@
     gap: var(--s-3) var(--s-5);
   }
   .pf-date {
-    display: flex;
-    flex-direction: column;
+    display: grid;
     gap: var(--s-1);
   }
   .pf-date .ui-field-label {
@@ -495,10 +370,6 @@
     min-height: var(--input-h);
     align-items: center;
   }
-  .pf-dates .ui-field-error {
-    margin-top: var(--s-1-5);
-  }
-
   .pf-skills-input {
     display: flex;
     flex-wrap: wrap;
@@ -508,8 +379,6 @@
     padding: 3px var(--s-1-5);
     border: 1px solid var(--control);
     border-radius: var(--r-md);
-    background: var(--bg);
-    cursor: text;
   }
   .pf-skills-input:focus-within {
     border-color: var(--accent);
@@ -519,26 +388,19 @@
     flex: 1;
     min-width: 120px;
     height: 26px;
-    padding: 0 var(--s-1);
     border: 0;
-    background: transparent;
+    background: none;
     color: var(--text);
     font: var(--t-md);
     outline: none;
-  }
-  .pf-skills-input input:focus-visible {
     box-shadow: none;
   }
-  .pf-skill {
-    gap: 2px;
-  }
-
-  /* Highlights in the form */
   .pf-hl-rows {
     display: flex;
     flex-direction: column;
     gap: var(--s-1);
-    margin: 0 0 var(--s-2);
+    width: 100%;
+    margin: 0;
     padding: 0;
     list-style: none;
   }
@@ -547,8 +409,7 @@
     grid-template-columns: 24px minmax(0, 1fr) auto;
     align-items: start;
     gap: var(--s-1-5);
-    margin: 0 calc(-1 * var(--s-1-5));
-    padding: var(--s-1) var(--s-1-5);
+    padding: var(--s-1);
     border-radius: var(--r-lg);
   }
   .pf-hl-rows > li[data-unapproved] {
@@ -560,18 +421,16 @@
   .pf-hl-handle {
     display: grid;
     place-items: center;
-    width: 24px;
     height: var(--input-h);
     padding: 0;
     border: 0;
     border-radius: var(--r-md);
-    background: transparent;
+    background: none;
     color: var(--text-3);
     cursor: grab;
   }
   .pf-hl-handle:hover {
     background: var(--hover);
-    color: var(--text);
   }
   .pf-hl-input {
     min-height: var(--input-h);
@@ -584,32 +443,17 @@
     gap: 2px;
     min-height: var(--input-h);
   }
-  .pf-hl-ok {
-    display: inline-grid;
-    place-items: center;
-    width: 28px;
-    color: var(--text-3);
-  }
-  .pf-star[aria-pressed="true"] {
-    color: var(--text);
-  }
-
   .pf-file-add {
-    position: relative;
-    align-self: flex-start;
     margin-left: calc(-1 * var(--s-2));
     cursor: pointer;
   }
-  .pf-file-add:focus-within {
+  .pf-file-add:focus-within,
+  .pf-drop:focus-within {
     box-shadow: var(--focus-ring);
-  }
-  .pf-files-edit .pf-files {
-    margin: 0 0 var(--s-2);
   }
 
   /* The phone's sheet */
   .pf-sheet {
-    position: fixed;
     inset: 0;
     width: 100%;
     max-width: none;
@@ -621,9 +465,6 @@
     background: var(--bg);
     color: var(--text);
   }
-  .pf-sheet::backdrop {
-    background: var(--backdrop);
-  }
   .pf-sheet[open] {
     display: flex;
     flex-direction: column;
@@ -633,12 +474,10 @@
     grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
     gap: var(--s-2);
-    min-height: 56px;
     padding: env(safe-area-inset-top) var(--s-2) 0;
     border-bottom: 1px solid var(--border);
   }
   .pf-sheet-head h2 {
-    margin: 0;
     overflow: hidden;
     font: 15px/20px var(--font);
     font-weight: var(--w-semibold);
@@ -649,29 +488,19 @@
   .pf-sheet-body {
     flex: 1;
     overflow: auto;
-    overscroll-behavior: contain;
   }
   .pf-sheet .pf-form {
-    padding: var(--s-4) var(--s-4)
-      calc(var(--s-8) + env(safe-area-inset-bottom));
-  }
-  .pf-sheet .pf-fields {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .pf-sheet .pf-field-half {
-    max-width: none;
+    padding: var(--s-4) var(--s-4) var(--s-12);
   }
 
   /* Import */
-  .pf-import-lead {
-    margin: 0 0 var(--s-4);
+  .pf-lead {
+    margin-bottom: var(--s-4);
     color: var(--text-2);
     font: var(--t-sm);
-    letter-spacing: 0;
   }
-  .pf-import textarea[name="cv_text"] {
+  .pf-import textarea {
     font: 13px/20px var(--mono);
-    letter-spacing: 0;
   }
   .pf-drop {
     display: flex;
@@ -684,96 +513,42 @@
     background: var(--bg-subtle);
     color: var(--text-2);
     font: var(--t-sm);
-    letter-spacing: 0;
     cursor: pointer;
-    transition:
-      border-color var(--d-fast) var(--ease),
-      background-color var(--d-fast) var(--ease);
   }
   .pf-drop:hover,
   .pf-drop[data-over] {
     border-color: var(--accent);
     background: var(--accent-soft);
   }
-  .pf-drop:focus-within {
-    box-shadow: var(--focus-ring);
-  }
-  .pf-drop .ui-icon {
-    flex: none;
-    color: var(--text-3);
-  }
   .pf-drop b {
-    font-weight: var(--w-medium);
     color: var(--text);
+    font-weight: var(--w-medium);
   }
-  .pf-drop-link {
+  .pf-drop u {
     color: var(--accent-text);
+    text-decoration: none;
   }
-  .pf-import .ui-field-error {
-    margin-top: var(--s-2);
-  }
-  .pf-import-note {
-    margin: 0 0 var(--s-3);
-    color: var(--warning);
-    font: var(--t-sm);
-  }
-  .pf-import-h {
-    margin: var(--s-5) 0 0;
-    padding-bottom: var(--s-1-5);
-    border-bottom: 1px solid var(--border);
-    font: var(--t-sm);
-    font-weight: var(--w-semibold);
-  }
-  .pf-import-entries {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-  .pf-import-entries > li {
+  .pf-found {
     padding: var(--s-3) 0;
-    border-bottom: 1px solid var(--border);
+    border-top: 1px solid var(--border);
   }
-  .pf-import-title {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: var(--s-2);
-    margin: 0;
+  .pf-found-title {
     font-weight: var(--w-semibold);
   }
-  .pf-import-title .pf-entry-kind {
+  .pf-found-title span {
+    margin-left: var(--s-2);
+    color: var(--text-3);
     font: var(--t-xs);
-    font-weight: var(--w-regular);
   }
-  .pf-import-sub,
-  .pf-import-text {
-    margin: 2px 0 0;
-    color: var(--text-2);
+  .pf-found .pf-highlights {
     font: var(--t-sm);
-    letter-spacing: 0;
-  }
-  .pf-import-preview .pf-highlights {
-    font: var(--t-sm);
-    line-height: 20px;
   }
 
-  /* Loading */
-  .pf-skel-head {
-    display: flex;
-    align-items: center;
-    gap: var(--s-4);
-  }
-  .pf-skel-head > div,
-  .pf-skel-block {
-    display: flex;
-    flex-direction: column;
-    gap: var(--s-2-5, 10px);
-  }
-  .pf-skel-round {
-    border-radius: var(--r-full);
+  .pf-skel {
+    display: grid;
+    gap: var(--s-2);
   }
 
-  /* Without the room for the rail */
   @container app (max-width: 1279px) {
     .pf-layout {
       grid-template-columns: minmax(0, 760px);
@@ -781,29 +556,28 @@
     .pf-rail {
       display: none;
     }
+    .pf > .ui-page-header {
+      max-width: calc(760px + 2 * var(--pane-pad));
+    }
   }
 
   /* Touch: Edit and … are always there */
   @media (hover: none) {
-    .pf-block-actions {
-      opacity: 1;
+    .pf-block-actions,
+    .pf-block .pf-entry-dates {
+      opacity: 1 !important;
     }
-    .pf-block:hover,
-    .pf-block:focus-within {
-      background: none;
-    }
-    .pf-block:hover .pf-entry-dates,
-    .pf-block:focus-within .pf-entry-dates {
-      opacity: 1;
-    }
-    .pf-entry .pf-entry-head {
-      flex-direction: column;
-      gap: 0;
-      padding-right: 108px;
+    .pf-entry-head {
+      display: block;
+      padding-right: 104px;
     }
   }
 
   @container app (max-width: 719px) {
+    .pf-block-actions,
+    .pf-block .pf-entry-dates {
+      opacity: 1 !important;
+    }
     .pf-body {
       padding: var(--s-3) var(--s-4) var(--s-12);
     }
@@ -815,22 +589,12 @@
       padding: var(--s-3);
     }
     .pf-name {
-      font: 24px/30px var(--font);
-      font-weight: var(--w-semibold);
-      letter-spacing: var(--tr-2xl);
-    }
-    .pf-header .ui-avatar {
-      width: 48px !important;
-      height: 48px !important;
+      font-size: 24px;
+      line-height: 30px;
     }
     .pf-entry-head {
-      flex-direction: column;
-      gap: 0;
-      padding-right: 108px;
-    }
-    .pf-block-actions .ui-btn {
-      height: 36px;
-      min-width: 36px;
+      display: block;
+      padding-right: 104px;
     }
     .pf-fields {
       grid-template-columns: minmax(0, 1fr);

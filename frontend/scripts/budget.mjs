@@ -10,7 +10,7 @@
 // Interim: the first screen still carries the old data layer and component
 // helpers (src/state.tsx, src/api.ts, src/design) that Today and the other
 // old screens need, and the old screens weigh on all JS. Until they are
-// rebuilt (#222–#227) the budgets are 120 kB and 210 kB; #228 deletes the old
+// rebuilt (#222–#227) the budgets are 120 kB and 215 kB; #228 deletes the old
 // code and sets them back to 85 kB and 160 kB.
 //
 // Sizes are gzip (level 9) in kB of 1000 bytes, as Vite reports them. The
@@ -23,7 +23,9 @@ const KB = 1000;
 const BUDGET = {
   first: 120 * KB, // 85 kB once #228 deletes the old screens' code
   later: 30 * KB,
-  all: 210 * KB, // 160 kB once #228 deletes the old screens' code
+  // A rebuilt screen brings its own design-system modules while the old
+  // library it no longer uses stays loaded for the others (Profile, #225).
+  all: 215 * KB, // 160 kB once #228 deletes the old screens' code
   css: 20 * KB,
 };
 const HOME = "src/pages/Today.tsx";

@@ -228,7 +228,7 @@ export function FilesInput({
           id={id}
           type="file"
           multiple
-          className="pf-visually-hidden"
+          className="pf-hidden"
           onChange={(event) => {
             const files = [...(event.target.files ?? [])];
             event.target.value = "";

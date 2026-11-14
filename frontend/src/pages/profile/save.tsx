@@ -1,6 +1,7 @@
 // Saving a block: one versioned write; on a conflict the draft stays and
 // the block shows "Changed elsewhere" (Reload, Keep editing); any other
 // failure is said above the fields.
+import { useState } from "react";
 import { CircleAlert } from "lucide-react";
 import { ConflictNotice } from "../../query/ConflictNotice";
 import { isConflict, useVersionedMutation } from "../../query/mutation";
@@ -43,6 +44,8 @@ export function useBlockSave<Vars extends object>({
   onKeepEditing: () => void;
 }) {
   const toast = useToast();
+  // Keep editing reads the record again before the next save may start.
+  const [rebasing, setRebasing] = useState(false);
   const mutation = useVersionedMutation<unknown, Vars>({
     touches: ["career", "files"],
     mutationFn: write,
@@ -52,8 +55,10 @@ export function useBlockSave<Vars extends object>({
     <ConflictNotice
       onReload={mutation.reload}
       onKeepEditing={async () => {
+        setRebasing(true);
         await mutation.keepEditing();
         onKeepEditing();
+        setRebasing(false);
       }}
     />
   ) : (
@@ -63,7 +68,7 @@ export function useBlockSave<Vars extends object>({
     />
   );
   return {
-    saving: mutation.isPending,
+    saving: mutation.isPending || rebasing,
     notice,
     save: async (vars: Vars) => {
       try {

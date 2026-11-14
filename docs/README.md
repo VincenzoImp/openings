@@ -7,7 +7,7 @@ three work with the same jobs, career knowledge, documents and collection settin
 |---|---|
 | Install Openings and add a first job | [Setup and first use](user/getting-started.md) |
 | Search portals or follow chosen companies | [Collection](user/sources.md) |
-| Organize experience, skills and reusable wording | [Career entries and claims](user/career.md) |
+| Organize experience, skills and reusable wording | [Profile, career entries and highlights](user/career.md) |
 | State what I want, what I rule out, my writing rules and the facts employers ask about | [Preferences](user/preferences.md) |
 | Prepare a CV, letter or form answers | [Application documents](user/applications.md) |
 | Plan deadlines, priorities and employer requirements | [Plan and track requirements](user/applications.md#plan-and-track-requirements) |
