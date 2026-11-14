@@ -1,12 +1,12 @@
 ---
 name: maintain-career
-title: Keep your Profile and Career current
-summary: Give your agent a CV or tell it what changed, and have your Profile, Career entries, highlights and templates updated.
+title: Keep your Profile and career entries current
+summary: Give your agent a CV or tell it what changed, and have your Profile, career entries, highlights and templates updated.
 example: Update my profile from this CV.
-description: Maintain the owner's Openings Profile, Career record, highlights and CV/letter templates - "update my profile from this CV", "add my new job", "improve my highlights", "fix my CV template". Reconciles new material into the existing record without inventing anything.
+description: Maintain the owner's Openings Profile, career entries, highlights and CV/letter templates - "update my profile from this CV", "add my new job", "improve my highlights", "fix my CV template". Reconciles new material into the existing record without inventing anything.
 ---
 
-# Keep your Profile and Career current
+# Keep your Profile and career entries current
 
 Read [openings](../openings/SKILL.md) first, and the
 [writing reference](../prepare-applications/references/writing.md) before

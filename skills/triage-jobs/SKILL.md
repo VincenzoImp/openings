@@ -3,7 +3,7 @@ name: triage-jobs
 title: Go through new jobs
 summary: Have your new jobs read against your Preferences and experience, then shortlisted or dismissed with a reason.
 example: Go through my new jobs using my criteria, and filter them really well.
-description: Triage the new jobs in Openings by the owner's Preferences and Career - "empty my inbox", "go through new jobs", "filter the inbox", "anything good today?". Shortlists clear fits, dismisses confirmed mismatches with a reason, resolves duplicates and asks about the rest.
+description: Triage the new jobs in Openings by the owner's Preferences and career entries - "go through new jobs", "triage my new jobs", "filter them well", "anything good today?". Shortlists clear fits, dismisses confirmed mismatches with a reason, resolves duplicates and asks about the rest.
 ---
 
 # Go through new jobs
@@ -18,8 +18,8 @@ Call `workspace_context`. Before reading any job, write down for yourself:
 
 - **Dealbreakers** from What I rule out and Facts about me (work permit,
   places, languages, seniority, domains);
-- **Must-haves and pluses** from What I'm looking for, and what the Career
-  record shows the owner has done;
+- **Must-haves and pluses** from What I'm looking for, and what the career
+  entries show the owner has done;
 - **Lessons** from `feedback`: a restored dismissal means that reason was too
   strict, a closed application from your shortlist means that kind of job is
   not wanted;
@@ -76,9 +76,9 @@ For each job you shortlist, and each likely duplicate, check the vacancy:
 - Different: another requisition, level, city or team, or a reopened round
   months later. Same company and title alone prove nothing.
 
-With `jobs_link`, merge a confirmed copy into the record that has the
-application or history, or mark the pair different so the flag stops. When
-unsure, leave both and ask.
+With `jobs_link` (decision same), the copy is job_id and the record to keep,
+the one with the application or history, is other_id: other_id survives.
+Or mark the pair different so the flag stops. When unsure, leave both and ask.
 
 ## 7. Check the result
 
