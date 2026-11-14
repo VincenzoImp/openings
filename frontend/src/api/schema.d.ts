@@ -1784,7 +1784,7 @@ export interface components {
        * Requirements
        * @default []
        */
-      requirements: components["schemas"]["Requirement-Output"][];
+      requirements: components["schemas"]["EmployerRequirement"][];
       /** Status */
       status: string;
       /** Updated At */
@@ -1887,7 +1887,7 @@ export interface components {
        * Requirements
        * @default []
        */
-      requirements: components["schemas"]["Requirement-Output"][];
+      requirements: components["schemas"]["EmployerRequirement"][];
       /** Status */
       status: string;
       /** Updated At */
@@ -1922,7 +1922,7 @@ export interface components {
        */
       required_documents: ("cv" | "letter")[];
       /** Requirements */
-      requirements?: components["schemas"]["Requirement-Input"][];
+      requirements?: components["schemas"]["Requirement"][];
     };
     /** ApplicationPage */
     ApplicationPage: {
@@ -1983,7 +1983,7 @@ export interface components {
        * Requirements
        * @description Replaces the whole requirement list; include existing ids to keep them.
        */
-      requirements?: components["schemas"]["Requirement-Input"][] | null;
+      requirements?: components["schemas"]["Requirement"][] | null;
       /**
        * Status
        * @description applied is Mark applied (applied_at defaults to now); shortlisted again undoes it while the application has no reply, clearing applied_at. Record an employer reply with reply, which sets the stage itself.
@@ -2602,6 +2602,26 @@ export interface components {
       };
       /** Total */
       total: number;
+    } & {
+      [key: string]: unknown;
+    };
+    /** EmployerRequirement */
+    EmployerRequirement: {
+      /** Blocking */
+      blocking: boolean;
+      /** Id */
+      id: string;
+      /** Kind */
+      kind: string;
+      /**
+       * Note
+       * @default
+       */
+      note: string;
+      /** Resolved */
+      resolved: boolean;
+      /** Text */
+      text: string;
     } & {
       [key: string]: unknown;
     };
@@ -3615,7 +3635,7 @@ export interface components {
      * Requirement
      * @description One employer requirement found in a posting or application form.
      */
-    "Requirement-Input": {
+    Requirement: {
       /**
        * Blocking
        * @description True when documents must not be prepared or submitted until it is resolved.
@@ -3657,26 +3677,6 @@ export interface components {
        * @description The requirement as stated.
        */
       text: string;
-    };
-    /** Requirement */
-    "Requirement-Output": {
-      /** Blocking */
-      blocking: boolean;
-      /** Id */
-      id: string;
-      /** Kind */
-      kind: string;
-      /**
-       * Note
-       * @default
-       */
-      note: string;
-      /** Resolved */
-      resolved: boolean;
-      /** Text */
-      text: string;
-    } & {
-      [key: string]: unknown;
     };
     /** ResolvedJob */
     ResolvedJob: {
@@ -4992,7 +4992,6 @@ export interface operations {
   timeline_get_1: {
     parameters: {
       query?: {
-        job_id?: string | null;
         /** @description Only these kinds of entry: note, event (a recorded change) and reply (an employer reply recorded, corrected or removed). Every kind when omitted. */
         kinds?: ("note" | "event" | "reply")[] | null;
         limit?: number;
@@ -5185,9 +5184,7 @@ export interface operations {
   };
   owner_password_update: {
     parameters: {
-      query?: {
-        a?: unknown;
-      };
+      query?: never;
       header?: never;
       path?: never;
       cookie?: never;
@@ -5361,15 +5358,6 @@ export interface operations {
           "application/json": components["schemas"]["Error"];
         };
       };
-      /** @description conflict */
-      409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
       /** @description request_size or file_size */
       413: {
         headers: {
@@ -5412,9 +5400,7 @@ export interface operations {
   };
   backups_list: {
     parameters: {
-      query?: {
-        a?: unknown;
-      };
+      query?: never;
       header?: never;
       path?: never;
       cookie?: never;
@@ -5499,9 +5485,7 @@ export interface operations {
   };
   backups_delete: {
     parameters: {
-      query?: {
-        a?: unknown;
-      };
+      query?: never;
       header?: never;
       path: {
         name: string;
@@ -7273,15 +7257,6 @@ export interface operations {
           "application/json": components["schemas"]["Error"];
         };
       };
-      /** @description conflict */
-      409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
       /** @description request_size or file_size */
       413: {
         headers: {
@@ -8339,7 +8314,6 @@ export interface operations {
   timeline_get: {
     parameters: {
       query?: {
-        application_id?: string | null;
         /** @description Only these kinds of entry: note, event (a recorded change) and reply (an employer reply recorded, corrected or removed). Every kind when omitted. */
         kinds?: ("note" | "event" | "reply")[] | null;
         limit?: number;
@@ -10694,9 +10668,7 @@ export interface operations {
   };
   tokens_list: {
     parameters: {
-      query?: {
-        a?: unknown;
-      };
+      query?: never;
       header?: never;
       path?: never;
       cookie?: never;
@@ -10752,9 +10724,7 @@ export interface operations {
   };
   tokens_create: {
     parameters: {
-      query?: {
-        a?: unknown;
-      };
+      query?: never;
       header?: never;
       path?: never;
       cookie?: never;
@@ -10823,9 +10793,7 @@ export interface operations {
   };
   tokens_revoke: {
     parameters: {
-      query?: {
-        a?: unknown;
-      };
+      query?: never;
       header?: never;
       path: {
         token_id: string;

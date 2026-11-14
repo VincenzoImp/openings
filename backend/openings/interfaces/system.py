@@ -10,7 +10,7 @@ from .. import backups
 from ..auth import COOKIE
 from ..models import Input
 from ..responses import BackupList, Deleted, OperationGrant, PasswordChanged, Token, TokenList
-from .operation import OWNER, WRITE, WS, operation
+from .operation import OWNER, WS, operation
 
 
 class PasswordInput(Input):
@@ -41,7 +41,7 @@ def grant(ws, operation):
     }
 
 
-@operation("POST /backup/grant", access=WRITE, tags=["workspace"])
+@operation("POST /backup/grant", tags=["workspace"])
 def workspace_backup(ws: WS) -> OperationGrant:
     """Reserve a backup download.
 
@@ -51,7 +51,7 @@ def workspace_backup(ws: WS) -> OperationGrant:
     return grant(ws, "backup")
 
 
-@operation("POST /export/grant", access=WRITE, tags=["workspace"])
+@operation("POST /export/grant", tags=["workspace"])
 def workspace_export(ws: WS) -> OperationGrant:
     """Reserve a records export.
 

@@ -19,6 +19,7 @@ parameters, a model's fields flattened beside them, so a call names the same
 fields as the REST path and body. Owner-only operations (``OWNER``) are REST only.
 """
 
+import functools
 import inspect
 from contextvars import ContextVar
 from dataclasses import dataclass
@@ -94,6 +95,29 @@ def operation(*routes, access=READ, tags=(), status=None, open_world=False):
     return register
 
 
+def _owner_only(action):
+    """A dependency that refuses an agent token."""
+
+    def owner_only():
+        require_owner(action)
+
+    return Depends(owner_only)
+
+
+def _endpoint(fn, path):
+    """``fn`` for one route of an operation with several: identifiers that the
+    route's path does not name (``application_id`` on ``/jobs/{job_id}/...``) are
+    left out rather than read from the query string."""
+    signature = inspect.signature(fn)
+    kept = [
+        p for n, p in signature.parameters.items() if not n.endswith("_id") or f"{{{n}}}" in path
+    ]
+    assert not inspect.iscoroutinefunction(fn), "an operation with REST aliases is sync"
+    endpoint = functools.wraps(fn)(lambda *args, **kwargs: fn(*args, **kwargs))
+    endpoint.__signature__ = signature.replace(parameters=kept)
+    return endpoint
+
+
 def bind_rest(router, errors):
     """Add every operation's routes; ``errors(op, path)`` gives its documented errors."""
     for op in OPERATIONS:
@@ -102,7 +126,7 @@ def bind_rest(router, errors):
             name = op.name if index == 0 else f"{op.name}_{index}"
             router.add_api_route(
                 path,
-                op.fn,
+                _endpoint(op.fn, path) if len(op.routes) > 1 else op.fn,
                 methods=[method],
                 name=name,
                 operation_id=name,
@@ -111,9 +135,7 @@ def bind_rest(router, errors):
                 tags=op.tags,
                 responses=errors(op, path),
                 response_model_exclude_unset=True,
-                dependencies=[Depends(lambda a=action: require_owner(a))]
-                if op.access == OWNER
-                else None,
+                dependencies=[_owner_only(action)] if op.access == OWNER else None,
                 openapi_extra={"x-openings-access": op.access},
                 **({"status_code": op.status} if op.status else {}),
             )
