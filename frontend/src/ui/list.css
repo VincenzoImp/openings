@@ -144,6 +144,63 @@
     display: none;
   }
 
+  /* Picked for a bulk action: the check replaces the leading dot. */
+  .ui-row[data-checked] {
+    background: var(--accent-soft);
+  }
+  .ui-row[data-checked] .ui-row-lead {
+    color: var(--accent-text);
+  }
+
+  /* A swipe: the row follows the finger over the action it will run. */
+  .ui-row[data-swipe] {
+    touch-action: pan-y;
+    overflow: hidden;
+  }
+  .ui-row[data-swiping] > .ui-row-main,
+  .ui-row[data-swiping] > .ui-row-end {
+    translate: var(--ui-swipe, 0) 0;
+  }
+  .ui-row[data-swiping] > .ui-row-main {
+    background: var(--bg);
+  }
+  .ui-row-swipe {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    padding: 0 var(--s-5);
+    background: var(--selected);
+    color: var(--text);
+    font: var(--t-sm);
+    font-weight: var(--w-medium);
+  }
+  .ui-row-swipe[data-side="left"] {
+    justify-content: flex-end;
+  }
+
+  /* The bar that replaces the toolbar while rows are selected. */
+  .ui-bulkbar {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    min-width: 0;
+    min-height: var(--detail-bar-h);
+    padding: 0 var(--s-5) 0 var(--pane-pad);
+    border-bottom: 1px solid var(--border);
+    background: var(--accent-soft);
+  }
+  .ui-bulkbar-count {
+    font: var(--t-sm);
+    font-weight: var(--w-semibold);
+    font-variant-numeric: tabular-nums;
+  }
+  .ui-bulkbar-actions {
+    display: flex;
+    gap: var(--s-1);
+  }
+
   /* Touch: the meta stays; actions go to swipe and the long-press menu. */
   @container app (max-width: 719px) {
     .ui-list-head {

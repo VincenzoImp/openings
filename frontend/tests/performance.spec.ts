@@ -30,7 +30,7 @@ async function signIn(page: Page) {
   await page.goto(base + "/");
   await page.locator("input[name=password]").fill("synthetic-browser-password");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(page.locator(".main h1")).toHaveText("Today");
+  await expect(page.locator("h1:visible")).toHaveText("Today");
 }
 
 /**
@@ -41,7 +41,7 @@ async function median(page: Page, href: string, rows: string, label: string) {
   const timings: number[] = [];
   for (let run = 0; run < RUNS; run++) {
     await page.goto(base + "/#today");
-    await expect(page.locator(".main h1")).toHaveText("Today");
+    await expect(page.locator("h1:visible")).toHaveText("Today");
     await page.waitForLoadState("networkidle");
     const elapsed = await page.evaluate(
       ({ href, rows }) =>

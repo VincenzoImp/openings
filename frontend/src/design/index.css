@@ -1,18 +1,21 @@
-/* The dashboard's stylesheet: tokens first, then elements, the shell and one
-   file per component group. Screens add no global styles of their own. */
-@import "./tokens.css";
-@import "./base.css";
-@import "./shell.css";
-@import "./button.css";
-@import "./tag.css";
-@import "./card.css";
-@import "./tabs.css";
-@import "./field.css";
-@import "./feedback.css";
-@import "./dialog.css";
-@import "./library.css";
-@import "./activity.css";
-@import "./data.css";
-@import "./jobs.css";
-@import "./system.css";
-@import "./setup.css";
+/* The old dashboard stylesheet, kept for the screens not yet rebuilt
+   (#222–#227) and deleted in #228. It sits in the `legacy` cascade layer:
+   after the design system's reset and tokens, before its components, so a
+   primitive of src/ui always wins over an old element rule. */
+@layer reset, tokens, legacy, ui, screens;
+@import "./tokens.css" layer(legacy);
+@import "./base.css" layer(legacy);
+@import "./shell.css" layer(legacy);
+@import "./button.css" layer(legacy);
+@import "./tag.css" layer(legacy);
+@import "./card.css" layer(legacy);
+@import "./tabs.css" layer(legacy);
+@import "./field.css" layer(legacy);
+@import "./feedback.css" layer(legacy);
+@import "./dialog.css" layer(legacy);
+@import "./library.css" layer(legacy);
+@import "./activity.css" layer(legacy);
+@import "./data.css" layer(legacy);
+@import "./jobs.css" layer(legacy);
+@import "./system.css" layer(legacy);
+@import "./setup.css" layer(legacy);

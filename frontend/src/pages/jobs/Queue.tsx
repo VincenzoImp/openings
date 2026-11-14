@@ -337,7 +337,7 @@ export function Queue({
               <>
                 <Button onClick={clear}>Clear the filters</Button>
                 {section === "all" && filters.q && (
-                  <a className="btn quiet" href="#collection">
+                  <a className="btn quiet" href="#sources">
                     Add a search for it
                   </a>
                 )}

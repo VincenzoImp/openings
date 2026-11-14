@@ -332,6 +332,7 @@ export function AppFrame({
           <Content
             className="ui-app-content"
             id={preview ? undefined : "content"}
+            tabIndex={preview ? undefined : -1}
           >
             {children}
           </Content>
