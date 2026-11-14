@@ -122,9 +122,9 @@ the PDF. If you write your own documents, you need no template.
 | Replace one Preferences section | `PUT /preferences/{section}` | `preferences_update` |
 | Change a setting | `PATCH /settings` | `settings_update` |
 | Update the profile | `PATCH /career/profile` | `profile_update` |
-| Read or save career entries | `/career/batch` | `career_get`, `career_save` |
-| Save highlights | `POST /career/highlights` | `highlights_save` |
-| Read or save templates | `/templates` | `templates_get`, `templates_save` |
+| Read or save career entries | `GET`, `POST /career/batch` | `career_get`, `career_save` |
+| Save highlights | `POST /career/highlights/batch` | `highlights_save` |
+| Read or save templates | `GET /templates/{template_id}`, `POST /templates/save` | `templates_get`, `templates_save` |
 
 The sections are `looking_for`, `ruled_out`, `facts`, `writing` and
 `working_with_me`. A write replaces the whole section with `{"expected_version": N,

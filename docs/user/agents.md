@@ -98,7 +98,7 @@ sources**. One call that changes many records shares one batch.
 
 - **Jobs › Dismissed** shows the reason and who dismissed each job. Choose
   **Filter › Dismissed by › An agent**, select the jobs and **Restore** them.
-- Job and application **Timelines** label each change with its author.
+- The **History** of a job or application labels each change with its author.
 - Notes the agent writes are marked with its token name.
 - When you correct something the agent did, such as restoring a job it dismissed,
   it reads that as feedback at the start of its next session.
