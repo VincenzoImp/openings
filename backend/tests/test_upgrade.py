@@ -493,6 +493,55 @@ def test_the_archive_keeps_the_policy_whole(upgraded):
     )
 
 
+def _sentences(count, start=0):
+    return " ".join(
+        f"Synthetic rule {n} keeps letters short and specific." for n in range(start, start + count)
+    )
+
+
+def test_split_text_keeps_whole_paragraphs_sentences_and_words_in_order():
+    short = "A short paragraph that fits."
+    long_paragraph = _sentences(60)  # about 3,000 characters, sentences of 50
+    one_long_sentence = " ".join(["word"] * 900)  # 4,499 characters without a full stop
+    text = f"{short}\n\n{long_paragraph}\n\n{one_long_sentence}"
+    pieces = m15.split_text(text)
+    assert all(0 < len(piece) <= m15.PREFERENCE_ITEM_LIMIT for piece in pieces)
+    # Nothing is lost or reordered, and no word is cut.
+    assert " ".join(pieces).split() == text.split()
+    # The short paragraph travels with the first sentences; sentences stay whole.
+    assert pieces[0].startswith(short + "\n\nSynthetic rule 0 ")
+    assert all(piece.endswith(".") for piece in pieces[:2])
+    assert m15.split_text("Fits.") == ["Fits."] and m15.split_text("  ") == []
+
+
+def test_long_preference_texts_become_several_items_within_the_limit(tmp_path):
+    instructions = json.dumps({"general": _sentences(100)})
+    note = _sentences(50, start=100)
+    path = load_fixture(
+        tmp_path / "openings.sqlite",
+        f"UPDATE settings SET data='{instructions}' WHERE key='instructions'; "
+        f"UPDATE policy_items SET note='{note}' WHERE label='Work authorization';",
+    )
+    # The rehearsal reports the items after splitting (scripts/verify_m15.py).
+    verify = runpy.run_path(str(Path(__file__).parents[2] / "scripts" / "verify_m15.py"))
+    assert verify["aggregates"](path)["preference_items_after_splitting"] == {
+        "texts longer than 2000 characters": 2,
+        "items they become": 5,
+        "items longer than 2000 characters after splitting": 0,
+    }
+    Database(path)
+    sections = preferences(path)
+    every = [item for section in sections.values() for item in section[0]]
+    assert every and all(len(item["text"]) <= m15.PREFERENCE_ITEM_LIMIT for item in every)
+    writing = [item for item in sections["writing"][0] if "Synthetic rule" in item["text"]]
+    assert len(writing) == 3 and {item["scope"] for item in writing} == {"all"}
+    assert " ".join(item["text"] for item in writing).split() == _sentences(100).split()
+    facts = [item["text"] for item in sections["facts"][0]]
+    start = next(i for i, text in enumerate(facts) if text.startswith("Work authorization"))
+    held = " ".join(facts[start : start + 2])
+    assert held.endswith(note) and len(facts[start]) <= m15.PREFERENCE_ITEM_LIMIT
+
+
 def test_a_workspace_without_policy_items_keeps_the_default_writing_rule(tmp_path):
     path = load_fixture(
         tmp_path / "openings.sqlite",
