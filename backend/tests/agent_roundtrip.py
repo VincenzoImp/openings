@@ -21,7 +21,6 @@ import json
 import socket
 import sqlite3
 import subprocess
-import sys
 import tempfile
 import threading
 import time
@@ -34,10 +33,8 @@ import uvicorn
 from mcp import Client
 from mcp.client.streamable_http import streamable_http_client
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from document_fixtures import text_pdf  # noqa: E402
-
-from openings.app import create_app  # noqa: E402
+from document_fixtures import text_pdf
+from openings.app import create_app
 
 JOBS = 50
 SHORTLIST = 4
