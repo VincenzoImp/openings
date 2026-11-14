@@ -1,19 +1,13 @@
-"""Proxy-aware sign-in limits, pinned public fetches and single-use operational grants."""
-
-import ipaddress
-import socket
-import threading
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+"""Proxy-aware sign-in limits and single-use operational grants."""
 
 import pytest
 from fastapi.testclient import TestClient
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from conftest import BASE_URL, PASSWORD
-from discovery_fixtures import patch_discovery
+from doubles import Clock
 from openings import __main__ as entrypoint
 from openings.auth import COOKIE, LoginGuard
-from openings.discovery import network
 from openings.errors import DomainError
 
 # --- SEC-3: trusted proxies and sign-in backoff -------------------------------------------
@@ -70,14 +64,6 @@ def test_forwarded_clients_get_their_own_bucket_only_behind_a_trusted_proxy(app)
     assert login(untrusted, "wrong-password", "203.0.113.99").status_code == 429
 
 
-class Clock:
-    def __init__(self):
-        self.value = 1000.0
-
-    def __call__(self):
-        return self.value
-
-
 def test_global_backoff_spaces_attempts_and_clears_on_success():
     clock = Clock()
     guard = LoginGuard(free_failures=3, max_delay=4, max_wait=10, clock=clock)
@@ -102,7 +88,7 @@ def test_global_backoff_spaces_attempts_and_clears_on_success():
     assert refused.value.details["retry_after_seconds"] >= 1
 
     # The queue drains with time, so the owner gets a bounded turn.
-    clock.value += 20
+    clock.advance(20)
     assert guard.admit("192.0.2.1") <= 10
     guard.succeeded()
     assert guard.delay() == 0
@@ -116,7 +102,7 @@ def test_global_backoff_forgets_old_failures_skips_setup_and_bounds_clients():
     guard.failed()
     assert guard.delay() == 1
     assert guard.admit("192.0.2.1", login=False) == 0
-    clock.value += 61
+    clock.advance(61)
     assert guard.delay() == 0
     for index in range(10):
         guard.admit(f"203.0.113.{index}", login=False)
@@ -161,94 +147,6 @@ def test_operational_grants_are_single_use_and_separate_from_sessions(app):
     auth.used_operations.expiries.clear()
     auth.authorize_operation(auth.operation_ticket("backup"), "backup")
     assert len(auth.used_operations.expiries) == 1
-    clock.value += 200
+    clock.advance(200)
     auth.authorize_operation(auth.operation_ticket("backup"), "backup")
     assert len(auth.used_operations.expiries) == 1
-
-
-# --- SEC-4: DNS rebinding ----------------------------------------------------------------
-
-
-@pytest.fixture
-def local_server():
-    seen = []
-
-    class Handler(BaseHTTPRequestHandler):
-        def do_GET(self):
-            seen.append(self.path)
-            if self.path == "/start":
-                self.send_response(302)
-                self.send_header("Location", self.server.redirect)
-                self.end_headers()
-                return
-            body = b"internal"
-            self.send_response(200)
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
-
-        def log_message(self, *args):
-            pass
-
-    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-    server.seen = seen
-    thread = threading.Thread(
-        target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
-    )
-    thread.start()
-    yield server
-    server.shutdown()
-    server.server_close()
-
-
-def synthetic_resolver(monkeypatch, answers):
-    """Return the next scripted address for each lookup of a host."""
-    calls = []
-
-    def resolve(host, port, *args, **kwargs):
-        if host in answers:
-            calls.append(host)
-            address = answers[host].pop(0)
-        else:
-            address = str(ipaddress.ip_address(host))  # the pinned dial itself
-        family = socket.AF_INET6 if ":" in address else socket.AF_INET
-        return [(family, socket.SOCK_STREAM, 6, "", (address, port))]
-
-    monkeypatch.setattr(network.socket, "getaddrinfo", resolve)
-    return calls
-
-
-def test_rebinding_after_the_url_check_is_refused_before_connecting(monkeypatch, local_server):
-    port = local_server.server_address[1]
-    calls = synthetic_resolver(monkeypatch, {"rebind.test": ["93.184.216.34", "127.0.0.1"]})
-    with pytest.raises(DomainError) as refused:
-        network.fetch_bytes(f"http://rebind.test:{port}/secret", budget=network.UNGUARDED)
-    assert refused.value.code == "private_url"
-    assert calls == ["rebind.test", "rebind.test"]
-    assert local_server.seen == []
-
-
-def test_connections_use_the_checked_address(monkeypatch, local_server):
-    port = local_server.server_address[1]
-    # Treat the synthetic server as public; the name itself is unresolvable by the system.
-    patch_discovery(monkeypatch, "is_public_address", lambda address: address == "127.0.0.1")
-    synthetic_resolver(monkeypatch, {"pinned.test": ["127.0.0.1", "127.0.0.1"]})
-    assert (
-        network.fetch_bytes(f"http://pinned.test:{port}/page", budget=network.UNGUARDED)
-        == b"internal"
-    )
-    assert local_server.seen == ["/page"]
-
-
-def test_every_redirect_hop_is_pinned(monkeypatch, local_server):
-    port = local_server.server_address[1]
-    local_server.redirect = f"http://rebind.test:{port}/secret"
-    patch_discovery(monkeypatch, "is_public_address", lambda address: address == "127.0.0.1")
-    synthetic_resolver(
-        monkeypatch,
-        {"start.test": ["127.0.0.1", "127.0.0.1"], "rebind.test": ["127.0.0.1", "10.0.0.8"]},
-    )
-    with pytest.raises(DomainError) as refused:
-        network.fetch_bytes(f"http://start.test:{port}/start", budget=network.UNGUARDED)
-    assert refused.value.code == "private_url"
-    assert local_server.seen == ["/start"]

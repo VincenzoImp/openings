@@ -1,27 +1,11 @@
 import { test, expect, type Page } from "./fixtures";
-import {
-  attachSource,
-  call,
-  go,
-  isPhone,
-  ownerSession,
-  syntheticPdf,
-  type Cookies,
-} from "./session";
+import { attachSource, call, go, isPhone, syntheticPdf } from "./session";
 
 // Applications (#224): the list by stage, Stats, and the application page
 // whose content follows its stage, with the send loop review → send → next.
 // Each test starts from the seeded workspace (fixtures.ts).
-const cookies: Cookies = ownerSession();
-const errors = new WeakMap<Page, string[]>();
 test.beforeEach(async ({ page }) => {
-  errors.set(page, []);
-  page.on("pageerror", (error) => errors.get(page)!.push(error.message));
-  await page.context().addCookies(cookies);
   await go(page, "today");
-});
-test.afterEach(async ({ page }) => {
-  expect(errors.get(page)).toEqual([]);
 });
 
 const unique = (name: string) =>
@@ -342,6 +326,72 @@ test("close as no reply from the page with Undo, and in bulk from the list", asy
     ),
   );
   expect(closed.filter((value) => value === "no_response")).toHaveLength(2);
+});
+
+test("an application is deleted permanently from its page; the job stays", async ({
+  page,
+}) => {
+  const title = unique("Delete me");
+  const app = await make(page, title);
+  await go(page, `applications/${app.id}`);
+  await page
+    .getByRole("button", { name: "More actions" })
+    .filter({ visible: true })
+    .click();
+  await page.getByRole("menuitem", { name: "Delete permanently…" }).click();
+  await expect(dialog(page)).toContainText("The job stays.");
+  await dialog(page)
+    .getByRole("button", { name: "Delete permanently" })
+    .click();
+  await expect(toast(page)).toContainText(`Deleted “${title}”`);
+  await expect(page).toHaveURL(/#applications$/);
+  expect((await call(page, `/applications?q=${title}`)).total).toBe(0);
+  expect((await call(page, `/jobs/${app.job.id}`)).title).toBe(title);
+});
+
+test("a CV's changes from the version before, then its newest version removed", async ({
+  page,
+}) => {
+  const app = await make(page, unique("Two versions"));
+  const revision = async (text: string, previous_id?: string) => {
+    const document = await call(page, "/documents", "POST", {
+      application_id: app.id,
+      kind: "cv",
+      title: "CV",
+      pdf: { name: "cv.pdf", size: 1 },
+      previous_id,
+    });
+    await attachSource(page, document.id, text, "cv");
+    return document;
+  };
+  const first = await revision("Data engineer in Zurich");
+  await revision("Senior data engineer in Basel", first.id);
+  await go(page, `applications/${app.id}`);
+  const cv = page.getByRole("region", { name: "CV", exact: true });
+  await expect(cv).toContainText("Version 2");
+  const actions = async (item: string) => {
+    await cv.getByRole("button", { name: "CV actions" }).click();
+    await page.getByRole("menuitem", { name: item }).click();
+  };
+
+  await actions("Show changes from previous version");
+  const changes = page.getByRole("dialog", { name: "Changes in the cv" });
+  await expect(changes).toContainText("1 added · 1 removed");
+  await expect(changes.getByRole("list", { name: "Changed lines" })).toHaveText(
+    /Removed: Data engineer in Zurich\s*.*Added: Senior data engineer in Basel/,
+  );
+  await changes.getByRole("button", { name: "Close" }).click();
+  await expect(changes).toBeHidden();
+
+  await actions("Remove…");
+  await expect(dialog(page)).toContainText("earlier versions stay");
+  await dialog(page)
+    .getByRole("button", { name: "Remove permanently" })
+    .click();
+  await expect(toast(page)).toContainText("Removed CV version 2");
+  await expect(cv).toContainText("Version 1");
+  const left = await call(page, `/documents?application_id=${app.id}`);
+  expect(left.items.map((item: { id: string }) => item.id)).toEqual([first.id]);
 });
 
 test("the list starts with what needs action and opens the page; Stats has its numbers", async ({

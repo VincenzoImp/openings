@@ -9,8 +9,9 @@ from email.utils import format_datetime
 import httpx
 import pytest
 
-from discovery_fixtures import patch_discovery
+from discovery_fixtures import mock_http, patch_discovery
 from openings.collectors import company
+from openings.collectors.jobspy import JobSpyConfig
 from openings.collectors.policy import (
     MAX_RETRY_AFTER,
     ProviderDeferred,
@@ -30,18 +31,15 @@ from openings.discovery import (
 )
 from openings.discovery.feeds import fetch_postings
 from openings.errors import DomainError
+from openings.posting import matches_filters
 from openings.workspace import Workspace
 
 
 @pytest.fixture
-def collection(tmp_path, monkeypatch):
-    workspace = Workspace(tmp_path / "collection.sqlite")
-    service = DiscoveryService(workspace)
-    workspace.discovery = service
-    patch_discovery(monkeypatch, "public_url", lambda url: url)
+def collection(collection, monkeypatch):
     # Provider sessions connect only to checked addresses; every host is the local test server.
     patch_discovery(monkeypatch, "public_addresses", lambda host, port: ["127.0.0.1"])
-    return workspace, service
+    return collection
 
 
 def policy(service, provider, **changes):
@@ -92,12 +90,7 @@ def test_every_http_attempt_obeys_persisted_cooldown(collection, monkeypatch):
             return httpx.Response(302, headers={"location": "https://example.org/final"})
         return httpx.Response(429, headers={"Retry-After": retry})
 
-    original = httpx.Client
-    monkeypatch.setattr(
-        httpx,
-        "Client",
-        lambda **kwargs: original(**{**kwargs, "transport": httpx.MockTransport(send)}),
-    )
+    mock_http(monkeypatch, send)
     with pytest.raises(ProviderDeferred):
         service.fetch_bytes("https://example.org/start")
     assert len(calls) == 2
@@ -205,17 +198,12 @@ def test_preview_manual_and_worker_share_provider_gate(collection, monkeypatch):
     workspace, service = collection
     policy(service, "greenhouse", min_interval_seconds=0)
     calls = []
-    original = httpx.Client
 
     def send(request):
         calls.append(str(request.url))
         return httpx.Response(429, headers={"Retry-After": "120"})
 
-    monkeypatch.setattr(
-        httpx,
-        "Client",
-        lambda **kwargs: original(**{**kwargs, "transport": httpx.MockTransport(send)}),
-    )
+    mock_http(monkeypatch, send)
     preview = service.preview_source(
         SourcePreview(name="Example", kind="greenhouse", config={"board": "example"})
     )
@@ -254,6 +242,27 @@ def test_feed_unknown_location_is_retained_when_location_filters_are_set(monkeyp
         }
     )
     assert len(rows) == 1 and rows[0]["location"] == ""
+
+
+def test_location_and_title_filters_match_whole_terms():
+    # Remote does not widen a specific geography.
+    filters = {"locations": ["Canada", "Remote"]}
+    for place in ("Remote - USA", "Remote EMEA", "Remote"):
+        assert not matches_filters({"title": "Engineer", "location": place}, filters)
+    for place in ("Toronto, Canada", "Remote Worldwide"):
+        assert matches_filters({"title": "Engineer", "location": place}, filters)
+    assert matches_filters(
+        {"title": "Engineer", "location": "Remote", "metadata": {"eligible_countries": ["Canada"]}},
+        filters,
+    )
+    # Excluded title terms match whole words before the role filters.
+    filters = {"titles": ["engineer", "analyst"], "exclude_titles": ["sales", "SAP"]}
+    assert not matches_filters({"title": "Senior Sales Engineer"}, filters)
+    assert not matches_filters({"title": "SAP CRM Analyst"}, filters)
+    assert matches_filters({"title": "Wholesales Data Engineer"}, filters)
+    assert matches_filters({"title": "Sapling Research Engineer"}, filters)
+    assert not matches_filters({"title": "Sales Director"}, {"exclude_titles": ["sales"]})
+    assert matches_filters({"title": "Backend Engineer"}, {"exclude_titles": []})
 
 
 def test_company_clients_fetch_all_details_and_reuse_complete_cached_bodies():
@@ -327,56 +336,31 @@ def test_a_server_pause_is_at_most_a_day_and_the_owner_can_lift_it(collection):
     service.http_budget("greenhouse").before("GET", "https://boards.greenhouse.io/example")
 
 
-def test_actual_requests_and_curl_transports_bound_bodies_and_record_integer_status(collection):
-    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-
+def test_actual_requests_and_curl_transports_bound_bodies_and_record_integer_status(
+    collection, local_server
+):
     from openings._vendor.jobspy.util import RequestsRotating, TLSRotating
 
     _, service = collection
     policy(service, "manual", min_interval_seconds=0)
-
-    class Handler(BaseHTTPRequestHandler):
-        def log_message(self, *args):
-            pass
-
-        def do_GET(self):
-            content = b'{"ok":true}' if self.path == "/small" else b"x" * (8 * 1024 * 1024 + 1)
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Content-Length", str(len(content)))
-            self.end_headers()
-            try:
-                self.wfile.write(content)
-            except BrokenPipeError, ConnectionResetError:
-                pass
-
-    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-    server_thread = threading.Thread(
-        target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
-    )
-    server_thread.start()
-    try:
-        base = f"http://127.0.0.1:{server.server_address[1]}"
-        for session_class in (RequestsRotating, TLSRotating):
-            budget = service.http_budget("manual")
-            session = session_class()
-            session.transport = budget
-            try:
-                response = session.get(base + "/small")
-                assert response.json() == {"ok": True}
-                assert type(response.status_code) is int and response.status_code == 200
-                with pytest.raises(DomainError) as caught:
-                    session.get(base + "/large")
-                assert caught.value.code == "source_too_large"
-                assert budget.requests == 2
-                assert [row["status"] for row in budget.responses] == [200, 200]
-            finally:
-                session.close()
-        assert service.providers.get("manual")["runtime"]["total_requests"] == 4
-    finally:
-        server.shutdown()
-        server.server_close()
-        server_thread.join(timeout=1)
+    local_server.bodies = {"/small": b'{"ok":true}', "/large": b"x" * (8 * 1024 * 1024 + 1)}
+    base = f"http://127.0.0.1:{local_server.server_address[1]}"
+    for session_class in (RequestsRotating, TLSRotating):
+        budget = service.http_budget("manual")
+        session = session_class()
+        session.transport = budget
+        try:
+            response = session.get(base + "/small")
+            assert response.json() == {"ok": True}
+            assert type(response.status_code) is int and response.status_code == 200
+            with pytest.raises(DomainError) as caught:
+                session.get(base + "/large")
+            assert caught.value.code == "source_too_large"
+            assert budget.requests == 2
+            assert [row["status"] for row in budget.responses] == [200, 200]
+        finally:
+            session.close()
+    assert service.providers.get("manual")["runtime"]["total_requests"] == 4
 
 
 def test_company_partial_rows_survive_detail_failure_and_keep_prior_metadata(
@@ -388,7 +372,6 @@ def test_company_partial_rows_survive_detail_failure_and_keep_prior_metadata(
         SourceCreate(name="Example", kind="bamboohr", config={"board": "example"})
     )
     calls = []
-    original = httpx.Client
 
     def send(request):
         calls.append(str(request.url))
@@ -413,11 +396,7 @@ def test_company_partial_rows_survive_detail_failure_and_keep_prior_metadata(
             )
         return httpx.Response(429, headers={"Retry-After": "90"})
 
-    monkeypatch.setattr(
-        httpx,
-        "Client",
-        lambda **kwargs: original(**{**kwargs, "transport": httpx.MockTransport(send)}),
-    )
+    mock_http(monkeypatch, send)
     queued = service.queue_collection(source["id"])
     task = service.claim_task("worker", "collect")
     service.run_task(task, "worker")
@@ -524,3 +503,15 @@ async def test_slow_mcp_preview_keeps_health_and_other_tools_responsive(app, mon
     finally:
         release.set()
         await task
+
+
+def test_a_search_has_no_country_unless_one_is_chosen():
+    linkedin = JobSpyConfig.model_validate({"query": "engineer", "providers": ["linkedin"]})
+    assert linkedin.country == ""
+    chosen = JobSpyConfig.model_validate(
+        {"query": "engineer", "country": "switzerland", "providers": ["indeed"]}
+    )
+    assert chosen.country == "switzerland"
+    for providers in (["indeed"], ["linkedin", "glassdoor"]):
+        with pytest.raises(ValueError, match="search one country's site"):
+            JobSpyConfig.model_validate({"query": "engineer", "providers": providers})

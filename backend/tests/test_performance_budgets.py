@@ -22,10 +22,10 @@ import time
 import pytest
 from fastapi.testclient import TestClient
 
+from document_fixtures import guided_application
 from large_fixtures import seed_large, seed_signals
 from openings.app import create_app
 from openings.career import EntryCreate, HighlightCreate, TemplateCreate
-from timeline_fixtures import guided_application
 
 pytestmark = pytest.mark.performance
 

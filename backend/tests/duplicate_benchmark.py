@@ -21,17 +21,11 @@ and ``kind`` says why it is still another vacancy:
 - ``collision``: an unrelated employer whose text happens to share a numeric id.
 """
 
-import hashlib
 import random
 from itertools import combinations
 
 from openings.common import now
-from openings.duplicate_signals import (
-    MIN_POSTING_WORDS,
-    job_features,
-    normalize_title,
-    words,
-)
+from openings.duplicate_signals import job_features, words
 from openings.duplicates import DEFAULT_MIN_CONFIDENCE, confidence_tier
 from openings.errors import missing
 from openings.identities import job_identities, normalize_url
@@ -605,12 +599,6 @@ def benchmark_jobs():
     return jobs
 
 
-_LEGACY_LEGAL = frozenset(
-    ["ab", "ag", "as", "bv", "co", "corp", "corporation", "gmbh", "inc", "kg", "limited"]
-    + ["llc", "ltd", "nv", "oy", "plc", "pty", "sa", "sarl", "sas", "se", "spa", "srl"]
-)
-
-
 def true_pairs(labels):
     """Every pair of record ids labelled as the same vacancy."""
     return {
@@ -628,45 +616,6 @@ def precision_recall(groups, labels):
     found, truth = grouped_pairs(groups), true_pairs(labels)
     correct = len(found & truth)
     return (correct / len(found) if found else 1.0), correct / len(truth)
-
-
-def legacy_groups(rows):
-    """The grouping rule before confidence scores, frozen here as the baseline:
-    the same normalized company and title, or identical posting text."""
-    parent = {row["id"]: row["id"] for row in rows}
-
-    def find(item):
-        while parent[item] != item:
-            parent[item] = parent[parent[item]]
-            item = parent[item]
-        return item
-
-    buckets = {}
-    for row in rows:
-        company = words(row["company"])
-        while len(company) > 1 and company[-1] in _LEGACY_LEGAL:
-            company.pop()
-        title = normalize_title(row["title"])
-        if title and company:
-            buckets.setdefault((" ".join(company), title), []).append(row["id"])
-        fingerprint = posting_fingerprint(row["posting"])
-        if fingerprint:
-            buckets.setdefault(fingerprint, []).append(row["id"])
-    for members in buckets.values():
-        for member in members[1:]:
-            parent[find(member)] = find(members[0])
-    groups = {}
-    for row in rows:
-        groups.setdefault(find(row["id"]), []).append(row["id"])
-    return [members for members in groups.values() if len(members) > 1]
-
-
-def posting_fingerprint(posting):
-    """Hash of the posting's words, ignoring case, punctuation and whitespace."""
-    tokens = words((posting or "")[:50_000])
-    if len(tokens) < MIN_POSTING_WORDS:
-        return None
-    return hashlib.sha256(" ".join(tokens).encode()).hexdigest()[:16]
 
 
 def likely_duplicates(workspace, job, min_confidence=DEFAULT_MIN_CONFIDENCE, limit=5):

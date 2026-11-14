@@ -6,43 +6,13 @@ from pathlib import Path
 
 import pytest
 
-from document_fixtures import PDF, tex, text_pdf, upload
-from openings.documents import DocumentCreate
+from document_fixtures import PDF, SOURCE, TEXT, tex, text_pdf, upload
+from openings.documents import DocumentCreate, UploadReservation
 from openings.documents.pdf import pdf_text
 from openings.documents.text import derive_text, revision_text, tokens
 from openings.errors import DomainError
 
 EXAMPLES = Path(__file__).resolve().parents[2] / "examples"
-
-SOURCE = r"""\documentclass{article}
-\usepackage{hyperref}
-\newcommand{\role}[2]{\textbf{#1} \hfill #2}
-\newcommand{\myname}{Alex Example}
-\begin{document}
-{\LARGE \myname}\\[3pt]
-\href{https://example.test}{example.test}
-\section*{Experience}
-\role{Backend Engineer --- Example Cloud}{2021--present}
-\begin{itemize}[leftmargin=*]
-  \item Reduced API p95 latency by 20\% through tracing. % measured on staging
-  \item Built \textcolor{blue}{Python} services for Caf\'e~Example in M\"{u}nchen.
-\end{itemize}
-\vspace{4pt}{\small Skills: Python, SQL.}
-
-Thank you for
-your time.
-\end{document}
-"""
-TEXT = """Alex Example
-example.test
-
-Experience
-Backend Engineer — Example Cloud 2021–present
-• Reduced API p95 latency by 20% through tracing.
-• Built Python services for Café Example in München.
-Skills: Python, SQL.
-
-Thank you for your time."""
 
 
 def sha(data):
@@ -414,3 +384,47 @@ def test_a_retry_returns_only_a_revision_without_files(app, client):
     assert documents.create_document(value)["id"] == first["id"]
     upload(documents, client.put, first["id"], "cv.tex", tex(), "application/x-tex")
     assert documents.create_document(value)["id"] != first["id"]
+
+
+def test_parallel_upload_grants_remain_valid_until_a_revision_is_complete(app, client):
+    workspace, documents = app.state.workspace, app.state.documents
+    job = workspace.ingest_job({"posting": "Build APIs"})
+    application = workspace.create_application({"job_id": job["id"]})
+    doc = documents.create_document(DocumentCreate(application_id=application["id"], kind="other"))
+    grants = [
+        documents.reserve_upload(
+            UploadReservation(owner_type="document", owner_id=doc["id"], name=name, size=3)
+        )
+        for name in ("cv.tex", "cv.txt", "late.txt")
+    ]
+    for grant in grants[:2]:
+        assert client.put(grant["url"], headers=grant["headers"], content=b"abc").status_code == 200
+    current = documents.get_document(doc["id"])
+    assert current["version"] == 3 and len(current["files"]) == 2
+    # The identical completed transfer is a retry, not another mutation.
+    assert (
+        client.put(grants[0]["url"], headers=grants[0]["headers"], content=b"abc").status_code
+        == 200
+    )
+    assert documents.get_document(doc["id"])["version"] == 3
+    # A file of another kind of revision may still be added.
+    assert (
+        client.put(grants[2]["url"], headers=grants[2]["headers"], content=b"abc").status_code
+        == 200
+    )
+    assert len(documents.get_document(doc["id"])["files"]) == 3
+    # A CV is complete once its PDF is stored: a grant reserved before is refused.
+    cv = documents.create_document(
+        DocumentCreate(
+            application_id=application["id"], kind="cv", pdf={"name": "cv.pdf", "size": 8}
+        )
+    )
+    late = documents.reserve_upload(
+        UploadReservation(owner_type="document", owner_id=cv["id"], name="photo.png", size=3)
+    )
+    pdf = cv["uploads"]["pdf"]
+    assert client.put(pdf["url"], headers=pdf["headers"], content=b"%PDF-1.4").status_code == 200
+    assert documents.get_document(cv["id"])["complete"]
+    refused = client.put(late["url"], headers=late["headers"], content=b"abc")
+    assert refused.status_code == 409 and refused.json()["error"]["code"] == "revision_complete"
+    assert len(documents.get_document(cv["id"])["files"]) == 1

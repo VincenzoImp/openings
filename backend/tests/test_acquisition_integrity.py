@@ -3,55 +3,17 @@
 import json
 from urllib.parse import parse_qs, urlsplit
 
-import httpx
-import pytest
-
 from discovery_fixtures import patch_discovery
 from openings.collectors import company
-from openings.collectors.policy import ProviderPatch
-from openings.discovery import DiscoveryService, Filters, SourceCreate, feeds
+from openings.discovery import Filters, SourceCreate, feeds
 from openings.errors import DomainError
-from openings.workspace import Workspace
-
-
-def test_cross_provider_redirect_is_rejected_before_destination_request(tmp_path, monkeypatch):
-    workspace = Workspace(tmp_path / "gate.sqlite")
-    discovery = DiscoveryService(workspace)
-    discovery.update_provider("manual", ProviderPatch(expected_version=1, min_interval_seconds=0))
-    discovery.update_provider("linkedin", ProviderPatch(expected_version=1, enabled=False))
-    patch_discovery(monkeypatch, "public_url", lambda url: url)
-    calls = []
-    target = "https://www.linkedin.com/jobs/view/123"
-
-    def send(request):
-        calls.append(str(request.url))
-        return httpx.Response(302, headers={"location": target})
-
-    original = httpx.Client
-    monkeypatch.setattr(
-        httpx,
-        "Client",
-        lambda **kwargs: original(**{**kwargs, "transport": httpx.MockTransport(send)}),
-    )
-    with pytest.raises(DomainError) as error:
-        discovery.fetch_bytes("https://example.org/alias")
-    assert error.value.code == "provider_redirect" and target in error.value.message
-    assert calls == ["https://example.org/alias"]
-    assert discovery.providers.get("linkedin")["runtime"]["total_requests"] == 0
-    # The requests/curl transport uses the identical per-attempt check.
-    with pytest.raises(DomainError):
-        discovery.http_budget("manual").request(
-            lambda *args, **kwargs: pytest.fail("must not send"), "GET", target
-        )
 
 
 def test_detail_refresh_rotates_across_pages_and_sources_without_material_timestamp(
-    tmp_path, monkeypatch
+    collection, monkeypatch
 ):
     # Workday lists 20 rows per page, so 21 jobs span two pages.
-    workspace = Workspace(tmp_path / "fresh.sqlite")
-    discovery = DiscoveryService(workspace)
-    workspace.discovery = discovery
+    workspace, discovery = collection
     board = "example.wd5.myworkdayjobs.com/Careers"
     config = {"board": board, "max_results": 21}
     source = discovery.create_source(SourceCreate(name="Example", kind="workday", config=config))
@@ -133,9 +95,8 @@ def test_detail_refresh_rotates_across_pages_and_sources_without_material_timest
     assert job_of(1)["posting"] == text[0]
 
 
-def test_greenhouse_filters_metadata_before_bounded_detail_requests(tmp_path, monkeypatch):
-    workspace = Workspace(tmp_path / "greenhouse.sqlite")
-    discovery = DiscoveryService(workspace)
+def test_greenhouse_filters_metadata_before_bounded_detail_requests(collection, monkeypatch):
+    workspace, discovery = collection
     source = discovery.create_source(
         SourceCreate(
             name="Example",
@@ -174,10 +135,9 @@ def test_greenhouse_filters_metadata_before_bounded_detail_requests(tmp_path, mo
 
 
 def test_collection_retains_other_results_and_bounds_identity_conflict_report(
-    tmp_path, monkeypatch
+    collection, monkeypatch
 ):
-    workspace = Workspace(tmp_path / "conflicts.sqlite")
-    discovery = DiscoveryService(workspace)
+    workspace, discovery = collection
     source = discovery.create_source(
         SourceCreate(name="Example", kind="bamboohr", config={"board": "example"})
     )
@@ -201,10 +161,9 @@ def test_collection_retains_other_results_and_bounds_identity_conflict_report(
 
 
 def test_later_listing_page_failure_stages_metadata_without_archiving_empty_jobs(
-    tmp_path, monkeypatch
+    collection, monkeypatch
 ):
-    workspace = Workspace(tmp_path / "partial-pages.sqlite")
-    discovery = DiscoveryService(workspace)
+    workspace, discovery = collection
     source = discovery.create_source(
         SourceCreate(
             name="Example",
