@@ -50,8 +50,7 @@ def grant(ws, operation):
 def workspace_backup(ws: WS) -> OperationGrant:
     """Reserve a backup download; take one before any permanent bulk clean-up.
 
-    A two-minute GET grant (curl line given). An agent's backup leaves out the password
-    hash, session secret and tokens.
+    A two-minute GET grant (curl line given). An agent's copy holds no credentials.
     """
     return with_curl(grant(ws, "backup"), "openings-backup.sqlite")
 

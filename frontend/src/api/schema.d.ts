@@ -254,7 +254,7 @@ export interface paths {
     put?: never;
     /**
      * Reserve a backup download; take one before any permanent bulk clean-up.
-     * @description A two-minute GET grant (curl line given). An agent's backup leaves out the password hash, session secret and tokens.
+     * @description A two-minute GET grant (curl line given). An agent's copy holds no credentials.
      */
     post: operations["workspace_backup"];
     delete?: never;
@@ -488,7 +488,7 @@ export interface paths {
     put?: never;
     /**
      * Add, update or approve up to 100 highlights.
-     * @description Reusable wording on a career entry (career_id). highlight_id with expected_version updates. always_include puts it in every CV unless the job gives a reason not to.
+     * @description Reusable wording on a career entry (career_id). highlight_id with expected_version updates. always_include: use it in every CV unless the job argues against it.
      */
     post: operations["highlights_save"];
     delete?: never;
@@ -1480,7 +1480,7 @@ export interface paths {
     put?: never;
     /**
      * Fetch a saved source now, or preview (preview true) what a source would collect.
-     * @description Preview a saved source (source_id) or an unsaved one (url, kind, config); nothing is stored. Through the provider gate.
+     * @description Preview a saved source (source_id) or an unsaved one (url, kind, config); nothing is stored.
      */
     post: operations["sources_run"];
     delete?: never;
