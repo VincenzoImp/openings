@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { FileCode2, Pencil } from "lucide-react";
-import { Button } from "../../ui/Button";
+import {
+  Button,
+  EmptyState,
+  LeaveDialog,
+  SaveBar,
+  isModKey,
+  useToast,
+} from "../../ui";
 import { CodeEditor, CodeView } from "../../ui/CodeView";
-import { EmptyState } from "../../ui/Page";
-import { LeaveDialog, SaveBar } from "../../ui/ReadEdit";
-import { isModKey } from "../../ui/keys";
-import { useToast } from "../../ui/Toast";
 import { ConflictNotice } from "../../query/ConflictNotice";
 import { isConflict } from "../../query/mutation";
 import { useUpdateTemplate, type Template } from "../../query/templates";

@@ -11,15 +11,22 @@ import {
   Trash2,
 } from "lucide-react";
 import { save } from "../../api/client";
+import {
+  Button,
+  IconButton,
+  ConfirmDialog,
+  Dialog,
+  Field,
+  Input,
+  formatDate,
+  MetaLine,
+  SkeletonRows,
+  DetailBar,
+  DetailBody,
+  Tabs,
+  useToast,
+} from "../../ui";
 import { SheetMenu } from "../../ui/ActionSheet";
-import { Button, IconButton } from "../../ui/Button";
-import { ConfirmDialog, Dialog } from "../../ui/Dialog";
-import { Field, Input } from "../../ui/Field";
-import { formatDate } from "../../ui/format";
-import { MetaLine, SkeletonRows } from "../../ui/Page";
-import { DetailBar, DetailBody } from "../../ui/Split";
-import { Tabs } from "../../ui/Tabs";
-import { useToast } from "../../ui/Toast";
 import {
   useDeleteTemplate,
   useDuplicateTemplate,

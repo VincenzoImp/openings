@@ -6,11 +6,8 @@ import {
   type PointerEvent,
 } from "react";
 import { Ellipsis, GripVertical, Pencil, Trash2 } from "lucide-react";
-import { Button, IconButton } from "../../ui/Button";
+import { Button, IconButton, Segmented, Tag, type MenuEntry } from "../../ui";
 import { SheetMenu } from "../../ui/ActionSheet";
-import { Segmented } from "../../ui/Tabs";
-import { Tag } from "../../ui/Badge";
-import type { MenuEntry } from "../../ui/Menu";
 import type { Scope, SectionName, Statement } from "../../query/preferences";
 import { SCOPES, SECTIONS, itemName, scopeLabels } from "./model";
 
