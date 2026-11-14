@@ -14,23 +14,14 @@ from fastapi.staticfiles import StaticFiles
 from mcp.server.transport_security import TransportSecuritySettings
 
 from . import __version__, backups
-from .activity import ActivityService
-from .actors import SYSTEM, acting_as
-from .agent_requests import RequestService
+from .actors import SYSTEM, acting_as, batch
 from .auth import Auth, LoginGuard
 from .career import CareerService
 from .discovery import DiscoveryService
 from .documents import DocumentService
 from .errors import DomainError
+from .events import EventLog
 from .insights import InsightsService
-from .interfaces.activity import (
-    register_api as register_activity_api,
-    register_mcp as register_activity_mcp,
-)
-from .interfaces.agent_requests import (
-    register_api as register_request_api,
-    register_mcp as register_request_mcp,
-)
 from .interfaces.career import (
     register_api as register_career_api,
     register_mcp as register_career_mcp,
@@ -43,6 +34,10 @@ from .interfaces.discovery import (
 from .interfaces.documents import (
     register_api as register_document_api,
     register_mcp as register_document_mcp,
+)
+from .interfaces.events import (
+    register_api as register_events_api,
+    register_mcp as register_events_mcp,
 )
 from .interfaces.insights import (
     register_api as register_insights_api,
@@ -69,7 +64,6 @@ from .limits import REQUEST_LIMIT, BodyLimit
 from .mcp_server import OpeningsMCP
 from .outcomes import ResponseService
 from .preferences import PreferencesService
-from .skill_notes import SkillNotesService
 from .skills import SkillLibrary
 from .source_yield import YieldService
 from .worker import Worker
@@ -92,8 +86,7 @@ def create_app(database=None, start_worker=True):
     career = CareerService(workspace)
     documents = DocumentService(workspace)
     discovery = DiscoveryService(workspace)
-    activity = ActivityService(workspace)
-    requests = RequestService(workspace)
+    events = EventLog(workspace)
     preferences = PreferencesService(workspace)
     responses = ResponseService(workspace)
     insights = InsightsService(workspace)
@@ -109,19 +102,17 @@ def create_app(database=None, start_worker=True):
     # Tools, prompts and resources never change at runtime, so no notification
     # stream is offered: every exchange stays one request and one JSON response.
     mcp = OpeningsMCP("Openings", version=__version__, subscriptions=False)
-    register_core_mcp(mcp, workspace, requests)
+    register_core_mcp(mcp, workspace)
     register_career_mcp(mcp, career)
     register_document_mcp(mcp, documents)
     register_discovery_mcp(mcp, discovery)
-    register_activity_mcp(mcp, activity)
-    register_request_mcp(mcp, requests)
+    register_events_mcp(mcp, events)
     register_preferences_mcp(mcp, preferences)
     register_response_mcp(mcp, responses)
     register_insights_mcp(mcp, insights)
     register_yield_mcp(mcp, source_yield)
     skills = SkillLibrary()
-    skill_notes = SkillNotesService(workspace, skills)
-    register_skills_mcp(mcp, skills, skill_notes)
+    register_skills_mcp(mcp, skills)
 
     @asynccontextmanager
     async def lifespan(app):
@@ -145,9 +136,8 @@ def create_app(database=None, start_worker=True):
     )
     app.state.workspace, app.state.auth, app.state.mcp = workspace, auth, mcp
     app.state.career, app.state.documents, app.state.discovery = career, documents, discovery
-    app.state.activity, app.state.requests = activity, requests
+    app.state.events = events
     app.state.preferences = preferences
-    app.state.skill_notes = skill_notes
     app.state.responses, app.state.insights = responses, insights
     app.state.source_yield = source_yield
     app.add_middleware(BodyLimit)
@@ -210,7 +200,8 @@ def create_app(database=None, start_worker=True):
                 request.scope["path"] = "/mcp/"
                 request.scope["raw_path"] = request.scope.get("raw_path", b"/mcp") + b"/"
             # Handlers, offloaded threads and MCP tools inherit the actor from this context.
-            with acting_as(actor):
+            # Every change of one request shares one batch id.
+            with acting_as(actor), batch():
                 async with semaphore:
                     response = await call_next(request)
             if sign_in:
@@ -271,13 +262,12 @@ def create_app(database=None, start_worker=True):
 
     register_system(router, mcp, workspace, auth, public_url)
 
-    register_core(router, workspace, requests)
-    register_skills_api(router, skills, skill_notes)
+    register_core(router, workspace)
+    register_skills_api(router, skills)
     register_career_api(router, career)
     register_document_api(router, documents)
     register_discovery_api(router, discovery)
-    register_activity_api(router, activity)
-    register_request_api(router, requests)
+    register_events_api(router, events)
     register_preferences_api(router, preferences)
     register_response_api(router, responses)
     register_insights_api(router, insights)

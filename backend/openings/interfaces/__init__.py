@@ -7,12 +7,11 @@ and the interface tests.
 """
 
 from . import (
-    activity,
-    agent_requests,
     career,
     core,
     discovery,
     documents,
+    events,
     insights,
     outcomes,
     preferences,
@@ -28,8 +27,7 @@ AREAS = (
     career,
     documents,
     discovery,
-    activity,
-    agent_requests,
+    events,
     preferences,
     outcomes,
     insights,

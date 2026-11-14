@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from .. import events
 from ..common import check_version, decode_record, encode, new_id, now
 from ..errors import missing
 from ..idempotency import fingerprint, remember, replay
@@ -102,7 +103,7 @@ class EntryOperations:
                 timestamp,
             ),
         )
-        self._record(conn, "knowledge_created", "knowledge", record_id, kind=value.kind)
+        events.record(conn, "knowledge_created", ("knowledge", record_id), {"kind": value.kind})
         remember(conn, "knowledge", value.idempotency_key, digest, record_id)
         return record_id
 
@@ -141,13 +142,14 @@ class EntryOperations:
                         knowledge_id,
                     ),
                 )
-                self._record(
+                events.record(
                     conn,
                     "knowledge_updated",
-                    "knowledge",
-                    knowledge_id,
-                    fields=[key for key in fields if previous[key] != merged[key]],
-                    version=row["version"] + 1,
+                    ("knowledge", knowledge_id),
+                    {
+                        "fields": [key for key in fields if previous[key] != merged[key]],
+                        "version": row["version"] + 1,
+                    },
                 )
         return self.get_knowledge(knowledge_id)
 
@@ -158,6 +160,6 @@ class EntryOperations:
                 _get(conn, "knowledge", knowledge_id, "Career knowledge"), expected_version
             )
             conn.execute("DELETE FROM knowledge WHERE id=?", (knowledge_id,))
-            self._record(conn, "knowledge_deleted", "knowledge", knowledge_id)
+            events.record(conn, "knowledge_deleted", ("knowledge", knowledge_id))
         self.db.collect_blobs()
         return {"deleted": True, "id": knowledge_id}

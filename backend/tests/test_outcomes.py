@@ -60,7 +60,7 @@ def test_responses_are_recorded_corrected_and_removed_for_a_sent_application(wor
                 "idempotency_key": "k1",
             },
         )
-    assert first["created_by"]["token_kind"] == "agent" and first["version"] == 1
+    assert first["created_by"] == "agent:Synthetic agent" and first["version"] == 1
     # A retry of the same request with the same key returns the same response; another
     # use of the key is refused.
     assert (
@@ -114,7 +114,7 @@ def test_responses_are_recorded_corrected_and_removed_for_a_sent_application(wor
 
     # Events name the response, never its note.
     events = workspace.db.all(
-        "SELECT kind,payload,subject_type,actor_token_kind FROM events WHERE subject_type='response' ORDER BY created_at"
+        "SELECT kind,payload,subject_type,actor FROM events WHERE subject_type='response' ORDER BY created_at"
     )
     assert [event["kind"] for event in events] == [
         "response_added",
@@ -123,7 +123,7 @@ def test_responses_are_recorded_corrected_and_removed_for_a_sent_application(wor
         "response_edited",
         "response_removed",
     ]
-    assert events[0]["actor_token_kind"] == "agent"
+    assert events[0]["actor"] == "agent:Synthetic agent"
     assert json.loads(events[3]["payload"]) == {"fields": ["date", "note"], "version": 2}
     assert "references" not in json.dumps([event["payload"] for event in events]).lower()
     assert "Second round" not in json.dumps([event["payload"] for event in events])

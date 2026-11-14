@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from .. import events
 from ..common import check_version, decode_record, encode, new_id, now
 from ..errors import missing
 from ..idempotency import fingerprint, remember, replay
@@ -98,7 +99,7 @@ class TemplateOperations:
                 timestamp,
             ),
         )
-        self._record(conn, "template_created", "template", record_id, kind=value.kind)
+        events.record(conn, "template_created", ("template", record_id), {"kind": value.kind})
         return record_id
 
     def update_template(self, template_id: str, value: TemplateUpdate) -> dict:
@@ -117,13 +118,11 @@ class TemplateOperations:
                 if previous[key] != merged[key]
             ]
             if changed:
-                self._record(
+                events.record(
                     conn,
                     "template_updated",
-                    "template",
-                    template_id,
-                    fields=changed,
-                    version=row["version"] + 1,
+                    ("template", template_id),
+                    {"fields": changed, "version": row["version"] + 1},
                 )
                 if merged["is_default"]:
                     conn.execute(
@@ -151,7 +150,7 @@ class TemplateOperations:
             row = _get(conn, "templates", template_id, "Template")
             check_version(row, expected_version)
             conn.execute("DELETE FROM templates WHERE id=?", (template_id,))
-            self._record(conn, "template_deleted", "template", template_id)
+            events.record(conn, "template_deleted", ("template", template_id))
             if row["is_default"]:
                 other = conn.execute(
                     "SELECT id FROM templates WHERE kind=? ORDER BY created_at,id LIMIT 1",

@@ -3,6 +3,7 @@
 import json
 import math
 
+from .. import events
 from ..actors import current_actor
 from ..common import check_version, new_id, now
 from ..db import encode
@@ -36,12 +37,12 @@ class ApplicationChanges:
             connection.execute("DELETE FROM applications WHERE id=?", (application_id,))
             if collect:
                 collect_unused(connection)
-            self.event(
+            events.record(
+                connection,
                 "application_deleted",
-                row["job_id"],
-                payload={"application_id": application_id},
-                conn=connection,
                 subject=("application", application_id),
+                payload={"application_id": application_id},
+                job_id=row["job_id"],
             )
         return {"deleted": True, "id": application_id}
 
@@ -82,7 +83,13 @@ class ApplicationChanges:
                 "UPDATE jobs SET triage='saved',version=version+1,updated_at=? WHERE id=?",
                 (stamp, value.job_id),
             )
-            self.event("application_created", value.job_id, record_id, {"status": "draft"}, c)
+            events.record(
+                c,
+                "application_created",
+                payload={"status": "draft"},
+                job_id=value.job_id,
+                application_id=record_id,
+            )
         return self.get_application(record_id)
 
     @staticmethod
@@ -202,12 +209,12 @@ class ApplicationChanges:
                     + ",version=version+1,updated_at=? WHERE id=?",
                     (*actual.values(), now(), application_id),
                 )
-                self.event(
-                    "application_updated",
-                    row["job_id"],
-                    application_id,
-                    {"from": row["status"], "to": status, "fields": list(actual)},
+                events.record(
                     c,
+                    "application_updated",
+                    payload={"from": row["status"], "to": status, "fields": list(actual)},
+                    job_id=row["job_id"],
+                    application_id=application_id,
                 )
                 # Ready is a judgement on a Preparing attempt without blocking requirements.
                 if status != "draft":
@@ -297,7 +304,12 @@ class ApplicationChanges:
                     "UPDATE applications SET ready_at=?,ready_by_kind=?,ready_by_id=?,ready_by_name=?,ready_by_token_kind=?,version=version+1,updated_at=? WHERE id=?",
                     (stamp, *current_actor().columns(), stamp, application_id),
                 )
-                self.event("application_marked_ready", row["job_id"], application_id, conn=c)
+                events.record(
+                    c,
+                    "application_marked_ready",
+                    job_id=row["job_id"],
+                    application_id=application_id,
+                )
         return self.get_application(application_id, compact_job=True)
 
     def clear_ready(self, conn, application_id, reason):
@@ -315,12 +327,12 @@ class ApplicationChanges:
             "UPDATE applications SET ready_at=NULL,ready_by_kind=NULL,ready_by_id=NULL,ready_by_name=NULL,ready_by_token_kind=NULL,version=version+1,updated_at=? WHERE id=?",
             (now(), application_id),
         )
-        self.event(
-            "application_ready_cleared",
-            row["job_id"],
-            application_id,
-            {"reason": reason, "automatic": reason != "unmarked"},
+        events.record(
             conn,
+            "application_ready_cleared",
+            payload={"reason": reason, "automatic": reason != "unmarked"},
+            job_id=row["job_id"],
+            application_id=application_id,
         )
         return True
 

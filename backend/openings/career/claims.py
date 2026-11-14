@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from .. import events
 from ..common import check_version, encode, new_id, now
 from ..errors import missing
 from ..idempotency import fingerprint, remember, replay
@@ -93,13 +94,11 @@ class ClaimOperations:
                 timestamp,
             ),
         )
-        self._record(
+        events.record(
             conn,
             "claim_created",
-            "claim",
-            record_id,
-            knowledge_id=value.knowledge_id,
-            approved=value.approved,
+            ("claim", record_id),
+            {"knowledge_id": value.knowledge_id, "approved": value.approved},
         )
 
     def update_claim(self, claim_id: str, value: ClaimUpdate) -> dict:
@@ -127,14 +126,15 @@ class ClaimOperations:
                 if previous[key] != merged[key]
             ]
             if changed:
-                self._record(
+                events.record(
                     conn,
                     "claim_updated",
-                    "claim",
-                    claim_id,
-                    knowledge_id=merged["knowledge_id"],
-                    fields=changed,
-                    version=row["version"] + 1,
+                    ("claim", claim_id),
+                    {
+                        "knowledge_id": merged["knowledge_id"],
+                        "fields": changed,
+                        "version": row["version"] + 1,
+                    },
                 )
                 conn.execute(
                     'UPDATE claims SET knowledge_id=?,text=?,approved=?,position=?,default_in_cv=?,role=?,"group"=?,metadata=?,version=version+1,updated_at=? WHERE id=?',
@@ -159,5 +159,7 @@ class ClaimOperations:
             row = _get(conn, "claims", claim_id, "Claim")
             check_version(row, expected_version)
             conn.execute("DELETE FROM claims WHERE id=?", (claim_id,))
-            self._record(conn, "claim_deleted", "claim", claim_id, knowledge_id=row["knowledge_id"])
+            events.record(
+                conn, "claim_deleted", ("claim", claim_id), {"knowledge_id": row["knowledge_id"]}
+            )
         return {"deleted": True, "id": claim_id}

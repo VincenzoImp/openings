@@ -1,16 +1,16 @@
-"""Shipped agent workflow skills, served read-only over REST and MCP.
+"""Shipped agent workflow skills, served read-only and unchanged over REST and MCP.
 
-A served ``SKILL.md`` ends with the workspace's local notes for that skill
-(``skill_notes.serve``); reference files are served as shipped.
+Each ``SKILL.md`` front matter names the skill (``name``, ``description``) and
+says, for the dashboard's "What you can ask your agent" list, what the owner can
+ask in plain words: ``title``, a one-sentence ``summary`` and an ``example``
+phrase.
 """
 
 import os
 import re
 from pathlib import Path
 
-from . import skill_notes
 from .errors import DomainError
-from .skill_notes import SkillNotesService
 
 FRONTMATTER = re.compile(r"\A---\n(.*?)\n---\n", re.DOTALL)
 HEADING = re.compile(r"^#{1,6}\s+(.+?)\s*#*\s*$", re.MULTILINE)
@@ -67,6 +67,9 @@ class SkillLibrary:
             items.append(
                 {
                     "name": fields.get("name", root.name),
+                    "title": fields.get("title", ""),
+                    "summary": fields.get("summary", ""),
+                    "example": fields.get("example", ""),
                     "description": fields.get("description", ""),
                     "files": files,
                     "file_details": details,
@@ -92,25 +95,12 @@ class SkillLibrary:
         }
 
 
-def list_skills(library: SkillLibrary, notes: SkillNotesService) -> dict:
-    """Every shipped skill with its reference files and the version of its local notes."""
-    summaries = notes.summaries()
-    items = [{**item, "local_notes": summaries.get(item["name"])} for item in library.list()]
+def list_skills(library: SkillLibrary) -> dict:
+    """Every shipped skill with what the owner can ask and its reference files."""
+    items = library.list()
     return {"items": items, "total": len(items)}
 
 
-def read_skill(
-    library: SkillLibrary,
-    notes: SkillNotesService,
-    name: str,
-    path: str = SKILL_FILE,
-    local_notes: bool = True,
-) -> dict:
-    """A skill file as served: SKILL.md ends with the local notes unless local_notes is false."""
-    result = library.read(name, path)
-    note = notes.current(name) if result["path"] == SKILL_FILE else None
-    if note and local_notes:
-        result["content"] = skill_notes.serve(result["content"], note)
-    if note:
-        note = {key: value for key, value in note.items() if key != "text"}
-    return {**result, "local_notes": note}
+def read_skill(library: SkillLibrary, name: str, path: str = SKILL_FILE) -> dict:
+    """A skill file as shipped."""
+    return library.read(name, path)

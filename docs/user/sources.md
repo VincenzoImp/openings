@@ -175,7 +175,7 @@ saved search and company board brought: the jobs it **Collected** first, how
 many are still **To review**, **Shortlisted** (kept, including those with an
 application of any outcome), **Applied** to, with employer **Answers** (and
 interviews), and **Dismissed**, split by who dismissed them: an agent, you, or
-other (dismissals without a record). Each job counts once, for the source that found it first, so the
+the system (including dismissals without a record). Each job counts once, for the source that found it first, so the
 rows add up to the total; jobs you added yourself and jobs of a removed source
 have a row of their own. A search also shows how many of its jobs came from each
 job board.

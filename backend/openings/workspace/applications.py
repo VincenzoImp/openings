@@ -1,8 +1,9 @@
 """Application reads: derived readiness, preparation summaries, lists and history."""
 
-from ..actors import pop_actor
+from ..actors import label_of
 from ..db import decode_record
 from ..errors import DomainError, missing
+from ..events import event_record
 from ..models import OUTCOMES
 from ..outcomes import last_responses, no_reply_cutoff, no_reply_period, responses_of
 from ..staleness import application_staleness, stale_summary
@@ -78,7 +79,10 @@ class ApplicationReads:
     @staticmethod
     def _ready_by(row):
         """Replace the stored actor columns with who marked the application ready."""
-        marked_by = pop_actor(row, "ready_by")
+        marked_by = label_of(
+            *(row.pop(f"ready_by_{name}") for name in ("kind", "name", "token_kind"))
+        )
+        row.pop("ready_by_id")
         row["ready_by"] = marked_by if row["ready_at"] else None
         return row
 
@@ -250,7 +254,7 @@ class ApplicationReads:
     def application_events(self, application_id):
         self.get_application(application_id)
         rows = [
-            self.event_record(r)
+            event_record(r)
             for r in self.db.all(
                 "SELECT * FROM events WHERE application_id=? ORDER BY created_at DESC",
                 (application_id,),

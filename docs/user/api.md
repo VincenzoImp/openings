@@ -6,8 +6,7 @@ for fields. All normal data operations require an owner session or bearer token.
 
 Create a token in **Settings** and store it outside source control. A token is
 an **owner** token (full access) or an **agent** token, which is refused with
-`403 forbidden` for the owner password, token management, restore, answering
-a question and writing or withdrawing a request (see
+`403 forbidden` for the owner password, token management and restore (see
 [token kinds](agents.md#token-kinds)). `POST /tokens` takes
 `{"name": "...", "kind": "agent"}`; `kind` defaults to `agent`. Tokens can be
 revoked independently. Browser session writes also need
@@ -45,8 +44,8 @@ Paste the posting when extraction cannot obtain the complete text.
 | Tasks | `GET /tasks`, `GET /tasks/{id}`, `POST /tasks/{id}/cancel` or `/retry` |
 | Documents | `GET/POST /contexts`, `GET /contexts/{id}`, `GET/POST /documents`, `GET/DELETE /documents/{id}`, `GET /documents/{id}/comparison`, `POST /documents/{id}/review` |
 | Files | `GET /files`, `GET/DELETE /files/{id}`, `GET /files/{id}/content`, `POST /files/uploads`, `POST /files/{id}/download` |
-| Agent activity | `GET /events`; `GET/POST /runs`, `GET/PATCH /runs/{id}`, `POST /runs/{id}/finish`; `GET/POST /questions`, `GET /questions/{id}`, `POST /questions/{id}/answer`, `POST /questions/{id}/withdraw`; `GET/POST /requests`, `GET /requests/{id}`, `POST /requests/{id}/take`, `/complete`, `/decline`, `/withdraw` |
-| Skills | `GET /skills`, `GET /skills/{name}`, `GET /skills/{name}/files/{path}`, `GET/PUT /skills/{name}/notes` |
+| Change log | `GET /events` |
+| Skills | `GET /skills`, `GET /skills/{name}`, `GET /skills/{name}/files/{path}` |
 | Operations | `GET /workspace`, `/capabilities`, `/overview`, `/export`, `/backup`; `POST /backup/restore`; `/tokens`; `POST /auth/password` |
 
 Paged list routes take bounded `limit` and `offset` and return `items`, `total`,
@@ -109,8 +108,11 @@ For Shortlist use `{"expected_version":3,"triage":"saved"}`; `inbox` returns a
 job without attempts to review and `dismissed` remembers it outside active review.
 A dismissal takes an optional `reason` (at most 500 characters), as does the
 `dismissed` action of `POST /jobs/bulk`. Every job read carries `dismissal`
-(null unless dismissed): `at`, `by` (the actor), `category` (`agent`, `owner`
-or `other`) and `reason`. Restoring a job clears it. Nothing dismisses a job
+(null unless dismissed): `at`, `by` (the actor label, or null), `category`
+(`agent`, `owner` or `system`) and `reason`. Restoring a job clears it.
+`GET /jobs` filters dismissed jobs with `dismissed_by` (`owner`, `agent`,
+`system` or `agent:<token name>`), `batch_id` and `since` (dismissed at or after
+a time); `POST /jobs/bulk` with action `inbox` restores a selection. Nothing dismisses a job
 automatically.
 
 ### Ingest signals
@@ -140,7 +142,7 @@ dismiss one. `computed: false` marks a job whose signals are still being compute
 
 `GET /jobs` filters on them: `signal=likely_duplicate|no_longer_listed|language_required|pending`,
 `posting_language=de`, `posting_language_not=en`, `requires=de` (codes or names
-such as `German`), `dismissed_by=agent|owner|other` and `sort=dismissed` (most
+such as `German`), `dismissed_by=agent|owner|system` (or `agent:<token name>`) and `sort=dismissed` (most
 recently dismissed first). `hide_unspoken_required=true` leaves out jobs whose
 required languages are outside the `spoken_languages` setting (a job is left
 out when one required group has no spoken language); with `true` or `false`
@@ -155,7 +157,7 @@ Whether a company board still lists a posting is `signals.no_longer_listed`.
 source (`items`, with `source_id`, `name`, `kind`, `providers` for searches) and
 in `total`: `collected`, `to_review`, `shortlisted`, `applied`, `responded`,
 `interviews`, `offers`, `dismissed`, `dismissed_by` (`agent`, `owner`,
-`other`), `likely_duplicates`, `no_longer_listed` and
+`system`), `likely_duplicates`, `no_longer_listed` and
 `kept_rate` (shortlisted over collected; `null` with `withheld:
 "too_few_collected"` below `min_sample`). Each job counts once, for the source that collected it first and
 by the time it was added; jobs added by hand or by a removed source have a row
@@ -279,7 +281,7 @@ rules belong in Preferences, and `rules.statements` is refused.
 ## Notes and the timeline
 
 A note belongs to a job, or to one of its applications when `application_id` is
-given. It records its `author` and, for a token with an open run, that `run`.
+given. It records its `author` as an actor label.
 `pinned: true` pins it on creation; `POST /notes/{id}/pin` with
 `{"expected_version": N, "pinned": true}` pins an existing note and `false`
 unpins it. A job and an application each have at most one pinned note: pinning
@@ -301,7 +303,7 @@ application and of its job, not of the job's other applications. Pinned notes
 come first, then everything newest first. Each entry has `type` (`note` or
 `event`), `kind` (`note`, `event`, or `response` for an employer response
 recorded, corrected or removed), `scope` (`{"type": "job" | "application",
-"id"}`), `actor`, `run` and either `note` (`body`, `version`, `updated_at`,
+"id"}`), `actor`, `batch_id` and either `note` (`body`, `version`, `updated_at`,
 `pinned`, `pinned_at`) or `event` (`kind`, `payload`, `subject`).
 Event payloads hold identifiers, field names and versions, never text; adding
 or editing a note is shown by the note itself. Filters: `kinds`, `who` (`owner`
@@ -317,137 +319,57 @@ notes. A frozen context carries the pinned note as `application.note` and
 `instructions.application_note`. An application has no `note` field since 0.23:
 sending one is refused with `422 validation`.
 
-## Runs, questions and the change log
+## The change log
 
-Each write records its actor: `owner` for the dashboard session, `token` with the
-token's id, name and `token_kind` (`owner` or `agent`), or `system`. History entries (`GET /applications/{id}/events`,
-`GET /events`, the overview activity) return `actor`, `run_id` and `subject`;
-notes return `author` and `run`. Entries from before version 0.17 have
-`actor.kind = "unknown"`. A source refresh is an entry only when it changed the
-title, company, location or posting text (`job_refreshed`, with the field names);
-the `posting_updated` kind of earlier releases no longer exists.
+Each write records an actor label: `owner` for the dashboard session or an owner
+token, `agent:<token name>` for an agent token, or `system` for collection, the
+worker and upgrades. Entries from before version 0.17 have a null actor. Every
+change written by one REST request or MCP tool call carries the same `batch_id`
+(`b_` followed by a ULID); history upgraded from earlier releases keeps the
+changes of one former run together as `run:<id>`. History entries
+(`GET /applications/{id}/events`, `GET /events`, the overview activity) return
+`actor`, `batch_id` and `subject`; notes return `author`. A source refresh is an
+entry only when it changed the title, company, location or posting text
+(`job_refreshed`, with the field names); the `posting_updated` kind of earlier
+releases no longer exists.
 
-`GET /workspace` and `workspace_info` return `schema_version` (the database
+`GET /events` (`events_list`) is a read for scripts. It filters by `actor`
+(`owner`, `agent`, `system`, `unknown` or `agent:<token name>`), `batch_id`,
+`job_id`, `application_id`, `subject_type`, `subject_id`, `kind`, `since` and
+`until`; `subject_types` (repeat the parameter) takes several kinds of record at
+once. System changes are left out unless `actor=system` or
+`include_system=true`.
+
+```bash
+# What the agent token "laptop" changed since this morning.
+curl -sS "$OPENINGS_URL/api/v1/events?actor=agent:laptop&since=2026-03-02T08:00:00Z" \
+  -H "Authorization: Bearer $OPENINGS_TOKEN"
+# The jobs one batch dismissed, ready to restore with POST /jobs/bulk (action "inbox").
+curl -sS "$OPENINGS_URL/api/v1/jobs?triage=dismissed&dismissed_by=agent&batch_id=BATCH_ID" \
+  -H "Authorization: Bearer $OPENINGS_TOKEN"
+```
+
+Deleting an application or forgetting a job removes that record's own history
+and leaves one attributed entry.
+
+`GET /workspace` and `workspace_info` return the caller's `actor` label, `schema_version` (the database
 schema of this release) and `storage`: `database_bytes`,
 `free_bytes` on the data volume, `restore_limit_bytes` (the largest backup a
 restore accepts now), `restore_limit_configured_bytes` (the optional
 `OPENINGS_MAX_RESTORE_MB` bound, or null), `retention_days` and
 `kept_runs_per_source` ([retention](operations.md#retention)).
 
-Runs need an API token; a dashboard session gets `403 run_actor`.
+## Skills
 
-```bash
-# Open a run; later writes with this token are attached to it.
-curl -sS -X POST "$OPENINGS_URL/api/v1/runs" -H "Authorization: Bearer $OPENINGS_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"workflow": "review-inbox", "scope": "Inbox: 14 jobs", "idempotency_key": "review-2026-03-02"}'
-
-# Ask the owner a question about a job.
-curl -sS -X POST "$OPENINGS_URL/api/v1/questions" -H "Authorization: Bearer $OPENINGS_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"question": "Is a hybrid schedule acceptable?", "why": "Two office days are required.",
-       "subject_type": "job", "subject_id": "JOB_ID", "choices": ["Yes", "No"]}'
-
-# Close the run with its report (expected_version from the run).
-curl -sS -X POST "$OPENINGS_URL/api/v1/runs/RUN_ID/finish" -H "Authorization: Bearer $OPENINGS_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"expected_version": 1, "summary": "Reviewed 14 jobs.", "changes": "Saved 3, dismissed 9.",
-       "not_done": [{"item": "Two postings", "reason": "On-call duty is not stated."}],
-       "checks": [{"check": "Final Inbox query"}, {"check": "Salary ranges", "verified": false}],
-       "limits": "Nothing was submitted.", "method": ""}'
-
-# Answers given since a time, oldest first.
-curl -sS "$OPENINGS_URL/api/v1/questions?answered_since=2026-03-01T08:00:00Z" \
-  -H "Authorization: Bearer $OPENINGS_TOKEN"
-```
-
-A second `POST /runs` for a token with an open run returns `409 run_open` with
-that run in `error.details.run`, unless `supersede` is true. `PATCH /runs/{id}`
-stores a progress `note`. `GET /runs/{id}?changes_limit=50&changes_offset=0`
-returns the report, the questions asked and the changes made; `GET /runs` filters
-by `status`, `workflow`, `token_id`, `started_since`, `started_until` and
-`active_since` (last activity at or after a time: a start, a change or the end).
-Each listed run carries `summary` and `method`, the report's account of what the
-workflow lacked (empty when none), which the owner may turn into the skill's
-[local notes](#skills-and-local-notes).
-`GET /questions` filters by `state`, `subject_type`, `subject_id`, `run_id` and
-`answered_since`; answer and withdraw take `expected_version`, and answering
-needs owner authority (an agent token gets `403 forbidden`). `GET /events`
-filters by `run_id`, `job_id`, `application_id`, `subject_type`, `subject_id`,
-`actor`, `token_id`, `kind`, `since` and `until`; `subject_types` (repeat the
-parameter) takes several kinds of record at once. A change, a question and a
-request carry `run_workflow`, the workflow of their run, beside `run_id`.
-
-A question keeps its text, state and a `subject.label` after its job,
-application or Career entry is deleted. Deleting an application or forgetting a
-job removes that record's own history and leaves one attributed entry.
-
-## Requests for the agent
-
-The owner writes a request; an agent reads it at the start of its next run.
-
-```bash
-# The owner (session or owner token) writes a request about a job.
-curl -sS -X POST "$OPENINGS_URL/api/v1/requests" -H "Authorization: Bearer $OWNER_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"text": "Prepare this one too.", "subject_type": "job", "subject_id": "JOB_ID"}'
-
-# The agent reads the open requests, takes one and reports the result.
-curl -sS "$OPENINGS_URL/api/v1/requests?state=open" -H "Authorization: Bearer $OPENINGS_TOKEN"
-curl -sS -X POST "$OPENINGS_URL/api/v1/requests/REQUEST_ID/take" \
-  -H "Authorization: Bearer $OPENINGS_TOKEN" -H "Content-Type: application/json" \
-  -d '{"expected_version": 1}'
-curl -sS -X POST "$OPENINGS_URL/api/v1/requests/REQUEST_ID/complete" \
-  -H "Authorization: Bearer $OPENINGS_TOKEN" -H "Content-Type: application/json" \
-  -d '{"expected_version": 2, "result": "Draft prepared and marked ready."}'
-```
-
-States are `open`, `taken`, `done`, `declined` and `withdrawn`. `take` needs an
-open request (`409 request_taken` with the taker's `run_id`, or
-`409 request_closed`); `complete` (`result`) and `decline` (`reason`) work from
-`open` or `taken`. These three need an API token (`403 request_actor` for a
-dashboard session) and record the token's open run on the request, when it has
-one. `POST /requests` (`text`, optional `subject_type` and `subject_id`,
-`idempotency_key`) and `withdraw` need owner authority. `GET /requests` filters
-by `state`, `subject_type`, `subject_id`, `run_id` and `updated_since`.
-`GET /workspace` returns `open_requests`, and `GET /runs/{id}` the requests the
-run handled. A request keeps its text, state and `subject.label` after its
-subject is deleted, and follows a job through a merge.
-
-## Skills and local notes
-
-`GET /skills` lists the shipped skills: `name`, `description`, `files`,
-`file_details` (`path`, `bytes` and the first heading as `title` for each file)
-and `local_notes` (`version`, `updated_at`, `updated_by`, `length`, or null).
-`GET /skills/{name}` reads `SKILL.md`, `GET /skills/{name}/files/{path}` a
-reference file. Skills ship with the server and are never edited by a workspace.
-
-A workspace adds **local notes** to a skill instead: at most 2,000 characters,
-appended to the served `SKILL.md` (over REST, `skills_get` and the MCP prompt
-alike) after a rule, under `## Local notes for this workspace`, with the
-version, the day and who wrote them. `?local_notes=false` returns the shipped
-text alone; reference files are served as shipped. The response's
-`local_notes` describes the current notes without their text.
-
-```bash
-# Read the notes with their earlier versions, newest first (version 0: none yet).
-curl -sS "$OPENINGS_URL/api/v1/skills/review-inbox/notes" -H "Authorization: Bearer $OPENINGS_TOKEN"
-
-# Replace them, naming the version they replace; empty text clears them.
-curl -sS -X PUT "$OPENINGS_URL/api/v1/skills/review-inbox/notes" \
-  -H "Authorization: Bearer $OPENINGS_TOKEN" -H "Content-Type: application/json" \
-  -d '{"expected_version": 0, "text": "Leave every job at Northstar Labs for the owner."}'
-```
-
-The notes return `skill`, `text`, `version`, `max_length`, `updated_at`,
-`updated_by`, `versions` (up to 50, each with `version`, `text`, `created_at`
-and `created_by`) and `versions_total`. A stale `expected_version` returns
-`409 conflict` with `details.current_version`; the same text again is no
-change. Each save is a new version with a `skill_notes_updated` change (subject
-`skill`). The dashboard session, owner tokens and agent tokens may write notes:
-an agent records a lasting method gap of this workspace, and the owner sees who
-wrote each version and restores any of them. Personal criteria belong to
-[Preferences](preferences.md).
+`GET /skills` lists the shipped skills: `name`, `title`, `summary`, `example`,
+`description`, `files` and `file_details` (`path`, `bytes` and the first
+heading as `title` for each file). `title`, `summary` and `example` come from
+the `SKILL.md` frontmatter and feed **Settings › Skills** ("What you can ask
+your agent"). `GET /skills/{name}` returns `name`, `path` and the shipped
+`content` of `SKILL.md`; `GET /skills/{name}/files/{path}` a reference file.
+Skills ship with the server and are never edited by a workspace. Standing
+instructions for the agent belong to Preferences › Working with me
+([Preferences](preferences.md)).
 
 ## Identity and duplicates
 

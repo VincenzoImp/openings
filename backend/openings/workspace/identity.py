@@ -5,6 +5,7 @@ import logging
 import threading
 import time
 
+from .. import events
 from ..common import check_version, now
 from ..db import encode
 from ..duplicate_signals import job_features, posting_similarity
@@ -50,7 +51,7 @@ class JobIdentity:
                 )
                 changed = True
             if changed:
-                self.event("duplicate_cleared", job_id, payload={"other_id": other_id}, conn=c)
+                events.record(c, "duplicate_cleared", payload={"other_id": other_id}, job_id=job_id)
         return self.job_summary(job_id)
 
     def resolve_jobs(self, value):
@@ -481,8 +482,6 @@ class JobIdentity:
                 "events",
                 "notes",
                 "tasks",
-                "questions",
-                "requests",
             ):
                 c.execute(f"UPDATE {table} SET job_id=? WHERE job_id=?", (target_id, source_id))
             c.execute("UPDATE files SET job_id=? WHERE job_id=?", (target_id, source_id))
@@ -507,5 +506,5 @@ class JobIdentity:
                 "UPDATE events SET subject_id=? WHERE subject_type='job' AND subject_id=?",
                 (target_id, source_id),
             )
-            self.event("jobs_merged", target_id, payload={"previous_id": source_id}, conn=c)
+            events.record(c, "jobs_merged", payload={"previous_id": source_id}, job_id=target_id)
         return self.get_job(target_id)

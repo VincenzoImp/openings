@@ -45,7 +45,7 @@ def expected(rows):
     """The counts computed straight from the fixture, without the service."""
     fates = [fate for *_, fate in rows]
     dismissed = Counter(
-        {"dismissed_system": "other", "dismissed_agent": "agent", "dismissed_owner": "owner"}[fate]
+        {"dismissed_system": "system", "dismissed_agent": "agent", "dismissed_owner": "owner"}[fate]
         for fate in fates
         if fate in {"dismissed_system", "dismissed_agent", "dismissed_owner"}
     )
@@ -58,7 +58,7 @@ def expected(rows):
         "interviews": sum(fate in {"interview", "offer"} for fate in fates),
         "offers": fates.count("offer"),
         "dismissed": sum(dismissed.values()),
-        "dismissed_by": {key: dismissed.get(key, 0) for key in ("agent", "owner", "other")},
+        "dismissed_by": {key: dismissed.get(key, 0) for key in ("agent", "owner", "system")},
     }
 
 

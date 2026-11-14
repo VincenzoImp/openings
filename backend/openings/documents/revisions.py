@@ -13,6 +13,7 @@ import difflib
 import json
 from typing import Literal
 
+from .. import events
 from ..career.records import _get, _page
 from ..common import check_version, encode, new_id, now
 from ..errors import DomainError, conflict, missing
@@ -281,17 +282,17 @@ class RevisionOperations:
                             now(),
                         ),
                     )
-                    self.workspace.event(
+                    events.record(
+                        conn,
                         "document_created",
-                        application["job_id"],
-                        value.application_id,
-                        {
+                        subject=("document", document_id),
+                        payload={
                             "document_id": document_id,
                             "kind": value.kind,
                             "previous_id": value.previous_id,
                         },
-                        conn,
-                        subject=("document", document_id),
+                        job_id=application["job_id"],
+                        application_id=value.application_id,
                     )
                     self.workspace.clear_ready(conn, value.application_id, "document_created")
                 remember(conn, "documents", value.idempotency_key, digest, document_id)
@@ -462,18 +463,18 @@ class RevisionOperations:
                     (document_id,),
                 )
                 application = _get(conn, "applications", row["application_id"], "Application")
-                self.workspace.event(
+                events.record(
+                    conn,
                     "document_reviewed",
-                    application["job_id"],
-                    row["application_id"],
-                    {
+                    subject=("document", document_id),
+                    payload={
                         "document_id": document_id,
                         "kind": row["kind"],
                         "review_state": "approved",
                         "version": row["version"] + 1,
                     },
-                    conn,
-                    subject=("document", document_id),
+                    job_id=application["job_id"],
+                    application_id=row["application_id"],
                 )
         return self.get_document(document_id)
 
@@ -497,13 +498,13 @@ class RevisionOperations:
                     )
             conn.execute("DELETE FROM documents WHERE id=?", (document_id,))
             if application:
-                self.workspace.event(
-                    "document_deleted",
-                    application["job_id"],
-                    document["application_id"],
-                    {"document_id": document_id, "kind": document["kind"]},
+                events.record(
                     conn,
+                    "document_deleted",
                     subject=("document", document_id),
+                    payload={"document_id": document_id, "kind": document["kind"]},
+                    job_id=application["job_id"],
+                    application_id=document["application_id"],
                 )
                 self.workspace.clear_ready(conn, document["application_id"], "document_deleted")
         self.db.collect_blobs()

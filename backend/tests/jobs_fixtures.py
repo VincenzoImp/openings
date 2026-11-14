@@ -3,13 +3,13 @@
 Two saved searches and two company boards, jobs in English, German, French and
 Italian, a likely duplicate of a job with an application, a posting a board no
 longer lists, postings that require German (hidden by the spoken-languages filter,
-never dismissed), dismissals by the agent and by the owner, and a question for the
-owner about one job. Everything is fictional.
+never dismissed) and dismissals by the agent and by the owner. Everything is
+fictional.
 """
 
 import json
 
-from openings.actors import OWNER, acting_as, token_actor
+from openings.actors import OWNER, acting_as, batch, token_actor
 from openings.common import new_id, now
 
 ENGLISH_DATA = (
@@ -84,7 +84,7 @@ def agent_actor(app):
 
 def seed_jobs(app):
     """Sources, jobs with signals and dismissals of every kind; returns the job ids by key."""
-    workspace, activity = app.state.workspace, app.state.activity
+    workspace = app.state.workspace
     agent = agent_actor(app)
     sources = {}
     with workspace.db.transaction() as conn:
@@ -253,17 +253,9 @@ def seed_jobs(app):
         job = workspace.get_job(ids[key])
         return workspace.set_triage(job["id"], value, job["version"], reason)
 
-    with acting_as(agent):
+    with acting_as(agent), batch():
         triage("lumen-platform", "saved")
         triage("orbit-junior", "dismissed", "Junior role; you look for mid to senior level.")
-        activity.ask_question(
-            {
-                "question": "This role includes night on-call once a month. Shortlist it?",
-                "why": "Your Preferences say nothing about on-call work at night.",
-                "subject_type": "job",
-                "subject_id": ids["orbit-sre"],
-            }
-        )
     with acting_as(OWNER):
         triage("lumen-manager", "dismissed", "Not looking for management roles this year.")
     return ids

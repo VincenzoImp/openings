@@ -1,5 +1,6 @@
 """The overview: funnel counts and activity from recorded application history."""
 
+from ..events import event_record
 from ..posting import posting_complete_sql
 
 
@@ -77,7 +78,7 @@ class Overview:
             "incomplete": counts["incomplete"],
             "funnel": funnel,
             "activity": [
-                self.event_record(r)
+                event_record(r)
                 for r in self.db.all(
                     "SELECT events.*,jobs.title,jobs.company FROM events LEFT JOIN jobs ON jobs.id=events.job_id ORDER BY events.created_at DESC LIMIT 12"
                 )
