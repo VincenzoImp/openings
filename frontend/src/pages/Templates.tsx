@@ -1,181 +1,332 @@
-import { useState } from "react";
-import { type ListResult, type Template } from "../api";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Button,
-  EmptyState,
-  ErrorBanner,
-  Loading,
-  Split,
-  Tag,
-} from "../design";
-import { PageHead, plural } from "../library/common";
-import { useFresh } from "../library/useFresh";
+  CircleAlert,
+  FilePlus2,
+  Files,
+  Mail,
+  Plus,
+  Upload,
+} from "lucide-react";
+import { SheetMenu } from "../ui/ActionSheet";
+import { Button, IconButton } from "../ui/Button";
+import { formatDate } from "../ui/format";
+import { List, ListGroup, ListRow } from "../ui/List";
+import type { MenuEntry } from "../ui/Menu";
+import { Callout, EmptyState, PageHeader, SkeletonRows } from "../ui/Page";
+import { LeaveDialog, useUnloadGuard } from "../ui/ReadEdit";
+import { SplitPane } from "../ui/Split";
+import { useToast } from "../ui/Toast";
+import { TopBarActions } from "../shell/context";
+import { addLeaveGuard, href, navigate, useRoute } from "../shell/router";
 import {
-  confirmLeave,
-  useDebounce,
-  useEditorRecord,
-  useResource,
-  useUrlFilters,
-} from "../state";
+  useCreateTemplate,
+  useTemplates,
+  type NewTemplate,
+  type Template,
+} from "../query/templates";
 import { TemplateDetail } from "./templates/Detail";
-import { CreateTemplate, kindLabels } from "./templates/Dialogs";
+import { DefaultMark } from "./templates/Mark";
+import {
+  KINDS,
+  changedText,
+  kindOfFile,
+  nameOfFile,
+  tabOf,
+  type Tab,
+} from "./templates/model";
+import { EXAMPLE_CV, EXAMPLE_LETTER } from "./templates/starters";
+import "./templates/templates.css";
 
-const NONE: ListResult<Template> = { items: [], total: 0 };
+const byDefaultThenName = (a: Template, b: Template) =>
+  Number(b.is_default) - Number(a.is_default) ||
+  a.name.localeCompare(b.name, "en", { numeric: true });
 
-export default function TemplatesPage() {
-  // `template` and `section` keep the links of earlier versions working.
-  const [filters, setFilters] = useUrlFilters({
-    template: "",
-    section: "",
-    q: "",
-    kind: "",
-  });
-  const query = useDebounce(filters.q);
-  const list = useFresh(
-    `/templates?summary=true&limit=200&q=${encodeURIComponent(query)}&kind=${filters.kind}`,
-    NONE,
-    ["templates", "files"],
+/** Create a template from an example or an uploaded .tex file. */
+function useStart(onCreated: (template: Template) => void) {
+  const create = useCreateTemplate();
+  const toast = useToast();
+  const input = useRef<HTMLInputElement>(null);
+  const start = (body: NewTemplate) =>
+    create.mutate(
+      { ...body, idempotency_key: crypto.randomUUID?.() },
+      {
+        onSuccess: (template) => {
+          toast.show({
+            tone: "success",
+            message: `Created “${template.name}”`,
+          });
+          onCreated(template);
+        },
+        onError: (cause) =>
+          toast.show({
+            tone: "error",
+            message:
+              cause instanceof Error
+                ? cause.message
+                : "The template was not created.",
+          }),
+      },
+    );
+  const picker = (
+    <input
+      ref={input}
+      type="file"
+      accept=".tex,.ltx,text/x-tex,application/x-tex"
+      hidden
+      aria-label="A .tex file to start from"
+      onChange={async (event) => {
+        const file = event.target.files?.[0];
+        event.target.value = "";
+        if (!file) return;
+        if (file.size > 1_000_000)
+          return toast.show({
+            tone: "error",
+            message: "Use a .tex file smaller than 1 MB.",
+          });
+        start({
+          name: nameOfFile(file.name),
+          kind: kindOfFile(file.name),
+          tex: await file.text(),
+          guidance: "",
+          is_default: false,
+        });
+      }}
+    />
   );
-  const [creating, setCreating] = useState(false);
-  const [pane, setPane] = useState<0 | 1>(filters.template ? 1 : 0);
-  const selected = filters.template || list.data.items[0]?.id || "";
-  const detail = useResource<Template | null>(
-    selected ? `/templates/${selected}` : null,
-    null,
-  );
-  const loaded = detail.data?.id === selected ? detail.data : undefined;
-  const template = useEditorRecord(loaded, `/templates/${selected}`);
-  const select = (id: string) => {
-    if (id !== selected && !confirmLeave()) return;
-    setFilters({ template: id });
-    setPane(1);
+  return {
+    picker,
+    busy: create.isPending,
+    exampleCv: () => start(EXAMPLE_CV),
+    exampleLetter: () => start(EXAMPLE_LETTER),
+    upload: () => input.current?.click(),
   };
-  const add = <Button onClick={() => setCreating(true)}>Add a template</Button>;
-  const filtered = !!(query || filters.kind);
-  return (
-    <>
-      <PageHead title="Templates" actions={add}>
-        The source your CVs and letters are built from, with each one's guidance
-        and limits. Your agent compiles them on its own machine; the workspace
-        stores the files. Writing rules live in{" "}
-        <a href="#preferences">Preferences</a>.
-      </PageHead>
-      {list.error ? (
-        <ErrorBanner message={list.error} retry={list.reload} />
-      ) : list.loading ? (
-        <Loading label="Loading templates…" />
-      ) : !list.data.items.length && !filtered ? (
-        <section className="card">
-          <EmptyState title="No template yet" action={add}>
-            Add the LaTeX source of your CV or letter with its fonts and images.
-            Your agent needs one template of each kind before it can prepare an
-            application.
-          </EmptyState>
-        </section>
-      ) : (
-        <Split
-          columns="minmax(0, 320px) minmax(0, 1fr)"
-          labels={["Templates", template?.name || "Selected template"]}
-          pane={pane}
-          onPane={setPane}
-        >
-          <section className="card" aria-label="Templates by kind">
-            <div className="filters" role="search">
-              <input
-                className="input"
-                type="search"
-                aria-label="Search templates"
-                placeholder="Find a template"
-                value={filters.q}
-                onChange={(event) => setFilters({ q: event.target.value })}
-              />
-              <select
-                className="input"
-                aria-label="Kind of document"
-                value={filters.kind}
-                onChange={(event) => setFilters({ kind: event.target.value })}
-              >
-                <option value="">CV and letter</option>
-                <option value="cv">CV</option>
-                <option value="letter">Letter</option>
-              </select>
-            </div>
-            {!list.data.items.length && (
-              <p className="body muted">No template matches.</p>
-            )}
-            {(["cv", "letter"] as const)
-              .filter((kind) =>
-                list.data.items.some((item) => item.kind === kind),
-              )
-              .map((kind) => (
-                <div key={kind}>
-                  <h2 className="kind eyebrow">{kindLabels[kind]}</h2>
-                  <ul className="list">
-                    {list.data.items
-                      .filter((item) => item.kind === kind)
-                      .map((item) => (
-                        <li
-                          key={item.id}
-                          className={
-                            item.id === selected ? "is-selected" : undefined
-                          }
-                        >
-                          <div className="grow">
-                            <button
-                              type="button"
-                              className="title"
-                              aria-current={item.id === selected || undefined}
-                              onClick={() => select(item.id)}
-                            >
-                              {item.name}
-                            </button>
-                            <div className="meta">
-                              Version {item.version} ·{" "}
-                              {plural(item.file_count ?? 0, "asset")}
-                            </div>
-                          </div>
-                          {item.is_default && <Tag tone="ready">Default</Tag>}
-                        </li>
-                      ))}
-                  </ul>
-                </div>
-              ))}
-          </section>
-          {detail.error ? (
-            <ErrorBanner message={detail.error} retry={detail.reload} />
-          ) : template ? (
-            <TemplateDetail
-              template={template}
-              tab={filters.section}
-              onTab={(section) => setFilters({ section })}
-              onRemoved={() => {
-                setFilters({ template: "" });
-                setPane(0);
-              }}
-            />
-          ) : (
-            <section className="card detail">
-              {selected ? (
-                <Loading label="Loading the template…" />
-              ) : (
-                <EmptyState title="No template selected">
-                  Choose a template to see its source, rules and assets.
-                </EmptyState>
-              )}
-            </section>
-          )}
-        </Split>
+}
+
+/**
+ * Templates: the designs CVs and letters are built from. A list grouped by
+ * kind beside the selected template, each scrolling on its own.
+ */
+export default function TemplatesScreen() {
+  const route = useRoute();
+  const param = route.query.get("template");
+  const tab = tabOf(route.query.get("tab"));
+  const list = useTemplates();
+  const items = useMemo(
+    () => [...(list.data?.items ?? [])].sort(byDefaultThenName),
+    [list.data],
+  );
+  const groups = KINDS.map((group) => ({
+    ...group,
+    rows: items.filter(
+      (item) => (item.kind === "letter" ? "letter" : "cv") === group.kind,
+    ),
+  })).filter((group) => group.rows.length);
+  const ordered = groups.flatMap((group) => group.rows);
+  const selected =
+    ordered.find((item) => item.id === param) ??
+    (param ? null : ordered[0]) ??
+    null;
+  const go = useCallback(
+    (template: string | null, next: Tab | null = null) =>
+      navigate(
+        href(
+          "templates",
+          {},
+          {
+            template: template ?? undefined,
+            tab: template && next && next !== "preview" ? next : undefined,
+          },
+        ),
+        { replace: true },
+      ),
+    [],
+  );
+  const start = useStart((template) => go(template.id, "source"));
+
+  // Unsaved source or limits ask before the template or the page changes.
+  const [dirty, setDirty] = useState(false);
+  const [leaving, setLeaving] = useState<null | (() => void)>(null);
+  useUnloadGuard(dirty);
+  useEffect(() => {
+    if (!dirty) return;
+    return addLeaveGuard((proceed) => {
+      setLeaving(() => proceed);
+      return false;
+    });
+  }, [dirty]);
+
+  const newMenu: MenuEntry[] = [
+    {
+      id: "cv",
+      label: "Start from the example CV",
+      icon: FilePlus2,
+      onSelect: start.exampleCv,
+    },
+    {
+      id: "letter",
+      label: "Start from the example letter",
+      icon: Mail,
+      onSelect: start.exampleLetter,
+    },
+    "separator",
+    {
+      id: "upload",
+      label: "Upload a .tex file…",
+      icon: Upload,
+      onSelect: start.upload,
+    },
+  ];
+  const empty = list.isSuccess && !items.length;
+  const newButton = !empty && (
+    <SheetMenu
+      label="New template"
+      items={newMenu}
+      trigger={(props) => (
+        <Button {...props} icon={Plus} disabled={start.busy}>
+          New template
+        </Button>
       )}
-      {creating && (
-        <CreateTemplate
-          onClose={() => setCreating(false)}
-          onCreated={(id) => {
-            setCreating(false);
-            setFilters({ template: id, q: "", kind: "" });
-            setPane(1);
-          }}
+    />
+  );
+
+  return (
+    <div className="tpl-screen">
+      {start.picker}
+      <PageHeader title="Templates" action={newButton} />
+      {!empty && (
+        <TopBarActions>
+          <SheetMenu
+            label="New template"
+            items={newMenu}
+            trigger={(props) => (
+              <IconButton
+                {...props}
+                icon={Plus}
+                label="New template"
+                size="touch"
+                tooltip="none"
+              />
+            )}
+          />
+        </TopBarActions>
+      )}
+      <p className="tpl-note">
+        Writing rules live in <a href="#preferences">Preferences</a>.
+      </p>
+      {list.isError && !list.data ? (
+        <div className="tpl-state">
+          <Callout
+            icon={CircleAlert}
+            tone="danger"
+            title="Templates could not be loaded"
+            actions={
+              <Button size="sm" onClick={() => void list.refetch()}>
+                Try again
+              </Button>
+            }
+          />
+        </div>
+      ) : list.isPending ? (
+        <div className="tpl-state">
+          <SkeletonRows rows={6} />
+        </div>
+      ) : empty ? (
+        <EmptyState
+          icon={Files}
+          title="No templates yet."
+          className="tpl-empty"
+          actions={
+            <>
+              <Button
+                variant="primary"
+                icon={FilePlus2}
+                disabled={start.busy}
+                onClick={start.exampleCv}
+              >
+                Start from the example CV
+              </Button>
+              <Button
+                icon={Upload}
+                disabled={start.busy}
+                onClick={start.upload}
+              >
+                Upload a .tex file
+              </Button>
+              <Button
+                variant="ghost"
+                disabled={start.busy}
+                onClick={start.exampleLetter}
+              >
+                Start from the example letter
+              </Button>
+            </>
+          }
+        >
+          A template is the LaTeX design your CV or letter is built from.
+        </EmptyState>
+      ) : (
+        <SplitPane
+          label={selected ? selected.name : "Template"}
+          open={!!param && !!selected}
+          onClose={() => go(null)}
+          list={
+            <List
+              label="Templates"
+              activeId={selected?.id ?? null}
+              onActiveChange={(id) => go(id, tab)}
+              onOpen={(id) => go(id, tab)}
+            >
+              {groups.map((group) => (
+                <ListGroup
+                  key={group.kind}
+                  label={group.label}
+                  count={group.rows.length}
+                >
+                  {group.rows.map((item) => (
+                    <ListRow
+                      key={item.id}
+                      id={item.id}
+                      title={item.name}
+                      sub={changedText(formatDate(item.updated_at))}
+                      meta={item.is_default ? <DefaultMark /> : undefined}
+                    />
+                  ))}
+                </ListGroup>
+              ))}
+            </List>
+          }
+          detail={
+            selected ? (
+              <TemplateDetail
+                key={selected.id}
+                id={selected.id}
+                summary={selected}
+                names={items.map((item) => item.name)}
+                tab={tab}
+                onTab={(next) => go(selected.id, next)}
+                onBack={() => go(null)}
+                onSelect={(id) => go(id)}
+                onDirty={setDirty}
+              />
+            ) : (
+              <EmptyState icon={Files} title="This template no longer exists">
+                Choose another one from the list.
+              </EmptyState>
+            )
+          }
         />
       )}
-    </>
+      <LeaveDialog
+        open={leaving !== null}
+        changes={1}
+        onStay={() => setLeaving(null)}
+        onLeave={() => {
+          const proceed = leaving;
+          setLeaving(null);
+          setDirty(false);
+          proceed?.();
+        }}
+      />
+    </div>
   );
 }

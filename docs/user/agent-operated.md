@@ -27,7 +27,7 @@ The agent never submits an application, contacts an employer or records Applied
 on its own, and never invents career facts. Your preferences live in
 [Preferences](preferences.md) and the Career record; applications you close are
 not read as preferences. The agent records what you tell it, for example an
-answer you gave, in your words under **Library → Preferences**, where you can
+answer you gave, in your words under **You → Preferences**, where you can
 edit or delete it.
 
 ## Set it up

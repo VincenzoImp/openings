@@ -47,8 +47,6 @@ const LEGACY = new Set<RouteId>([
   "applications",
   "application",
   "profile",
-  "preferences",
-  "templates",
   "sources",
   "settings",
   "setup",

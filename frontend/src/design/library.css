@@ -60,26 +60,6 @@
   gap: var(--s2) var(--s3);
   margin-top: var(--s2);
 }
-.section-nav button {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: var(--s3);
-  width: 100%;
-  min-height: var(--row-min);
-  padding: 0 var(--s4);
-  border: 0;
-  border-top: 1px solid var(--line);
-  background: none;
-  text-align: left;
-  cursor: pointer;
-}
-.section-nav button:hover {
-  background: var(--hover);
-}
-.section-nav button:focus-visible {
-  outline-offset: -2px;
-}
 
 /* A list beside its detail panel; --split sets the columns. */
 .split {
@@ -122,11 +102,6 @@
 }
 .edit-grid .wide {
   grid-column: 1 / -1;
-}
-.limits {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--s4);
 }
 fieldset.field {
   margin: 0;
@@ -282,10 +257,6 @@ dl.tree > div {
   white-space: pre;
   overflow: auto;
   tab-size: 2;
-}
-textarea.code {
-  min-height: 420px;
-  resize: vertical;
 }
 .frame {
   display: block;
@@ -495,14 +466,6 @@ img.frame {
 }
 .claim-text {
   align-items: flex-start;
-}
-.input.days {
-  width: 6rem;
-}
-ul.chips {
-  margin: 0;
-  padding: 0;
-  list-style: none;
 }
 .wrap {
   flex-wrap: wrap;

@@ -8,14 +8,15 @@ application at a time and retain earlier closed attempts.
 
 In **Career**, store your profile, stable [career entries](career.md) and approved
 claims. In **Preferences**, state [what you want and your writing rules](preferences.md)
-once. In **Templates**, add one or more CV or letter templates with their
-source, assets, guidance and typed limits (pages, bullets per entry, bullet
-length). Set a default for each kind of document. Writing rules live in
-Preferences, for all documents, the CV or the letter.
+once. In **Templates**, start from the example CV or letter (the synthetic
+files in `examples/`) or upload a `.tex` file. Each template has a
+**Preview** (a sample PDF you upload: Openings runs no TeX), its **Source**,
+its **Files** (fonts, images, class files) and its **Limits** (pages, bullets
+per entry, bullet length). Set a default for each kind of document; Rename,
+Duplicate, Download source and Delete permanently are in the `…` menu.
+Writing rules live in Preferences, for all documents, the CV or the letter.
 
-![Templates with the list by kind and the Rules tab](../images/templates.png)
-
-The synthetic templates in `examples/` provide starting points.
+![Templates with the list by kind and the Preview tab](../images/templates.png)
 
 A template can define a one-page engineering CV, a longer research CV or another
 layout. Your external agent fills it using the selected facts and your writing rules.

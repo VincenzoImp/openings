@@ -1,162 +1,189 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { CircleAlert } from "lucide-react";
+import { Button } from "../ui/Button";
+import { Callout, PageHeader, SkeletonRows } from "../ui/Page";
+import { LeaveDialog, useUnloadGuard } from "../ui/ReadEdit";
+import { useToast } from "../ui/Toast";
+import { addLeaveGuard } from "../shell/router";
 import {
-  ApiError,
-  api,
-  type PreferenceSection,
-  type Preferences,
-  type WorkspaceSettings,
-} from "../api";
-import { Card, ErrorBanner, Loading, Split } from "../design";
-import { PageHead, plural } from "../library/common";
-import { useFresh } from "../library/useFresh";
-import { useWorkspace } from "../state";
-import { itemsBody } from "./preferences/model";
-import { SectionCard, type Outcome, type Save } from "./preferences/Section";
-import { FactSettings, type SaveSettings } from "./preferences/Settings";
+  usePreferences,
+  type SectionName,
+  type Statement,
+} from "../query/preferences";
+import {
+  SECTIONS,
+  itemName,
+  placeOf,
+  removed,
+  reordered,
+  saved,
+  sectionTitle,
+} from "./preferences/model";
+import { PreferenceSection, type SectionActions } from "./preferences/Section";
+import { FollowingUp, Languages } from "./preferences/Settings";
+import { useStatements } from "./preferences/useStatements";
+import "./preferences/preferences.css";
 
-const CHANGED =
-  "Preferences changed in another session. The latest version is shown; check it and try again.";
+/**
+ * Preferences: in the owner's words, what they want, rule out and are, how
+ * their documents are written and how to work with them; then the no-reply
+ * period. Statements are lines of text, edited in place.
+ */
+export default function PreferencesScreen() {
+  const query = usePreferences();
+  const statements = useStatements(query.data?.sections);
+  const toast = useToast();
+  const [dirty, setDirty] = useState<ReadonlySet<SectionName>>(() => new Set());
+  const [leaving, setLeaving] = useState<null | (() => void)>(null);
+  const unsaved = dirty.size > 0;
+  useUnloadGuard(unsaved);
+  useEffect(() => {
+    if (!unsaved) return;
+    return addLeaveGuard((proceed) => {
+      setLeaving(() => proceed);
+      return false;
+    });
+  }, [unsaved]);
+  const markDirty = useCallback((name: SectionName, value: boolean) => {
+    setDirty((current) => {
+      if (current.has(name) === value) return current;
+      const next = new Set(current);
+      if (value) next.add(name);
+      else next.delete(name);
+      return next;
+    });
+  }, []);
+  const { change, itemsOf, error, clearError } = statements;
+  useEffect(() => {
+    if (!error) return;
+    toast.show({ tone: "error", message: error });
+    clearError();
+  }, [error, toast, clearError]);
 
-export default function PreferencesPage() {
-  const { data, setData, loading, error, reload } =
-    useFresh<Preferences | null>("/preferences", null, [
-      "preferences",
-      "settings",
-    ]);
-  const { notify } = useWorkspace();
-  const [busy, setBusy] = useState(false);
-  /** Send one write; a conflict reads Preferences again and says so. */
-  async function write<T>(
-    call: () => Promise<T>,
-    apply: (result: T) => void,
-    message: string,
-    form = false,
-  ): Promise<Outcome> {
-    setBusy(true);
-    try {
-      apply(await call());
-      notify(message);
-      return "ok";
-    } catch (cause) {
-      if (cause instanceof ApiError && cause.code === "conflict") {
-        // Show what the other session wrote; an open form keeps its text.
-        try {
-          setData(await api<Preferences>("/preferences"));
-        } catch {
-          reload();
-        }
-        // A form says so beside the text it kept.
-        if (!form) notify(CHANGED, true);
-        return "conflict";
-      }
-      notify(
-        cause instanceof Error ? cause.message : "The change was not saved.",
-        true,
-      );
-      return "error";
-    } finally {
-      setBusy(false);
-    }
+  function actionsOf(name: SectionName): SectionActions {
+    const writing = name === "writing";
+    const clean = (item: Statement): Statement =>
+      writing
+        ? { text: item.text, scope: item.scope || "all" }
+        : { text: item.text };
+    return {
+      save: async (index, original, draft) =>
+        (await change(name, (items) =>
+          saved(items, clean(draft), index ?? -1, original),
+        )) === "ok",
+      remove: (index) => {
+        const item = itemsOf(name)[index];
+        if (!item) return;
+        void change(name, (items) => removed(items, index, item.text)).then(
+          (outcome) => {
+            if (outcome !== "ok") return;
+            toast.show({
+              message: `Deleted “${itemName(item.text, 32)}”`,
+              action: {
+                label: "Undo",
+                undo: true,
+                run: () =>
+                  void change(name, (items) => [
+                    ...items.slice(0, index),
+                    item,
+                    ...items.slice(index),
+                  ]),
+              },
+            });
+          },
+        );
+      },
+      move: async (index, to) => {
+        const item = itemsOf(name)[index];
+        if (!item) return;
+        const moved: Statement =
+          to === "writing"
+            ? { text: item.text, scope: "all" }
+            : { text: item.text };
+        if ((await change(to, (items) => [...items, moved])) !== "ok") return;
+        if (
+          (await change(name, (items) => removed(items, index, item.text))) !==
+          "ok"
+        )
+          return;
+        toast.show({
+          message: `Moved “${itemName(item.text, 28)}” to ${sectionTitle(to)}`,
+        });
+      },
+      reorder: (from, to) => {
+        const item = itemsOf(name)[from];
+        if (!item) return;
+        void change(name, (items) => {
+          const at = placeOf(items, from, item.text);
+          return at < 0 ? items : reordered(items, at, to);
+        });
+      },
+    };
   }
-  const save: Save = (section, items, message, form) =>
-    write(
-      () =>
-        api<PreferenceSection>(`/preferences/${section.section}`, "PUT", {
-          expected_version: section.version,
-          items: itemsBody(section.section, items),
-        }),
-      (result) =>
-        setData(
-          (current) =>
-            current && {
-              ...current,
-              sections: current.sections.map((entry) =>
-                entry.section === result.section ? result : entry,
-              ),
-            },
-        ),
-      message,
-      form,
-    );
-  const saveSettings: SaveSettings = (patch, message) =>
-    write(
-      () =>
-        api<WorkspaceSettings>("/settings", "PATCH", {
-          expected_version: data!.settings.version,
-          ...patch,
-        }),
-      (settings) => setData((current) => current && { ...current, settings }),
-      message,
-    );
+
+  const settings = query.data?.settings;
   return (
-    <>
-      <PageHead title="Preferences">
-        What you want, in your own words. Your agent reads these statements when
-        it reviews jobs and writes documents, and asks you when they do not
-        cover a case. Nothing here acts on its own.
-      </PageHead>
-      {error ? (
-        <ErrorBanner message={error} retry={reload} />
-      ) : loading || !data ? (
-        <Loading label="Loading your preferences…" />
+    <div className="prefs">
+      <PageHeader title="Preferences" />
+      <p className="prefs-lede">
+        Your agent reads this page as your instructions.
+      </p>
+      {query.isError && !query.data ? (
+        <div className="prefs-state">
+          <Callout
+            icon={CircleAlert}
+            tone="danger"
+            title="Preferences could not be loaded"
+            actions={
+              <Button size="sm" onClick={() => void query.refetch()}>
+                Try again
+              </Button>
+            }
+          >
+            {query.error instanceof Error ? query.error.message : null}
+          </Callout>
+        </div>
+      ) : !query.data || !settings ? (
+        <div className="prefs-state">
+          <SkeletonRows rows={8} />
+        </div>
       ) : (
-        <Split columns="minmax(0, 2.2fr) minmax(0, 1fr)">
-          <div className="stack">
-            {data.sections.map((section) => (
-              <SectionCard
-                key={section.section}
-                section={section}
-                busy={busy}
-                save={save}
-              >
-                {section.section === "facts" && (
-                  <FactSettings
-                    settings={data.settings}
-                    busy={busy}
-                    save={saveSettings}
-                  />
-                )}
-              </SectionCard>
-            ))}
-          </div>
-          <aside className="stack detail" aria-label="About Preferences">
-            <Card title="Sections" className="section-nav">
-              {data.sections.map((section) => (
-                <button
-                  type="button"
-                  key={section.section}
-                  onClick={() => {
-                    const heading = document.getElementById(
-                      `preferences-${section.section}`,
-                    );
-                    heading?.scrollIntoView({ block: "start" });
-                    heading?.focus({ preventScroll: true });
-                  }}
-                >
-                  <span>{section.title}</span>
-                  <span className="caption num">
-                    {plural(section.items.length, "statement")}
-                  </span>
-                </button>
-              ))}
-            </Card>
-            <Card title="How it is used">
-              <div className="body stack">
-                <p>
-                  An application keeps a copy of your facts and writing rules as
-                  they were when its documents were prepared, so a later change
-                  shows there as an input that changed.
-                </p>
-                <p>
-                  Your agent may add or change a statement when you ask it to.
-                  Jobs are never dismissed automatically: Jobs can hide the ones
-                  requiring a language you do not speak.
-                </p>
-              </div>
-            </Card>
-          </aside>
-        </Split>
+        <div className="prefs-doc">
+          {SECTIONS.map((info) => (
+            <PreferenceSection
+              key={info.name}
+              info={info}
+              items={itemsOf(info.name)}
+              conflict={statements.conflicts.has(info.name)}
+              actions={actionsOf(info.name)}
+              onDirty={(value) => markDirty(info.name, value)}
+              onReload={() => {
+                statements.settle(info.name);
+                markDirty(info.name, false);
+                void query.refetch();
+              }}
+              onKeepEditing={() => {
+                statements.settle(info.name);
+                void query.refetch();
+              }}
+            >
+              {info.name === "facts" && <Languages settings={settings} />}
+            </PreferenceSection>
+          ))}
+          <FollowingUp settings={settings} />
+        </div>
       )}
-    </>
+      <LeaveDialog
+        open={leaving !== null}
+        changes={dirty.size}
+        onStay={() => setLeaving(null)}
+        onLeave={() => {
+          const proceed = leaving;
+          setLeaving(null);
+          setDirty(new Set());
+          proceed?.();
+        }}
+      />
+    </div>
   );
 }

@@ -1,286 +1,330 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useState } from "react";
 import {
-  api,
-  date,
-  download,
-  fileUrl,
-  version,
+  CircleCheck,
+  Clock,
+  Copy,
+  Download,
+  Ellipsis,
+  FileText,
+  Paperclip,
+  PenLine,
+  Trash2,
+} from "lucide-react";
+import { save } from "../../api/client";
+import { SheetMenu } from "../../ui/ActionSheet";
+import { Button, IconButton } from "../../ui/Button";
+import { ConfirmDialog, Dialog } from "../../ui/Dialog";
+import { Field, Input } from "../../ui/Field";
+import { formatDate } from "../../ui/format";
+import { MetaLine, SkeletonRows } from "../../ui/Page";
+import { DetailBar, DetailBody } from "../../ui/Split";
+import { Tabs } from "../../ui/Tabs";
+import { useToast } from "../../ui/Toast";
+import {
+  useDeleteTemplate,
+  useDuplicateTemplate,
+  useTemplate,
+  useUpdateTemplate,
   type Template,
-} from "../../api";
-import { Button, EmptyState, Field, Tabs, Tag } from "../../design";
-import { Assets, isPdf, useAssets } from "../../library/Assets";
-import { ConfirmDialog, fileSize, plural } from "../../library/common";
-import { useWorkspace } from "../../state";
-import { TemplateSettings, kindLabels } from "./Dialogs";
-import { RulesTab } from "./Rules";
+} from "../../query/templates";
+import { FilesTab } from "./Files";
+import { LimitsTab } from "./Limits";
+import { PreviewTab } from "./Preview";
+import { SourceTab } from "./Source";
+import { TABS, changedText, copyName, kindLabel, type Tab } from "./model";
 
-// The tab names of earlier versions still open the right tab.
-const TAB_ALIASES: Record<string, string> = {
-  instructions: "rules",
-  "": "source",
-};
-const fileName = (template: Template) => template.kind + ".tex";
-
-function SourceTab({ template }: { template: Template }) {
-  const { mutate, pending, notify } = useWorkspace();
-  const [source, setSource] = useState(template.tex);
-  const picker = useRef<HTMLInputElement>(null);
-  const form = useRef<HTMLFormElement>(null);
-  async function save(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    await mutate(
-      () =>
-        api(
-          `/templates/${template.id}`,
-          "PATCH",
-          version(template, { tex: source }),
-        ),
-      "Source saved. Applications that were already prepared keep theirs.",
-    );
-  }
-  const lines = source ? source.split("\n").length : 0;
-  return (
-    <form ref={form} onSubmit={save}>
-      <div className="body stack">
-        <div className="spread wrap">
-          <div>
-            <strong className="mono">{fileName(template)}</strong>{" "}
-            <span className="caption">
-              · {plural(lines, "line")} ·{" "}
-              {fileSize(new TextEncoder().encode(source).length)}
-            </span>
-          </div>
-          <div className="row">
-            <input
-              ref={picker}
-              type="file"
-              accept=".tex,.txt"
-              hidden
-              aria-label="Source file to load"
-              onChange={async (event) => {
-                const file = event.target.files?.[0];
-                event.target.value = "";
-                if (!file) return;
-                if (file.size > 1_000_000)
-                  return notify("Use a source file smaller than 1 MB.", true);
-                setSource(await file.text());
-                // Loading a file is an edit of this form.
-                if (form.current) form.current.dataset.dirty = "true";
-              }}
-            />
-            <Button
-              type="button"
-              size="sm"
-              onClick={() => picker.current?.click()}
-            >
-              Replace from a file
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="quiet"
-              onClick={() =>
-                download(fileName(template), source, "application/x-tex")
-              }
-            >
-              Download
-            </Button>
-          </div>
-        </div>
-        <Field
-          label="LaTeX source"
-          hint="The workspace stores this text. Your agent fills and compiles it on its own machine."
-        >
-          <textarea
-            className="code"
-            name="tex"
-            spellCheck={false}
-            value={source}
-            onChange={(event) => setSource(event.target.value)}
-          />
-        </Field>
-      </div>
-      <footer>
-        <span className="muted grow">
-          {source
-            ? "Applications that were already prepared keep the source they froze."
-            : "No source yet: the agent cannot build a document from this template."}
-        </span>
-        <Button variant="primary" size="sm" disabled={pending}>
-          Save source
-        </Button>
-      </footer>
-    </form>
-  );
-}
-
-function PreviewTab({ template }: { template: Template }) {
-  const { data } = useAssets("template", template.id);
-  const pdf = data.items.find(isPdf);
-  const [url, setUrl] = useState("");
-  useEffect(() => {
-    let active = true;
-    setUrl("");
-    if (pdf)
-      fileUrl(pdf)
-        .then((value) => active && setUrl(value))
-        .catch(() => {});
-    return () => {
-      active = false;
-    };
-  }, [pdf?.id]);
-  if (!pdf)
-    return (
-      <EmptyState title="No preview yet">
-        The workspace does not compile TeX. When your agent compiles a sample of
-        this template, add the PDF under Assets and it is shown here.
-      </EmptyState>
-    );
-  return (
-    <div className="body stack">
-      <p className="caption">
-        <span className="mono">{pdf.name}</span>, added {date(pdf.created_at)}.
-        It was compiled outside the workspace and may be older than the source.
-      </p>
-      {url && (
-        <iframe
-          title={`Sample of ${template.name}`}
-          className="frame"
-          src={`${url}${url.includes("?") ? "&" : "?"}inline=true#toolbar=0`}
-          referrerPolicy="no-referrer"
-        />
-      )}
-    </div>
-  );
-}
-
-/** One template: its source, rules, assets and an uploaded sample. */
+/** One template: its header actions and the Preview · Source · Files · Limits tabs. */
 export function TemplateDetail({
-  template,
+  id,
+  summary,
+  names,
   tab,
   onTab,
-  onRemoved,
+  onBack,
+  onSelect,
+  onDirty,
 }: {
-  template: Template;
-  tab: string;
-  onTab: (tab: string) => void;
-  onRemoved: () => void;
+  id: string;
+  /** The list's copy, shown while the full record loads. */
+  summary: Template;
+  names: string[];
+  tab: Tab;
+  onTab: (tab: Tab) => void;
+  onBack: () => void;
+  onSelect: (id: string | null) => void;
+  onDirty: (dirty: boolean) => void;
 }) {
-  const { mutate, pending } = useWorkspace();
-  const assets = useAssets("template", template.id);
-  const [settings, setSettings] = useState(false);
-  const [removing, setRemoving] = useState(false);
-  const kind = kindLabels[template.kind];
-  const shown = TAB_ALIASES[tab] ?? tab;
-  const current = ["source", "rules", "assets", "preview"].includes(shown)
-    ? shown
-    : "source";
+  const query = useTemplate(id);
+  const template = query.data ?? summary;
+  const full = query.data;
+  const toast = useToast();
+  const update = useUpdateTemplate(full);
+  const remove = useDeleteTemplate();
+  const duplicate = useDuplicateTemplate();
+  const [renaming, setRenaming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const kind = kindLabel(template.kind);
+  const files = template.file_count ?? 0;
+  const fail = (cause: unknown) =>
+    toast.show({
+      tone: "error",
+      message: cause instanceof Error ? cause.message : "That did not work.",
+    });
+  const menu = [
+    {
+      id: "rename",
+      label: "Rename",
+      icon: PenLine,
+      onSelect: () => setRenaming(true),
+    },
+    {
+      id: "duplicate",
+      label: "Duplicate",
+      icon: Copy,
+      disabled: duplicate.isPending,
+      onSelect: () =>
+        duplicate.mutate(
+          { template, name: copyName(template.name, names) },
+          {
+            onSuccess: (copy) => {
+              toast.show({
+                tone: "success",
+                message: `Created “${copy.name}”`,
+              });
+              onSelect(copy.id);
+            },
+            onError: fail,
+          },
+        ),
+    },
+    {
+      id: "download",
+      label: "Download source",
+      icon: Download,
+      disabled: !full,
+      onSelect: () =>
+        full &&
+        save(
+          new Blob([full.tex ?? ""], { type: "application/x-tex" }),
+          `${template.name.replace(/[^\w.-]+/g, "-").toLowerCase() || "template"}.tex`,
+        ),
+    },
+    "separator" as const,
+    {
+      id: "delete",
+      label: "Delete permanently…",
+      icon: Trash2,
+      danger: true,
+      onSelect: () => setDeleting(true),
+    },
+  ];
   return (
-    <section className="card detail" aria-labelledby="template-title">
-      <header>
-        <div className="grow">
-          <div className="row">
-            <h2 id="template-title">{template.name}</h2>
-            {template.is_default && <Tag tone="ready">Default {kind}</Tag>}
-          </div>
-          <div className="caption">
-            {kind} · version {template.version} · changed{" "}
-            {date(template.updated_at)}
-          </div>
-        </div>
-        <Button size="sm" variant="quiet" onClick={() => setSettings(true)}>
-          Rename
-        </Button>
-        {!template.is_default && (
-          <Button
-            size="sm"
-            variant="quiet"
-            disabled={pending}
-            onClick={() =>
-              mutate(
-                () =>
-                  api(
-                    `/templates/${template.id}`,
-                    "PATCH",
-                    version(template, { is_default: true }),
-                  ),
-                `${template.name} is the default ${kind}.`,
-              )
-            }
-          >
-            Make default
-          </Button>
-        )}
-        <Button
-          size="sm"
-          variant="quiet danger"
-          onClick={() => setRemoving(true)}
-        >
-          Delete
-        </Button>
-      </header>
-      <Tabs
-        id="template"
-        label={template.name}
-        value={current}
-        onChange={onTab}
-        items={[
-          { id: "source", label: "Source" },
-          { id: "rules", label: "Guidance" },
-          { id: "assets", label: "Assets", count: assets.data.total },
-          { id: "preview", label: "Preview" },
-        ]}
-      >
-        {current === "source" ? (
-          <SourceTab key={template.version} template={template} />
-        ) : current === "rules" ? (
-          <RulesTab key={template.version} template={template} />
-        ) : current === "assets" ? (
-          <Assets
-            ownerType="template"
-            ownerId={template.id}
-            empty="No assets yet. Add the class file, fonts and images the source loads."
-            note="Assets are stored once and shared by every application that uses this template."
-          />
-        ) : (
-          <PreviewTab template={template} />
-        )}
-      </Tabs>
-      {settings && (
-        <TemplateSettings
-          template={template}
-          onClose={() => setSettings(false)}
+    <>
+      <DetailBar onBack={onBack} backLabel="Back to templates">
+        <SheetMenu
+          label={`Template ${template.name}`}
+          items={menu}
+          trigger={(props) => (
+            <IconButton
+              {...props}
+              icon={Ellipsis}
+              label="More actions"
+              tooltip="none"
+            />
+          )}
         />
-      )}
-      {removing && (
-        <ConfirmDialog
-          title="Remove this template?"
-          confirm="Remove template"
-          keep="Keep template"
-          onClose={() => setRemoving(false)}
-          onConfirm={async () => {
-            if (
-              await mutate(
-                () =>
-                  api(
-                    `/templates/${template.id}?expected_version=${template.version}`,
-                    "DELETE",
-                  ),
-                "Template removed.",
-              )
-            ) {
-              setRemoving(false);
-              onRemoved();
-            }
-          }}
+      </DetailBar>
+      <DetailBody className="tpl-detail">
+        <header className="tpl-head">
+          <h2 className="tpl-title">{template.name}</h2>
+          <MetaLine
+            items={[
+              { icon: FileText, text: kind, label: "Kind" },
+              {
+                icon: Paperclip,
+                text: files === 1 ? "1 file" : `${files} files`,
+                label: "Files",
+              },
+              {
+                icon: Clock,
+                text: changedText(formatDate(template.updated_at)),
+                label: "Changed",
+              },
+              ...(template.is_default
+                ? [{ icon: CircleCheck, text: `Default ${kind}` }]
+                : []),
+            ]}
+          />
+          {!template.is_default && (
+            <div className="tpl-actions">
+              <Button
+                disabled={!full || update.isPending}
+                onClick={() =>
+                  update.mutate(
+                    { is_default: true },
+                    {
+                      onSuccess: () =>
+                        toast.show({
+                          tone: "success",
+                          message: `“${template.name}” is the default ${kind}`,
+                        }),
+                      onError: fail,
+                    },
+                  )
+                }
+              >
+                Set as default
+              </Button>
+            </div>
+          )}
+        </header>
+        <Tabs
+          label="Template"
+          idPrefix="template"
+          items={TABS.map((item) => ({
+            id: item.id,
+            label: item.label,
+            count: item.id === "files" && files ? files : undefined,
+          }))}
+          value={tab}
+          onChange={(value) => onTab(value as Tab)}
+          className="tpl-tabs"
+        />
+        <div
+          className="tpl-panel"
+          id="template-panel"
+          role="tabpanel"
+          aria-labelledby={`template-tab-${tab}`}
         >
-          <p>
-            <strong>{template.name}</strong> and its assets are removed.
-            Applications that were already prepared keep the template they
-            froze.
-          </p>
-        </ConfirmDialog>
-      )}
-    </section>
+          {!full ? (
+            <SkeletonRows rows={4} />
+          ) : tab === "preview" ? (
+            <PreviewTab template={full} />
+          ) : tab === "source" ? (
+            <SourceTab template={full} onDirty={onDirty} />
+          ) : tab === "files" ? (
+            <FilesTab template={full} />
+          ) : (
+            <LimitsTab template={full} onDirty={onDirty} />
+          )}
+        </div>
+      </DetailBody>
+      <RenameDialog
+        open={renaming}
+        template={template}
+        saving={update.isPending}
+        onClose={() => setRenaming(false)}
+        onSave={(name) =>
+          update.mutate(
+            { name },
+            {
+              onSuccess: () => {
+                setRenaming(false);
+                toast.show({
+                  tone: "success",
+                  message: `Renamed to “${name}”`,
+                });
+              },
+              onError: fail,
+            },
+          )
+        }
+      />
+      <ConfirmDialog
+        open={deleting}
+        title={`Delete “${template.name}” permanently?`}
+        confirm="Delete template"
+        onClose={() => setDeleting(false)}
+        onConfirm={() =>
+          remove.mutate(template, {
+            onSuccess: () => {
+              toast.show({
+                tone: "success",
+                message: `Deleted “${template.name}”`,
+              });
+              onSelect(null);
+            },
+            onError: fail,
+          })
+        }
+      >
+        {`Its source${files ? ` and ${files === 1 ? "1 file" : `${files} files`}` : ""} are deleted. Documents already made from it keep their own copy. This cannot be undone.`}
+      </ConfirmDialog>
+    </>
+  );
+}
+
+function RenameDialog({
+  open,
+  template,
+  saving,
+  onClose,
+  onSave,
+}: {
+  open: boolean;
+  template: Template;
+  saving: boolean;
+  onClose: () => void;
+  onSave: (name: string) => void;
+}) {
+  const [name, setName] = useState(template.name);
+  const [error, setError] = useState<string | null>(null);
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) {
+      setName(template.name);
+      setError(null);
+    }
+  }
+  const submit = () => {
+    const value = name.trim();
+    if (!value) return setError("Give the template a name.");
+    if (value === template.name) return onClose();
+    onSave(value);
+  };
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title="Rename template"
+      initialFocus="input"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            type="submit"
+            form="template-rename"
+            disabled={saving}
+          >
+            Save
+          </Button>
+        </>
+      }
+    >
+      <form
+        id="template-rename"
+        data-unguarded=""
+        noValidate
+        onSubmit={(event) => {
+          event.preventDefault();
+          submit();
+        }}
+      >
+        <Field label="Name" error={error}>
+          <Input
+            value={name}
+            maxLength={200}
+            onChange={(event) => {
+              setName(event.target.value);
+              setError(null);
+            }}
+          />
+        </Field>
+      </form>
+    </Dialog>
   );
 }

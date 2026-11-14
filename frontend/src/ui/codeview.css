@@ -1,0 +1,76 @@
+@layer ui {
+  .ui-code {
+    --ui-code-line: 20px;
+    display: flex;
+    align-items: flex-start;
+    min-width: 0;
+    max-width: 100%;
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    background: var(--bg-subtle);
+    overflow-x: auto;
+    font: 12.5px / var(--ui-code-line) var(--mono);
+    letter-spacing: 0;
+    tab-size: 2;
+  }
+  .ui-code:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+  }
+  .ui-code pre {
+    margin: 0;
+    font: inherit;
+  }
+  .ui-code-gutter {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    flex: none;
+    min-width: 44px;
+    padding: var(--s-3) var(--s-2) var(--s-3) var(--s-3);
+    border-right: 1px solid var(--border);
+    background: var(--bg-subtle);
+    color: var(--text-3);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    user-select: none;
+  }
+  .ui-code-text {
+    flex: 1;
+    padding: var(--s-3) var(--s-4);
+    color: var(--text);
+    white-space: pre;
+  }
+  .ui-code-edit {
+    background: var(--bg);
+    border-color: var(--control);
+    overflow: hidden;
+  }
+  .ui-code-edit:focus-within {
+    border-color: var(--accent);
+    box-shadow: var(--focus-input);
+  }
+  .ui-code-edit .ui-code-gutter {
+    background: var(--bg-subtle);
+  }
+  .ui-code-input {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    padding: var(--s-3) var(--s-4);
+    border: 0;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    line-height: var(--ui-code-line);
+    resize: none;
+    overflow-x: auto;
+    overflow-y: hidden;
+    white-space: pre;
+  }
+  .ui-code-input:focus,
+  .ui-code-input:focus-visible {
+    outline: none;
+    box-shadow: none;
+  }
+}
