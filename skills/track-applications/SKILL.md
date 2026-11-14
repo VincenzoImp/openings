@@ -1,5 +1,8 @@
 ---
 name: track-applications
+title: Track your applications
+summary: Review what is Ready, follow-ups, employer replies and outcomes, and record the progress you report.
+example: Which of my applications need attention this week?
 description: Review the Openings application pipeline - what is Ready and its priority, expired postings, follow-ups, employer replies, no-reply closures and stats - and record owner-reported progress without submitting anything.
 compatibility: Requires access to the Openings MCP server or REST API, as described in the openings-workspace skill.
 ---
@@ -15,19 +18,10 @@ Read [Openings workspace](../openings-workspace/SKILL.md) for transport, schemas
 application history and versions. Closing an application never changes its
 job's triage.
 
-## Run and questions
+## Questions and report
 
-Open a run before the first write: `runs_start` with `workflow: "track-applications"` and the scope; writes made
-with this token then attach to the run. First read the owner's answers given
-since the previous run (`questions_list` with `answered_since`) and act on them.
-Then read the owner's open requests (`requests_list` with `state: "open"`): take
-the ones in this workflow's scope (`requests_take`), do the work, and report on
-each with `requests_complete` and a short result, or `requests_decline` and the
-reason. Leave requests for other workflows open. A request never authorises
-submitting an application, contacting an employer or recording Applied.
-Ask each new question as a record tied to its job, application or Career entry
-(`questions_ask`), not only in chat. Close the run with `runs_finish` and the
-stored [run report](../openings-workspace/references/run-report.md). A run asked only to inspect needs no run record.
+Ask the owner in the chat when a missing fact matters, and never record an
+answer the owner did not give. Report what you did in the chat.
 
 ## Read the pipeline
 
@@ -94,7 +88,7 @@ without a reply sent longer ago than the no-reply period; the result's
 propose closing them as no reply. Close them (`applications_update` or
 `applications_bulk` with `outcome: "no_response"` and `concluded_on`, today
 when omitted) only when the owner asks or Working with me in the owner's
-Preferences says to; otherwise ask with one `questions_ask` that lists them.
+Preferences says to; otherwise ask the owner in the chat with one list of them.
 Nothing closes automatically. Never close an Interview or Offer as no reply.
 
 ## Patterns
@@ -107,5 +101,4 @@ sent do not count; dismissed jobs never had an application. Do not read
 applications the owner closed without applying as preferences: the owner applies
 to every feasible prepared application, and closures record feasibility.
 Present patterns as observations for the owner to weigh, not as changes to
-the Preferences. Report using the shared
-[run report](../openings-workspace/references/run-report.md).
+the Preferences. Report what you did in the chat.

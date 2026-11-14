@@ -13,6 +13,7 @@ import difflib
 import hashlib
 import json
 
+from .. import events
 from ..career.records import _get, _page
 from ..common import check_version, encode, new_id, now
 from ..errors import DomainError, missing
@@ -165,17 +166,17 @@ class RevisionOperations:
                     )
                     if value.source is not None:
                         self._store_inline_source(conn, document_id, value.kind, value.source)
-                    self.workspace.event(
+                    events.record(
+                        conn,
                         "document_created",
-                        application["job_id"],
-                        value.application_id,
-                        {
+                        subject=("document", document_id),
+                        payload={
                             "document_id": document_id,
                             "kind": value.kind,
                             "previous_id": value.previous_id,
                         },
-                        conn,
-                        subject=("document", document_id),
+                        job_id=application["job_id"],
+                        application_id=value.application_id,
                     )
                 remember(conn, "documents", value.idempotency_key, digest, document_id)
             uploads = self._create_grants(conn, document_id, value) if source_kind else None
@@ -432,13 +433,13 @@ class RevisionOperations:
                     )
             conn.execute("DELETE FROM documents WHERE id=?", (document_id,))
             if application:
-                self.workspace.event(
-                    "document_deleted",
-                    application["job_id"],
-                    document["application_id"],
-                    {"document_id": document_id, "kind": document["kind"]},
+                events.record(
                     conn,
+                    "document_deleted",
                     subject=("document", document_id),
+                    payload={"document_id": document_id, "kind": document["kind"]},
+                    job_id=application["job_id"],
+                    application_id=document["application_id"],
                 )
         self.db.collect_blobs()
         return {"deleted": True, "id": document_id}

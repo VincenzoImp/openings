@@ -8,7 +8,7 @@ export interface Destination {
   /** Routes shown under this destination (the two queues of Jobs). */
   routes?: string[];
   /** Which number the navigation shows beside the label. */
-  count?: "ready" | "questions" | "new";
+  count?: "ready" | "new";
 }
 export interface NavGroup {
   group: string;
@@ -29,7 +29,6 @@ export const NAV: NavGroup[] = [
       },
       // New (the old Inbox), Shortlisted, Dismissed and All are tabs of Jobs.
       { id: "jobs", label: "Jobs", count: "new" },
-      { id: "activity", label: "Activity", count: "questions" },
     ],
   },
   {
@@ -50,7 +49,7 @@ export const NAV: NavGroup[] = [
 ];
 
 /** The destinations of the bottom bar on narrow screens; the rest is under More. */
-export const TAB_BAR = ["today", "applications", "jobs", "activity"];
+export const TAB_BAR = ["today", "applications", "jobs", "career"];
 
 /** Titles of the screens, by route. */
 export const SCREENS: Record<string, string> = {
@@ -58,7 +57,6 @@ export const SCREENS: Record<string, string> = {
   applications: "Applications",
   review: "Application review",
   jobs: "Jobs",
-  activity: "Activity",
   career: "Career",
   preferences: "Preferences",
   templates: "Templates",

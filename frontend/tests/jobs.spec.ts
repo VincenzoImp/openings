@@ -343,6 +343,70 @@ test("bulk actions shortlist, return and forget selected jobs after asking", asy
   }
 });
 
+test("Dismissed by agent shows who dismissed each job and why, and Restore brings the selection back to New", async ({
+  page,
+}) => {
+  const tag = unique("Agent batch");
+  const agent = await call(page, "/tokens", "POST", {
+    name: unique("Triage agent"),
+    kind: "agent",
+  });
+  const made = [await job(page, `${tag} one`), await job(page, `${tag} two`)];
+  // The agent dismisses both in one call, with one reason.
+  const result = await call(
+    page,
+    "/jobs/bulk",
+    "POST",
+    {
+      action: "dismissed",
+      reason: "Synthetic: outside the preferences.",
+      items: made.map((item) => ({
+        id: item.id,
+        expected_version: item.version,
+      })),
+    },
+    agent.token,
+  );
+  expect(result.succeeded).toBe(2);
+  await go(page, "jobs?section=dismissed");
+  await settled(page);
+  const chips = page.getByRole("group", { name: "Dismissed by" });
+  await chips.getByRole("button", { name: /^By agent/ }).click();
+  await expect(page).toHaveURL(/dismissed_by=agent/);
+  await expect(
+    chips.getByRole("button", { name: /^By agent/ }),
+  ).toHaveAttribute("aria-pressed", "true");
+  // The seeded review of career-agent is listed with its reason.
+  const seeded = page
+    .locator(".job-list > li")
+    .filter({ hasText: "Support role, not data." });
+  await expect(seeded).toContainText("Dismissed by career-agent");
+  // The agent's batch: each row names the token and the reason.
+  await page.getByRole("searchbox", { name: "Search jobs" }).fill(tag);
+  const rows = page.locator(".job-list > li");
+  await expect(rows).toHaveCount(2);
+  for (const index of [0, 1]) {
+    await expect(rows.nth(index)).toContainText(`Dismissed by ${agent.name}`);
+    await expect(rows.nth(index)).toContainText(
+      "Synthetic: outside the preferences.",
+    );
+  }
+  // Dismissed by you lists none of them.
+  await chips.getByRole("button", { name: /^By you/ }).click();
+  await expect(rows).toHaveCount(0);
+  await chips.getByRole("button", { name: /^By agent/ }).click();
+  await expect(rows).toHaveCount(2);
+  // Restore the whole selection in one action.
+  await page.getByRole("checkbox", { name: "Select every job shown" }).check();
+  const bar = page.getByRole("group", { name: "Selected jobs" });
+  await bar.getByRole("button", { name: "Restore", exact: true }).click();
+  await expect(toast(page)).toContainText("Jobs restored to New.");
+  await expect(rows).toHaveCount(0);
+  for (const item of made)
+    expect((await call(page, `/jobs/${item.id}`)).triage).toBe("new");
+  await call(page, `/tokens/${agent.id}`, "DELETE");
+});
+
 test("signals filter the list and Collection counts what each source found", async ({
   page,
 }) => {

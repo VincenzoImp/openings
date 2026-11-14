@@ -70,12 +70,12 @@ def test_a_write_replaces_the_section_and_records_who_wrote_it(services):
     assert second["items"] == [{"text": "Zurich."}]
     assert (second["version"], second["updated_by"]) == (2, "agent:Synthetic agent")
     events = workspace.db.all(
-        "SELECT kind,payload,subject_type,subject_id,actor_kind,actor_name FROM events "
+        "SELECT kind,payload,subject_type,subject_id,actor FROM events "
         "WHERE kind='preferences_updated' ORDER BY created_at"
     )
-    assert [(e["subject_type"], e["subject_id"], e["actor_kind"]) for e in events] == [
+    assert [(e["subject_type"], e["subject_id"], e["actor"]) for e in events] == [
         ("preferences", "looking_for", "owner"),
-        ("preferences", "looking_for", "token"),
+        ("preferences", "looking_for", "agent:Synthetic agent"),
     ]
     # The change record names the section and its size, never the text.
     assert json.loads(events[1]["payload"]) == {"section": "looking_for", "version": 2, "items": 1}

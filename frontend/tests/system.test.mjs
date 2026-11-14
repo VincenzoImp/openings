@@ -109,20 +109,7 @@ test("sources name their providers and share only common limits", () => {
   ]);
 });
 
-test("a skill's text, its shared references and appended notes", () => {
-  const content =
-    "---\nname: review-inbox\ndescription: Review.\n---\n\n# Review Inbox\n\n" +
-    "Read the [mandate](../openings-workspace/references/operating-mandate.md), " +
-    "[Openings workspace](../openings-workspace/SKILL.md) and " +
-    "[the mandate again](../openings-workspace/references/operating-mandate.md) " +
-    "and [our file](../review-inbox/references/own.md).";
-  assert.ok(settings.body(content).startsWith("# Review Inbox"));
-  assert.deepEqual(settings.linkedFiles(content, "review-inbox"), [
-    { skill: "openings-workspace", path: "references/operating-mandate.md" },
-  ]);
-  assert.equal(settings.appended("", "  First.  "), "First.");
-  assert.equal(settings.appended("First.\n", "Second."), "First.\n\nSecond.");
-  assert.equal(settings.appended("First.", "  "), "First.");
+test("sizes read in the units of the restore limit", () => {
   assert.equal(settings.megabytes(5 * 1024 ** 2), "5.0 MiB");
   assert.equal(settings.megabytes(3 * 1024 ** 3), "3.0 GiB");
 });

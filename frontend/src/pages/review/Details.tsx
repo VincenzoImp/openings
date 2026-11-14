@@ -1,19 +1,16 @@
 import { useState, type FormEvent } from "react";
 import {
-  actorLabel,
   api,
   localToday,
   type Application,
   type DocumentKind,
   type Stage,
 } from "../../api";
-import { Banner, Button, Field } from "../../design";
+import { Banner, Button, Field, actorPhrase } from "../../design";
 import { ConfirmDialog } from "../../library/common";
 import { dayTime } from "../../library/time";
 import { useWorkspace } from "../../state";
-import type { Links } from "../activity/records";
 import { missingText, outcomeLabels, stageLabels } from "../applications/model";
-import { AskAgent } from "./AskAgent";
 
 const priorities: Record<number, string> = {
   1: "P1 · highest",
@@ -104,8 +101,12 @@ function PinnedNote({ application }: { application: Application }) {
         )}
         {pinned && (
           <span className="caption">
-            {actorLabel(pinned.author) || "Unknown"},{" "}
-            {dayTime(pinned.updated_at || pinned.created_at)}
+            {[
+              dayTime(pinned.updated_at || pinned.created_at),
+              actorPhrase(pinned.author),
+            ]
+              .filter(Boolean)
+              .join(" ")}
           </span>
         )}
       </div>
@@ -114,14 +115,16 @@ function PinnedNote({ application }: { application: Application }) {
 }
 
 /**
- * The application's stage and plan, whether it is Ready, its pinned note, requests
- * for the agent, the job it belongs to, and its permanent deletion.
+ * The application's stage and plan, whether it is Ready, its pinned note, the job
+ * it belongs to, and its permanent deletion.
  */
 export function Details({
   application,
   onDeleted,
-  ...links
-}: Links & { application: Application; onDeleted: () => void }) {
+}: {
+  application: Application;
+  onDeleted: () => void;
+}) {
   const { mutate, pending } = useWorkspace();
   const [stage, setStage] = useState<Stage>(application.status);
   const [outcome, setOutcome] = useState(application.outcome || "not_pursued");
@@ -259,11 +262,6 @@ export function Details({
       <PinnedNote
         key={`${application.pinned_note?.id}-${application.pinned_note?.version}`}
         application={application}
-      />
-      <AskAgent
-        subjectType="application"
-        subjectId={application.id}
-        {...links}
       />
       <section className="stack" aria-labelledby="job-title">
         <h3 id="job-title">The job</h3>

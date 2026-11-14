@@ -1,5 +1,5 @@
-/* Two columns, question, pipeline strip, filter chips, stats and report
-   pieces: what Today and Activity are made of. */
+/* Two columns, pipeline strip, filter chips, stats and plain lists: what
+   Today and the lists of other screens are made of. */
 .cols {
   display: grid;
   grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
@@ -12,47 +12,6 @@
 }
 .roomy > * + * {
   margin-top: var(--s5);
-}
-
-/* A question for the owner, with its answer controls */
-.question {
-  padding: var(--s4);
-  border-top: 1px solid var(--line);
-}
-.question:first-child,
-.card > :is(header, .filters) + .question {
-  border-top: 0;
-}
-.question .ask,
-.question .asked {
-  font-weight: 600;
-  overflow-wrap: anywhere;
-}
-.question .ask {
-  font-size: var(--t-lg);
-  line-height: 1.35;
-}
-.question .why {
-  margin-top: var(--s1);
-  color: var(--ink-2);
-}
-.question .about {
-  margin-top: var(--s1);
-}
-.question .answer,
-.question .answered {
-  margin-top: var(--s3);
-}
-.answer .write {
-  display: grid;
-  gap: var(--s2);
-}
-.answer .row + .write {
-  margin-top: var(--s3);
-}
-.answered {
-  padding-left: var(--s3);
-  border-left: 3px solid var(--accent);
 }
 
 .pipeline {
@@ -133,17 +92,9 @@
   color: var(--accent);
 }
 
-/* Report: counts with what they count, plain lists */
-.report .sub > * + * {
-  margin-top: var(--s2);
-}
+/* Plain lists */
 .sub > .list {
   margin: 0 calc(-1 * var(--s4));
-}
-.counts dt {
-  color: var(--ink);
-  font-weight: 600;
-  text-align: right;
 }
 .plain {
   margin: 0;
@@ -168,16 +119,6 @@
 }
 .page-head strong {
   color: var(--ink);
-}
-@media (min-width: 861px) {
-  /* The form comes first in the document and sits beside the list. */
-  .aside-first > :first-child {
-    grid-column: 2;
-  }
-  .aside-first > :last-child {
-    grid-column: 1;
-    grid-row: 1;
-  }
 }
 @media (max-width: 860px) {
   .cols {

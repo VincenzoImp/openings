@@ -70,7 +70,7 @@ test("each tab reads its queue, and only Dismissed filters by who dismissed", ()
     new: 4,
     shortlisted: 2,
     dismissed: 3,
-    dismissed_by: { agent: 1, owner: 2, other: 0 },
+    dismissed_by: { agent: 1, owner: 2, system: 0 },
   };
   assert.equal(model.sectionCount("new", counts), 4);
   assert.equal(model.sectionCount("shortlisted", counts), 2);
@@ -143,44 +143,36 @@ test("the languages toggle is always asked for and says how many it hides", () =
   assert.equal(model.unspokenLine(undefined, 40), "");
 });
 
-test("a dismissal says who made it, when and why", () => {
+test("a dismissal says who made it and when, in plain words", () => {
   const at = "2026-11-13T09:12:00";
-  const by = (kind, extra = {}) => ({
-    kind,
-    id: null,
-    name: null,
-    token_kind: null,
-    label: "",
-    ...extra,
-  });
   const dismissed = (dismissal) =>
     job({
       triage: "dismissed",
       dismissal: { at, reason: "", ...dismissal },
     });
   assert.equal(
-    model.dismissalLine(
-      dismissed({ by: by("system"), category: "other" }),
-      now,
-    ),
-    "Dismissed by System · Today 09:12",
+    model.dismissalLine(dismissed({ by: "system", category: "system" }), now),
+    "Dismissed by job sources · Today 09:12",
   );
   assert.equal(
     model.dismissedBy(
-      dismissed({
-        by: by("token", { name: "career-agent", token_kind: "agent" }),
-        category: "agent",
-      }),
+      dismissed({ by: "agent:career-agent", category: "agent" }),
     ),
-    "career-agent",
+    "Dismissed by career-agent",
   );
   assert.equal(
-    model.dismissalLine(dismissed({ by: by("owner"), category: "owner" }), now),
+    model.dismissalLine(dismissed({ by: "owner", category: "owner" }), now),
     "Dismissed by you · Today 09:12",
   );
+  // Written before attribution was recorded: no one is named.
   assert.equal(
-    model.dismissedBy(dismissed({ by: by("unknown"), category: "other" })),
-    "Not recorded",
+    model.dismissedBy(dismissed({ by: null, category: "system" })),
+    "Dismissed",
+  );
+  assert.equal(model.dismissedBy(job()), "");
+  assert.deepEqual(
+    model.DISMISSED_BY.map((chip) => chip.label),
+    ["All", "By agent", "By you", "By job sources"],
   );
 });
 

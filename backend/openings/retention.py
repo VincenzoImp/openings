@@ -76,8 +76,8 @@ def prune(db, days=None, keep=KEPT_RUNS_PER_SOURCE, batch=PRUNE_BATCH):
 
     A run is finished when none of its tasks is queued or running, so work in
     progress and its checkpoint are never touched. Job and application history is
-    never removed: only records of runs and tasks that no longer exist, written
-    outside an agent run, go with them.
+    never removed: only records of runs and tasks that no longer exist, not
+    made by an agent token, go with them.
     """
     days = retention_days() if days is None else days
     removed = {"runs": 0, "tasks": 0, "events": 0, "keys": 0, "more": False}
@@ -120,7 +120,7 @@ def prune(db, days=None, keep=KEPT_RUNS_PER_SOURCE, batch=PRUNE_BATCH):
             events += conn.execute(
                 "DELETE FROM events WHERE id IN (SELECT e.id FROM events e WHERE "
                 "e.subject_type=? AND e.created_at<? AND e.job_id IS NULL AND "
-                "e.application_id IS NULL AND e.run_id IS NULL AND NOT EXISTS("
+                "e.application_id IS NULL AND coalesce(e.actor,'') NOT LIKE 'agent:%' AND NOT EXISTS("
                 f"SELECT 1 FROM {table} s WHERE s.id=e.subject_id) LIMIT ?)",
                 (kind, cutoff, batch),
             ).rowcount

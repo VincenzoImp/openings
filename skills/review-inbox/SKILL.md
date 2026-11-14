@@ -1,5 +1,8 @@
 ---
 name: review-inbox
+title: Review new jobs
+summary: Have new jobs read against your Preferences and Career, then shortlisted or dismissed with a reason.
+example: Go through my new jobs and shortlist the good ones.
 description: Review or clear the Openings New jobs (to review) by reading full jobs against current Profile and Career evidence, then shortlist credible opportunities or dismiss confirmed mismatches; runs routinely under the operating mandate.
 compatibility: Requires access to the Openings MCP server or REST API, as described in the openings-workspace skill.
 ---
@@ -22,19 +25,10 @@ owner speaks. Read the Profile and the full current Career record, then its rele
 decisions. Those live data own the selection criteria; keep no personal criteria
 in this skill.
 
-## Run and questions
+## Questions and report
 
-Open a run before the first write: `runs_start` with `workflow: "review-inbox"` and the scope; writes made
-with this token then attach to the run. First read the owner's answers given
-since the previous run (`questions_list` with `answered_since`) and act on them.
-Then read the owner's open requests (`requests_list` with `state: "open"`): take
-the ones in this workflow's scope (`requests_take`), do the work, and report on
-each with `requests_complete` and a short result, or `requests_decline` and the
-reason. Leave requests for other workflows open. A request never authorises
-submitting an application, contacting an employer or recording Applied.
-Ask each new question as a record tied to its job, application or Career entry
-(`questions_ask`), not only in chat. Close the run with `runs_finish` and the
-stored [run report](../openings-workspace/references/run-report.md). A run asked only to inspect needs no run record.
+Ask the owner in the chat when a missing fact matters, and never record an
+answer the owner did not give. Report what you did in the chat.
 
 ## Establish and read the cohort
 
@@ -86,8 +80,8 @@ Explain the fit or mismatch with specific facts, not a keyword score.
 Missing evidence does not establish that a skill or experience is absent.
 
 Shortlist or dismiss only when the evidence supports the decision. If a plausible
-role depends on a specific unresolved fact, leave it in New, ask the question
-on that job (`questions_ask`) and continue the other jobs. Do not manufacture certainty to empty the list.
+role depends on a specific unresolved fact, leave it in New, ask the owner in the
+chat and continue the other jobs. Do not manufacture certainty to empty the list.
 
 ## Write and resume safely
 
@@ -107,8 +101,8 @@ Do not dismiss a job to remove it from another pipeline view.
 
 Reconcile the initial cohort, successful changes, unresolved jobs and new arrivals.
 Use a fresh `triage: "new"` query at the end. Report actual shortlisted/dismissed counts, remaining
-IDs with reasons, failures and any arrivals outside the reviewed cohort, using
-the shared [run report](../openings-workspace/references/run-report.md). When the
+IDs with reasons, failures and any arrivals outside the reviewed cohort, in the
+chat. When the
 same kind of clear mismatch recurs from one source, mention it for
 [Manage sources](../manage-sources/SKILL.md) instead of changing sources here.
 Only call New empty when the final check establishes it.

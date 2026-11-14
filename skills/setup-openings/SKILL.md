@@ -1,5 +1,8 @@
 ---
 name: setup-openings
+title: Set up Openings
+summary: Get Openings installed and connected, then onboard your Career, Preferences, templates and first searches.
+example: Set up Openings for me and import my CV.
 description: Install, connect and onboard an Openings workspace for its owner - Docker setup, agent connection, then career record, Profile and Preferences, CV and letter templates and first searches - so the other workflow skills can run the job search.
 compatibility: Requires a machine with Docker Compose v2 for installation, or an existing Openings URL; see the openings-workspace skill for connection details.
 ---
@@ -37,8 +40,8 @@ workspace opens on, or in **Settings → Agent access**, and starts
 the agent client with `OPENINGS_URL`, `OPENINGS_TOKEN` and, for a private
 certificate authority, `OPENINGS_CA_FILE`. Recommend an agent token, not an owner
 token: it runs every workflow and cannot change the owner password, manage
-tokens, restore a backup or answer a question for the owner. `workspace_info`
-reports the kind in `actor.token_kind`; when it is `owner`, tell the owner that
+tokens or restore a backup. `workspace_info` reports the token in `actor`
+(`owner` or `agent:<token name>`); when it is `owner`, tell the owner that
 an agent token is enough. Never ask for the token in the conversation. Register the MCP
 server at `<origin>/mcp` with the bearer header in the client's own configuration.
 Confirm with `workspace_info`.
@@ -53,19 +56,10 @@ checks). Openings does not compile documents. If they are missing, propose a
 user-level TeX distribution such as TinyTeX, install it with the owner's
 agreement, and report PDF preparation as blocked until a compiler works.
 
-## Run and questions
+## Questions and report
 
-Once the connection works, open a run: `runs_start` with `workflow: "setup-openings"` and the scope; writes made
-with this token then attach to the run. First read the owner's answers given
-since the previous run (`questions_list` with `answered_since`) and act on them.
-Then read the owner's open requests (`requests_list` with `state: "open"`): take
-the ones in this workflow's scope (`requests_take`), do the work, and report on
-each with `requests_complete` and a short result, or `requests_decline` and the
-reason. Leave requests for other workflows open. A request never authorises
-submitting an application, contacting an employer or recording Applied.
-Ask each new question as a record tied to its job, application or Career entry
-(`questions_ask`), not only in chat. Close the run with `runs_finish` and the
-stored [run report](../openings-workspace/references/run-report.md).
+Ask the owner in the chat when a missing fact matters, and never record an
+answer the owner did not give. Report what you did in the chat.
 
 ## Onboard the owner
 
@@ -109,6 +103,5 @@ Work in this order; each step uses records the next ones need.
 
 Run one [Review new jobs](../review-inbox/SKILL.md) pass and prepare one application with
 [Prepare Shortlist](../prepare-shortlist/SKILL.md) so the owner can see a real
-result. Explain the owner's part in two sentences and report with the shared
-[run report](../openings-workspace/references/run-report.md), including the
-open questions about their career.
+result. Explain the owner's part in two sentences and report what you did in the chat,
+including the open questions about their career.

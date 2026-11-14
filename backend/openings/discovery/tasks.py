@@ -10,6 +10,7 @@ from datetime import UTC, datetime, timedelta
 
 from pydantic import ValidationError
 
+from .. import events
 from ..collectors.policy import ProviderDeferred
 from ..common import decode_record, encode, missing, now
 from ..errors import DomainError
@@ -88,13 +89,11 @@ class TaskOperations:
                 (now(), task_id),
             ).rowcount
             if changed:
-                self._record(
+                events.record(
                     connection,
                     "task_cancelled",
-                    "task",
-                    task_id,
-                    source_id=task["source_id"],
-                    run_id=task.get("run_id"),
+                    ("task", task_id),
+                    {"source_id": task["source_id"], "run_id": task.get("run_id")},
                 )
         return self.get_task(task_id)
 
@@ -125,13 +124,11 @@ class TaskOperations:
                 ),
             ).rowcount
             if changed:
-                self._record(
+                events.record(
                     connection,
                     "task_retried",
-                    "task",
-                    task_id,
-                    source_id=task["source_id"],
-                    run_id=task.get("run_id"),
+                    ("task", task_id),
+                    {"source_id": task["source_id"], "run_id": task.get("run_id")},
                 )
         return self.get_task(task_id)
 

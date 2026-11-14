@@ -11,6 +11,7 @@ from urllib.parse import quote
 
 from fastapi import Request
 
+from .. import events
 from ..actors import current_actor, from_columns
 from ..career.records import _get, _page
 from ..common import check_version, encode, new_id, now
@@ -331,13 +332,13 @@ class FileOperations:
             application_id = _get(conn, "documents", owner_id, "Document revision")[
                 "application_id"
             ]
-        self.workspace.event(
-            kind,
-            job_id,
-            application_id,
-            {"file_id": file_id, "owner_type": owner_type, "owner_id": owner_id},
+        events.record(
             conn,
+            kind,
             subject=("file", file_id),
+            payload={"file_id": file_id, "owner_type": owner_type, "owner_id": owner_id},
+            job_id=job_id,
+            application_id=application_id,
             actor=actor,
         )
 

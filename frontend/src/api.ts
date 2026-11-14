@@ -61,7 +61,8 @@ export interface JobSignals {
   no_longer_listed: boolean;
   unlisted_at: string | null;
 }
-export type DismissedBy = "agent" | "owner" | "other";
+/** Who dismissed a job, by kind; "system" also covers an unknown actor. */
+export type DismissedBy = "agent" | "owner" | "system";
 export interface Dismissal {
   at: string | null;
   by: Actor;
@@ -174,7 +175,6 @@ export interface Note {
   application_id?: string | null;
   scope?: "job" | "application";
   author?: Actor;
-  run?: { id: string; workflow: string | null } | null;
   /** At most one pinned note per job and per application; listed first. */
   pinned?: boolean;
   pinned_at?: string | null;
@@ -190,7 +190,7 @@ export interface TimelineItem {
   job_id: string;
   application_id: string | null;
   actor: Actor;
-  run: { id: string; workflow: string | null } | null;
+  batch_id: string | null;
   note: {
     body: string;
     version: number;
@@ -500,107 +500,24 @@ export const tokenKinds: Record<TokenKind, string> = {
   agent: "Agent",
   owner: "Owner",
 };
-export interface Actor {
-  kind: "owner" | "token" | "system" | "unknown";
-  id: string | null;
-  name: string | null;
-  token_kind?: TokenKind | null;
-  label: string;
-}
-/** Who made a change; an API token is shown with its kind. */
-export function actorLabel(actor?: Actor | null) {
-  if (!actor) return "";
-  return actor.kind === "token" && actor.token_kind
-    ? `${actor.label} (${actor.token_kind} token)`
-    : actor.label;
-}
+/**
+ * Who made a change: "owner" (the dashboard or an owner token),
+ * "agent:<token name>", "system" (collection, the worker, an upgrade), or
+ * null when it was written before attribution was recorded.
+ */
+export type Actor = string | null;
+/** One recorded change (`/events`). */
 export interface Activity {
   id?: string;
   kind?: string;
-  type?: string;
-  message?: string;
-  title?: string;
   created_at: string;
   payload?: Json;
   application_id?: string | null;
   job_id?: string | null;
   actor?: Actor;
-  run_id?: string | null;
-  /** The workflow of the run the change belongs to. */
-  run_workflow?: string | null;
+  /** One id per REST request or MCP tool call that wrote it. */
+  batch_id?: string | null;
   subject?: { type: string | null; id: string | null; label?: string };
-}
-export type RunStatus = "open" | "finished" | "interrupted";
-export interface RunReport {
-  summary: string;
-  changes: { text: string; counts: Record<string, number>; total: number };
-  not_done: {
-    item: string;
-    reason: string;
-    subject_type: string | null;
-    subject_id: string | null;
-    label: string;
-  }[];
-  checks: { check: string; verified: boolean }[];
-  limits: string;
-  method: string;
-}
-export interface Run extends Versioned {
-  workflow: string;
-  scope: string;
-  status: RunStatus;
-  interruption: "no_activity" | "superseded" | null;
-  superseded_by: string | null;
-  note: string;
-  actor: Actor;
-  started_at: string;
-  last_activity_at: string;
-  ended_at: string | null;
-  summary: string;
-  change_counts: Record<string, number>;
-  changes_total: number;
-  questions_count: number;
-  requests_count?: number;
-  report?: RunReport | null;
-  changes?: ListResult<Activity>;
-  questions?: OwnerQuestion[];
-  requests?: AgentRequest[];
-}
-export type RequestState = "open" | "taken" | "done" | "declined" | "withdrawn";
-export interface AgentRequest extends Versioned {
-  text: string;
-  state: RequestState;
-  result: string;
-  subject: OwnerQuestion["subject"];
-  created_by: Actor;
-  run_id: string | null;
-  run_workflow?: string | null;
-  taken_by: Actor | null;
-  taken_at: string | null;
-  resolved_by: Actor | null;
-  resolved_at: string | null;
-}
-export interface OwnerQuestion extends Versioned {
-  question: string;
-  why: string;
-  choices: string[];
-  state: "open" | "answered" | "withdrawn";
-  answer: string;
-  answer_choice: string | null;
-  subject: {
-    type: "job" | "application" | "knowledge";
-    id: string | null;
-    label: string;
-    deleted: boolean;
-    job_id: string | null;
-  } | null;
-  asked_by: Actor;
-  run_id: string | null;
-  run_workflow?: string | null;
-  answered_by: Actor | null;
-  answered_at: string | null;
-  withdrawn_by: Actor | null;
-  withdrawn_at: string | null;
 }
 export type StatsPeriod = "90d" | "12m" | "all";
 /** What happened to the applications sent in a period (`/stats`). */

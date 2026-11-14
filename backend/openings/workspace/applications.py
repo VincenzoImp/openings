@@ -2,6 +2,7 @@
 
 from ..db import decode_record
 from ..errors import DomainError, missing
+from ..events import event_record
 from ..models import OUTCOMES
 from ..outcomes import last_replies, no_reply_cutoff, no_reply_period, replies_of
 from .readiness import MISSING_DOCUMENTS_SQL, READY_SQL, readiness
@@ -203,7 +204,7 @@ class ApplicationReads:
     def application_events(self, application_id):
         self.get_application(application_id)
         rows = [
-            self.event_record(r)
+            event_record(r)
             for r in self.db.all(
                 "SELECT * FROM events WHERE application_id=? ORDER BY created_at DESC",
                 (application_id,),

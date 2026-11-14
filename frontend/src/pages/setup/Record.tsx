@@ -1,7 +1,6 @@
 import { useState } from "react";
 import type { Preferences, Profile } from "../../api";
-import { Banner, Button, Icon, Tag } from "../../design";
-import { plural } from "../../library/common";
+import { Button, Icon, Tag } from "../../design";
 import { confirmLeave } from "../../state";
 import { SourceEditor } from "../collection/SourceEditor";
 import { recordItems, type ItemId, type SetupFacts } from "./model";
@@ -28,13 +27,11 @@ export function RecordStep({
   facts,
   profile,
   preferences,
-  questions,
   onNext,
 }: {
   facts: SetupFacts;
   profile: Profile;
   preferences: Preferences;
-  questions: number;
   onNext: () => void;
 }) {
   const [open, setOpen] = useState<ItemId | null>(null);
@@ -51,22 +48,6 @@ export function RecordStep({
         </h2>
         <span className="caption">Your agent builds it with you</span>
       </header>
-      {questions > 0 && (
-        <div className="body">
-          <Banner
-            tone="attention"
-            title={`Your agent has ${plural(questions, "question")} for you.`}
-            action={
-              <a className="btn sm" href="#activity">
-                Answer the questions
-              </a>
-            }
-          >
-            It continues with what it can, and waits for your answers where it
-            must.
-          </Banner>
-        </div>
-      )}
       <ul className="list checklist" aria-label="Your record">
         {items.map((item, index) => {
           const formId = `setup-${item.id}`;

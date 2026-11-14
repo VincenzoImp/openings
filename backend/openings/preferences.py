@@ -25,6 +25,7 @@ from typing import Literal
 
 from pydantic import Field, field_validator, model_validator
 
+from . import events
 from .actors import current_actor
 from .common import encode, now
 from .errors import DomainError, conflict
@@ -239,11 +240,11 @@ class PreferencesService:
                 "WHERE section=?",
                 (encode(items), version, now(), actor.label, section),
             )
-            self.workspace.event(
+            events.record(
+                conn,
                 "preferences_updated",
-                payload={"section": section, "version": version, "items": len(items)},
-                conn=conn,
                 subject=("preferences", section),
+                payload={"section": section, "version": version, "items": len(items)},
             )
             return section_record(_section_row(conn, section))
 
@@ -266,13 +267,13 @@ class PreferencesService:
                 "updated_at=excluded.updated_at",
                 (SETTINGS_KEY, encode(merged), version, now()),
             )
-            self.workspace.event(
+            events.record(
+                conn,
                 "settings_updated",
+                subject=("settings", SETTINGS_KEY),
                 payload={
                     "fields": sorted(key for key in merged if merged[key] != data[key]),
                     "version": version,
                 },
-                conn=conn,
-                subject=("settings", SETTINGS_KEY),
             )
             return settings_record(conn)

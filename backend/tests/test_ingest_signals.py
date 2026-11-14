@@ -186,7 +186,7 @@ def test_triage_reasons_and_who_dismissed(services):
     assert owner["dismissal"]["category"] == "owner" and owner["dismissal"]["reason"] == "Too far."
     counts = workspace.list_jobs(include_counts=True)["counts"]
     assert counts["dismissed"] == 2 and counts["new"] == 1
-    assert counts["dismissed_by"] == {"agent": 1, "owner": 1, "other": 0}
+    assert counts["dismissed_by"] == {"agent": 1, "owner": 1, "system": 0}
     with pytest.raises(Exception, match="reason"):
         workspace.set_triage(third["id"], "shortlisted", third["version"], "Nice")
 

@@ -1,5 +1,8 @@
 ---
 name: prepare-shortlist
+title: Prepare CVs and letters
+summary: Have a tailored CV and cover letter prepared and checked for each shortlisted job until it is Ready.
+example: Prepare CVs and letters for the jobs on my shortlist.
 description: Prepare the job-specific CV and letter of Openings Shortlisted applications, using current evidence and template rules, with resumable document and PDF checks until each is Ready and the owner applies manually.
 compatibility: Requires access to the Openings MCP server or REST API, as described in the openings-workspace skill.
 ---
@@ -19,19 +22,10 @@ schemas, contexts, document revisions and transfers. Use
 all document-selection rules come from current Openings records: the owner's
 Preferences (`preferences_get`), the typed claim fields and the templates.
 
-## Run and questions
+## Questions and report
 
-Open a run before the first write: `runs_start` with `workflow: "prepare-shortlist"` and the scope; writes made
-with this token then attach to the run. First read the owner's answers given
-since the previous run (`questions_list` with `answered_since`) and act on them.
-Then read the owner's open requests (`requests_list` with `state: "open"`): take
-the ones in this workflow's scope (`requests_take`), do the work, and report on
-each with `requests_complete` and a short result, or `requests_decline` and the
-reason. Leave requests for other workflows open. A request never authorises
-submitting an application, contacting an employer or recording Applied.
-Ask each new question as a record tied to its job, application or Career entry
-(`questions_ask`), not only in chat. Close the run with `runs_finish` and the
-stored [run report](../openings-workspace/references/run-report.md).
+Ask the owner in the chat when a missing fact matters, and never record an
+answer the owner did not give. Report what you did in the chat.
 
 ## Scope and checkpoint
 
@@ -173,6 +167,5 @@ an error. On rerun, inspect server state and resume that step.
 
 Report each application with its ID, CV/CL revision IDs, verified files and any
 remaining problem. Separate Ready applications from incomplete ones and from those
-blocked by employer requirements. Use the shared
-[run report](../openings-workspace/references/run-report.md); state explicitly
+blocked by employer requirements, in the chat; state explicitly
 that no application was submitted or marked Applied by this workflow.

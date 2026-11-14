@@ -84,7 +84,7 @@ OPERATIONS = (
         rest=(Route("GET", "/jobs", "jobs"),),
         tool=Tool(
             READ_ONLY,
-            "Search compact paginated job summaries with triage (new, shortlisted, dismissed, active), location, source, remote and date filters; include_facets=true adds filter value lists and include_counts=true the number of jobs by triage. Each job has its ingest signals (posting language, languages the posting requires, the earlier job it likely duplicates with a confidence, whether the source no longer lists it) and, when dismissed, its dismissal (who and why). Filter by signal, posting_language, posting_language_not, requires or dismissed_by; hide_unspoken_required=true leaves out jobs requiring a language the owner does not speak. Read jobs_get for full content.",
+            "Search compact paginated job summaries with triage (new, shortlisted, dismissed, active), location, source, remote and date filters; include_facets=true adds filter value lists and include_counts=true the number of jobs by triage. Each job has its ingest signals (posting language, languages the posting requires, the earlier job it likely duplicates with a confidence, whether the source no longer lists it) and, when dismissed, its dismissal (who and why). Filter by signal, posting_language, posting_language_not, requires, dismissed_by (owner, agent, agent:<token name> or system), batch_id (jobs changed by one call; restore an agent's batch with jobs_bulk action new) or since (dismissed at or after); hide_unspoken_required=true leaves out jobs requiring a language the owner does not speak. Read jobs_get for full content.",
         ),
     ),
     Operation(
@@ -245,7 +245,7 @@ OPERATIONS = (
         rest=(Route("GET", "/jobs/{job_id}/notes", "notes"),),
         tool=Tool(
             READ_ONLY,
-            "Read the notes of a job and of its applications (scope, author, run, pinned), pinned first. timeline_get lists them with the recorded changes.",
+            "Read the notes of a job and of its applications (scope, author label, pinned), pinned first. timeline_get lists them with the recorded changes.",
         ),
     ),
     Operation(
@@ -280,7 +280,7 @@ OPERATIONS = (
         ),
         tool=Tool(
             READ_ONLY,
-            "Read the timeline of a job (job_id) or of an application (application_id): its notes and recorded changes in one list, pinned notes first, then newest first. A job's timeline includes its applications' entries; an application's includes its job's. Each entry has type (note or event), kind (note, event or reply), scope (job or application), actor (who), run and either note (body, version, pinned) or event (kind, payload of identifiers and field names, subject). Filter by kinds, who (owner, agent, system, unknown), scope, since and until; counts gives the entries of each kind for the other filters. Page with limit and offset.",
+            "Read the timeline of a job (job_id) or of an application (application_id): its notes and recorded changes in one list, pinned notes first, then newest first. A job's timeline includes its applications' entries; an application's includes its job's. Each entry has type (note or event), kind (note, event or reply), scope (job or application), actor (the label owner, agent:<token name> or system; null before 0.17), batch_id and either note (body, version, pinned) or event (kind, payload of identifiers and field names, subject). Filter by kinds, who (owner, agent, system, unknown), scope, since and until; counts gives the entries of each kind for the other filters. Page with limit and offset.",
         ),
     ),
     Operation(
@@ -294,7 +294,7 @@ OPERATIONS = (
         rest=(Route("POST", "/jobs/{job_id}/notes", "note"),),
         tool=Tool(
             WRITE,
-            "Write a note on a job, or on one of its applications with application_id. The note records you as its author and your open run. pinned=true pins it: it is listed first, and a job and an application each have one pinned note (pinning unpins the previous one). The application's pinned note is its standing guidance for its documents.",
+            "Write a note on a job, or on one of its applications with application_id. The note records you as its author. pinned=true pins it: it is listed first, and a job and an application each have one pinned note (pinning unpins the previous one). The application's pinned note is its standing guidance for its documents.",
         ),
     ),
     Operation(
@@ -459,8 +459,8 @@ OPERATIONS = (
 )
 
 
-def register_core(router: APIRouter, workspace, requests):
-    # workspace.info is hand-written: it reads the request and the open requests.
+def register_core(router: APIRouter, workspace):
+    # workspace.info is hand-written: it reads the request.
     @router.get("/workspace")
     def info(request: Request):
         return {
@@ -471,18 +471,17 @@ def register_core(router: APIRouter, workspace, requests):
             "api_base": "/api/v1",
             "mcp_endpoint": "/mcp",
             "single_owner": True,
-            "actor": current_actor().describe(),
-            "open_requests": requests.count_open(),
+            "actor": current_actor().label,
             "storage": storage_status(workspace.db),
         }
 
     bind_rest(router, OPERATIONS, workspace)
 
 
-def register_core_mcp(mcp, workspace, requests):
+def register_core_mcp(mcp, workspace):
     @mcp.tool(annotations=READ_ONLY)
     def workspace_info(ctx: Context) -> dict:
-        """Read workspace capabilities, the version and schema_version, who this token is (actor, with token_kind owner or agent), open_requests, the number of owner requests waiting for an agent (requests_list), and storage: database size, free space on the data volume, the largest backup a restore accepts and the days finished collection runs are kept. Use REST transfer grants for file bytes."""
+        """Read workspace capabilities, the version and schema_version, who this token is (actor: owner or agent:<token name>, the label its changes carry) and storage: database size, free space on the data volume, the largest backup a restore accepts and the days finished collection runs are kept. Use REST transfer grants for file bytes."""
         request = ctx.request_context.request
         origin = os.environ.get("OPENINGS_PUBLIC_URL") or (
             str(request.base_url).rstrip("/") if request else None
@@ -493,10 +492,9 @@ def register_core_mcp(mcp, workspace, requests):
             "schema_version": SCHEMA_VERSION,
             "origin": origin,
             "api_base": "/api/v1",
-            "actor": current_actor().describe(),
-            "open_requests": requests.count_open(),
+            "actor": current_actor().label,
             "storage": storage_status(workspace.db),
-            "workflow": "Read open requests for the agent first. Read Preferences, career, templates and the application; write and compile externally; save CV and letter revisions with their PDF (and TeX source); an application is Ready when its required documents are complete. Mark applied and replies are recorded only as the owner reports them.",
+            "workflow": "Read Preferences, career, templates and the application; write and compile externally; save CV and letter revisions with their PDF (and TeX source); an application is Ready when its required documents are complete. Mark applied and replies are recorded only as the owner reports them. Report what you did in the chat.",
         }
 
     bind_mcp(mcp, OPERATIONS, workspace)

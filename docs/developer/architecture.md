@@ -32,8 +32,7 @@ flowchart LR
 | `backend/openings/operations.py` | Backup credentials, restore, the room a restore needs and storage status |
 | `backend/openings/backups.py` | Scheduled local backups run by the worker, their rotation and status, and the owner's access to them and to the pre-upgrade copies `db.py` keeps |
 | `backend/openings/idempotency.py` | Idempotency keys of the creates whose records have no key column |
-| `backend/openings/activity.py`, `actors.py` | Actor of each change, agent runs with reports, questions for the owner, change log |
-| `backend/openings/agent_requests.py`, `subjects.py` | Requests for the agent; the subject reference shared with questions |
+| `backend/openings/events.py`, `actors.py` | The attributed change log (`events.record`, the API-only `events_list`); the actor label and batch id of the current request or tool call |
 | `backend/openings/discovery/` | Typed sources, schedules and queue operations |
 | `backend/openings/collectors` | Adapter capability catalog, typed options and shared HTTP policy/runtime |
 | `backend/openings/worker.py` | Independent scheduling and acquisition lanes |
@@ -43,7 +42,7 @@ flowchart LR
 | `backend/openings/migrations/` | The one supported upgrade, from the previous schema (`m15.py`: a new file with the data copied in, the archive and the pre-upgrade copy) |
 | `frontend/src` | Dashboard using REST; no duplicated domain decisions |
 | `frontend/src/ui/` | Design system of the new dashboard: tokens, Inter, Lucide icons and the primitives, in cascade layers; `ui.html` is its gallery |
-| `backend/openings/skills.py`, `skill_notes.py` | Shipped skills served read-only; per-workspace local notes appended when a skill is served |
+| `backend/openings/skills.py` | Shipped skills served read-only, with the `title`, `summary` and `example` of their frontmatter |
 | `skills/` | Agent workflow skills (Agent Skills format) and their shared references |
 
 The running OpenAPI schema at `/api/openapi.json` and MCP `tools/list` are the
@@ -67,15 +66,15 @@ belongs to the module of its concern.
 
 | Package | Modules |
 |---|---|
-| `workspace/` | `service.py` settings and the attributed change log; `jobs.py` job reads, filters and search; `job_changes.py` ingest, corrections, triage and Forget; `identity.py` URL lookup, duplicate candidates, distinct marks and Merge; `notes.py` notes, their author, run and pin; `timeline.py` the timeline of a job or an application; `readiness.py` computed Ready (the one rule lists, reads, counts and filters use); `applications.py` preparation summaries, lists and history; `application_changes.py` one open attempt per job, stages, Mark applied and its undo, deletion; `shortlist.py` the application a shortlist starts and its undo; `replies.py` employer replies through the application update; `bulk.py` per-item bulk results |
+| `workspace/` | `service.py` settings and the attributed change log; `jobs.py` job reads, filters and search; `job_changes.py` ingest, corrections, triage and Forget; `identity.py` URL lookup, duplicate candidates, distinct marks and Merge; `notes.py` notes, their author and pin; `timeline.py` the timeline of a job or an application; `readiness.py` computed Ready (the one rule lists, reads, counts and filters use); `applications.py` preparation summaries, lists and history; `application_changes.py` one open attempt per job, stages, Mark applied and its undo, deletion; `shortlist.py` the application a shortlist starts and its undo; `replies.py` employer replies through the application update; `bulk.py` per-item bulk results |
 | `discovery/` | `service.py` the provider gate (`http_budget`, `fetch_bytes`); `models.py` typed inputs; `network.py` the public-address policy and the bounded fetch; `resolution.py` board detection and source configuration; `feeds.py` posting readers (Lever, Ashby, RSS) and adapter dispatch; `sources.py` source schemas, preview and writes; `runs.py` the global switch, provider policies, queueing, scheduling and run records; `tasks.py` leases, retry and running one collection |
 | `documents/` | `revisions.py` creation with upload grants, cited evidence, comparison and deletion; `sources.py` when a CV or letter is complete, the pairing of its source and PDF and its text; `text.py` readable text of a TeX source; `pdf.py` readable text of a PDF (pypdf); `latex.py` what CV and letter class commands print; `files.py` owned files and scoped transfer grants; `models.py` inputs |
 | `career/` | `profile.py` the Profile; `entries.py` Career entries; `claims.py`; `templates.py`; `imports.py`; `models.py` inputs and defaults; `records.py` row helpers shared with documents |
-| `interfaces/` | One module per area declaring its operations and binding them to its service: `core.py` (workspace, jobs, notes, applications), `career.py`, `documents.py`, `discovery.py`, `activity.py`, `agent_requests.py`, `preferences.py`, `stats.py`, `skills.py` and `system.py` (sign-in, tokens, capabilities, backup, restore, examples, export); `registry.py` the declaration and its binding |
+| `interfaces/` | One module per area declaring its operations and binding them to its service: `core.py` (workspace, jobs, notes, applications), `career.py`, `documents.py`, `discovery.py`, `events.py`, `preferences.py`, `stats.py`, `skills.py` and `system.py` (sign-in, tokens, capabilities, backup, restore, examples, export); `registry.py` the declaration and its binding |
 
 Services never import FastAPI routing or MCP registration; `interfaces/` binds
 them, and `app.py` calls each area in a fixed order. Smaller concerns stay single
-modules (`activity.py`, `outcomes.py`, `stats.py`,
+modules (`events.py`, `outcomes.py`, `stats.py`,
 `job_signals.py` and the others in the code map). When a module approaches the
 limit, split it the same way rather than growing it.
 
@@ -233,15 +232,19 @@ route, tool or surface is not registered.
   A claim's one typed selection field is `always_include` (★ in the dashboard);
   any other hint an agent keeps (such as a role or group) goes in its `metadata`.
   Reserved structured fields are stored once, outside arbitrary metadata.
-- **Attribution:** authentication sets the actor (owner session, named API token
-  with its kind, or system) in a context variable (`actors.py`) that reaches the
-  shared services through thread offloading; worker threads start with an empty context and
-  record the system. Every write leaves one event with its subject, actor and,
-  for a token with an open run, that run. Payloads hold identifiers, field names
-  and versions, never content. Events of a job or application are deleted with
+- **Attribution:** authentication sets the actor in a context variable
+  (`actors.py`) that reaches the shared services through thread offloading;
+  worker threads start with an empty context and record the system. Each write
+  stores one plain actor label: `owner` (dashboard session or owner token),
+  `agent:<token name>` (agent token), `system` (collection, worker, upgrade), or
+  NULL for rows written before 0.17. Every REST request or MCP tool call that
+  writes gets one `batch_id` (`b_` + ULID) in the same context, so all its events
+  share it; upgraded history keeps `run:<id>`. `events.record` is the one writer:
+  every write leaves one event with its subject, actor and batch. Payloads hold
+  identifiers, field names and versions, never content. Events of a job or application are deleted with
   it; the deletion itself stays recorded.
 - **Timeline:** a note belongs to a job, or to one of its applications
-  (`application_id`), and records its author and run. A job and an application
+  (`application_id`), and records its author label. A job and an application
   each have at most one pinned note (`pinned_at`; two partial unique indexes);
   pinning a note unpins the previous one, both recorded as `note_pinned` and
   `note_unpinned`. `Workspace.timeline` is the one read of a job's or an
@@ -249,36 +252,12 @@ route, tool or surface is not registered.
   (`job`, or `application` when the row has an `application_id`), the kind
   (`note`, `event`, or `reply` for an event whose subject is a reply, or a response
   before 0.24), the
-  actor and the run, filtered by kind, who, scope and period, ordered pinned
+  actor and the batch, filtered by kind, who, scope and period, ordered pinned
   first and then by time, with counts by kind. An application's timeline holds
   its rows and its job's rows without an application. `note_added` and
   `note_edited` are not entries: the note is. The application's pinned note is
   its standing guidance, returned with the application as `pinned_note`; an
   application has no note field of its own.
-- **Runs and questions:** a token has one open run (a partial unique index); its
-  writes attach to it. A run without activity is reported as interrupted but
-  only an explicit supersede closes it. A finished run stores its report and
-  change counts. Questions reference a job, application or Career entry with
-  `ON DELETE SET NULL` and keep a label, so they outlive their subject.
-- **Requests:** the mirror of questions. The owner writes a request (owner
-  authority), an API token takes it and completes or declines it, and the owner
-  may withdraw it until then. The request records the run of the token that
-  handled it when that token has an open run; taking without a run is allowed.
-  Like questions, requests reference a job, application or Career entry with
-  `ON DELETE SET NULL`, keep a label and follow a job through a merge. The
-  server runs no agent: a request is only read.
-- **Skill notes:** skills ship with the server and are never edited. A
-  workspace keeps local notes per skill in `skill_notes`, one immutable row per
-  version (at most 2,000 characters; the highest version is current, so the
-  earlier versions are the history). A save names the version it replaces (0
-  for the first) and leaves an attributed `skill_notes_updated` event with the
-  skill and version only. `skill_notes.serve` is the one place that appends the
-  notes to `SKILL.md` under "Local notes for this workspace", for REST,
-  `skills_get` and the MCP prompts alike; reference files are served as shipped.
-  Any authenticated actor may write: the agent discovers what a workflow lacks
-  while running it, the notes stay in the workspace, and each version names its
-  author and can be restored. A finished run's `method` is listed with the run
-  so the owner can turn it into notes.
 - **Token scope:** a token is `owner` or `agent`. Owner-only operations call
   `actors.require_owner` in the shared service, so REST and MCP refuse an agent
   token alike with `403 forbidden`; `/api/v1/capabilities` marks them `access: owner` and
@@ -367,7 +346,7 @@ a pass is one short transaction that removes at most 500 finished collection
 runs (their tasks cascade), finished tasks without a run and the change records
 of removed runs and tasks, and repeats after a minute while more remain. A run
 with a queued or running task is never finished, the 20 most recent finished
-runs of every source stay, and events of jobs, applications and agent runs are
+runs of every source stay, and events of jobs, applications and agent changes are
 never pruned.
 
 A restore of *B* bytes over a database of *D* bytes needs 3 *B* + *D* +

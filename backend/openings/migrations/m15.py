@@ -122,6 +122,21 @@ def _repairs(**columns):
     return columns
 
 
+def _label(prefix):
+    """#209: the actor label of a schema-14 actor block ``<prefix>_kind/_id/_name/_token_kind``.
+
+    The dashboard session and an owner token (or a token from before 0.17, which
+    had no kind) are ``owner``; an agent token is ``agent:<token name>``; the
+    system is ``system``; a row written before 0.17 has none.
+    """
+    return (
+        f"CASE WHEN o.{prefix}_kind IS NULL THEN NULL "
+        f"WHEN o.{prefix}_kind='token' AND o.{prefix}_token_kind='agent' "
+        f"THEN 'agent:'||coalesce(o.{prefix}_name,'token') "
+        f"WHEN o.{prefix}_kind IN ('owner','token') THEN 'owner' ELSE 'system' END"
+    )
+
+
 # #214 Applications and documents: the words of a job's triage, an application's
 # stage and a document's kind; the stored Ready mark and per-document review leave
 # the schema (archived), responses become replies, and every shortlisted job without
@@ -262,6 +277,9 @@ TABLES = (
         columns={
             "dismissed_reason": "CASE WHEN o.dismissed_reason='' AND o.dismissed_rule_label "
             "IS NOT NULL THEN o.dismissed_rule_label ELSE o.dismissed_reason END",
+            # #209: who dismissed it becomes an actor label.
+            "dismissed_by": _label("dismissed_by"),
+            # #214: the triage words of 0.24.
             "triage": TRIAGE_214,
         },
     ),
@@ -270,9 +288,15 @@ TABLES = (
     Table("job_identities"),
     Table("posting_details"),
     Table("applications", columns={"status": STATUS_214}),
-    Table("runs"),
-    Table("events"),
-    Table("notes"),
+    # #209: runs are archived; the changes of one run keep one batch.
+    Table(
+        "events",
+        columns={
+            "actor": _label("actor"),
+            "batch_id": "CASE WHEN o.run_id IS NULL THEN NULL ELSE 'run:'||o.run_id END",
+        },
+    ),
+    Table("notes", columns={"author": _label("author")}),
     Table("knowledge"),
     # #211: default_in_cv becomes always_include; role and group fold into metadata.
     Table("claims", columns={"always_include": "o.default_in_cv"}),
@@ -296,13 +320,20 @@ TABLES = (
     Table("collection_runs"),
     Table("tasks"),
     Table("providers"),
-    Table("questions"),
-    Table("requests"),
     Table("preference_sections", fresh=True),
-    Table("replies", source="responses", columns=REPLIES_214),
-    Table("skill_notes"),
+    # #209: who recorded a reply becomes an actor label.
+    Table(
+        "replies",
+        source="responses",
+        columns={
+            **REPLIES_214,
+            "created_by": _label("created_by"),
+            "updated_by": _label("updated_by"),
+        },
+    ),
     Table("job_signals"),
-    Table("idempotency_keys"),
+    # #209: keys of runs, questions and requests go to the archive with them.
+    Table("idempotency_keys", where="o.scope NOT IN ('runs','questions','requests')"),
 )
 
 # JSON columns that gain a json_valid CHECK in schema 15, with the value a stored
@@ -662,7 +693,7 @@ def _start_shortlisted(conn):
         )
         conn.execute(
             "INSERT INTO main.events(id,job_id,application_id,kind,payload,created_at,"
-            "subject_type,subject_id,actor_kind) VALUES(?,?,?,'application_created',?,?,"
+            "subject_type,subject_id,actor) VALUES(?,?,?,'application_created',?,?,"
             "'application',?,'system')",
             (
                 uuid.uuid4().hex,
@@ -682,11 +713,11 @@ def _archive_ready_marks(conn):
         "SELECT id,job_id," + ",".join(READY_COLUMNS_214) + " FROM old.applications "
         "WHERE ready_at IS NOT NULL ORDER BY id"
     ).fetchall()
-    for application_id, job_id, ready_at, kind, actor_id, name, token_kind in rows:
+    for application_id, job_id, ready_at, kind, _actor_id, name, token_kind in rows:
         conn.execute(
             "INSERT INTO main.events(id,job_id,application_id,kind,payload,created_at,"
-            "subject_type,subject_id,actor_kind,actor_id,actor_name,actor_token_kind) "
-            "VALUES(?,?,?,'application_ready_mark_archived',?,?,'application',?,?,?,?,?)",
+            "subject_type,subject_id,actor) "
+            "VALUES(?,?,?,'application_ready_mark_archived',?,?,'application',?,?)",
             (
                 uuid.uuid4().hex,
                 job_id,
@@ -694,10 +725,8 @@ def _archive_ready_marks(conn):
                 json.dumps({"ready_at": ready_at, "by": "upgrade"}),
                 ready_at,
                 application_id,
-                kind,
-                actor_id,
-                name,
-                token_kind,
+                # #209: the actor label of who set the mark.
+                _actor_label(kind, name, token_kind) if kind else None,
             ),
         )
     return {"events": len(rows)}
@@ -772,6 +801,178 @@ INVARIANTS = (
         ),
     ),
 )
+
+# --- #209 Remove the agent-collaboration layer; minimal attribution ------------------
+#
+# ``runs``, ``questions``, ``requests`` and ``skill_notes`` leave the schema and are
+# archived whole under their own names. Every actor block of a kept table becomes
+# one actor label (``_label``); ``events.run_id`` becomes ``batch_id = 'run:' ||
+# run_id``, so the changes of one former run stay grouped. The token id, name and
+# kind of each block stay in ``dropped_columns``. What the owner answered or asked
+# for is kept where the owner looks:
+#
+# - an answered question about a job or an application: a note on that record,
+#   "Question from <actor label> (<date>): <text> — Answer (<date>): <answer>";
+#   an answered question without a subject (or about a Career entry): the same
+#   text as a "Facts about me" item. Open and withdrawn questions, and questions
+#   whose job or application was deleted, stay in the archive only.
+# - a request about a job or an application, in any state: a note on that record,
+#   "Request to the agent (<date>, <state>): <text>" with its result or decline
+#   reason. Requests without a subject stay in the archive only.
+# - the current version of each skill's local notes: one "Working with me" item,
+#   "For <skill>: <text>".
+#
+# Notes the upgrade creates carry ``author = 'system'`` and are counted in the
+# upgrade report (``created.notes``).
+
+AGENT_LAYER_SECTIONS = (
+    Section("runs", "SELECT * FROM old.runs ORDER BY started_at,id", tables=("runs",)),
+    Section(
+        "questions", "SELECT * FROM old.questions ORDER BY created_at,id", tables=("questions",)
+    ),
+    Section("requests", "SELECT * FROM old.requests ORDER BY created_at,id", tables=("requests",)),
+    Section(
+        "skill_notes",
+        "SELECT * FROM old.skill_notes ORDER BY skill,version",
+        tables=("skill_notes",),
+    ),
+    Section(
+        "idempotency_keys_of_removed",
+        "SELECT * FROM old.idempotency_keys WHERE scope IN ('runs','questions','requests') "
+        "ORDER BY scope,key",
+    ),
+)
+SECTIONS = (*SECTIONS, *AGENT_LAYER_SECTIONS)
+_KEPT_AS_LABEL = "kept as the actor label; a token's id, name and kind are archived"
+NOT_ARCHIVED = {
+    **NOT_ARCHIVED,
+    "events.run_id": "kept as batch_id 'run:<run id>'; the run is archived under runs",
+    "events.actor_kind": _KEPT_AS_LABEL,
+    "notes.author_kind": _KEPT_AS_LABEL,
+    "jobs.dismissed_by_kind": _KEPT_AS_LABEL,
+    "responses.created_by_kind": _KEPT_AS_LABEL,
+    "responses.updated_by_kind": _KEPT_AS_LABEL,
+}
+PREFERENCE_ITEM_LIMIT = 2000
+
+
+def _day(stamp):
+    return (stamp or "")[:10]
+
+
+def _item_text(text):
+    """A Preferences item holds at most 2,000 characters; the archive keeps the whole text."""
+    if len(text) <= PREFERENCE_ITEM_LIMIT:
+        return text
+    return text[: PREFERENCE_ITEM_LIMIT - 1].rstrip() + "…"
+
+
+def _question_text(row):
+    answer = " — ".join(part for part in (row["answer_choice"], row["answer"]) if part)
+    asked_by = _actor_label(row["asked_by_kind"], row["asked_by_name"], row["asked_by_token_kind"])
+    about = f" about {row['subject_label']}" if row["subject_type"] == "knowledge" else ""
+    return (
+        f"Question from {asked_by} ({_day(row['created_at'])}){about}: {row['question']} — "
+        f"Answer ({_day(row['resolved_at'])}): {answer}"
+    )
+
+
+def _request_text(row):
+    text = f"Request to the agent ({_day(row['created_at'])}, {row['state']}): {row['text']}"
+    if row["result"]:
+        text += (" — Declined: " if row["state"] == "declined" else " — Result: ") + row["result"]
+    return text
+
+
+def _subject_scope(conn, row):
+    """(job_id, application_id) of a question's or request's job or application, if it exists."""
+    if row["subject_type"] == "job" and row["job_id"]:
+        found = conn.execute("SELECT id FROM main.jobs WHERE id=?", (row["job_id"],)).fetchone()
+        return (found[0], None) if found else None
+    if row["subject_type"] == "application" and row["application_id"]:
+        found = conn.execute(
+            "SELECT job_id,id FROM main.applications WHERE id=?", (row["application_id"],)
+        ).fetchone()
+        return (found[0], found[1]) if found else None
+    return None
+
+
+def _append_items(conn, section, texts, stamp):
+    if not texts:
+        return
+    current = json.loads(
+        conn.execute(
+            "SELECT items FROM main.preference_sections WHERE section=?", (section,)
+        ).fetchone()[0]
+    )
+    conn.execute(
+        "UPDATE main.preference_sections SET items=?,version=max(version,1),updated_at=?,"
+        "updated_by='system' WHERE section=?",
+        (_dump(current + [{"text": _item_text(text)} for text in texts]), stamp, section),
+    )
+
+
+def fold_agent_layer(conn):
+    """Notes and Preferences items from answered questions, requests and skill notes."""
+    stamp = datetime.now(UTC).isoformat(timespec="microseconds")
+    notes, facts, working = [], [], []
+    conn.row_factory = sqlite3.Row
+    try:
+        for row in conn.execute(
+            "SELECT * FROM old.questions WHERE state='answered' ORDER BY resolved_at,created_at,id"
+        ).fetchall():
+            scope = _subject_scope(conn, row)
+            if scope:
+                notes.append((*scope, _question_text(row), row["resolved_at"] or row["created_at"]))
+            elif row["subject_type"] in (None, "knowledge"):
+                facts.append(_question_text(row))
+        for row in conn.execute("SELECT * FROM old.requests ORDER BY created_at,id").fetchall():
+            scope = _subject_scope(conn, row)
+            if scope:
+                notes.append((*scope, _request_text(row), row["created_at"]))
+        for row in conn.execute(
+            "SELECT n.skill,n.text FROM old.skill_notes n WHERE n.version=(SELECT max(version) "
+            "FROM old.skill_notes m WHERE m.skill=n.skill) AND trim(n.text)<>'' ORDER BY n.skill"
+        ):
+            working.append(f"For {row['skill']}: {row['text'].strip()}")
+    finally:
+        conn.row_factory = None
+    for job_id, application_id, body, created_at in notes:
+        conn.execute(
+            "INSERT INTO main.notes(id,job_id,application_id,body,version,created_at,updated_at,"
+            "author) VALUES(lower(hex(randomblob(16))),?,?,?,1,?,?,'system')",
+            (job_id, application_id, body, created_at, created_at),
+        )
+    _append_items(conn, "facts", facts, stamp)
+    _append_items(conn, "working_with_me", working, stamp)
+    return {"notes": len(notes)} if notes else {}
+
+
+FOLDS = (*FOLDS, fold_agent_layer)
+INVARIANTS = (
+    *INVARIANTS,
+    (
+        "changes by an agent token (#209)",
+        # Without the events #214 adds for stored Ready marks.
+        (
+            "SELECT count(*) FROM main.events WHERE actor LIKE 'agent:%' "
+            "AND kind<>'application_ready_mark_archived'"
+        ),
+        "SELECT count(*) FROM old.events WHERE actor_kind='token' AND actor_token_kind='agent'",
+    ),
+    (
+        "changes of former agent runs (#209)",
+        "SELECT count(*) FROM main.events WHERE batch_id LIKE 'run:%'",
+        "SELECT count(*) FROM old.events WHERE run_id IS NOT NULL",
+    ),
+    (
+        "jobs dismissed by an agent token (#209)",
+        "SELECT count(*) FROM main.jobs WHERE dismissed_by LIKE 'agent:%'",
+        "SELECT count(*) FROM old.jobs WHERE dismissed_by_kind='token' AND dismissed_by_token_kind='agent'",
+    ),
+)
+
+# --- end #209 ------------------------------------------------------------------------
 
 
 @dataclass(frozen=True)

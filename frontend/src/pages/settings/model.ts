@@ -1,5 +1,5 @@
 // What the Settings screen reads, and the pure helpers it uses.
-import type { Actor, TokenKind } from "../../api";
+import type { TokenKind } from "../../api";
 
 export interface Token {
   id: string;
@@ -66,75 +66,21 @@ export function megabytes(bytes: number) {
 
 export const tokenAccess: Record<TokenKind, string> = {
   agent:
-    "Runs the job search. Cannot change your password, manage tokens, restore a backup, answer its own questions or write requests for itself.",
+    "Runs the job search. Cannot change your password, manage tokens or restore a backup.",
   owner: "Full access, the same as your dashboard session.",
 };
 
-/** A served skill, as listed. */
+/** A served skill, as listed: what the owner can ask the agent with it. */
 export interface SkillItem {
   name: string;
+  /** A plain title: "Prepare for an interview". */
+  title: string;
+  /** One sentence on what the owner can ask. */
+  summary: string;
+  /** One phrase the owner could say in the agent's chat. */
+  example: string;
+  /** The skill's description for agents. */
   description: string;
   files: string[];
   file_details?: { path: string; bytes: number; title: string }[];
-  local_notes: NotesSummary | null;
-}
-export interface NotesSummary {
-  version: number;
-  updated_at: string;
-  updated_by: Actor;
-  length: number;
-}
-export interface SkillText {
-  name: string;
-  path: string;
-  content: string;
-  local_notes: NotesSummary | null;
-}
-export interface NoteVersion {
-  version: number;
-  text: string;
-  created_at: string;
-  created_by: Actor;
-}
-export interface SkillNotes {
-  skill: string;
-  text: string;
-  version: number;
-  max_length: number;
-  updated_at: string | null;
-  updated_by: Actor | null;
-  versions: NoteVersion[];
-  versions_total: number;
-}
-
-/** The text of SKILL.md after its front matter, which the list already shows. */
-export function body(content: string) {
-  return content.replace(/^---\n[\s\S]*?\n---\n+/, "");
-}
-
-/**
- * Files of other skills a skill's text links to, as `../<skill>/<path>`:
- * the shared references an agent reads with it.
- */
-export function linkedFiles(content: string, own: string) {
-  const found = new Map<string, { skill: string; path: string }>();
-  for (const match of content.matchAll(
-    /\]\(\.\.\/([\w-]+)\/([\w./-]+\.md)\)/g,
-  )) {
-    const [, skill, path] = match;
-    // Another skill's SKILL.md is that skill, listed beside this one.
-    if (skill !== own && path !== "SKILL.md")
-      found.set(`${skill}/${path}`, { skill, path });
-  }
-  return [...found.values()].sort((a, b) =>
-    `${a.skill}/${a.path}`.localeCompare(`${b.skill}/${b.path}`),
-  );
-}
-
-/** Text added to notes: a blank line between it and what is there. */
-export function appended(current: string, addition: string) {
-  const left = current.trimEnd(),
-    right = addition.trim();
-  if (!right) return current;
-  return left ? `${left}\n\n${right}` : right;
 }

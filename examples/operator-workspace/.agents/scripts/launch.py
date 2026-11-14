@@ -45,10 +45,10 @@ def accepted(token):
     try:
         with urllib.request.urlopen(request, timeout=10, context=context) as response:
             try:
-                kind = json.load(response).get('actor', {}).get('token_kind')
+                actor = json.load(response).get('actor')
             except ValueError:
-                kind = None
-            if kind == 'owner':
+                actor = None
+            if actor == 'owner':
                 print('This is an owner token with full access. An agent token '
                       '(Settings → Agent access) is enough for an agent.', file=sys.stderr)
             return True

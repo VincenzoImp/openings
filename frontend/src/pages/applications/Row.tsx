@@ -45,14 +45,12 @@ function Action({
   application,
   title,
   primary,
-  asked,
   open,
   onRespond,
 }: {
   application: Application;
   title: string;
   primary: boolean;
-  asked: boolean;
   open: boolean;
   onRespond: () => void;
 }) {
@@ -78,12 +76,6 @@ function Action({
         Review{name}
       </a>
     );
-  if (stage === "shortlisted" && asked)
-    return (
-      <a className="btn sm" href="#activity">
-        Answer{name}
-      </a>
-    );
   if (stage === "shortlisted" && application.blocking_requirements)
     return (
       <a className="btn sm" href={reviewHref(application.id, "requirements")}>
@@ -107,7 +99,6 @@ export function Row({
   onSelect,
   disabled,
   primary,
-  asked,
   open,
   onRespond,
   reload,
@@ -120,8 +111,6 @@ export function Row({
   disabled: boolean;
   /** The first Ready row carries the primary action. */
   primary: boolean;
-  /** The agent waits for the owner's answer to a question about it. */
-  asked: boolean;
   open: boolean;
   onRespond: (open: boolean) => void;
   reload: () => void;
@@ -168,14 +157,7 @@ export function Row({
         )}
         <Cell label="Documents">
           <span>{documents[0].text}</span>
-          <Tags
-            items={[
-              ...documents.slice(1),
-              ...(asked
-                ? [{ text: "Waits for your answer", tone: "agent" as const }]
-                : []),
-            ]}
-          />
+          <Tags items={documents.slice(1)} />
         </Cell>
         <Cell label="Reply">
           {response.text ? (
@@ -196,7 +178,6 @@ export function Row({
             application={application}
             title={title}
             primary={primary}
-            asked={asked}
             open={open}
             onRespond={() => onRespond(!open)}
           />

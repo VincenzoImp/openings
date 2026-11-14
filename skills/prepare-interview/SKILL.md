@@ -1,5 +1,8 @@
 ---
 name: prepare-interview
+title: Prepare for an interview
+summary: Get role analysis, evidence-backed stories, likely questions and questions to ask, saved on the application.
+example: I have an interview next week for the backend role, help me prepare.
 description: Prepare the owner for an interview on an Openings application - role analysis, evidence-backed stories, likely questions, gaps and questions to ask - kept as private notes on that application.
 compatibility: Requires access to the Openings MCP server or REST API, as described in the openings-workspace skill.
 ---
@@ -13,19 +16,10 @@ application stage unless the owner reports a new stage.
 Read [Openings workspace](../openings-workspace/SKILL.md) for transport and notes,
 and [Career claims](../career-claims/SKILL.md) for evidence-led wording.
 
-## Run and questions
+## Questions and report
 
-Open a run before the first write: `runs_start` with `workflow: "prepare-interview"` and the scope; writes made
-with this token then attach to the run. First read the owner's answers given
-since the previous run (`questions_list` with `answered_since`) and act on them.
-Then read the owner's open requests (`requests_list` with `state: "open"`): take
-the ones in this workflow's scope (`requests_take`), do the work, and report on
-each with `requests_complete` and a short result, or `requests_decline` and the
-reason. Leave requests for other workflows open. A request never authorises
-submitting an application, contacting an employer or recording Applied.
-Ask each new question as a record tied to its job, application or Career entry
-(`questions_ask`), not only in chat. Close the run with `runs_finish` and the
-stored [run report](../openings-workspace/references/run-report.md).
+Ask the owner in the chat when a missing fact matters, and never record an
+answer the owner did not give. Report what you did in the chat.
 
 ## Read the application as sent
 
@@ -58,5 +52,4 @@ Use public company information only from sources the owner can verify; cite them
 Save the preparation as a note on the application (`notes_create` with
 `application_id`), so it stays with that attempt. Do not pin it: the pinned note
 is the owner's standing guidance.
-Report the note ID and any open questions for the owner, using the shared
-[run report](../openings-workspace/references/run-report.md).
+Report the note ID and any open questions for the owner in the chat.

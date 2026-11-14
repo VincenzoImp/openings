@@ -8,7 +8,6 @@ import {
   Tabs,
 } from "../design";
 import { useResource, useUrlState } from "../state";
-import type { Links } from "./activity/records";
 import { Answers } from "./review/Answers";
 import { Details } from "./review/Details";
 import { DocumentPanes, useCurrentDocuments } from "./review/DocumentPanes";
@@ -24,8 +23,10 @@ const capital = (text: string) => text[0].toUpperCase() + text.slice(1);
 function Review({
   application,
   reload,
-  ...links
-}: Links & { application: Application; reload: () => void }) {
+}: {
+  application: Application;
+  reload: () => void;
+}) {
   const [raw, setTab] = useUrlState("tab", "answers");
   const [pane, setPane] = useUrlState("pane", "cv");
   const tab = tabOf(raw);
@@ -104,7 +105,6 @@ function Review({
                 key={key}
                 application={application}
                 onDeleted={() => (location.hash = "#applications")}
-                {...links}
               />
             ) : (
               <Answers application={application} />
@@ -121,7 +121,7 @@ function Review({
  * actions that end the task, then answers, requirements, timeline, documents
  * and details. `#review?application=…&tab=…` opens it.
  */
-export default function ReviewPage(links: Links) {
+export default function ReviewPage() {
   const [id] = useUrlState("application", "");
   const record = useResource<Application | null>(
     id ? `/applications/${id}` : null,
@@ -155,5 +155,5 @@ export default function ReviewPage(links: Links) {
     );
   if (record.loading || !record.data)
     return <Loading label="Loading the application…" />;
-  return <Review application={record.data} reload={record.reload} {...links} />;
+  return <Review application={record.data} reload={record.reload} />;
 }

@@ -12,7 +12,7 @@ and submit. Jobs, documents and file bytes live in one portable SQLite database.
 **[Start with Docker](#start-with-docker)** · [Connect an agent](#connect-an-agent) ·
 [Documentation](docs/README.md) · [Changelog](CHANGELOG.md)
 
-![Today: applications ready to apply, the agent's questions, the pipeline, what happened since the last visit and replies to record](docs/images/today.png)
+![Today: applications ready to apply, the pipeline and replies to record](docs/images/today.png)
 
 ## Features
 
@@ -57,11 +57,11 @@ and submit. Jobs, documents and file bytes live in one portable SQLite database.
   applications you sent, the share that got a reply or led to an interview, the
   median days to a reply, the funnel and, once two sources have enough
   applications, replies by source.
-- **See what the agent did:** every change records who made it. An agent works in
-  runs with a stored report, and asks you questions that you answer under **Activity**.
-- **Tell the agent what to do next:** write a request under **Activity**, or
-  **Ask your agent** on a job or an application. The agent picks it up at its next
-  run and reports the result.
+- **See what the agent did:** every change records who made it (you, the agent
+  token by name, or job sources), and job and application histories say so.
+  Jobs the agent dismissed can be filtered under **Jobs › Dismissed** and
+  restored in one action. You talk to your agent in its own chat; Settings ›
+  Skills lists what you can ask it.
 - **Automate:** the dashboard, REST API and MCP share one service layer and the same
   operations.
 
@@ -74,7 +74,7 @@ Openings works best when your own AI agent runs it. The server ships
 `skills_get` and one MCP prompt per skill). With them, an agent reviews new jobs
 against your Preferences, prepares a CV and letter for every shortlisted job, records
 employer requirements, tunes searches and keeps your Career record current. You
-answer its questions, apply to the Ready applications and mark them Applied.
+answer its questions in the chat, apply to the Ready applications and mark them Applied.
 
 The agent uses its own model access and tools and never submits applications for
 you. Read [Agent-operated job search](docs/user/agent-operated.md).

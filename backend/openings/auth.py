@@ -12,6 +12,7 @@ from collections import deque
 
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
+from . import events
 from .actors import (
     OWNER,
     TOKEN_KINDS,
@@ -74,7 +75,8 @@ class Auth:
             self.workspace.set_settings(
                 "auth", {"password_hash": password_hash(password), "secret": secrets.token_hex(32)}
             )
-            self.workspace.event("owner_password_changed", subject=("workspace", "auth"))
+            with self.workspace.db.transaction() as conn:
+                events.record(conn, "owner_password_changed", ("workspace", "auth"))
         return {"updated": True, "sign_in_required": True, "api_tokens_preserved": True}
 
     def serializer(self, data=None):
@@ -183,11 +185,11 @@ class Auth:
                 "INSERT INTO api_tokens(id,name,kind,token_hash,created_at) VALUES(?,?,?,?,?)",
                 (record_id, name, kind, hashlib.sha256(token.encode()).hexdigest(), stamp),
             )
-            self.workspace.event(
+            events.record(
+                conn,
                 "token_created",
-                payload={"name": name, "kind": kind},
-                conn=conn,
                 subject=("token", record_id),
+                payload={"name": name, "kind": kind},
             )
         return {"id": record_id, "name": name, "kind": kind, "token": token, "created_at": stamp}
 
@@ -197,11 +199,11 @@ class Auth:
             row = conn.execute("SELECT name FROM api_tokens WHERE id=?", (record_id,)).fetchone()
             conn.execute("DELETE FROM api_tokens WHERE id=?", (record_id,))
             if row:
-                self.workspace.event(
+                events.record(
+                    conn,
                     "token_revoked",
-                    payload={"name": row["name"]},
-                    conn=conn,
                     subject=("token", record_id),
+                    payload={"name": row["name"]},
                 )
         return {"deleted": True}
 

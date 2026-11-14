@@ -73,18 +73,6 @@
 .nav .count {
   margin-left: auto;
 }
-/* On the shell background, small text uses the secondary ink: the caption
-   ink is for surface and card only. */
-.sidebar-foot {
-  margin-top: auto;
-  padding: 0 var(--s3);
-  color: var(--ink-2);
-  font-size: var(--t-xs);
-  overflow-wrap: anywhere;
-}
-.sidebar-foot .actor {
-  display: flex;
-}
 .main {
   background: var(--surface);
   border-left: 1px solid var(--line);
@@ -280,11 +268,6 @@
   }
   .more-sheet a {
     min-height: 44px;
-  }
-  .more-sheet .sidebar-foot {
-    margin-top: var(--s4);
-    padding-top: var(--s3);
-    border-top: 1px solid var(--line);
   }
   .more-sheet a[aria-current="page"] {
     background: var(--accent-soft);

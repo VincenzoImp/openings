@@ -17,9 +17,9 @@ CREATE TABLE jobs (
  metadata TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(metadata)), overrides TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(overrides)),
  content_version INTEGER NOT NULL DEFAULT 1, version INTEGER NOT NULL DEFAULT 1,
  created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
- -- The current dismissal: when, by whom and why. Cleared on restore.
- dismissed_at TEXT, dismissed_by_kind TEXT, dismissed_by_id TEXT, dismissed_by_name TEXT,
- dismissed_by_token_kind TEXT, dismissed_reason TEXT NOT NULL DEFAULT ''
+ -- The current dismissal: when, by whom (an actor label, see events) and why.
+ -- Cleared on restore.
+ dismissed_at TEXT, dismissed_by TEXT, dismissed_reason TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX jobs_url ON jobs(url);
 CREATE INDEX jobs_triage ON jobs(triage,created_at);
@@ -77,38 +77,27 @@ CREATE TABLE applications (
   CHECK(required_documents IN ('["cv","letter"]','["cv"]','["letter"]','[]')),
  from_shortlist INTEGER NOT NULL DEFAULT 0 CHECK(from_shortlist IN (0,1))
 );
--- An agent run: opened by an API token, closed with a stored report.
-CREATE TABLE runs (
- id TEXT PRIMARY KEY, token_id TEXT NOT NULL, token_name TEXT NOT NULL,
- workflow TEXT NOT NULL, scope TEXT NOT NULL DEFAULT '',
- status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open','finished','interrupted')),
- note TEXT NOT NULL DEFAULT '', report TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(report)),
- change_counts TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(change_counts)),
- superseded_by TEXT, version INTEGER NOT NULL DEFAULT 1,
- started_at TEXT NOT NULL, last_activity_at TEXT NOT NULL, ended_at TEXT, updated_at TEXT NOT NULL,
- token_kind TEXT
-);
 -- One record per change. job_id/application_id keep the owning timeline (and its
--- deletion); subject_* names the changed record of any type; actor_* and run_id
--- say who changed it (a token with its kind, owner or agent). Rows written before
--- 0.17 have no actor.
+-- deletion); subject_* names the changed record of any type. actor is the actor
+-- label of who changed it: owner (the dashboard session or an owner token),
+-- agent:<token name> (an agent token) or system (collection, worker, upgrade);
+-- NULL before 0.17. batch_id groups the changes of one REST request or MCP tool
+-- call (b_<ULID>), or of one former agent run (run:<id>).
 CREATE TABLE events (
  id TEXT PRIMARY KEY, job_id TEXT REFERENCES jobs(id) ON DELETE CASCADE,
  application_id TEXT REFERENCES applications(id) ON DELETE CASCADE,
  kind TEXT NOT NULL, payload TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(payload)), created_at TEXT NOT NULL,
- subject_type TEXT, subject_id TEXT, actor_kind TEXT, actor_id TEXT, actor_name TEXT,
- actor_token_kind TEXT, run_id TEXT REFERENCES runs(id) ON DELETE SET NULL
+ subject_type TEXT, subject_id TEXT, actor TEXT, batch_id TEXT
 );
 CREATE INDEX events_app ON events(application_id,created_at);
 -- A note on a job, or on one application when application_id is set (its scope).
--- author_* and run_id say who wrote it; pinned_at marks the one pinned note of
--- its scope.
+-- author is the actor label of who wrote it; pinned_at marks the one pinned note
+-- of its scope.
 CREATE TABLE notes (
  id TEXT PRIMARY KEY, job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
  application_id TEXT REFERENCES applications(id) ON DELETE CASCADE, body TEXT NOT NULL,
  version INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
- author_kind TEXT, author_id TEXT, author_name TEXT, author_token_kind TEXT,
- run_id TEXT REFERENCES runs(id) ON DELETE SET NULL, pinned_at TEXT
+ author TEXT, pinned_at TEXT
 );
 CREATE TABLE knowledge (
  id TEXT PRIMARY KEY, kind TEXT NOT NULL, title TEXT NOT NULL, organization TEXT NOT NULL DEFAULT '',
@@ -213,63 +202,8 @@ CREATE INDEX tasks_job ON tasks(job_id);
 CREATE INDEX tasks_source ON tasks(source_id);
 -- Also counts the jobs of each source (sources_list counts, #211).
 CREATE INDEX postings_source ON postings(source_id,job_id);
--- A question for the owner. The subject reference becomes NULL when its record is
--- deleted; subject_type and subject_label keep the question readable.
-CREATE TABLE questions (
- id TEXT PRIMARY KEY, subject_type TEXT CHECK(subject_type IS NULL OR subject_type IN ('job','application','knowledge')),
- job_id TEXT REFERENCES jobs(id) ON DELETE SET NULL,
- application_id TEXT REFERENCES applications(id) ON DELETE SET NULL,
- knowledge_id TEXT REFERENCES knowledge(id) ON DELETE SET NULL,
- subject_label TEXT NOT NULL DEFAULT '', question TEXT NOT NULL, why TEXT NOT NULL DEFAULT '',
- choices TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(choices) AND json_type(choices)='array'),
- state TEXT NOT NULL DEFAULT 'open' CHECK(state IN ('open','answered','withdrawn')),
- answer TEXT NOT NULL DEFAULT '', answer_choice TEXT,
- asked_by_kind TEXT NOT NULL, asked_by_id TEXT, asked_by_name TEXT, asked_by_token_kind TEXT,
- run_id TEXT REFERENCES runs(id) ON DELETE SET NULL,
- resolved_by_kind TEXT, resolved_by_id TEXT, resolved_by_name TEXT, resolved_by_token_kind TEXT,
- resolved_at TEXT,
- version INTEGER NOT NULL DEFAULT 1,
- created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
- CHECK((job_id IS NOT NULL)+(application_id IS NOT NULL)+(knowledge_id IS NOT NULL)<=1)
-);
--- A request for the agent: an owner instruction read at the start of the next run.
--- Like a question, it outlives its subject through subject_type and subject_label.
-CREATE TABLE requests (
- id TEXT PRIMARY KEY, subject_type TEXT CHECK(subject_type IS NULL OR subject_type IN ('job','application','knowledge')),
- job_id TEXT REFERENCES jobs(id) ON DELETE SET NULL,
- application_id TEXT REFERENCES applications(id) ON DELETE SET NULL,
- knowledge_id TEXT REFERENCES knowledge(id) ON DELETE SET NULL,
- subject_label TEXT NOT NULL DEFAULT '', text TEXT NOT NULL,
- state TEXT NOT NULL DEFAULT 'open' CHECK(state IN ('open','taken','done','declined','withdrawn')),
- result TEXT NOT NULL DEFAULT '',
- created_by_kind TEXT NOT NULL, created_by_id TEXT, created_by_name TEXT, created_by_token_kind TEXT,
- taken_by_kind TEXT, taken_by_id TEXT, taken_by_name TEXT, taken_by_token_kind TEXT, taken_at TEXT,
- run_id TEXT REFERENCES runs(id) ON DELETE SET NULL,
- resolved_by_kind TEXT, resolved_by_id TEXT, resolved_by_name TEXT, resolved_by_token_kind TEXT,
- resolved_at TEXT,
- version INTEGER NOT NULL DEFAULT 1,
- created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
- CHECK((job_id IS NOT NULL)+(application_id IS NOT NULL)+(knowledge_id IS NOT NULL)<=1)
-);
-CREATE UNIQUE INDEX runs_open_token ON runs(token_id) WHERE status='open';
-CREATE INDEX runs_token ON runs(token_id,started_at);
-CREATE INDEX runs_status ON runs(status,started_at);
-CREATE INDEX runs_started ON runs(started_at);
-CREATE INDEX events_run ON events(run_id,created_at);
+CREATE INDEX events_batch ON events(batch_id,created_at);
 CREATE INDEX events_subject ON events(subject_type,subject_id,created_at);
-CREATE INDEX questions_state ON questions(state,created_at);
-CREATE INDEX questions_resolved ON questions(state,resolved_at);
-CREATE INDEX questions_job ON questions(job_id);
-CREATE INDEX questions_application ON questions(application_id);
-CREATE INDEX questions_knowledge ON questions(knowledge_id);
-CREATE INDEX questions_run ON questions(run_id);
-CREATE INDEX requests_state ON requests(state,created_at);
-CREATE INDEX requests_created ON requests(created_at);
-CREATE INDEX requests_updated ON requests(updated_at);
-CREATE INDEX requests_job ON requests(job_id);
-CREATE INDEX requests_application ON requests(application_id);
-CREATE INDEX requests_knowledge ON requests(knowledge_id);
-CREATE INDEX requests_run ON requests(run_id);
 -- The owner's Preferences (preferences.py): five sections of statements in the
 -- owner's words, each replaced whole with its own version. An item is
 -- {"text": ...}, and in writing {"text": ..., "scope": "all"|"cv"|"letter"}.
@@ -291,23 +225,12 @@ CREATE TABLE replies (
  kind TEXT NOT NULL CHECK(kind IN ('rejection','interview','offer','other')),
  date TEXT NOT NULL CHECK(length(date)=10 AND date(date)=date),
  note TEXT NOT NULL DEFAULT '',
- created_by_kind TEXT, created_by_id TEXT, created_by_name TEXT, created_by_token_kind TEXT,
- updated_by_kind TEXT, updated_by_id TEXT, updated_by_name TEXT, updated_by_token_kind TEXT,
+ created_by TEXT, updated_by TEXT,
  version INTEGER NOT NULL DEFAULT 1,
  created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
 CREATE INDEX replies_application ON replies(application_id,date);
 CREATE UNIQUE INDEX replies_once ON replies(application_id,kind,date) WHERE kind<>'other';
--- Local notes for a shipped skill (skill_notes.py): one immutable row per
--- version; the highest version is current. Appended when the skill is served.
-CREATE TABLE skill_notes (
- skill TEXT NOT NULL CHECK(length(skill) BETWEEN 1 AND 100),
- version INTEGER NOT NULL CHECK(version>=1),
- text TEXT NOT NULL DEFAULT '' CHECK(length(text)<=2000),
- created_by_kind TEXT, created_by_id TEXT, created_by_name TEXT, created_by_token_kind TEXT,
- created_at TEXT NOT NULL,
- PRIMARY KEY(skill,version)
-);
 -- Ingest signals of each job (job_signals.py). Derived from the job and
 -- rebuildable, except distinct_from (pairs the owner judged different vacancies).
 CREATE TABLE job_signals (
@@ -326,7 +249,6 @@ CREATE INDEX postings_unlisted ON postings(job_id) WHERE unlisted_at IS NOT NULL
 -- One pinned note per job and per application.
 CREATE UNIQUE INDEX notes_pinned_application ON notes(application_id) WHERE pinned_at IS NOT NULL AND application_id IS NOT NULL;
 CREATE UNIQUE INDEX notes_pinned_job ON notes(job_id) WHERE pinned_at IS NOT NULL AND application_id IS NULL;
-CREATE INDEX notes_run ON notes(run_id);
 -- Idempotency keys of creates (idempotency.py): the record's table, the key, the
 -- SHA-256 of the request and the record it gave.
 CREATE TABLE idempotency_keys (

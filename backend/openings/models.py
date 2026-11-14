@@ -475,9 +475,19 @@ class JobQuery(Input):
         max_length=40,
         description="Only postings that state this language as required (alone or as one of alternatives).",
     )
-    dismissed_by: Literal["agent", "owner", "other"] | None = Field(
+    dismissed_by: str | None = Field(
         default=None,
-        description="Only dismissed jobs, by who dismissed them: an agent token, the owner (dashboard or owner token) or other (the system, or before 0.21 without a record).",
+        max_length=200,
+        pattern=r"^(owner|agent|system|agent:.+)$",
+        description="Only dismissed jobs, by who dismissed them: agent (any agent token), agent:<token name>, owner (dashboard or owner token) or system (job sources, or before 0.21 without a record).",
+    )
+    batch_id: str | None = Field(
+        default=None,
+        max_length=100,
+        description="Only jobs changed by one REST request or MCP tool call (its batch_id, as events_list and histories show it). Restore an agent's dismissals with jobs_bulk action inbox.",
+    )
+    since: str | None = Field(
+        default=None, description="Only jobs dismissed at or after this time."
     )
     hide_unspoken_required: bool | None = Field(
         default=None,
@@ -497,7 +507,7 @@ class JobQuery(Input):
         description="Also return counts: jobs by triage (new, shortlisted, dismissed, all) and dismissed jobs by who dismissed them, for the same search, company, location, source, date and signal filters.",
     )
 
-    @field_validator("created_since", "created_until")
+    @field_validator("created_since", "created_until", "since")
     @classmethod
     def valid_date(cls, value, info):
         return normalized_date(value, end=info.field_name == "created_until")
