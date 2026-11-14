@@ -30,16 +30,13 @@ from timeline_fixtures import guided_application
 pytestmark = pytest.mark.performance
 
 JOBS, APPLICATIONS, SOURCES = 25_000, 500, 20
-# The reads of the Today screen, measured together as one budget.
+# The reads of the Today screen (frontend/src/pages/Today.tsx), measured together
+# as one budget.
 TODAY = (
-    "/api/v1/jobs?complete=false&limit=1",
-    "/api/v1/applications?limit=1",
     "/api/v1/applications?stage=ready&sort=deadline&limit=5",
-    "/api/v1/applications?needs=documents&sort=deadline&limit=3",
-    "/api/v1/applications?needs=reply_overdue&limit=1",
-    "/api/v1/questions?state=open&limit=3",
-    "/api/v1/runs?limit=1",
-    "/api/v1/collection/runs?limit=100",
+    "/api/v1/applications?limit=1",
+    "/api/v1/applications?stage=shortlisted&sort=deadline&limit=200",
+    "/api/v1/applications?needs=reply_overdue&sort=applied&limit=200",
 )
 BUDGETS_MS = {
     "applications": (("/api/v1/applications?limit=200",), 200),
@@ -113,14 +110,14 @@ def test_a_busy_timeline_stays_within_its_budget(client):
             stamp = f"2026-{1 + index % 12:02d}-{1 + index % 28:02d}T10:{index % 60:02d}:00+00:00"
             on_application = application["id"] if index % 2 else None
             conn.execute(
-                "INSERT INTO events(id,job_id,application_id,kind,payload,created_at,actor_kind) "
+                "INSERT INTO events(id,job_id,application_id,kind,payload,created_at,actor) "
                 "VALUES(?,?,?,?,?,?,?)",
                 (f"busy-{index}", job["id"], on_application, "job_edited", "{}", stamp, "owner"),
             )
             if index % 4 == 0:
                 conn.execute(
                     "INSERT INTO notes(id,job_id,application_id,body,created_at,updated_at,"
-                    "author_kind) VALUES(?,?,?,?,?,?,?)",
+                    "author) VALUES(?,?,?,?,?,?,?)",
                     (
                         f"busy-{index}",
                         job["id"],
