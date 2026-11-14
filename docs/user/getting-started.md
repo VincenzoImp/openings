@@ -40,9 +40,9 @@ are read from the workspace, so every browser shows the same state.
 ## Finding your way
 
 The navigation has three groups. **Work** holds Today, Applications, Jobs (the
-tabs New, Shortlisted, Dismissed and All, each with the selected job beside
-the list; after you shortlist or dismiss a job in New, the next job of the list
-is shown). **Library** holds Career, Preferences and Templates. **System** holds
+tabs New, Dismissed and All, each with the selected job beside the list; after
+you shortlist or dismiss a job, the next one is shown, and every decision can
+be undone). **Library** holds Career, Preferences and Templates. **System** holds
 Collection and Settings. The number beside Applications counts the
 applications ready to apply.
 
@@ -78,10 +78,12 @@ you choose one.
    a job already in your workspace is shown instead of a copy. If URL extraction
    cannot obtain the text, paste it yourself.
 3. Select the job to read its posting and signals beside the list, then choose
-   **Shortlist** or **Dismiss…**. Shortlisting starts the job's application in
-   stage Shortlisted, needing a CV and a letter; undoing it removes that
-   application while nothing has been added to it. **Dismiss…** keeps its identity and history and asks for an
-   optional reason.
+   **Shortlist** (`s`) or **Dismiss** (`d`); `j` and `k` move between jobs and
+   `z` undoes. Shortlisting starts the job's application in stage Shortlisted,
+   needing a CV and a letter; undoing it removes that application while
+   nothing has been added to it. Dismissing keeps the job's identity and
+   history; its toast offers **Add reason**. Dismissed jobs are restored from
+   the Dismissed tab (`r`), where a filter shows who dismissed them.
 4. In **Collection**, add a saved search or company board, preview it, then enable
    its schedule. New sources start paused.
 5. Add [career entries and claims](career.md), templates and writing rules.
