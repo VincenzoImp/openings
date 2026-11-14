@@ -2,6 +2,7 @@
 
 import hashlib
 
+import httpx
 import pytest
 
 from document_fixtures import PDF, tex, text_pdf
@@ -65,6 +66,37 @@ def test_a_pdf_only_revision_is_complete_with_text_read_from_the_pdf(setup):
     read = documents.get_document(blank["id"])
     assert read["complete"] is True and (read["text"], read["text_from"]) == (None, None)
     assert workspace.get_application(application["id"])["ready"] is True
+
+
+def test_grants_are_absolute_on_the_public_origin_behind_a_reverse_proxy(setup, monkeypatch):
+    client, _, _, application = setup
+    data = text_pdf("Alex Example")
+
+    def create():
+        return client.post(
+            "/api/v1/documents",
+            json={
+                "application_id": application["id"],
+                "kind": "cv",
+                "pdf": {"name": "cv.pdf", "size": len(data)},
+            },
+        ).json()["uploads"]["pdf"]
+
+    # Without a public URL the grant names the origin the request reached.
+    direct = create()
+    assert direct["url"] == client.base_url.join("/api/v1/transfers")
+    # Behind a reverse proxy the request reaches an internal address; the grant names
+    # the public origin, so an agent uploads with the returned url alone.
+    public = "https://jobs.example.test"
+    monkeypatch.setenv("OPENINGS_PUBLIC_URL", public + "/")
+    grant = create()
+    assert grant["url"] == public + "/api/v1/transfers"
+    assert grant["curl"].endswith(f"'{public}/api/v1/transfers'")
+    exported = client.post("/api/v1/export/grant").json()
+    assert exported["url"] == public + "/api/v1/export"
+    # The proxy forwards the public path unchanged to the internal address.
+    proxied = client.base_url.join(httpx.URL(grant["url"]).path)
+    assert client.put(proxied, headers=grant["headers"], content=data).status_code == 200
 
 
 def test_an_inline_source_binds_the_pdf_grant_to_its_hash(setup):

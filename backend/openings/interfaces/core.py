@@ -82,9 +82,17 @@ def _origin():
     return os.environ.get("OPENINGS_PUBLIC_URL") or request_origin.get()
 
 
+def absolute(grant):
+    """Resolve a grant's url against the public origin, so an agent can use it as given."""
+    origin = (_origin() or "").rstrip("/")
+    if grant["url"].startswith("/"):
+        grant["url"] = origin + grant["url"]
+    return grant
+
+
 def with_curl(grant, name):
     """Add the shell line that uses a transfer grant: a PUT of the file ``name`` or a GET."""
-    url = (_origin() or "") + grant["url"]
+    url = absolute(grant)["url"]
     headers = " ".join(f"-H '{key}: {value}'" for key, value in grant["headers"].items())
     if grant["method"] == "PUT":
         grant["curl"] = f"curl -fsS -X PUT {headers} --data-binary @'{name}' '{url}'"

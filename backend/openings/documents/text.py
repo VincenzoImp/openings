@@ -60,10 +60,30 @@ _LAYOUT = {
     1: "vspace|hspace|includegraphics|label|ref|pageref|eqref|cite|color|pagecolor|linespread"
     "|usepackage|documentclass|geometry|hypersetup|pagestyle|thispagestyle|newgeometry"
     "|textcolor|colorbox|raisebox|input|include|setmainfont|setsansfont|setmonofont"
-    "|moderncvstyle|moderncvcolor|moderncvicons|hyphenation|setlist|faIcon",
-    2: "setlength|addtolength|setcounter|fontsize|rule|multicolumn",
+    "|moderncvstyle|moderncvcolor|moderncvicons|hyphenation|setlist|faIcon|addvspace"
+    "|enlargethispage|stepcounter",
+    2: "setlength|addtolength|setcounter|addtocounter|fontsize|rule|multicolumn",
     3: "definecolor",
+    4: "titlespacing",
 }
+# A TeX dimension or glue: -2pt, 0pt plus .4pt minus 1fil, 0.5\baselineskip.
+_NUMBER = r"[-+]?\s*(?:\d+(?:[.,]\d*)?|[.,]\d+)"
+_UNIT = r"(?:pt|pc|in|bp|cm|mm|dd|cc|nd|nc|sp|em|ex|mu|px|fil{1,3}|\\[A-Za-z@]+)(?![A-Za-z])"
+_DIMENSION = rf"{_NUMBER}\s*(?:true\s*)?{_UNIT}"
+_GLUE = rf"{_DIMENSION}(?:\s*plus\s*{_DIMENSION})?(?:\s*minus\s*{_DIMENSION})?"
+# Spacing primitives and length registers whose unbraced value is glue, not text.
+_SPACING = re.compile(
+    r"\\(?:kern|mkern|hskip|vskip|mskip|moveleft|moveright|raise|lower"
+    r"|(?:item|par|top|partop|column|tabcol|label|arraycol|fbox)sep"
+    r"|parskip|parindent|baselineskip|lineskip|leftmargin|rightmargin|itemindent"
+    r"|labelwidth|hangindent|leftskip|rightskip|parfillskip|topskip|emergencystretch"
+    r"|abovedisplayskip|belowdisplayskip|textwidth|linewidth|columnwidth|fboxrule)"
+    rf"(?![A-Za-z@])\s*=?\s*(?:{_GLUE})?"
+)
+# A length set with its register unbraced: \setlength\itemsep{0pt plus .4pt}.
+_ASSIGN = re.compile(r"\\(?:setlength|addtolength)\*?\s*(?:\\[A-Za-z@]+|\{[^{}]*\})\s*\{[^{}]*\}")
+# Ligatures a PDF's text layer keeps (U+FB00-FB06), as the letters they join.
+_LIGATURES = {code: unicodedata.normalize("NFKC", chr(code)) for code in range(0xFB00, 0xFB07)}
 _ENVIRONMENT_ARGUMENTS = {
     1: "tabular|minipage|multicols|longtable|array|wrapfigure",
     2: "tabularx|tabular\\*",
@@ -84,6 +104,11 @@ _ENVIRONMENT_DEFINITION = re.compile(
     r"\\(?:new|renew)environment\*?\s*\{[^{}]*\}\s*(?:\[\d\])?\s*(?:\[[^\]]*\])?\s*(?=\{)"
 )
 _EXPANSION_PASSES = 8
+
+
+def plain_letters(text: str) -> str:
+    """Text with typographic ligatures (ff, fi, fl, ffi, ffl, long st, st) as their letters."""
+    return text.translate(_LIGATURES)
 
 
 def is_tex_source(name: str, media_type: str) -> bool:
@@ -118,7 +143,8 @@ def _strip_markup(text: str, *, readable: bool = False) -> str:
     text = text.replace("\\-", "").replace("\\/", "").replace("\\@", "")
     text = re.sub(r"\\[,;:!> ]", " ", text)
     text = re.sub(r"\\\\\*?" + _OPTIONAL, " ", text)
-    text = re.sub(r"\\(?:kern|hskip|vskip)\s*-?[\d.]+\s*[a-z]{2}", " ", text)
+    text = _ASSIGN.sub(" ", text)
+    text = _SPACING.sub(" ", text)
     for count, names in sorted(_ENVIRONMENT_ARGUMENTS.items(), reverse=True):
         text = re.sub(rf"\\begin\s*\{{(?:{names})\}}{_OPTIONAL}{_ARGUMENT}{{{count}}}", " ", text)
     text = re.sub(r"\\(?:begin|end)\s*\{[^{}]*\}" + _OPTIONAL, " ", text)
@@ -298,7 +324,7 @@ def derive_text(source: str) -> str:
     # Personal data set in the preamble is printed where the body asks for it.
     collect(_expand(preamble, macros) + "\n" + body, context)
     body = render(drop_environment_arguments(body), context)
-    return _tidy(_strip_markup(_breaks(body), readable=True))
+    return plain_letters(_tidy(_strip_markup(_breaks(body), readable=True)))
 
 
 def revision_text(sources: list[tuple[str, str]]) -> str | None:

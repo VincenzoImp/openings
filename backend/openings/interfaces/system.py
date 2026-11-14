@@ -10,7 +10,7 @@ from .. import backups
 from ..auth import COOKIE
 from ..models import Input
 from ..responses import BackupList, Deleted, OperationGrant, PasswordChanged, Token, TokenList
-from .core import with_curl
+from .core import absolute, with_curl
 from .operation import OWNER, WS, operation
 
 
@@ -58,7 +58,7 @@ def workspace_export(ws: WS) -> OperationGrant:
 
     A two-minute GET grant for the JSON records, without file bytes or credentials.
     """
-    return grant(ws, "export")
+    return absolute(grant(ws, "export"))
 
 
 @operation("POST /auth/password", access=OWNER, tags=["owner"])
