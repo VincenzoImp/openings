@@ -1,0 +1,431 @@
+@layer screens {
+  /* One reading column: the page reads as a document, not a form. */
+  .prefs {
+    width: 100%;
+    max-width: calc(720px + 2 * var(--pane-pad));
+    margin: 0 auto;
+    padding-bottom: var(--s-16);
+  }
+  .prefs-lede {
+    margin: var(--s-1) 0 0;
+    padding: 0 var(--pane-pad);
+    color: var(--text-3);
+    font: var(--t-sm);
+    letter-spacing: 0;
+  }
+  .prefs-state {
+    padding: var(--s-6) var(--pane-pad);
+  }
+  .prefs-doc {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-10);
+    padding: var(--s-8) var(--pane-pad) 0;
+  }
+
+  .pref-section {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    min-width: 0;
+  }
+  .pref-section > * {
+    align-self: stretch;
+  }
+  .pref-title {
+    margin: 0 0 var(--s-2);
+    font: var(--t-lg);
+    font-weight: var(--w-semibold);
+    letter-spacing: -0.01em;
+  }
+  .pref-conflict {
+    margin-bottom: var(--s-3);
+  }
+
+  .pref-lines,
+  .pref-examples {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .pref-line {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: var(--s-1);
+    min-width: 0;
+    margin: 0 calc(-1 * var(--s-2));
+    padding: 3px var(--s-2) 3px 0;
+    border-radius: var(--r-md);
+    transition: background-color var(--d-fast) var(--ease);
+  }
+  .pref-lines > .pref-line[tabindex]:hover {
+    background: var(--hover);
+  }
+  .pref-line[tabindex]:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-inset);
+  }
+  .pref-line[data-dragging] {
+    background: var(--selected);
+    box-shadow: var(--shadow-sm);
+  }
+  .pref-lines[data-dragging] {
+    cursor: grabbing;
+    user-select: none;
+  }
+
+  /* The bullet at rest; the drag handle on hover or focus. */
+  .pref-lead {
+    position: relative;
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 24px;
+    height: 24px;
+  }
+  .pref-bullet {
+    width: 4px;
+    height: 4px;
+    border-radius: var(--r-full);
+    background: var(--text-3);
+  }
+  .pref-grip {
+    position: absolute;
+    inset: 0;
+    display: none;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-sm);
+    background: transparent;
+    color: var(--text-3);
+    cursor: grab;
+    touch-action: none;
+  }
+  .pref-grip:hover {
+    color: var(--text);
+  }
+  .pref-text {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    padding: 1px 0;
+    color: var(--text);
+    font: 400 14.5px/22px var(--font);
+    letter-spacing: -0.003em;
+    overflow-wrap: anywhere;
+    white-space: pre-line;
+  }
+  .pref-examples-label {
+    margin: 0 0 var(--s-1);
+    color: var(--text-3);
+    font: var(--t-xs);
+    font-weight: var(--w-regular);
+  }
+  .pref-examples .pref-text {
+    color: var(--text-3);
+  }
+  .pref-examples .pref-bullet {
+    background: var(--border-strong);
+  }
+  .pref-scope {
+    flex: none;
+    padding-top: 2px;
+  }
+  /* The actions' container stays, so an open menu inside it stays too. */
+  .pref-actions {
+    display: flex;
+    flex: none;
+    gap: 2px;
+    margin: -2px 0;
+  }
+  .pref-actions > .ui-btn {
+    display: none;
+  }
+  .pref-lines
+    > .pref-line[tabindex]:is(:hover, :focus-within)
+    .pref-actions
+    > .ui-btn {
+    display: inline-flex;
+  }
+  .pref-lines > .pref-line[tabindex]:is(:hover, :focus-within) .pref-grip {
+    display: grid;
+  }
+  .pref-lines > .pref-line[tabindex]:is(:hover, :focus-within) .pref-bullet {
+    visibility: hidden;
+  }
+  .pref-line[data-dragging] .pref-grip {
+    display: grid;
+    color: var(--text);
+    cursor: grabbing;
+  }
+  .pref-line[data-dragging] .pref-bullet {
+    visibility: hidden;
+  }
+  .pref-lines[data-dragging] .pref-actions > .ui-btn {
+    display: none !important;
+  }
+
+  /* A line being written. */
+  .pref-line[data-editing] {
+    padding: 0;
+    margin: var(--s-1) calc(-1 * var(--s-2));
+  }
+  .pref-edit {
+    flex: 1;
+    min-width: 0;
+    border: 1px solid var(--accent);
+    border-radius: var(--r-lg);
+    background: var(--bg);
+    box-shadow: var(--focus-input);
+  }
+  .pref-input {
+    display: block;
+    width: 100%;
+    min-height: 40px;
+    margin: 0;
+    padding: 9px 12px 4px;
+    border: 0;
+    background: transparent;
+    color: var(--text);
+    font: 400 14.5px/22px var(--font);
+    letter-spacing: -0.003em;
+    resize: none;
+    overflow: hidden;
+  }
+  .pref-input:focus,
+  .pref-input:focus-visible {
+    outline: none;
+    box-shadow: none;
+  }
+  .pref-input::placeholder {
+    color: var(--text-3);
+  }
+  .pref-editbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-2);
+    padding: var(--s-1) var(--s-2) var(--s-2) 12px;
+  }
+  .pref-edithint {
+    color: var(--text-3);
+    font: var(--t-xs);
+    font-weight: var(--w-regular);
+  }
+  .pref-editspace {
+    flex: 1;
+  }
+
+  .pref-add {
+    align-self: flex-start;
+    margin: var(--s-1) 0 0 calc(-1 * var(--s-2));
+    color: var(--text-3);
+  }
+  .pref-add:hover {
+    color: var(--text);
+  }
+
+  /* Languages I speak, under Facts about me. */
+  .pref-sub {
+    margin-top: var(--s-6);
+    padding-top: var(--s-5);
+    border-top: 1px solid var(--border);
+  }
+  .pref-subhead {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    min-height: 28px;
+  }
+  .pref-subhead h3 {
+    flex: 1;
+    font: var(--t-md);
+    font-weight: var(--w-semibold);
+  }
+  .pref-langs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-1-5);
+    margin: var(--s-2) 0 0;
+  }
+  .pref-muted {
+    margin: var(--s-1) 0 0;
+    color: var(--text-3);
+    font: var(--t-sm);
+    letter-spacing: 0;
+  }
+  .pref-langs-edit {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-3);
+    margin-top: var(--s-2);
+  }
+  .pref-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-1-5);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .pref-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    height: 28px;
+    padding: 0 2px 0 10px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-full);
+    background: var(--surface);
+    font: var(--t-sm);
+    font-weight: var(--w-medium);
+  }
+  .pref-chip button {
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-full);
+    background: transparent;
+    color: var(--text-3);
+  }
+  .pref-chip button:hover {
+    background: var(--hover);
+    color: var(--text);
+  }
+  .pref-langs-add {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2);
+    align-items: center;
+  }
+  .pref-langs-add .ui-select {
+    width: 220px;
+    max-width: 100%;
+  }
+
+  /* The Jobs filter, as a quiet link row. */
+  .pref-filter {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    margin-top: var(--s-4);
+    padding: 10px var(--s-3);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    color: var(--text-2);
+    text-decoration: none;
+    transition: background-color var(--d-fast) var(--ease);
+  }
+  .pref-filter:hover {
+    background: var(--hover);
+    text-decoration: none;
+  }
+  .pref-filter-text {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+  }
+  .pref-filter-label {
+    color: var(--text);
+    font: var(--t-sm);
+    font-weight: var(--w-medium);
+  }
+  .pref-filter-note {
+    color: var(--text-3);
+    font: var(--t-xs);
+    font-weight: var(--w-regular);
+    font-variant-numeric: tabular-nums;
+  }
+  .pref-filter-go {
+    color: var(--text-3);
+  }
+
+  /* Following up: one sentence with its number. */
+  .pref-sentence {
+    margin: 0;
+    color: var(--text);
+    font: 400 14.5px/32px var(--font);
+  }
+  .pref-sentence em {
+    font-style: italic;
+  }
+  .pref-days {
+    padding: 0 2px;
+    border: 0;
+    border-radius: var(--r-sm);
+    background: transparent;
+    text-decoration: underline dashed var(--control);
+    text-underline-offset: 4px;
+    color: var(--accent-text);
+    font: inherit;
+    font-weight: var(--w-medium);
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+  }
+  .pref-days:hover {
+    background: var(--hover);
+    text-decoration-style: solid;
+  }
+  .pref-days-form {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-1) var(--s-1-5);
+  }
+  .pref-days-input.ui-input {
+    width: 76px;
+    height: 32px;
+    font-variant-numeric: tabular-nums;
+  }
+  .pref-days-actions {
+    display: inline-flex;
+    gap: var(--s-1);
+    margin-left: var(--s-2);
+  }
+  .pref-error {
+    flex-basis: 100%;
+    color: var(--danger);
+    font: var(--t-sm);
+  }
+
+  @container app (max-width: 719px) {
+    .prefs-lede,
+    .prefs-state,
+    .prefs-doc {
+      padding-left: var(--s-4);
+      padding-right: var(--s-4);
+    }
+    .prefs-lede {
+      padding-top: var(--s-3);
+    }
+    .prefs-doc {
+      gap: var(--s-8);
+      padding-top: var(--s-6);
+    }
+    .pref-edithint {
+      display: none;
+    }
+    .pref-editbar .ui-btn {
+      height: 36px;
+    }
+    .pref-days-actions {
+      margin-left: 0;
+    }
+  }
+  /* Touch: no hover, so a tapped line shows its actions. */
+  @media (hover: none) {
+    .pref-actions .ui-btn {
+      width: 36px;
+      height: 36px;
+    }
+  }
+}

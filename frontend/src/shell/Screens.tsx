@@ -21,8 +21,8 @@ export const LOADERS: Record<RouteId, () => Module> = {
   applications: () => import("../screens/applications/Applications"),
   application: () => import("../screens/application/Page"),
   profile: () => import("../screens/profile/Profile"),
-  preferences: () => import("../pages/Preferences"),
-  templates: () => import("../pages/Templates"),
+  preferences: () => import("../screens/preferences/Preferences"),
+  templates: () => import("../screens/templates/Templates"),
   sources: () => import("../pages/Collection"),
   settings: () => import("../pages/Settings"),
   setup: () => import("../screens/setup/Setup"),
@@ -41,13 +41,7 @@ export function preload(id: RouteId) {
 
 // The screens built before the design system keep their own frame until
 // their issue rebuilds them (#222–#227); a rebuilt screen leaves this list.
-const LEGACY = new Set<RouteId>([
-  "jobs",
-  "preferences",
-  "templates",
-  "sources",
-  "settings",
-]);
+const LEGACY = new Set<RouteId>(["jobs", "sources", "settings"]);
 
 /**
  * A screen whose code or first render fails says so and offers a reload; a
