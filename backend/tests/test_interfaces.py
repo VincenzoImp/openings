@@ -15,8 +15,12 @@ OWNER_ONLY_CALLS = {
     "tokens_revoke": {},
     "backups_list": {},
     "backups_delete": {},
+    "workspace_export": {},
+    "career_preview_import": {"json": {"text": "Synthetic notes."}},
+    "career_import": {"json": {"entries": []}},
     "POST /backup/restore": {"content": b"SQLite format 3\x00"},
     "GET /backups/{name}": {},
+    "GET /export": {},
 }
 
 

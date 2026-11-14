@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 from starlette.requests import ClientDisconnect
 
 from openings.app import create_app
+from openings.interfaces.system import grant
 from openings.models import JobInput
 from openings.transfers import RecordsResponse
 
@@ -177,20 +178,18 @@ async def test_export_preserves_nullable_career_dates_and_scoped_mcp_download(tm
         )
     )
     claim = career.create_claim(
-        ClaimCreate(knowledge_id=undated["id"], text="Synthetic claim", approved=True)
+        ClaimCreate(career_id=undated["id"], text="Synthetic claim", approved=True)
     )
     career.create_template(TemplateCreate(name="Synthetic CV", tex="Example", is_default=True))
     job = workspace.ingest_job({"title": "Synthetic role", "posting": "Build reliable services."})
     application = workspace.create_application({"job_id": job["id"]})
-    documents.create_document(
-        {"application_id": application["id"], "knowledge_ids": [undated["id"]]}
-    )
+    documents.create_document({"application_id": application["id"], "career_ids": [undated["id"]]})
     with TestClient(app) as client:
         assert client.get("/api/v1/export").status_code == 401
         client.post("/api/v1/auth/setup", json={"password": "synthetic-password"})
         archive = client.get("/api/v1/export").json()
-        grant = await app.state.mcp.call_tool("workspace_export", {})
-        ticket = json.loads(grant.content[0].text)
+        # The owner's export grant (workspace_export, owner only).
+        ticket = grant(app.state.workspace, "export")
         client.cookies.clear()
         scoped = client.get(ticket["url"], headers=ticket["headers"])
         assert scoped.status_code == 200

@@ -9,6 +9,7 @@ from document_fixtures import attach, attach_pdf
 from openings.app import create_app
 from openings.documents import DocumentCreate
 from openings.errors import DomainError
+from openings.interfaces.operation import without_empty
 from openings.workspace import Workspace
 from timeline_fixtures import guided_application
 
@@ -214,103 +215,70 @@ def test_applications_filter_by_the_time_they_were_applied(tmp_path):
                 },
             },
         ).json()["result"]
-        assert (
-            mcp.get("structuredContent") or json.loads(mcp["content"][0]["text"])
-        ) == rest.json()
+        assert json.loads(mcp["content"][0]["text"]) == without_empty(rest.json())
         invalid = client.get("/api/v1/applications", params={"applied_since": "soon"})
         assert invalid.status_code == 422
 
 
-@pytest.mark.parametrize("transport", ["rest", "mcp"])
-def test_planning_fields_have_rest_and_mcp_parity(tmp_path, transport):
-    app = create_app(tmp_path / f"parity-{transport}.sqlite", start_worker=False)
+def test_planning_fields_have_rest_and_mcp_parity(tmp_path):
+    """REST's one-application routes and MCP's batch tools set the same planning fields."""
+    app = create_app(tmp_path / "parity.sqlite", start_worker=False)
     app.state.auth.setup("synthetic-password")
     token = app.state.auth.create_token("Synthetic planning client")["token"]
     headers = {"Authorization": "Bearer " + token, "Accept": "application/json, text/event-stream"}
-    job = app.state.workspace.ingest_job({"title": "Synthetic role", "posting": "Build."})
+    workspace = app.state.workspace
+    jobs = [workspace.ingest_job({"title": f"Role {n}", "posting": "Build."}) for n in (1, 2)]
+    planning = {
+        "priority": 2,
+        "deadline": "2026-12-15",
+        "requirements": [{"id": "ai", "kind": "authorship", "text": "No AI.", "blocking": True}],
+    }
     with TestClient(app, base_url="http://localhost:8080", headers=headers) as client:
 
-        def call(tool, method, path, arguments):
-            if transport == "rest":
-                # REST names the identifiers in the path and the rest in the body or query.
-                body = {
-                    k: v
-                    for k, v in arguments.items()
-                    if not (k.endswith("_id") and f"/{v}" in path)
-                }
-                response = client.request(
-                    method,
-                    "/api/v1" + path,
-                    params=body if method == "GET" else None,
-                    json=body if method != "GET" else None,
-                )
-                return response.status_code, response.json()
+        def tool(name, arguments):
             response = client.post(
                 "/mcp",
                 json={
                     "jsonrpc": "2.0",
                     "id": 1,
                     "method": "tools/call",
-                    "params": {"name": tool, "arguments": arguments},
+                    "params": {"name": name, "arguments": arguments},
                 },
             )
             result = response.json()["result"]
-            if result.get("isError"):
-                return 422, result
-            return 200, result.get("structuredContent") or json.loads(result["content"][0]["text"])
+            assert not result.get("isError"), result
+            return json.loads(result["content"][0]["text"])
 
-        status, created = call(
-            "applications_create",
-            "POST",
-            "/applications",
-            {
-                "job_id": job["id"],
-                "priority": 2,
-                "deadline": "2026-12-15",
-                "requirements": [
-                    {"id": "ai", "kind": "authorship", "text": "No AI.", "blocking": True}
-                ],
-            },
-        )
-        assert status == 200 and created["missing"] == ["cv", "letter", "requirement:ai"]
-        status, updated = call(
+        rest = client.post("/api/v1/applications", json={"job_id": jobs[0]["id"], **planning})
+        assert rest.status_code == 200
+        rest = rest.json()
+        created = tool("applications_create", {"items": [{"job_id": jobs[1]["id"], **planning}]})
+        item = created["items"][0]
+        assert item["ok"] and item["result"]["created"] is True
+        assert rest["missing"] == item["result"]["missing"] == ["cv", "letter", "requirement:ai"]
+
+        resolved = [{**rest["requirements"][0], "resolved": True}]
+        rest = client.patch(
+            f"/api/v1/applications/{rest['id']}",
+            json={"expected_version": rest["version"], "requirements": resolved, "deadline": None},
+        ).json()
+        changed = tool(
             "applications_update",
-            "PATCH",
-            f"/applications/{created['id']}",
-            {
-                "application_id": created["id"],
-                "expected_version": created["version"],
-                "requirements": [{**created["requirements"][0], "resolved": True}],
-                "deadline": None,
-            },
+            {"items": [{"application_id": item["id"], "requirements": resolved, "deadline": None}]},
         )
-        assert status == 200 and updated["missing"] == ["cv", "letter"]
-        assert updated["deadline"] is None
-        status, _ = call(
-            "applications_update",
-            "PATCH",
-            f"/applications/{created['id']}",
-            {
-                "application_id": created["id"],
-                "expected_version": updated["version"],
-                "priority": 9,
-            },
+        assert changed["items"][0]["result"]["missing"] == rest["missing"] == ["cv", "letter"]
+        assert (
+            client.patch(
+                f"/api/v1/applications/{rest['id']}",
+                json={"expected_version": rest["version"], "priority": 9},
+            ).status_code
+            == 422
         )
-        assert status == 422
-        status, listed = call(
-            "applications_list",
-            "GET",
-            "/applications",
-            {"needs": "documents", "sort": "priority"},
-        )
-        assert status == 200 and listed["total"] == 1
-        item = listed["items"][0]
-        assert (item["priority"], item["deadline"], item["ready"]) == (2, None, False)
-        assert item["open_requirements"] == item["blocking_requirements"] == 0
-        status, got = call(
-            "applications_get",
-            "GET",
-            f"/applications/{created['id']}",
-            {"application_id": created["id"]},
-        )
-        assert status == 200 and got["requirements"] == updated["requirements"]
+        both = tool("applications_get", {"ids": [rest["id"], item["id"]]})["items"]
+        for read in both:
+            assert (read["priority"], read.get("deadline"), read["ready"]) == (2, None, False)
+            assert read["requirements"] == without_empty(rest["requirements"])
+        listed = client.get(
+            "/api/v1/applications", params={"needs": "documents", "sort": "priority"}
+        ).json()
+        assert listed["total"] == 2

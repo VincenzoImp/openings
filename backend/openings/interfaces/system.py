@@ -10,6 +10,7 @@ from .. import backups
 from ..auth import COOKIE
 from ..models import Input
 from ..responses import BackupList, Deleted, OperationGrant, PasswordChanged, Token, TokenList
+from .core import with_curl
 from .operation import OWNER, WS, operation
 
 
@@ -43,20 +44,19 @@ def grant(ws, operation):
 
 @operation("POST /backup/grant", tags=["workspace"])
 def workspace_backup(ws: WS) -> OperationGrant:
-    """Reserve a backup download.
+    """Reserve a backup download; take one before any permanent bulk clean-up.
 
-    A two-minute GET grant for a consistent SQLite backup with file bytes. With an agent
-    token the backup omits the password hash, session secret and tokens; it still restores.
+    A two-minute GET grant (curl line given). An agent's backup leaves out the password
+    hash, session secret and tokens.
     """
-    return grant(ws, "backup")
+    return with_curl(grant(ws, "backup"), "openings-backup.sqlite")
 
 
-@operation("POST /export/grant", tags=["workspace"])
+@operation("POST /export/grant", access=OWNER, tags=["owner"])
 def workspace_export(ws: WS) -> OperationGrant:
-    """Reserve a records export.
+    """Reserve a records export (owner only).
 
-    A two-minute GET grant for redacted JSON records, without file bytes or installation
-    authentication; a backup is the full snapshot.
+    A two-minute GET grant for the JSON records, without file bytes or credentials.
     """
     return grant(ws, "export")
 
