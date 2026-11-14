@@ -353,7 +353,7 @@ export function CvStep({
   const save = useImport();
   const example = useExampleTemplate();
   const preview: ImportPreview | undefined = read.data;
-  const entries = (preview?.knowledge ?? []) as {
+  const entries = (preview?.entries ?? []) as {
     title?: string;
     organization?: string;
   }[];

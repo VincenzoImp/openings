@@ -12,7 +12,7 @@ type Preferences = Schema<"Preferences">;
 /** Step 1: the name, what the person looks for and where, their languages. */
 export function useSaveAbout() {
   return useApiMutation({
-    touches: ["career", "preferences", "settings"],
+    touches: ["career", "preferences", "settings", "workspace"],
     mutationFn: async ({
       about,
       profile,
@@ -77,7 +77,7 @@ export function useTestSearch() {
 /** Save the search; it then runs on its schedule. */
 export function useSaveSearch() {
   return useApiMutation({
-    touches: ["sources", "collection"],
+    touches: ["sources", "collection", "workspace"],
     mutationFn: (search: Search) =>
       call(
         api.POST("/api/v1/sources", {
@@ -105,12 +105,12 @@ export function usePreviewImport() {
 /** Save what the preview found. */
 export function useImport() {
   return useApiMutation({
-    touches: ["career"],
+    touches: ["career", "workspace"],
     mutationFn: (preview: ImportPreview) =>
       call(
         api.POST("/api/v1/career/import", {
           body: {
-            knowledge: preview.knowledge as Schema<"KnowledgeCreate">[],
+            entries: preview.entries as Schema<"KnowledgeCreate">[],
             profile: preview.profile ?? null,
             expected_profile_version:
               (preview.expected_profile_version as number | undefined) ?? null,
@@ -123,7 +123,7 @@ export function useImport() {
 /** Add the shipped example CV template as the default CV template. */
 export function useExampleTemplate() {
   return useApiMutation({
-    touches: ["templates"],
+    touches: ["templates", "workspace"],
     mutationFn: async () => {
       const { blob } = await download("/api/v1/examples/cv.tex");
       return call(
