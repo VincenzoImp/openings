@@ -70,8 +70,8 @@ and submit. Jobs, documents and file bytes live in one portable SQLite database.
 ## Agent-operated
 
 Openings works best when your own AI agent runs it. The server ships
-[workflow skills](skills/) and serves them to any connected agent (`skills_list`,
-`skills_get` and one MCP prompt per skill). With them, an agent reviews new jobs
+[workflow skills](skills/) and serves them to any connected agent (`skills_get`,
+one MCP prompt and resource per skill). With them, an agent reviews new jobs
 against your Preferences, prepares a CV and letter for every shortlisted job, records
 employer requirements, tunes searches and keeps your Career record current. You
 answer its questions in the chat, apply to the Ready applications and mark them Applied.

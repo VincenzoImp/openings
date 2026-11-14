@@ -391,8 +391,7 @@ share only a company and title. The response repeats `min_confidence` and the
 `tiers` thresholds. Add `match_location=true` to require agreeing locations.
 Signals come from requisition IDs, apply links and ATS posting IDs, posting text,
 company, title and location; the
-[vacancy identity reference](../../skills/openings-workspace/references/job-deduplication.md)
-lists them. Verify a group, then merge with `POST /jobs/{source_id}/merge`;
+[triage-jobs skill](../../skills/triage-jobs/SKILL.md) says how to check them. Verify a group, then merge with `POST /jobs/{source_id}/merge`;
 nothing is merged automatically.
 
 `POST /applications/bulk` closes, reopens or deletes selected attempts:

@@ -48,7 +48,7 @@ The server ships workflow [skills](../../skills/) in the Agent Skills format and
 serves them to connected agents: `skills_list`, `skills_get(name, path)` and one MCP
 prompt per skill, also at `GET /api/v1/skills`. Start with
 [`setup-openings`](../../skills/setup-openings/SKILL.md) for a new workspace or
-[`openings-workspace`](../../skills/openings-workspace/SKILL.md) for the basics.
+[`openings`](../../skills/openings/SKILL.md) for the basics.
 **Settings → Agent access** shows client configuration snippets; **Settings →
 Skills** shows what you can ask your agent: for each skill a title, one sentence
 and an example phrase (the `title`, `summary` and `example` fields of its

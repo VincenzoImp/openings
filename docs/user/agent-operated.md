@@ -7,21 +7,18 @@ apply to the applications it makes Ready, and mark each one Applied or close it.
 
 ## What the agent does
 
-With the [workflow skills](../../skills/) and the
-[operating mandate](../../skills/openings-workspace/references/operating-mandate.md),
-an agent can, without waiting for each request:
+With the [workflow skills](../../skills/), starting with the core
+[openings](../../skills/openings/SKILL.md) skill and its hard limits, an agent can:
 
 | Area | Skill |
 |---|---|
 | Install, connect and onboard: career record, Profile, Preferences, templates, searches | [setup-openings](../../skills/setup-openings/SKILL.md) |
-| Review new jobs and shortlist credible ones under your Preferences | [review-inbox](../../skills/review-inbox/SKILL.md) |
-| Prepare the CV and letter of every Shortlisted application until it is Ready, with PDF checks | [prepare-shortlist](../../skills/prepare-shortlist/SKILL.md) |
+| Triage new jobs under your Preferences and experience | [triage-jobs](../../skills/triage-jobs/SKILL.md) |
+| Prepare the CV and letter of every Shortlisted application until it is Ready, with PDF checks | [prepare-applications](../../skills/prepare-applications/SKILL.md) |
 | Keep searches and monitored companies effective; reduce noise | [manage-sources](../../skills/manage-sources/SKILL.md) |
-| Improve your Career record, claims, CV MASTER and letter template | [maintain-career](../../skills/maintain-career/SKILL.md) |
-| Prioritize Ready applications, find expired ones, record what you report | [track-applications](../../skills/track-applications/SKILL.md) |
+| Keep your Profile, Career record, highlights and templates current | [maintain-career](../../skills/maintain-career/SKILL.md) |
+| Record the replies and progress you report; show what is waiting | [track-applications](../../skills/track-applications/SKILL.md) |
 | Prepare you for interviews from the documents the employer received | [prepare-interview](../../skills/prepare-interview/SKILL.md) |
-| Write factual, evidence-based wording | [career-claims](../../skills/career-claims/SKILL.md) |
-| Connection, versions, transfers, shared references | [openings-workspace](../../skills/openings-workspace/SKILL.md) |
 
 The agent never submits an application, contacts an employer or records Applied
 on its own, and never invents career facts. Your preferences live in
