@@ -5,13 +5,23 @@
 // the seeded snapshot (server.ts), and an automatic fixture restores that copy
 // before every test. A test may change anything; the next one starts from the
 // same seeded workspace, whatever ran before it and in whichever worker.
-import { test as base } from "@playwright/test";
+//
+// Every test runs signed in as the owner (`test.use({ signedIn: false })` in
+// a describe block opts out) and fails on any uncaught error of the page; a
+// test that provokes one on purpose empties `pageErrors` itself.
+import { expect, test as base } from "@playwright/test";
 import { startServer, type Server } from "./server";
+import { ownerSession } from "./session";
 
 export { expect } from "@playwright/test";
 export type { BrowserContext, Locator, Page } from "@playwright/test";
 
-export const test = base.extend<{ seededWorkspace: void }, { server: Server }>({
+export type Options = { signedIn: boolean };
+
+export const test = base.extend<
+  Options & { seededWorkspace: void; pageErrors: string[] },
+  { server: Server }
+>({
   server: [
     async ({}, use) => {
       const snapshot = process.env.OPENINGS_E2E_SNAPSHOT;
@@ -31,6 +41,20 @@ export const test = base.extend<{ seededWorkspace: void }, { server: Server }>({
       if (response.status !== 204)
         throw Error(`The workspace was not reset (${response.status}).`);
       await use();
+    },
+    { auto: true },
+  ],
+  signedIn: [true, { option: true }],
+  context: async ({ context, signedIn }, use) => {
+    if (signedIn) await context.addCookies(ownerSession());
+    await use(context);
+  },
+  pageErrors: [
+    async ({ page }, use) => {
+      const errors: string[] = [];
+      page.on("pageerror", (error) => errors.push(error.message));
+      await use(errors);
+      expect(errors, "uncaught errors of the page").toEqual([]);
     },
     { auto: true },
   ],

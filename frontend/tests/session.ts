@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { expect, type BrowserContext, type Page } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
+import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 
 export type Cookies = Parameters<BrowserContext["addCookies"]>[0];
 
@@ -17,6 +18,22 @@ export function ownerSession(): Cookies {
       sameSite: "Strict",
     },
   ];
+}
+
+/**
+ * The key that moves focus to the next control, links included: WebKit on
+ * macOS, as Safari, skips links on a plain Tab.
+ */
+export const tabKey = (page: Page) =>
+  page.context().browser()?.browserType().name() === "webkit" &&
+  process.platform === "darwin"
+    ? "Alt+Tab"
+    : "Tab";
+
+/** The screen's requests are answered and its skeleton rows are gone. */
+export async function settled(page: Page) {
+  await page.waitForLoadState("networkidle");
+  await expect(page.locator(".ui-skeleton-rows")).toHaveCount(0);
 }
 
 /** Open a hash route and wait for its screen. */
@@ -230,4 +247,96 @@ export async function blockButton(page: Page, name: string) {
     await expect(button).toBeVisible();
   }
   await button.click();
+}
+
+/**
+ * The themes an accessibility check covers: both on `chromium`, light only on
+ * the other projects. Token contrast in both themes is proven by
+ * contrast.test.mjs, so the dark pass is not repeated per browser and width.
+ */
+export const themes = (): ("light" | "dark")[] =>
+  test.info().project.name === "chromium" ? ["light", "dark"] : ["light"];
+
+/** Apply a theme from the next load on, as the dashboard stores it. */
+export async function useTheme(page: Page, theme: string) {
+  await page.addInitScript((value) => {
+    try {
+      localStorage.setItem("openings-theme", value);
+    } catch {}
+  }, theme);
+}
+
+export const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
+
+/**
+ * The serious and critical axe findings against WCAG 2.2 AA of the page as
+ * it is, once its animations end; `[]` when there is none.
+ */
+export async function findings(page: Page) {
+  // A menu or dialog that is still fading in would be measured half blended.
+  await page.evaluate(() =>
+    Promise.all(
+      document
+        .getAnimations()
+        .filter(
+          (animation) => animation.effect?.getTiming().iterations !== Infinity,
+        )
+        .map((animation) => animation.finished.catch(() => undefined)),
+    ),
+  );
+  const { violations } = await new AxeBuilder({ page })
+    .withTags(WCAG)
+    .analyze();
+  const found: string[] = [];
+  for (const violation of violations) {
+    if (violation.impact !== "serious" && violation.impact !== "critical")
+      continue;
+    for (const node of violation.nodes) {
+      const target = node.target.join(" ");
+      // On a phone a fixed action bar covers whatever reaches the edge of the
+      // content, which axe reads as a small target.
+      // Scroll the target to the middle and check its size and spacing again.
+      const covered =
+        violation.id === "target-size" &&
+        (await visibleTargetFits(page, target));
+      if (!covered)
+        found.push(
+          `${violation.id}: ${target}\n    ${node.failureSummary?.replaceAll("\n", "\n    ")}`,
+        );
+    }
+  }
+  return found;
+}
+
+/** The target passes the target-size rule once nothing fixed covers it. */
+async function visibleTargetFits(page: Page, target: string) {
+  const element = page.locator(target).first();
+  const covered = await element
+    .evaluate((el) => {
+      const box = el.getBoundingClientRect();
+      const fixed = ".ui-bottombar, .sticky-actions, .ui-topbar";
+      const rects = (selector: string) =>
+        [...document.querySelectorAll(selector)]
+          .map((bar) => bar.getBoundingClientRect())
+          .filter((rect) => rect.height > 0);
+      const bottom = Math.min(
+        window.innerHeight,
+        ...rects(".ui-bottombar, .sticky-actions").map((rect) => rect.top),
+      );
+      // The phone's top bar sits above the content.
+      const top = Math.max(
+        0,
+        ...rects(".ui-topbar").map((rect) => rect.bottom),
+      );
+      return (box.bottom > bottom || box.top < top) && !el.closest(fixed);
+    })
+    .catch(() => false);
+  if (!covered) return false;
+  await element.evaluate((el) => el.scrollIntoView({ block: "center" }));
+  const { violations } = await new AxeBuilder({ page })
+    .include(target)
+    .withRules(["target-size"])
+    .analyze();
+  await page.evaluate(() => document.getElementById("content")?.scrollTo(0, 0));
+  return violations.length === 0;
 }

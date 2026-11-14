@@ -1,11 +1,11 @@
-import AxeBuilder from "@axe-core/playwright";
-import { test, expect, type Page } from "./fixtures";
-import { call, go, isPhone, ownerSession, type Cookies } from "./session";
+import { test, expect } from "./fixtures";
+import { call, findings, go, isPhone, settled, useTheme } from "./session";
 
-// Automated accessibility checks (axe) on every screen, in both themes; the
-// Playwright projects supply the desktop and the narrow width. The budget: no
-// serious or critical finding against WCAG 2.2 AA.
-const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
+// Automated accessibility checks (axe, `findings` in session.ts) on every
+// screen; the Playwright projects supply the desktop and the narrow width.
+// The dark theme runs on `chromium` only: contrast.test.mjs proves the
+// tokens of both themes. The budget: no serious or critical finding against
+// WCAG 2.2 AA.
 
 // Every screen, grouped by area so that a test reads a few screens in a row.
 const SCREENS: Record<string, string[]> = {
@@ -40,102 +40,26 @@ const SCREENS: Record<string, string[]> = {
   Setup: ["setup", "setup?step=jobs", "setup?step=cv", "setup?step=done"],
 };
 
-const cookies: Cookies = ownerSession();
-
-async function findings(page: Page, key: string) {
-  // A menu or dialog that is still fading in would be measured half blended.
-  await page.evaluate(() =>
-    Promise.all(
-      document
-        .getAnimations()
-        .filter(
-          (animation) => animation.effect?.getTiming().iterations !== Infinity,
-        )
-        .map((animation) => animation.finished.catch(() => undefined)),
-    ),
-  );
-  const { violations } = await new AxeBuilder({ page })
-    .withTags(TAGS)
-    .analyze();
-  const found: string[] = [];
-  for (const violation of violations) {
-    if (violation.impact !== "serious" && violation.impact !== "critical")
-      continue;
-    for (const node of violation.nodes) {
-      const target = node.target.join(" ");
-      // On a phone a fixed action bar covers whatever reaches the edge of the
-      // content, which axe reads as a small target.
-      // Scroll the target to the middle and check its size and spacing again.
-      const covered =
-        violation.id === "target-size" &&
-        (await visibleTargetFits(page, target));
-      if (!covered)
-        found.push(
-          `${violation.id}: ${target}\n    ${node.failureSummary?.replaceAll("\n", "\n    ")}`,
-        );
-    }
-  }
-  return found;
-}
-
-/** The target passes the target-size rule once nothing fixed covers it. */
-async function visibleTargetFits(page: Page, target: string) {
-  const element = page.locator(target).first();
-  const covered = await element
-    .evaluate((el) => {
-      const box = el.getBoundingClientRect();
-      const fixed = ".ui-bottombar, .sticky-actions, .ui-topbar";
-      const rects = (selector: string) =>
-        [...document.querySelectorAll(selector)]
-          .map((bar) => bar.getBoundingClientRect())
-          .filter((rect) => rect.height > 0);
-      const bottom = Math.min(
-        window.innerHeight,
-        ...rects(".ui-bottombar, .sticky-actions").map((rect) => rect.top),
-      );
-      // The phone's top bar sits above the content.
-      const top = Math.max(
-        0,
-        ...rects(".ui-topbar").map((rect) => rect.bottom),
-      );
-      return (box.bottom > bottom || box.top < top) && !el.closest(fixed);
-    })
-    .catch(() => false);
-  if (!covered) return false;
-  await element.evaluate((el) => el.scrollIntoView({ block: "center" }));
-  const { violations } = await new AxeBuilder({ page })
-    .include(target)
-    .withRules(["target-size"])
-    .analyze();
-  await page.evaluate(() => document.getElementById("content")?.scrollTo(0, 0));
-  return violations.length === 0;
-}
-
-async function useTheme(page: Page, theme: string) {
-  await page.addInitScript((value) => {
-    try {
-      localStorage.setItem("openings-theme", value);
-    } catch {}
-  }, theme);
-}
-async function settled(page: Page) {
-  await page.waitForLoadState("networkidle");
-  await expect(page.locator(".ui-skeleton-rows")).toHaveCount(0);
-}
-
 for (const theme of ["light", "dark"]) {
   test.describe(`${theme} theme`, () => {
     test.beforeEach(async ({ page }) => {
+      test.skip(
+        theme === "dark" && test.info().project.name !== "chromium",
+        "The dark theme runs on chromium only.",
+      );
       await useTheme(page, theme);
     });
 
-    test("the sign-in screen has no serious accessibility finding", async ({
-      page,
-    }) => {
-      await page.goto("/");
-      await expect(page.locator("input[name=password]")).toBeVisible();
-      await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
-      expect(await findings(page, "sign-in")).toEqual([]);
+    test.describe("signed out", () => {
+      test.use({ signedIn: false });
+      test("the sign-in screen has no serious accessibility finding", async ({
+        page,
+      }) => {
+        await page.goto("/");
+        await expect(page.locator("input[name=password]")).toBeVisible();
+        await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+        expect(await findings(page)).toEqual([]);
+      });
     });
 
     for (const [area, screens] of Object.entries(SCREENS))
@@ -143,7 +67,6 @@ for (const theme of ["light", "dark"]) {
         page,
       }) => {
         test.setTimeout(90000);
-        await page.context().addCookies(cookies);
         for (const screen of screens) {
           // A fresh load per screen, as a reader arriving at its address.
           await page.goto("about:blank");
@@ -153,14 +76,13 @@ for (const theme of ["light", "dark"]) {
             "data-theme",
             theme,
           );
-          expect(await findings(page, screen), screen).toEqual([]);
+          expect(await findings(page), screen).toEqual([]);
         }
       });
 
     test("Today's reply form and a focused row with its actions have no serious accessibility finding", async ({
       page,
     }) => {
-      await page.context().addCookies(cookies);
       await go(page, "today");
       await settled(page);
       const waiting = page
@@ -168,17 +90,16 @@ for (const theme of ["light", "dark"]) {
         .getByRole("link")
         .first();
       await waiting.focus();
-      expect(await findings(page, "today-row")).toEqual([]);
+      expect(await findings(page)).toEqual([]);
       await page.keyboard.press("r");
       await expect(page.locator("dialog[open]")).toBeVisible();
-      expect(await findings(page, "today-reply")).toEqual([]);
+      expect(await findings(page)).toEqual([]);
     });
 
     test("a job with its details, the dismissed job, the dialogs and the selection have no serious accessibility finding", async ({
       page,
     }) => {
       test.setTimeout(90000);
-      await page.context().addCookies(cookies);
       await go(page, "today");
       const api = (path: string) =>
         page.evaluate(
@@ -194,10 +115,10 @@ for (const theme of ["light", "dark"]) {
       await expect(page.locator(".jobs-callout")).toBeVisible();
       await page.getByText("Notes and history").click();
       await settled(page);
-      expect(await findings(page, "job")).toEqual([]);
+      expect(await findings(page)).toEqual([]);
       await go(page, `jobs?section=dismissed&job=${dismissed.id}`);
       await settled(page);
-      expect(await findings(page, "dismissed-job")).toEqual([]);
+      expect(await findings(page)).toEqual([]);
       // The … menu's dialogs: correct details, merge with another job.
       await go(page, `jobs?job=${flagged.id}`);
       await settled(page);
@@ -207,7 +128,7 @@ for (const theme of ["light", "dark"]) {
       await more.click();
       await page.getByRole("menuitem", { name: /^Correct details/ }).click();
       await expect(page.locator("dialog[open]")).toBeVisible();
-      expect(await findings(page, "correct")).toEqual([]);
+      expect(await findings(page)).toEqual([]);
       await page
         .locator("dialog[open]")
         .getByRole("button", { name: "Cancel" })
@@ -216,7 +137,7 @@ for (const theme of ["light", "dark"]) {
       await more.click();
       await page.getByRole("menuitem", { name: /^Merge with another/ }).click();
       await expect(page.locator("dialog[open]")).toBeVisible();
-      expect(await findings(page, "merge")).toEqual([]);
+      expect(await findings(page)).toEqual([]);
       await page
         .locator("dialog[open]")
         .getByRole("button", { name: "Cancel" })
@@ -229,11 +150,11 @@ for (const theme of ["light", "dark"]) {
         await page.getByRole("button", { name: "Filter and sort" }).click();
       else await page.getByRole("button", { name: "Filter" }).click();
       await settled(page);
-      expect(await findings(page, "jobs-filter")).toEqual([]);
+      expect(await findings(page)).toEqual([]);
       await page.keyboard.press("Escape");
       await page.keyboard.press("d");
       await page.getByRole("button", { name: "Add reason" }).click();
-      expect(await findings(page, "jobs-toast")).toEqual([]);
+      expect(await findings(page)).toEqual([]);
       await page.keyboard.press("Escape");
       // Selected rows with the bulk actions.
       await page.locator(".jobs-list .ui-row-main").first().focus();
@@ -242,14 +163,13 @@ for (const theme of ["light", "dark"]) {
       await expect(
         page.getByRole("toolbar", { name: "2 selected" }),
       ).toBeVisible();
-      expect(await findings(page, "jobs-bulk")).toEqual([]);
+      expect(await findings(page)).toEqual([]);
     });
 
     test("the application page in each stage, its dialogs and the list's bulk bar have no serious accessibility finding", async ({
       page,
     }) => {
       test.setTimeout(90000);
-      await page.context().addCookies(cookies);
       await go(page, "today");
       const first = async (query: string) =>
         (await call(page, `/applications?${query}&limit=1`)).items[0].id;
@@ -263,7 +183,7 @@ for (const theme of ["light", "dark"]) {
         await go(page, `applications/${id}`);
         await expect(page.locator(".ui-skeleton")).toHaveCount(0);
         await settled(page);
-        expect(await findings(page, `application-${stage}`)).toEqual([]);
+        expect(await findings(page)).toEqual([]);
       }
       // The Record reply dialog, and a stage's menu.
       await go(page, `applications/${pages[2][1]}`);
@@ -272,7 +192,7 @@ for (const theme of ["light", "dark"]) {
         .filter({ visible: true })
         .click();
       await expect(page.locator("dialog[open]")).toBeVisible();
-      expect(await findings(page, "record-reply")).toEqual([]);
+      expect(await findings(page)).toEqual([]);
       await page.keyboard.press("Escape");
       await page
         .getByRole("button", { name: "More actions" })
@@ -283,7 +203,7 @@ for (const theme of ["light", "dark"]) {
           .getByRole("menu", { name: "Application actions" })
           .filter({ visible: true }),
       ).toBeVisible();
-      expect(await findings(page, "application-menu")).toEqual([]);
+      expect(await findings(page)).toEqual([]);
       await page.keyboard.press("Escape");
       // Selected rows with the bulk bar (a desktop pattern).
       if (!isPhone(page)) {
@@ -296,30 +216,29 @@ for (const theme of ["light", "dark"]) {
         await expect(
           page.getByRole("toolbar", { name: "1 selected" }),
         ).toBeVisible();
-        expect(await findings(page, "applications-bulk")).toEqual([]);
+        expect(await findings(page)).toEqual([]);
       }
     });
 
     test("the shell: the More menu, the account menu, the palette, Add job and the shortcuts have no serious accessibility finding", async ({
       page,
     }) => {
-      await page.context().addCookies(cookies);
       await go(page, "templates");
       await settled(page);
-      expect(await findings(page, "shell")).toEqual([]);
+      expect(await findings(page)).toEqual([]);
       const navigation = page
         .getByRole("navigation", { name: "Main" })
         .filter({ visible: true });
       if (isPhone(page)) {
         await navigation.getByRole("button", { name: "More" }).click();
         await expect(page.getByRole("menu", { name: "More" })).toBeVisible();
-        expect(await findings(page, "more")).toEqual([]);
+        expect(await findings(page)).toEqual([]);
       } else {
         await navigation
           .getByRole("button", { name: /Alex Morgan|You/ })
           .click();
         await expect(page.getByRole("menu", { name: "Account" })).toBeVisible();
-        expect(await findings(page, "account")).toEqual([]);
+        expect(await findings(page)).toEqual([]);
       }
       await page.keyboard.press("Escape");
       // The palette with results of both kinds.
@@ -329,19 +248,19 @@ for (const theme of ["light", "dark"]) {
       await expect(
         palette.getByRole("group", { name: "Jobs" }).getByRole("option"),
       ).not.toHaveCount(0);
-      expect(await findings(page, "palette")).toEqual([]);
+      expect(await findings(page)).toEqual([]);
       await page.keyboard.press("Escape");
       await page.keyboard.press("n");
       const add = page.getByRole("dialog", { name: "Add a job" });
       await add.getByText("More details").click();
       await expect(add.getByLabel("Company")).toBeVisible();
-      expect(await findings(page, "add-job-details")).toEqual([]);
+      expect(await findings(page)).toEqual([]);
       await page.keyboard.press("Escape");
       await page.keyboard.press("?");
       await expect(
         page.getByRole("dialog", { name: "Keyboard shortcuts" }),
       ).toBeVisible();
-      expect(await findings(page, "shortcuts")).toEqual([]);
+      expect(await findings(page)).toEqual([]);
     });
   });
 }
