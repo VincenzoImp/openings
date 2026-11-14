@@ -5,8 +5,8 @@ import math
 
 from .. import events
 from ..actors import current_actor
-from ..common import check_version, new_id, now
-from ..db import collect_unused, encode
+from ..common import check_version, encode, new_id, now
+from ..db import collect_unused
 from ..errors import DomainError, conflict, missing
 from ..idempotency import fingerprint, remember, replay
 from ..models import ApplicationFields, ApplicationInput, ApplicationPatch

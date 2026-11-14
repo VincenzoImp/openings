@@ -1,6 +1,5 @@
 """Small connection-per-operation SQLite store; no connections cross worker threads."""
 
-import json
 import os
 import sqlite3
 import tempfile
@@ -211,17 +210,3 @@ class Database:
 def collect_unused(conn):
     """Remove file bytes that no file references any more, in the caller's transaction."""
     conn.execute("DELETE FROM blobs WHERE sha256 NOT IN (SELECT sha256 FROM files)")
-
-
-def encode(value):
-    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-
-
-def decode_record(row, fields=()):
-    if row is None:
-        return None
-    row = dict(row)
-    for name in fields:
-        if isinstance(row.get(name), str):
-            row[name] = json.loads(row[name])
-    return row

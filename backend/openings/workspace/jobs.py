@@ -3,7 +3,7 @@
 import json
 import re
 
-from ..db import decode_record
+from ..common import decode_record
 from ..errors import DomainError, missing
 from ..job_signals import (
     DISMISSAL_COLUMNS,

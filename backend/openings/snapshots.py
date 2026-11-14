@@ -1,4 +1,7 @@
-"""Close SQLite readers on their owning thread before serving portable byte snapshots."""
+"""Streamed snapshots: file bytes and the JSON export of records, read before streaming.
+
+SQLite readers close on their owning thread; the response streams a private copy.
+"""
 
 import json
 import tempfile
