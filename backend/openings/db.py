@@ -1,10 +1,6 @@
 """Small connection-per-operation SQLite store; no connections cross worker threads."""
 
-import json
-import logging
-import math
 import os
-import re
 import sqlite3
 import tempfile
 import threading
@@ -17,7 +13,6 @@ from .errors import DomainError
 from .migrations import MIGRATIONS, UpgradeError, recover
 from .posting import posting_complete
 
-LOG = logging.getLogger(__name__)
 SCHEMA_VERSION = 15
 SCHEMA_SQL = Path(__file__).with_name("schema.sql")
 TEMP_PREFIX = ".openings-temp-"
@@ -30,12 +25,6 @@ NEWER = (
     "This workspace was written by a newer Openings (schema {version}). Start that version "
     "or a newer one."
 )
-# A copy of the workspace taken before an upgrade that changes the file in place:
-# the copy itself, the write-ahead log of the upgrade and some slack must fit on the
-# data volume. (The 0.24 upgrade builds a new file and keeps the original instead.)
-PRE_UPGRADE_ROOM = 2.2
-PRE_UPGRADE_KEEP = 2
-MIB = 1024**2
 
 
 def utc_stamp():
@@ -52,18 +41,6 @@ def file_bytes(path):
         except FileNotFoundError:
             pass
     return total
-
-
-def pre_upgrade_copies(path):
-    """The copies ``copy_before_upgrade`` kept beside the workspace ``path``, newest first."""
-    path = Path(path)
-    pattern = re.compile(re.escape(path.stem) + r"\.pre-schema\d+-(\d{8}T\d{6}Z)\.sqlite")
-    found = [
-        (match.group(1), item.name, item)
-        for item in path.parent.iterdir()
-        if (match := pattern.fullmatch(item.name)) and item.is_file()
-    ]
-    return [item for _, _, item in sorted(found, reverse=True)]
 
 
 def write_verified_copy(conn, temp, target, check=None):
@@ -147,70 +124,11 @@ def prepare(path):
                 )
             create(path)
         elif version in MIGRATIONS:
-            step = MIGRATIONS[version]
-            if not getattr(step, "keeps_original", False):
-                copy_before_upgrade(path, version)
-            step(path, schema=SCHEMA_SQL.read_text())
+            MIGRATIONS[version](path, schema=SCHEMA_SQL.read_text())
         else:
             raise schema_error(version)
     except UpgradeError as error:
         raise upgrade_error(error) from error
-
-
-def copy_before_upgrade(path, version):
-    """Keep a verified copy of the workspace at ``version`` before upgrading it in place.
-
-    The copy is ``<name>.pre-schema<version>-<UTC timestamp>.sqlite`` beside the
-    workspace, mode 0600. Without room for it (``PRE_UPGRADE_ROOM`` times the
-    file), or when it fails its check, the start is refused and the workspace
-    file is left as it was. The two most recent copies are kept; older ones are
-    removed only after the new one is verified. A migration that builds a new
-    file and keeps the original (``keeps_original``) needs no copy.
-    """
-    path = Path(path)
-    size = file_bytes(path)
-    needed = math.ceil(PRE_UPGRADE_ROOM * size)
-    room, free = compaction.has_room(path.parent, needed)
-    if not room:
-        raise DomainError(
-            507,
-            "upgrade_room",
-            f"Openings keeps a copy of the workspace before upgrading it from schema "
-            f"{version} and needs {math.ceil(needed / MIB)} MiB of free space on the data "
-            f"volume ({path.parent}); {free // MIB} MiB are free. Free some space and "
-            "start again. The workspace file was not changed.",
-            {"needed_bytes": needed, "free_bytes": free, "database_bytes": size},
-        )
-    target = path.parent / f"{path.stem}.pre-schema{version}-{utc_stamp()}.sqlite"
-    handle, temp = tempfile.mkstemp(prefix=TEMP_PREFIX + "pre-upgrade-", dir=path.parent)
-    os.close(handle)
-    os.unlink(temp)
-
-    def same_version(copy):
-        if copy.execute("PRAGMA user_version").fetchone()[0] != version:
-            raise sqlite3.DatabaseError("The copy does not have the workspace's version.")
-
-    try:
-        with closing(sqlite3.connect(path)) as conn:
-            conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-            write_verified_copy(conn, temp, target, same_version)
-    except (sqlite3.Error, OSError) as error:
-        raise DomainError(
-            500,
-            "upgrade_copy",
-            f"Openings could not keep a verified copy of the workspace before upgrading it "
-            f"from schema {version} ({error}). The workspace file was not changed.",
-        ) from error
-    for old in pre_upgrade_copies(path)[PRE_UPGRADE_KEEP:]:
-        old.unlink(missing_ok=True)
-    compaction.fsync_directory(path.parent)
-    LOG.warning(
-        "Copied the schema %d workspace to %s before upgrading it to schema %d.",
-        version,
-        target,
-        SCHEMA_VERSION,
-    )
-    return target
 
 
 class Database:
@@ -292,17 +210,3 @@ class Database:
 def collect_unused(conn):
     """Remove file bytes that no file references any more, in the caller's transaction."""
     conn.execute("DELETE FROM blobs WHERE sha256 NOT IN (SELECT sha256 FROM files)")
-
-
-def encode(value):
-    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-
-
-def decode_record(row, fields=()):
-    if row is None:
-        return None
-    row = dict(row)
-    for name in fields:
-        if isinstance(row.get(name), str):
-            row[name] = json.loads(row[name])
-    return row

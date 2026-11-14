@@ -11,8 +11,7 @@ from typing import Annotated
 from pydantic import Field
 
 from .actors import AGENT_PREFIX, current_actor, current_batch
-from .common import new_id, now
-from .db import decode_record, encode
+from .common import decode_record, encode, new_id, now
 from .errors import DomainError
 from .models import Since, SubjectRef, Until
 

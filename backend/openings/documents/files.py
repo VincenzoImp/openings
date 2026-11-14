@@ -16,7 +16,7 @@ from ..actors import current_actor, from_columns
 from ..career.records import _get, _page
 from ..common import check_version, encode, new_id, now
 from ..errors import DomainError, conflict, missing
-from ..transfers import SnapshotResponse
+from ..snapshots import SnapshotResponse
 from .models import OWNER_COLUMNS, OWNER_TABLES, SOURCE_KINDS, OwnerType, UploadReservation
 from .pdf import pdf_text
 from .sources import (

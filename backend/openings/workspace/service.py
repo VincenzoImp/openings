@@ -3,8 +3,8 @@
 import json
 import threading
 
-from ..common import now
-from ..db import Database, encode
+from ..common import encode, now
+from ..db import Database
 from ..errors import conflict
 from ..job_signals import SignalService
 from .application_changes import ApplicationChanges

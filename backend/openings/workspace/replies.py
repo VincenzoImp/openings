@@ -13,7 +13,6 @@ from ..outcomes import (
     duplicate_reply,
     insert_reply,
     not_sent,
-    reply_record,
     stage_after_reply,
     today,
 )
@@ -105,14 +104,3 @@ class ReplyChanges:
             job_id=row["job_id"],
             application_id=row["id"],
         )
-
-    def get_reply(self, reply_id):
-        """One reply as reads return it."""
-        row = self.db.one(
-            "SELECT r.*,a.job_id FROM replies r JOIN applications a ON a.id=r.application_id "
-            "WHERE r.id=?",
-            (reply_id,),
-        )
-        if row is None:
-            missing("Reply")
-        return reply_record(row)

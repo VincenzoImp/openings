@@ -39,7 +39,7 @@ def remote_scope(item):
 
 
 def excluded_title(title, terms):
-    """Match whole words so "SAP" does not exclude "Sapienza"."""
+    """Match whole words so "SAP" does not exclude "Sapling"."""
     title = str(title or "").casefold()
     return any(
         re.search(r"(?<!\w)" + re.escape(term.casefold()) + r"(?!\w)", title) for term in terms
