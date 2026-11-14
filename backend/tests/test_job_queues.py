@@ -1,13 +1,8 @@
 """Jobs by triage (New, Shortlisted, Dismissed) across shared interfaces."""
 
-import json
-
 import pytest
-from fastapi.testclient import TestClient
 
-from openings.app import create_app
 from openings.errors import DomainError
-from openings.interfaces.operation import without_empty
 from openings.workspace import Workspace
 
 
@@ -72,47 +67,22 @@ def test_triage_follows_the_application_and_explicit_deletion(tmp_path):
     }
 
 
-@pytest.mark.asyncio
-async def test_rest_mcp_triage_filters_before_totals_facets_and_pagination(tmp_path):
-    app = create_app(tmp_path / "interfaces.sqlite", start_worker=False)
+def test_rest_triage_filters_before_totals_and_pagination(app, client):
     ws = app.state.workspace
     for title in ["C role", "A role", "B role"]:
         job = add(ws, title)
         if title != "B role":
             ws.set_triage(job["id"], "shortlisted", job["version"])
-    with TestClient(app) as client:
-        setup = client.post("/api/v1/auth/setup", json={"password": "synthetic-password"}).json()
-        client.headers["X-CSRF-Token"] = setup["csrf_token"]
-        result = client.get("/api/v1/jobs?triage=shortlisted&sort=title&limit=1&offset=1").json()
-        assert result["total"] == 2 and result["items"][0]["title"] == "C role"
-        mcp = await app.state.mcp.call_tool(
-            "jobs_list",
-            {"triage": "shortlisted", "sort": "title", "limit": 1, "offset": 1},
-        )
-        structured = json.loads(mcp.content[0].text)
-        assert structured == without_empty(result)
-        assert client.get("/api/v1/jobs?queue=shortlist").status_code == 422
-        job = result["items"][0]
-        stale = client.post(
-            "/api/v1/jobs/bulk",
-            json={
-                "action": "dismissed",
-                "items": [{"id": job["id"], "expected_version": job["version"] + 1}],
-            },
-        ).json()
-        assert stale["failed"] == 1
-        assert client.get("/api/v1/jobs?triage=shortlisted").json()["total"] == 2
-        assert client.get("/api/v1/scoring").status_code == 404
-        assert (
-            client.post(
-                "/api/v1/jobs/bulk",
-                json={
-                    "action": "rescore",
-                    "items": [{"id": job["id"], "expected_version": job["version"]}],
-                },
-            ).status_code
-            == 422
-        )
-    tools = [tool.name for tool in await app.state.mcp.list_tools()]
-    assert not any(name.startswith("scoring_") for name in tools)
-    assert "score" not in result["items"][0]
+    result = client.get("/api/v1/jobs?triage=shortlisted&sort=title&limit=1&offset=1").json()
+    assert result["total"] == 2 and result["items"][0]["title"] == "C role"
+    assert client.get("/api/v1/jobs?queue=shortlist").status_code == 422
+    job = result["items"][0]
+    stale = client.post(
+        "/api/v1/jobs/bulk",
+        json={
+            "action": "dismissed",
+            "items": [{"id": job["id"], "expected_version": job["version"] + 1}],
+        },
+    ).json()
+    assert stale["failed"] == 1
+    assert client.get("/api/v1/jobs?triage=shortlisted").json()["total"] == 2

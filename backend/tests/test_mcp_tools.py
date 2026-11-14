@@ -1,7 +1,5 @@
 """The agent's tools: batch reads and writes, per-item results, versions and the 0.23 names."""
 
-import pytest
-
 from openings.interfaces import OPERATIONS
 from openings.removed import TOOLS
 
@@ -166,6 +164,9 @@ async def test_every_0_23_tool_is_a_tool_or_names_its_replacement(app, mcp):
         _, error = mcp.call(name, {})
         assert error["details"] == {"tool": name, "use": gone.use or None}, name
         assert error["code"] == ("owner_only" if name in owner else gone.code), name
+        if name in owner:
+            # An owner operation names its REST route instead of being a tool.
+            assert "/api/v1/" in error["message"], name
     # A REST-only operation answers with the tool that does its work.
     _, error = mcp.call("jobs_read", {"job_id": "x"})
     assert (error["code"], error["details"]["use"]) == ("renamed", "jobs_get")
@@ -179,6 +180,24 @@ def test_jobs_get_reads_many_and_names_the_missing(app, mcp):
     assert read["missing"] == ["missing"] and read["items"][0]["posting"] == "Build APIs 0."
     assert read["items"][0]["notes"][0]["body"] == "Synthetic note."
     _, error = mcp.call("jobs_get", {"ids": [str(n) for n in range(21)]})
+    assert error["code"] == "validation"
+
+    note = ok(mcp.call("notes_create", {"job_id": first["id"], "body": "First."}))
+    changed = ok(
+        mcp.call(
+            "notes_update",
+            {
+                "note_id": note["id"],
+                "expected_version": note["version"],
+                "body": "Edited.",
+                "pinned": True,
+            },
+        )
+    )
+    assert changed["body"] == "Edited." and changed["pinned"] is True
+    _, error = mcp.call(
+        "notes_update", {"note_id": note["id"], "expected_version": changed["version"]}
+    )
     assert error["code"] == "validation"
 
 
@@ -379,6 +398,9 @@ def test_career_and_highlights_are_saved_in_batches_with_versions(app, mcp):
         )
     )
     assert updated["items"][0]["result"]["title"] == "Lead"
+    # An update item without its version fails alone.
+    result = ok(mcp.call("career_save", {"items": [{"career_id": entry["id"], "title": "X"}]}))
+    assert result["items"][0]["error"]["details"][0]["field"] == ["expected_version"]
     template = ok(
         mcp.call("templates_save", {"name": "CV", "kind": "cv", "tex": "\\documentclass{article}"})
     )
@@ -394,33 +416,6 @@ def test_career_and_highlights_are_saved_in_batches_with_versions(app, mcp):
     )
     assert changed["guidance"] == "Short."
     assert ok(mcp.call("templates_get", {"template_id": template["id"]}))["tex"].startswith("\\doc")
-
-
-def test_an_update_item_without_its_version_fails_alone(app, mcp):
-    entry = ok(mcp.call("career_save", {"items": [{"title": "Engineer"}]}))["items"][0]
-    result = ok(mcp.call("career_save", {"items": [{"career_id": entry["id"], "title": "Lead"}]}))
-    assert result["items"][0]["error"]["details"][0]["field"] == ["expected_version"]
-
-
-def test_notes_update_edits_and_pins_with_one_version(app, mcp):
-    (job,) = jobs(app, 1)
-    note = ok(mcp.call("notes_create", {"job_id": job["id"], "body": "First."}))
-    changed = ok(
-        mcp.call(
-            "notes_update",
-            {
-                "note_id": note["id"],
-                "expected_version": note["version"],
-                "body": "Edited.",
-                "pinned": True,
-            },
-        )
-    )
-    assert changed["body"] == "Edited." and changed["pinned"] is True
-    _, error = mcp.call(
-        "notes_update", {"note_id": note["id"], "expected_version": changed["version"]}
-    )
-    assert error["code"] == "validation"
 
 
 def test_sources_and_collection_through_the_agent_tools(app, mcp):
@@ -458,9 +453,3 @@ def test_sources_and_collection_through_the_agent_tools(app, mcp):
     assert changed["enabled"] is False and changed["results"]["items"][0]["error"]["status"] == 404
     _, stale = mcp.call("collection_update", {"expected_version": collection["version"]})
     assert stale["status"] == 409 and stale["details"]["id"] == "collection"
-
-
-@pytest.mark.parametrize("name", ["workspace_export", "career_import", "tokens_list"])
-def test_owner_operations_are_not_tools(app, mcp, name):
-    _, error = mcp.call(name, {})
-    assert error["code"] == "owner_only" and "/api/v1/" in error["message"]

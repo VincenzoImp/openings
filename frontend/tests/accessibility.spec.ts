@@ -7,32 +7,38 @@ import { call, go, isPhone, ownerSession, type Cookies } from "./session";
 // serious or critical finding against WCAG 2.2 AA.
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 
-const SCREENS = [
-  "today",
-  "applications",
-  "applications?stage=applied",
-  "applications?section=stats",
-  "jobs",
-  "jobs?section=dismissed",
-  "jobs?section=dismissed&dismissed_by=agent",
-  "jobs?section=all",
-  "jobs?signal=likely_duplicate",
-  "profile",
-  "preferences",
-  "templates",
-  "templates?tab=source",
-  "templates?tab=files",
-  "templates?tab=limits",
-  "sources",
-  "settings",
-  "settings?section=agents",
-  "settings?section=data",
-  "settings?section=advanced",
-  "setup",
-  "setup?step=jobs",
-  "setup?step=cv",
-  "setup?step=done",
-];
+// Every screen, grouped by area so that a test reads a few screens in a row.
+const SCREENS: Record<string, string[]> = {
+  "Today and Applications": [
+    "today",
+    "applications",
+    "applications?stage=applied",
+    "applications?section=stats",
+  ],
+  Jobs: [
+    "jobs",
+    "jobs?section=dismissed",
+    "jobs?section=dismissed&dismissed_by=agent",
+    "jobs?section=all",
+    "jobs?signal=likely_duplicate",
+  ],
+  "Profile, Preferences and Templates": [
+    "profile",
+    "preferences",
+    "templates",
+    "templates?tab=source",
+    "templates?tab=files",
+    "templates?tab=limits",
+  ],
+  "Sources and Settings": [
+    "sources",
+    "settings",
+    "settings?section=agents",
+    "settings?section=data",
+    "settings?section=advanced",
+  ],
+  Setup: ["setup", "setup?step=jobs", "setup?step=cv", "setup?step=done"],
+};
 
 const cookies: Cookies = ownerSession();
 
@@ -132,15 +138,23 @@ for (const theme of ["light", "dark"]) {
       expect(await findings(page, "sign-in")).toEqual([]);
     });
 
-    for (const screen of SCREENS)
-      test(`${screen} has no serious accessibility finding`, async ({
+    for (const [area, screens] of Object.entries(SCREENS))
+      test(`${area} have no serious accessibility finding`, async ({
         page,
       }) => {
+        test.setTimeout(90000);
         await page.context().addCookies(cookies);
-        await go(page, screen);
-        await settled(page);
-        await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
-        expect(await findings(page, screen)).toEqual([]);
+        for (const screen of screens) {
+          // A fresh load per screen, as a reader arriving at its address.
+          await page.goto("about:blank");
+          await go(page, screen);
+          await settled(page);
+          await expect(page.locator("html")).toHaveAttribute(
+            "data-theme",
+            theme,
+          );
+          expect(await findings(page, screen), screen).toEqual([]);
+        }
       });
 
     test("Today's reply form and a focused row with its actions have no serious accessibility finding", async ({

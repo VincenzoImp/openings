@@ -59,35 +59,33 @@ def last_rowid(workspace):
     return workspace.db.one("SELECT coalesce(max(rowid),0) AS n FROM events")["n"]
 
 
-@pytest.mark.parametrize(
-    ("kind", "status", "outcome"),
-    [
-        ("interview", "interview", None),
-        ("offer", "offer", None),
-        ("rejection", "closed", "rejected"),
-        ("other", "applied", None),
-    ],
-)
-def test_recording_a_reply_moves_the_stage_by_its_kind_in_one_event(
-    workspace, kind, status, outcome
-):
-    sent = attempt(workspace, status="applied")
-    before = last_rowid(workspace)
-    recorded = reply(workspace, sent, kind=kind, note="Synthetic note.")
-    assert (recorded["status"], recorded["outcome"]) == (status, outcome)
-    assert kinds(recorded) == [(kind, today())]  # The date defaults to today.
-    assert recorded["last_reply"]["kind"] == kind
-    assert recorded["version"] == sent["version"] + 1
-    events = events_of(workspace, sent["id"], before)
-    assert [(event["kind"], event["subject_type"]) for event in events] == [
-        ("reply_added", "reply")
-    ]
-    payload = json.loads(events[0]["payload"])
-    assert payload["kind"] == kind and "Synthetic note" not in json.dumps(payload)
-    if kind == "other":
-        assert "to" not in payload
-    else:
-        assert (payload["from"], payload["to"]) == ("applied", status)
+REPLY_STAGES = {
+    "interview": ("interview", None),
+    "offer": ("offer", None),
+    "rejection": ("closed", "rejected"),
+    "other": ("applied", None),
+}
+
+
+def test_recording_a_reply_moves_the_stage_by_its_kind_in_one_event(workspace):
+    for kind, (status, outcome) in REPLY_STAGES.items():
+        sent = attempt(workspace, f"Synthetic {kind} role", status="applied")
+        before = last_rowid(workspace)
+        recorded = reply(workspace, sent, kind=kind, note="Synthetic note.")
+        assert (recorded["status"], recorded["outcome"]) == (status, outcome)
+        assert kinds(recorded) == [(kind, today())]  # The date defaults to today.
+        assert recorded["last_reply"]["kind"] == kind
+        assert recorded["version"] == sent["version"] + 1
+        events = events_of(workspace, sent["id"], before)
+        assert [(event["kind"], event["subject_type"]) for event in events] == [
+            ("reply_added", "reply")
+        ]
+        payload = json.loads(events[0]["payload"])
+        assert payload["kind"] == kind and "Synthetic note" not in json.dumps(payload)
+        if kind == "other":
+            assert "to" not in payload
+        else:
+            assert (payload["from"], payload["to"]) == ("applied", status)
 
 
 def test_replies_need_a_sent_application_and_move_only_forward(workspace):
@@ -221,21 +219,12 @@ def test_the_no_reply_period_lists_overdue_applications_and_closes_nothing(works
     recent = attempt(workspace, "Synthetic recent", status="applied", applied_at=stamp_ago(10))
     attempt(workspace, "Synthetic interview", status="interview", applied_at=stamp_ago(60))
     overdue = workspace.list_applications(needs="reply_overdue")
-    # Applied, without a reply, past the period.
+    # Applied, without a reply, past the period; listing closes nothing.
     assert [item["id"] for item in overdue["items"]] == [old["id"]]
-    assert overdue["no_reply"]["overdue"] == 1 and overdue["no_reply"]["days"] == 30
-    # Nothing closes automatically: listing and reading leave the stage.
+    assert overdue["no_reply"] == {"days": 30, "source": "default", "overdue": 1}
     assert workspace.get_application(old["id"])["status"] == "applied"
-
-    preferences = PreferencesService(workspace)
     with acting_as(OWNER):
-        settings = preferences.update_settings({"expected_version": 0, "no_reply_days": 7})
-    assert {item["id"] for item in workspace.list_applications(needs="reply_overdue")["items"]} == {
-        old["id"],
-        recent["id"],
-    }
-    with acting_as(OWNER):
-        preferences.update_settings({"expected_version": settings["version"], "no_reply_days": 45})
+        PreferencesService(workspace).update_settings({"expected_version": 0, "no_reply_days": 7})
     listed = workspace.list_applications(needs="reply_overdue")
-    assert listed["no_reply"]["days"] == 45 and listed["no_reply"]["source"] == "settings"
-    assert listed["no_reply"]["overdue"] == 0 and listed["items"] == []
+    assert {item["id"] for item in listed["items"]} == {old["id"], recent["id"]}
+    assert listed["no_reply"] == {"days": 7, "source": "settings", "overdue": 2}

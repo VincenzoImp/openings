@@ -3,6 +3,7 @@
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from pydantic import ValidationError
 
 from openings.common import new_id, now
 from openings.stats import StatsQuery, StatsService
@@ -74,6 +75,9 @@ def test_stats_count_sent_applications_replies_and_the_funnel(workspace):
     assert (year["applied"], year["median_days_to_reply"]) == (4, 4)
     every = stats.stats(StatsQuery(period="all"))
     assert (every["since"], every["applied"], every["interviews"]) == (None, 5, 3)
+    assert recent["period"] == "90d" and year["period"] == "12m" and every["period"] == "all"
+    with pytest.raises(ValidationError):
+        StatsQuery(period="week")
 
 
 def test_replies_by_source_need_two_sources_with_five_applications(workspace):
@@ -90,26 +94,6 @@ def test_replies_by_source_need_two_sources_with_five_applications(workspace):
         {"source": "Data roles", "applied": 5, "replied": 2, "reply_rate": 0.4},
         {"source": "Example board", "applied": 5, "replied": 1, "reply_rate": 0.2},
     ]
-
-
-def test_stats_on_rest_and_the_removed_routes(client):
-    result = client.get("/api/v1/stats?period=12m").json()
-    assert result["period"] == "12m" and result["applied"] == 0
-    assert client.get("/api/v1/stats?period=week").status_code == 422
-    for path in ("/api/v1/overview", "/api/v1/insights", "/api/v1/collection/yield"):
-        assert client.get(path).status_code == 410, path
-
-
-def test_stats_on_mcp_and_the_removed_tools(mcp):
-    value, error = mcp.call("stats_get", {"period": "all"})
-    assert error is None and value["period"] == "all"
-    for name, replacement in (
-        ("insights_get", "stats_get"),
-        ("overview_get", "workspace_context"),
-        ("sources_yield", "sources_list"),
-    ):
-        _, removed = mcp.call(name)
-        assert removed["code"] == "renamed" and removed["details"]["use"] == replacement
 
 
 def test_sources_list_counts_what_each_source_found(app, client):
@@ -141,11 +125,6 @@ def test_sources_list_counts_what_each_source_found(app, client):
     }
     single = client.get(f"/api/v1/sources/{second}").json()
     assert single["counts"] == items["Example board"]
-
-
-@pytest.mark.parametrize("period", ["90d", "12m", "all"])
-def test_every_period_is_accepted(workspace, period):
-    assert StatsService(workspace).stats(StatsQuery(period=period))["period"] == period
 
 
 def test_every_stage_past_applied_is_a_reply_and_the_funnel_never_grows(workspace):

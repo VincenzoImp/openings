@@ -8,6 +8,8 @@ the schema script. The fixtures build on each other:
     workspace       a Workspace on database_path
     app             the product application on a copy whose owner password is PASSWORD
     client          a TestClient of app, signed in as the owner (session + CSRF header)
+                    with a cookie signed once per session: every copy of the owned
+                    database shares its secret, and sign-in has its own tests
     owner_token     an owner API token of app: {"id", "name", "token", "headers"}
     agent_token     an agent API token of app, same shape
     mcp             an MCP client of app that calls tools with agent_token
@@ -25,7 +27,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from openings.app import create_app
-from openings.auth import Auth
+from openings.auth import COOKIE, Auth
 from openings.workspace import Workspace
 
 PASSWORD = "synthetic-password"
@@ -57,6 +59,14 @@ def owned_database(tmp_path_factory, fresh_database):
     return _checkpointed(path)
 
 
+@pytest.fixture(scope="session")
+def owner_session(owned_database):
+    """A session cookie and CSRF token valid on every copy of the owned database."""
+    cookie, session = Auth(Workspace(owned_database)).login(PASSWORD)
+    _checkpointed(owned_database)
+    return cookie, session["csrf"]
+
+
 @pytest.fixture
 def database_path(tmp_path, fresh_database):
     path = tmp_path / "workspace.sqlite"
@@ -77,12 +87,11 @@ def app(tmp_path, owned_database):
 
 
 @pytest.fixture
-def client(app):
+def client(app, owner_session):
     """The owner's browser: a session cookie and its CSRF header on every request."""
-    with TestClient(app, base_url=BASE_URL) as client:
-        response = client.post("/api/v1/auth/login", json={"password": PASSWORD})
-        assert response.status_code == 200, response.text
-        client.headers["X-CSRF-Token"] = client.get("/api/v1/auth/session").json()["csrf_token"]
+    cookie, csrf = owner_session
+    with TestClient(app, base_url=BASE_URL, cookies={COOKIE: cookie}) as client:
+        client.headers["X-CSRF-Token"] = csrf
         yield client
 
 

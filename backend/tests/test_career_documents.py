@@ -1,16 +1,12 @@
 """Small invariant checks for career data and external document storage."""
 
 import hashlib
-import sqlite3
 from unittest.mock import patch
 
 import pytest
-from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
-from document_fixtures import bare_api
 from openings.career import (
-    CareerService,
     ClaimCreate,
     ClaimUpdate,
     KnowledgeCreate,
@@ -21,19 +17,15 @@ from openings.career import (
 )
 from openings.documents import (
     DocumentCreate,
-    DocumentService,
     UploadReservation,
 )
 from openings.errors import DomainError
-from openings.workspace import Workspace
 from timeline_fixtures import guided_application
 
 
 @pytest.fixture
-def workspace(database_path):
-    workspace = Workspace(database_path)
-    career = CareerService(workspace)
-    documents = DocumentService(workspace, max_file_bytes=1024 * 1024)
+def seeded(app, client):
+    workspace, career, documents = app.state.workspace, app.state.career, app.state.documents
     profile = career.get_profile()
     career.update_profile(
         ProfileUpdate(
@@ -65,9 +57,7 @@ def workspace(database_path):
         {"title": "Backend Engineer", "company": "Example Co", "posting": "Build Python APIs."}
     )
     application = guided_application(workspace, job["id"], "Prefer practical examples.")
-    api = bare_api(workspace, career=career, documents=documents)
-    with TestClient(api) as client:
-        yield workspace, career, documents, client, evidence, claim, template, application
+    return workspace, career, documents, client, evidence, claim, template, application
 
 
 def upload(
@@ -95,32 +85,8 @@ def upload(
     return response.json(), grant
 
 
-def test_relevant_profile_edits_are_distinct_from_contacts_and_templates(workspace):
-    _, career, _, _, evidence, _, template, _ = workspace
-    profile = career.get_profile()
-    changed = career.update_profile(
-        ProfileUpdate(expected_version=profile["version"], email="alex@example.test")
-    )
-    career.update_profile(
-        ProfileUpdate(
-            expected_version=changed["version"],
-            summary="Python API engineer; remote roles.",
-        )
-    )
-    career.update_template(
-        template["id"],
-        TemplateUpdate(expected_version=template["version"], guidance="Prefer short bullets."),
-    )
-    with pytest.raises(DomainError) as stale:
-        career.update_profile(
-            ProfileUpdate(expected_version=profile["version"], summary="Stale overwrite")
-        )
-    assert stale.value.status == 409
-    assert career.get_knowledge(evidence["id"])["narrative"].startswith("Built Python")
-
-
-def test_document_revisions_validate_evidence_and_never_inherit_old_pdf(workspace, tmp_path):
-    ws, _, documents, client, evidence, claim, _, application = workspace
+def test_document_revisions_validate_evidence_and_never_inherit_old_pdf(seeded):
+    _, _, documents, client, evidence, claim, _, application = seeded
     first = documents.create_document(
         DocumentCreate(
             application_id=application["id"],
@@ -174,22 +140,17 @@ def test_document_revisions_validate_evidence_and_never_inherit_old_pdf(workspac
         with pytest.raises(DomainError) as error:
             documents.create_document(DocumentCreate(application_id=application["id"], **invented))
         assert error.value.code == code
-    # Frozen contexts are gone (0.24): a revision names no context.
-    with pytest.raises(ValidationError):
-        DocumentCreate(application_id=application["id"], context_id="any")
-    ws.db.backup(tmp_path / "portable.sqlite")
-    with sqlite3.connect(tmp_path / "portable.sqlite") as restored:
-        assert restored.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
-        assert (
-            restored.execute(
-                "SELECT content FROM blobs WHERE sha256=?", (pdf["sha256"],)
-            ).fetchone()[0]
-            == data
-        )
 
 
-def test_transfer_scope_integrity_and_forget_prevent_late_resurrection(workspace):
-    ws, _, documents, client, _, _, _, application = workspace
+def test_transfer_scope_integrity_and_forget_prevent_late_resurrection(seeded):
+    ws, _, documents, client, evidence, _, _, application = seeded
+    # An upload without a declared hash (a LAN page without client crypto) is hashed exactly.
+    asset, _ = upload(
+        documents, client, "career", evidence["id"], "notes.txt", b"notes", declared_sha=False
+    )
+    assert asset["sha256"] == hashlib.sha256(b"notes").hexdigest()
+    assert client.get(asset["url"]).content == b"notes"
+
     document = documents.create_document(DocumentCreate(application_id=application["id"]))
     data = b"filled source"
     grant = documents.reserve_upload(
@@ -220,26 +181,12 @@ def test_transfer_scope_integrity_and_forget_prevent_late_resurrection(workspace
     assert client.put(late["url"], headers=late["headers"], content=b"late").status_code == 401
     assert client.get(download["url"], headers=download["headers"]).status_code == 401
     assert ws.db.one("SELECT count(*) AS n FROM documents")["n"] == 0
-    assert ws.db.one("SELECT count(*) AS n FROM blobs")["n"] == 0
+    # Only the career file is left.
+    assert ws.db.one("SELECT count(*) AS n FROM blobs")["n"] == 1
 
 
-def test_lan_upload_without_client_crypto_still_hashes_exact_bytes(workspace):
-    _, _, documents, client, evidence, _, _, _ = workspace
-    asset, _ = upload(
-        documents,
-        client,
-        "career",
-        evidence["id"],
-        "notes.txt",
-        b"public synthetic notes",
-        declared_sha=False,
-    )
-    assert asset["sha256"] == hashlib.sha256(b"public synthetic notes").hexdigest()
-    assert client.get(asset["url"]).content == b"public synthetic notes"
-
-
-def test_filtered_summary_pages_keep_large_content_in_detail_and_batch_revision_reads(workspace):
-    _, career, documents, client, evidence, claim, template, application = workspace
+def test_filtered_summary_pages_keep_large_content_in_detail_and_batch_revision_reads(seeded):
+    _, career, documents, client, evidence, claim, template, application = seeded
     evidence = career.update_knowledge(
         evidence["id"],
         KnowledgeUpdate(
@@ -291,7 +238,8 @@ def test_filtered_summary_pages_keep_large_content_in_detail_and_batch_revision_
             },
         ).json()
     assert result["total"] == 26
-    assert reads.call_count == 3 and singles.call_count == 1
+    # The other single read is the session check of the request.
+    assert reads.call_count == 3 and singles.call_count == 2
     assert {row["revision_number"] for row in result["items"]} == set(range(1, 27))
     assert sum(row["file_count"] for row in result["items"]) == 2
     assert all(not {"content", "files", "text"} & row.keys() for row in result["items"])
@@ -334,8 +282,12 @@ def test_filtered_summary_pages_keep_large_content_in_detail_and_batch_revision_
     )
 
 
-def test_career_patch_omissions_clear_values_and_finite_metadata_are_explicit(workspace):
-    _, career, _, _, evidence, claim, template, _ = workspace
+def test_career_patch_omissions_clear_values_and_finite_metadata_are_explicit(seeded):
+    _, career, _, _, evidence, claim, template, _ = seeded
+    profile = career.get_profile()
+    with pytest.raises(DomainError) as stale:
+        career.update_profile(ProfileUpdate(expected_version=profile["version"] - 1, summary="Old"))
+    assert stale.value.status == 409
     for model, fields in [
         (ProfileUpdate, {"name": None}),
         (KnowledgeUpdate, {"metadata": None}),

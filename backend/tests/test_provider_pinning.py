@@ -16,8 +16,6 @@ from openings.discovery import DiscoveryService, network
 from openings.errors import DomainError
 from openings.workspace import Workspace
 
-SESSIONS = pytest.mark.parametrize("session_class", [RequestsRotating, TLSRotating])
-
 
 @pytest.fixture
 def local_server():
@@ -87,78 +85,62 @@ def runtime(gate):
     return gate.providers.get("manual")["runtime"]
 
 
-@SESSIONS
-def test_provider_sessions_connect_to_the_checked_address(
+@pytest.mark.parametrize("session_class", [RequestsRotating, TLSRotating])
+def test_a_provider_session_connects_only_to_the_checked_address(
     gate, monkeypatch, local_server, session_class
 ):
+    """Each case uses a fresh session, so no connection is reused across them."""
     port = local_server.server_address[1]
-    # Treat the synthetic server as public; the name itself is unresolvable by the system.
-    patch_discovery(monkeypatch, "is_public_address", lambda address: address == "127.0.0.1")
-    calls = synthetic_resolver(monkeypatch, {"pinned.test": ["127.0.0.1"] * 4})
-    session = session_for(gate, session_class)
-    try:
+
+    def get(url):
+        session = session_for(gate, session_class)
+        try:
+            return session.get(url)
+        finally:
+            session.close()
+
+    # A public name is dialed at the address that was checked, once per request.
+    # The synthetic server counts as public; its name is unresolvable by the system.
+    with monkeypatch.context() as public:
+        patch_discovery(public, "is_public_address", lambda address: address == "127.0.0.1")
+        calls = synthetic_resolver(public, {"pinned.test": ["127.0.0.1"] * 4})
         for path in ("/first", "/second"):
-            assert session.get(f"http://pinned.test:{port}{path}").content == b"internal"
-    finally:
-        session.close()
-    assert local_server.seen == [("pinned.test", "/first"), ("pinned.test", "/second")]
-    assert set(calls) == {"pinned.test"}
-    assert runtime(gate)["total_requests"] == 2 and runtime(gate)["last_status"] == 200
+            assert get(f"http://pinned.test:{port}{path}").content == b"internal"
+        assert local_server.seen == [("pinned.test", "/first"), ("pinned.test", "/second")]
+        assert set(calls) == {"pinned.test"}
+        assert runtime(gate)["total_requests"] == 2 and runtime(gate)["last_status"] == 200
 
-
-@SESSIONS
-def test_rebinding_after_the_url_check_is_refused_inside_the_gate(
-    gate, monkeypatch, local_server, session_class
-):
-    port = local_server.server_address[1]
-    calls = synthetic_resolver(monkeypatch, {"rebind.test": ["93.184.216.34", "127.0.0.1"]})
-    session = session_for(gate, session_class)
-    try:
+        # Every redirect hop is checked and pinned again.
+        local_server.redirect = f"http://rebind.test:{port}/secret"
+        synthetic_resolver(
+            public,
+            {"start.test": ["127.0.0.1", "127.0.0.1"], "rebind.test": ["127.0.0.1", "10.0.0.8"]},
+        )
         with pytest.raises(DomainError) as refused:
-            session.get(f"http://rebind.test:{port}/secret")
-    finally:
-        session.close()
-    assert refused.value.code == "private_url"
-    assert calls == ["rebind.test", "rebind.test"]
-    assert local_server.seen == []
-    # The refused attempt was reserved and recorded by the provider gate, without a response.
-    assert runtime(gate)["total_requests"] == 1
+            get(f"http://start.test:{port}/start")
+        assert refused.value.code == "private_url"
+        assert local_server.seen[2:] == [("start.test", "/start")]
+        assert runtime(gate)["total_requests"] == 4
+
+    # A name that rebinds to a private address after the check is refused inside the gate:
+    # the attempt is reserved and recorded, without a response.
+    calls = synthetic_resolver(monkeypatch, {"rebind.test": ["93.184.216.34", "127.0.0.1"]})
+    with pytest.raises(DomainError) as refused:
+        get(f"http://rebind.test:{port}/secret")
+    assert refused.value.code == "private_url" and calls == ["rebind.test", "rebind.test"]
+    assert runtime(gate)["total_requests"] == 5
     assert runtime(gate)["last_status"] is None and runtime(gate)["last_error"] == "DomainError"
 
-
-@SESSIONS
-def test_every_redirect_hop_of_a_provider_session_is_pinned(
-    gate, monkeypatch, local_server, session_class
-):
-    port = local_server.server_address[1]
-    local_server.redirect = f"http://rebind.test:{port}/secret"
-    patch_discovery(monkeypatch, "is_public_address", lambda address: address == "127.0.0.1")
-    synthetic_resolver(
-        monkeypatch,
-        {"start.test": ["127.0.0.1", "127.0.0.1"], "rebind.test": ["127.0.0.1", "10.0.0.8"]},
-    )
+    # A private literal address is refused at connection time alone.
     session = session_for(gate, session_class)
-    try:
-        with pytest.raises(DomainError) as refused:
-            session.get(f"http://start.test:{port}/start")
-    finally:
-        session.close()
-    assert refused.value.code == "private_url"
-    assert local_server.seen == [("start.test", "/start")]
-    assert runtime(gate)["total_requests"] == 2
-
-
-@SESSIONS
-def test_private_literal_addresses_are_refused(gate, local_server, session_class):
-    port = local_server.server_address[1]
-    session = session_for(gate, session_class)
-    session.transport.validate_url = None  # only the connection-time check remains
+    session.transport.validate_url = None
     try:
         with pytest.raises(DomainError) as refused:
             session.get(f"http://127.0.0.1:{port}/secret")
     finally:
         session.close()
-    assert refused.value.code == "private_url" and local_server.seen == []
+    assert refused.value.code == "private_url"
+    assert len(local_server.seen) == 3
 
 
 def test_requests_adapter_is_mounted_once_and_tries_the_checked_addresses_in_turn(

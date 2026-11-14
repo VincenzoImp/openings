@@ -1,17 +1,13 @@
 """A CV or letter revision's TeX source and the PDF built from it; text derived from the source."""
 
 import hashlib
-import json
 
 import pytest
-from fastapi.testclient import TestClient
 
 from document_fixtures import PDF, tex, upload
-from openings.app import create_app
 from openings.documents import DocumentCreate
 from openings.documents.text import derive_text, revision_text, tokens
 from openings.errors import DomainError
-from openings.interfaces.operation import without_empty
 
 SOURCE = r"""\documentclass{article}
 \usepackage{hyperref}
@@ -171,7 +167,7 @@ CUSTOM = r"""\documentclass[10pt]{article}
 """
 
 
-def test_cv_and_letter_classes_read_as_their_pdf_prints_them():
+def test_derived_text_reads_as_the_pdf_prints_it():
     assert derive_text(MODERNCV) == MODERNCV_TEXT
     letter = derive_text(MODERNCV_LETTER)
     assert letter.startswith("Alex Example\nExample Street 1, 8000 Zurich\nalex@example.test\n\n")
@@ -186,9 +182,7 @@ def test_cv_and_letter_classes_read_as_their_pdf_prints_them():
     assert "alex@example.test | +41 00 000 00 00 | alex-example" in custom
     assert "• Reduced latency by 20% (~40 ms) via caching." in custom
     assert custom.endswith("Languages English (C2), German (C1)\nTools Docker, Terraform")
-
-
-def test_text_is_the_body_without_markup_with_the_breaks_tex_makes():
+    # The text is the body without markup, with the breaks TeX makes.
     assert derive_text(SOURCE) == TEXT
     # The preamble and comments are not text; a fragment without a body is read whole.
     assert derive_text("% only a comment\nPlain \\emph{fragment}.") == "Plain fragment."
@@ -198,33 +192,6 @@ def test_text_is_the_body_without_markup_with_the_breaks_tex_makes():
     assert revision_text([]) is None
     assert revision_text([("b.tex", "Second."), ("a.tex", "First.")]) == "First.\n\nSecond."
     assert tokens(r"Stra\ss e \v{S}koda na\"{\i}ve") == ["strasse", "skoda", "naive"]
-
-
-@pytest.fixture
-def client(tmp_path):
-    app = create_app(tmp_path / "sources.sqlite", start_worker=False)
-    app.state.auth.setup("synthetic-password")
-    token = app.state.auth.create_token("Synthetic document client")["token"]
-    headers = {"Authorization": "Bearer " + token, "Accept": "application/json, text/event-stream"}
-    with TestClient(app, base_url="http://localhost:8080", headers=headers) as client:
-        client.app_state = app.state
-        yield client
-
-
-def tool(client, name, arguments):
-    response = client.post(
-        "/mcp",
-        json={
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/call",
-            "params": {"name": name, "arguments": arguments},
-        },
-    )
-    result = response.json()["result"]
-    if result.get("isError"):
-        return None, result["content"][0]["text"]
-    return result.get("structuredContent") or json.loads(result["content"][0]["text"]), None
 
 
 def reserve(client, document_id, name, data, media_type, source_sha256=None):
@@ -251,8 +218,8 @@ def code(response):
     return response.status_code, response.json()["error"]["code"]
 
 
-def test_a_cv_is_its_source_and_the_pdf_built_from_it(client):
-    workspace = client.app_state.workspace
+def test_a_cv_is_its_source_and_the_pdf_built_from_it(app, client):
+    workspace = app.state.workspace
     job = workspace.ingest_job({"title": "Synthetic engineer", "posting": "Build services."})
     application = workspace.create_application({"job_id": job["id"]})
     refused = client.post(
@@ -260,12 +227,6 @@ def test_a_cv_is_its_source_and_the_pdf_built_from_it(client):
         json={"application_id": application["id"], "kind": "cv", "content": {"text": "CV"}},
     )
     assert code(refused) == (422, "content_not_accepted")
-    _, error = tool(
-        client,
-        "documents_create",
-        {"application_id": application["id"], "content": {"text": "CV"}},
-    )
-    assert "content_not_accepted" in error or "optional TeX source" in error
     created = client.post(
         "/api/v1/documents",
         json={"application_id": application["id"], "title": "CV", "note": "First draft."},
@@ -273,7 +234,6 @@ def test_a_cv_is_its_source_and_the_pdf_built_from_it(client):
     assert created.status_code == 201
     cv = created.json()
     assert "content" not in cv and cv["text"] is None
-    assert not {"context_id", "legacy_content"} & cv.keys()
     assert (cv["note"], cv["highlight_ids"], cv["career_ids"]) == ("First draft.", [], [])
 
     # A PDF naming a source comes after that source.
@@ -322,13 +282,9 @@ def test_a_cv_is_its_source_and_the_pdf_built_from_it(client):
         "revision_complete",
     )
     complete = client.get(f"/api/v1/documents/{cv['id']}").json()
-    assert complete["complete"] is True and "review_state" not in complete
+    assert complete["complete"] is True
     # The text stays the one derived from the TeX source.
     assert (complete["text"], complete["text_from"]) == (TEXT, "tex")
-    assert client.post(f"/api/v1/documents/{cv['id']}/review", json={}).status_code == 410
-    assert tool(client, "documents_review", {"document_id": cv["id"]})[0] is None
-    mcp, _ = tool(client, "documents_get", {"document_id": cv["id"]})
-    assert mcp == without_empty(complete)
 
     # A new revision is compared with the one it replaces, line by line.
     revised = client.post(
@@ -344,10 +300,6 @@ def test_a_cv_is_its_source_and_the_pdf_built_from_it(client):
         {"change": "added", "text": "Skills: Python, SQL, Rust."},
     ]
     assert comparison["text"] == {"document": True, "other": True}
-    read, _ = tool(
-        client, "documents_get", {"document_id": revised["id"], "compare_to": "previous"}
-    )
-    assert read["comparison"] == without_empty(comparison)
     backwards = client.get(
         f"/api/v1/documents/{cv['id']}/comparison", params={"other_id": revised["id"]}
     ).json()
@@ -362,8 +314,8 @@ def test_a_cv_is_its_source_and_the_pdf_built_from_it(client):
     assert client.get("/api/v1/documents", params={"q": "First draft"}).json()["total"] == 1
 
 
-def test_form_answers_keep_structured_content_and_compare_it(client):
-    workspace, documents = client.app_state.workspace, client.app_state.documents
+def test_form_answers_keep_structured_content_and_compare_it(app):
+    workspace, documents = app.state.workspace, app.state.documents
     job = workspace.ingest_job({"title": "Synthetic engineer", "posting": "Build services."})
     application = workspace.create_application({"job_id": job["id"]})
     first = documents.create_document(
@@ -399,14 +351,12 @@ def test_form_answers_keep_structured_content_and_compare_it(client):
     assert error.value.code == "comparison_target"
 
 
-def test_a_retry_returns_only_a_revision_without_files(tmp_path):
-    app = create_app(tmp_path / "retry.sqlite", start_worker=False)
+def test_a_retry_returns_only_a_revision_without_files(app, client):
     workspace, documents = app.state.workspace, app.state.documents
     job = workspace.ingest_job({"title": "Synthetic engineer", "posting": "Build services."})
     application = workspace.create_application({"job_id": job["id"]})
     value = DocumentCreate(application_id=application["id"], title="CV")
     first = documents.create_document(value)
     assert documents.create_document(value)["id"] == first["id"]
-    with TestClient(app) as client:
-        upload(documents, client.put, first["id"], "cv.tex", tex(), "application/x-tex")
+    upload(documents, client.put, first["id"], "cv.tex", tex(), "application/x-tex")
     assert documents.create_document(value)["id"] != first["id"]

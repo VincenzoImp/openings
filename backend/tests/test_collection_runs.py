@@ -3,11 +3,9 @@
 from datetime import UTC, datetime
 
 import pytest
-from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from discovery_fixtures import patch_discovery
-from openings.app import create_app
 from openings.collectors.policy import ProviderDeferred
 from openings.common import encode, now
 from openings.discovery import (
@@ -115,7 +113,7 @@ def test_frozen_options_resume_with_cumulative_unique_observations(collection, m
     assert service.list_runs(state="succeeded")["total"] == 1
 
 
-def test_bulk_configuration_preserves_untouched_fields_and_service(collection):
+def test_bulk_configuration_and_filter_patches_preserve_untouched_fields(collection):
     _, service = collection
     source = make_source(service)
     result = service.bulk_sources(
@@ -142,6 +140,41 @@ def test_bulk_configuration_preserves_untouched_fields_and_service(collection):
         service.update_source(
             source["id"], SourcePatch(expected_version=current["version"], kind="lever")
         )
+
+    # A partial filter patch keeps the other terms; an explicit empty list clears one.
+    source = service.create_source(
+        SourceCreate(
+            name="Example",
+            kind="greenhouse",
+            config={"board": "example"},
+            filters={"titles": ["engineer"], "locations": ["Canada"], "exclude_titles": ["sales"]},
+        )
+    )
+    changed = service.bulk_sources(
+        SourceBulk.model_validate(
+            {
+                "action": "configure",
+                "items": [{"id": source["id"], "expected_version": source["version"]}],
+                "patch": {"filters": {"titles": ["developer"]}},
+            }
+        )
+    )["items"][0]["result"]
+    assert changed["filters"] == {
+        "titles": ["developer"],
+        "locations": ["Canada"],
+        "exclude_titles": ["sales"],
+    }
+    cleared = service.update_source(
+        source["id"],
+        SourcePatch.model_validate(
+            {"expected_version": changed["version"], "filters": {"locations": []}}
+        ),
+    )
+    assert cleared["filters"] == {
+        "titles": ["developer"],
+        "locations": [],
+        "exclude_titles": ["sales"],
+    }
 
 
 def test_a_stored_search_without_its_query_is_refused_not_a_server_error(collection):
@@ -184,46 +217,40 @@ def test_pause_and_delete_preserve_run_history(collection, monkeypatch):
     assert run["state"] == "succeeded" and workspace.list_jobs()["total"] == 0
 
 
-def test_rest_versions_overrides_and_schema_discovery(tmp_path):
-    app = create_app(tmp_path / "api.sqlite", start_worker=False)
-    with TestClient(app) as client:
-        setup = client.post("/api/v1/auth/setup", json={"password": "synthetic-password"})
-        client.headers["X-CSRF-Token"] = setup.json()["csrf_token"]
-        source = client.post(
-            "/api/v1/sources",
-            json={
-                "name": "Backend",
-                "kind": "jobspy",
-                "config": {"query": "backend", "providers": ["linkedin"]},
-            },
-        ).json()
-        assert client.post(f"/api/v1/sources/{source['id']}/run").status_code == 422
-        assert client.delete(f"/api/v1/sources/{source['id']}").status_code == 422
-        assert (
-            client.post(
-                f"/api/v1/sources/{source['id']}/run", json={"expected_version": 99}
-            ).status_code
-            == 409
-        )
-        response = client.post(
-            f"/api/v1/sources/{source['id']}/run",
-            json={"expected_version": 1, "overrides": {"hours_old": 168, "results_wanted": 50}},
-        )
-        assert response.status_code == 200
-        run_id = response.json()["run_id"]
-        assert (
-            client.get(f"/api/v1/collection/runs/{run_id}").json()["source_snapshot"]["config"][
-                "hours_old"
-            ]
-            == 168
-        )
-        assert client.get(f"/api/v1/sources/{source['id']}").json()["config"]["hours_old"] == 72
-        schemas = client.get("/api/v1/sources/schemas").json()
-        assert schemas["items"][0]["config_schema"]["properties"]["results_wanted"]["default"] == 20
-        assert not {"jobcloud", "adzuna"}.intersection(item["kind"] for item in schemas["items"])
-        assert (
-            client.post(f"/api/v1/collection/runs/{run_id}/cancel").json()["state"] == "cancelled"
-        )
+def test_rest_versions_overrides_and_schema_discovery(client):
+    source = client.post(
+        "/api/v1/sources",
+        json={
+            "name": "Backend",
+            "kind": "jobspy",
+            "config": {"query": "backend", "providers": ["linkedin"]},
+        },
+    ).json()
+    assert client.post(f"/api/v1/sources/{source['id']}/run").status_code == 422
+    assert client.delete(f"/api/v1/sources/{source['id']}").status_code == 422
+    assert (
+        client.post(
+            f"/api/v1/sources/{source['id']}/run", json={"expected_version": 99}
+        ).status_code
+        == 409
+    )
+    response = client.post(
+        f"/api/v1/sources/{source['id']}/run",
+        json={"expected_version": 1, "overrides": {"hours_old": 168, "results_wanted": 50}},
+    )
+    assert response.status_code == 200
+    run_id = response.json()["run_id"]
+    assert (
+        client.get(f"/api/v1/collection/runs/{run_id}").json()["source_snapshot"]["config"][
+            "hours_old"
+        ]
+        == 168
+    )
+    assert client.get(f"/api/v1/sources/{source['id']}").json()["config"]["hours_old"] == 72
+    schemas = client.get("/api/v1/sources/schemas").json()
+    assert schemas["items"][0]["config_schema"]["properties"]["results_wanted"]["default"] == 20
+    assert not {"jobcloud", "adzuna"}.intersection(item["kind"] for item in schemas["items"])
+    assert client.post(f"/api/v1/collection/runs/{run_id}/cancel").json()["state"] == "cancelled"
 
 
 def test_explicit_retry_preserves_progress_and_renews_error_allowance(collection, monkeypatch):
@@ -255,68 +282,37 @@ def test_explicit_retry_preserves_progress_and_renews_error_allowance(collection
     assert service.get_task(queued["id"])["result"]["failure_attempts"] == 1
 
 
-@pytest.mark.parametrize("preview", ["", "Python and SQL preview"])
-def test_partial_refresh_keeps_complete_body_and_records_the_observation(collection, preview):
+def test_partial_refresh_keeps_complete_body_and_records_the_observation(collection):
     workspace, _ = collection
-    source = {"url": "https://example.org/job", "title": "Engineer", "company": "Example"}
-    original = workspace.ingest_job(
-        {
-            **source,
-            "posting": "Build APIs and maintain production data systems.",
-            "metadata": {"description_complete": True, "description_status": "complete"},
+    for number, preview in enumerate(["", "Python and SQL preview"]):
+        source = {
+            "url": f"https://example.org/job/{number}",
+            "title": "Engineer",
+            "company": "Example",
         }
-    )
-    first = workspace.db.one("SELECT * FROM postings WHERE job_id=?", (original["id"],))
-    refreshed = workspace.ingest_job(
-        {
-            **source,
-            "posting": preview,
-            "metadata": {"description_complete": False, "description_status": "pending"},
-        }
-    )
-    assert refreshed["complete"] and refreshed["posting"] == original["posting"]
-    assert refreshed["content_version"] == original["content_version"]
-    # The same observation records the sighting and that its content differed; the
-    # provider's response itself is not stored.
-    observation = workspace.db.one("SELECT * FROM postings WHERE job_id=?", (original["id"],))
-    assert observation["id"] == first["id"] and observation["payload"] == "{}"
-    assert observation["content_hash"] != first["content_hash"]
-    assert observation["last_seen_at"] > first["last_seen_at"]
-    assert workspace.db.one("SELECT count(*) n FROM events WHERE kind='job_refreshed'")["n"] == 0
-
-
-def test_partial_filter_patch_preserves_other_terms_and_explicit_empty_clears(collection):
-    _, service = collection
-    source = service.create_source(
-        SourceCreate(
-            name="Example",
-            kind="greenhouse",
-            config={"board": "example"},
-            filters={"titles": ["engineer"], "locations": ["Canada"], "exclude_titles": ["sales"]},
-        )
-    )
-    changed = service.bulk_sources(
-        SourceBulk.model_validate(
+        original = workspace.ingest_job(
             {
-                "action": "configure",
-                "items": [{"id": source["id"], "expected_version": source["version"]}],
-                "patch": {"filters": {"titles": ["developer"]}},
+                **source,
+                "posting": "Build APIs and maintain production data systems.",
+                "metadata": {"description_complete": True, "description_status": "complete"},
             }
         )
-    )["items"][0]["result"]
-    assert changed["filters"] == {
-        "titles": ["developer"],
-        "locations": ["Canada"],
-        "exclude_titles": ["sales"],
-    }
-    cleared = service.update_source(
-        source["id"],
-        SourcePatch.model_validate(
-            {"expected_version": changed["version"], "filters": {"locations": []}}
-        ),
-    )
-    assert cleared["filters"] == {
-        "titles": ["developer"],
-        "locations": [],
-        "exclude_titles": ["sales"],
-    }
+        first = workspace.db.one("SELECT * FROM postings WHERE job_id=?", (original["id"],))
+        refreshed = workspace.ingest_job(
+            {
+                **source,
+                "posting": preview,
+                "metadata": {"description_complete": False, "description_status": "pending"},
+            }
+        )
+        assert refreshed["complete"] and refreshed["posting"] == original["posting"]
+        assert refreshed["content_version"] == original["content_version"]
+        # The same observation records the sighting and that its content differed; the
+        # provider's response itself is not stored.
+        observation = workspace.db.one("SELECT * FROM postings WHERE job_id=?", (original["id"],))
+        assert observation["id"] == first["id"] and observation["payload"] == "{}"
+        assert observation["content_hash"] != first["content_hash"]
+        assert observation["last_seen_at"] > first["last_seen_at"]
+        assert (
+            workspace.db.one("SELECT count(*) n FROM events WHERE kind='job_refreshed'")["n"] == 0
+        )

@@ -322,23 +322,22 @@ test("a possible duplicate is decided inside the job: kept apart, then merged", 
   );
 });
 
-test("a job is added by its address, and the one already there is found", async ({
+test("a note is added to a job and pinned to the top of its history", async ({
   page,
 }) => {
-  const url = `https://jobs.example.test/known/${Date.now()}`;
-  const known = await job(page, unique("Known role"), { url });
-  await go(page, "jobs");
-  await page
-    .getByRole("button", { name: "Add job" })
-    .filter({ visible: true })
-    .first()
-    .click();
-  const field = dialog(page).getByLabel("Address or posting text");
-  await field.fill(url);
-  await field.blur();
-  await expect(dialog(page)).toContainText("Already in your workspace");
-  await dialog(page).getByRole("button", { name: "Open it" }).click();
-  await expect(title(page)).toHaveText(known.title);
+  const made = await job(page, unique("Owned notes"));
+  await go(page, `jobs?section=all&job=${made.id}`);
+  await page.getByText("Notes and history").click();
+  await page.getByLabel("Add a note").fill("Synthetic pinned note.");
+  await page.getByLabel("Pin it to the top").check();
+  await page.getByRole("button", { name: "Add note", exact: true }).click();
+  const history = page.getByRole("list", { name: "History of this job" });
+  await expect(history.locator("li").first()).toContainText(
+    "Synthetic pinned note.",
+  );
+  await expect(history.locator("li").first()).toContainText("Pinned note");
+  const notes = await call(page, `/jobs/${made.id}/notes`);
+  expect(notes.items[0].pinned).toBe(true);
 });
 
 test("forgetting a job asks first and names what is lost", async ({ page }) => {

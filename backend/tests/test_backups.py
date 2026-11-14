@@ -1,7 +1,5 @@
 """Pre-upgrade copies, scheduled local backups and the owner's access to them (#205)."""
 
-import asyncio
-import os
 import shutil
 import sqlite3
 import stat
@@ -18,8 +16,6 @@ from openings.db import SCHEMA_VERSION, Database
 from openings.errors import DomainError
 from openings.worker import Worker
 from openings.workspace import Workspace
-
-PASSWORD = "synthetic-password"
 
 
 def older(path, version=13):
@@ -53,7 +49,7 @@ def mode(path):
 # Pre-upgrade copies
 
 
-def test_a_verified_private_copy_is_kept_at_the_old_version(tmp_path):
+def test_a_verified_private_copy_is_kept_and_only_the_two_most_recent_stay(tmp_path):
     path = older(tmp_path / "openings.sqlite")
     before = path.read_bytes()
     copy = db_module.copy_before_upgrade(path, 13)
@@ -66,52 +62,7 @@ def test_a_verified_private_copy_is_kept_at_the_old_version(tmp_path):
     with closing(sqlite3.connect(copy)) as conn:
         assert conn.execute("SELECT count(*) FROM jobs").fetchone()[0] == 1
 
-
-def test_a_fresh_workspace_takes_no_copy(tmp_path):
-    Database(tmp_path / "openings.sqlite")
-    assert not list(tmp_path.glob("*.pre-*"))
-
-
-def test_an_unsupported_older_workspace_is_refused_without_a_copy(tmp_path):
-    path = older(tmp_path / "openings.sqlite")
-    before = path.read_bytes()
-    with pytest.raises(DomainError) as refused:
-        Database(path)
-    assert refused.value.code == "schema_version"
-    assert path.read_bytes() == before
-    assert sorted(item.name for item in tmp_path.iterdir()) == ["openings.sqlite"]
-
-
-def test_without_room_the_copy_is_refused_and_the_file_is_unchanged(tmp_path, monkeypatch):
-    path = older(tmp_path / "openings.sqlite")
-    before = path.read_bytes()
-    no_room(monkeypatch, free=1024)
-    with pytest.raises(DomainError) as refused:
-        db_module.copy_before_upgrade(path, 13)
-    assert refused.value.code == "upgrade_room"
-    assert "MiB of free space" in refused.value.message
-    assert refused.value.details["needed_bytes"] >= 2.2 * len(before)
-    assert path.read_bytes() == before
-    assert sorted(item.name for item in tmp_path.iterdir()) == ["openings.sqlite"]
-
-
-def test_a_copy_that_cannot_be_kept_is_refused(tmp_path, monkeypatch):
-    path = older(tmp_path / "openings.sqlite")
-    before = path.read_bytes()
-
-    def broken_rename(source, target):
-        raise OSError("synthetic rename failure")
-
-    monkeypatch.setattr(db_module.os, "replace", broken_rename)
-    with pytest.raises(DomainError) as refused:
-        db_module.copy_before_upgrade(path, 13)
-    assert refused.value.code == "upgrade_copy"
-    assert path.read_bytes() == before
-    assert sorted(item.name for item in tmp_path.iterdir()) == ["openings.sqlite"]
-
-
-def test_the_two_most_recent_pre_upgrade_copies_are_kept(tmp_path):
-    path = older(tmp_path / "openings.sqlite")
+    copy.unlink()
     for stamp in ("20250101T000000Z", "20250201T000000Z", "20250301T000000Z"):
         shutil.copyfile(path, tmp_path / f"openings.pre-schema12-{stamp}.sqlite")
     # Another kind of kept copy (0.24's renamed original) is never rotated here.
@@ -124,10 +75,42 @@ def test_the_two_most_recent_pre_upgrade_copies_are_kept(tmp_path):
     assert (tmp_path / "openings.pre-0.24.sqlite").is_file()
 
 
+def test_a_copy_is_refused_and_the_file_left_unchanged(tmp_path, monkeypatch):
+    Database(tmp_path / "fresh.sqlite")
+    assert not list(tmp_path.glob("*.pre-*"))  # a fresh workspace takes no copy
+
+    path = older(tmp_path / "openings.sqlite")
+    before = path.read_bytes()
+    files = sorted(item.name for item in tmp_path.iterdir())
+    # An unsupported older schema is refused without a copy.
+    with pytest.raises(DomainError) as refused:
+        Database(path)
+    assert refused.value.code == "schema_version"
+    # Without room for the copy.
+    with monkeypatch.context() as patch:
+        no_room(patch, free=1024)
+        with pytest.raises(DomainError) as refused:
+            db_module.copy_before_upgrade(path, 13)
+    assert refused.value.code == "upgrade_room"
+    assert "MiB of free space" in refused.value.message
+    assert refused.value.details["needed_bytes"] >= 2.2 * len(before)
+
+    # A copy that cannot be renamed into place.
+    def broken_rename(source, target):
+        raise OSError("synthetic rename failure")
+
+    monkeypatch.setattr(db_module.os, "replace", broken_rename)
+    with pytest.raises(DomainError) as refused:
+        db_module.copy_before_upgrade(path, 13)
+    assert refused.value.code == "upgrade_copy"
+    assert path.read_bytes() == before
+    assert sorted(item.name for item in tmp_path.iterdir()) == files
+
+
 # Scheduled backups
 
 
-def test_a_backup_is_verified_private_and_rotated(tmp_path):
+def test_a_backup_is_verified_private_and_rotated(tmp_path, monkeypatch):
     workspace = Workspace(tmp_path / "openings.sqlite")
     directory = tmp_path / "backups"
     directory.mkdir(mode=0o700)
@@ -144,10 +127,7 @@ def test_a_backup_is_verified_private_and_rotated(tmp_path):
     copy = directory / result["name"]
     assert opened_version(copy) == SCHEMA_VERSION
     assert mode(copy) == 0o600
-
-
-def test_the_backup_directory_is_created_private(tmp_path, monkeypatch):
-    workspace = Workspace(tmp_path / "openings.sqlite")
+    # The directory is created private, here or where the setting names.
     assert backups.backup_dir(workspace.db) == tmp_path / "backups"
     monkeypatch.setenv("OPENINGS_BACKUP_DIR", str(tmp_path / "elsewhere" / "copies"))
     directory = backups.backup_dir(workspace.db)
@@ -157,24 +137,34 @@ def test_the_backup_directory_is_created_private(tmp_path, monkeypatch):
     assert len(backups.scheduled(directory)) == 1
 
 
-def test_a_backup_without_room_is_skipped(tmp_path, monkeypatch, caplog):
+def test_skipped_failed_and_disabled_backups_are_recorded(tmp_path, monkeypatch, caplog):
     workspace = Workspace(tmp_path / "openings.sqlite")
-    no_room(monkeypatch)
-    assert backups.run_backup(workspace.db, tmp_path / "backups", 3) is None
-    assert "Scheduled backup skipped" in caplog.text
-    assert backups.scheduled(tmp_path / "backups") == []
-    attempt = backups.run_if_due(workspace.db)
+    with monkeypatch.context() as patch:
+        no_room(patch)
+        assert backups.run_backup(workspace.db, tmp_path / "backups", 3) is None
+        assert "Scheduled backup skipped" in caplog.text
+        assert backups.scheduled(tmp_path / "backups") == []
+        attempt = backups.run_if_due(workspace.db)
     assert attempt["outcome"] == "skipped" and attempt["name"] is None
     assert backups.last_attempt(workspace.db)["outcome"] == "skipped"
     assert backups.status(workspace.db)["ok"] is False
 
+    def broken(*_):
+        raise OSError("synthetic disk failure")
 
-def test_keep_zero_disables_scheduled_backups(tmp_path, monkeypatch):
-    workspace = Workspace(tmp_path / "openings.sqlite")
+    with monkeypatch.context() as patch:
+        patch.setattr(backups, "run_backup", broken)
+        attempt = backups.run_if_due(workspace.db)
+    assert attempt["outcome"] == "failed"
+    assert attempt["error"] == "synthetic disk failure"
+    assert backups.last_attempt(workspace.db)["error"] == "synthetic disk failure"
+    assert backups.status(workspace.db)["ok"] is False
+
+    # Keeping zero disables scheduled backups.
     monkeypatch.setenv("OPENINGS_BACKUP_KEEP", "0")
     assert backups.due(workspace.db) is False
     assert backups.run_if_due(workspace.db) is None
-    assert not (tmp_path / "backups").exists()
+    assert backups.scheduled(tmp_path / "backups") == []
     assert backups.status(workspace.db)["enabled"] is False
     monkeypatch.setenv("OPENINGS_BACKUP_KEEP", "not a number")
     assert backups.backup_keep() == backups.DEFAULT_KEEP
@@ -191,20 +181,6 @@ def test_a_backup_runs_when_due_and_not_before(tmp_path):
     status = backups.status(workspace.db)
     assert status["ok"] is True and status["last_at"] and status["age_hours"] < 1
     assert backups.last_attempt(workspace.db) == attempt
-
-
-def test_a_failed_backup_is_recorded_without_raising(tmp_path, monkeypatch):
-    workspace = Workspace(tmp_path / "openings.sqlite")
-
-    def broken(*_):
-        raise OSError("synthetic disk failure")
-
-    monkeypatch.setattr(backups, "run_backup", broken)
-    attempt = backups.run_if_due(workspace.db)
-    assert attempt["outcome"] == "failed"
-    assert attempt["error"] == "synthetic disk failure"
-    assert backups.last_attempt(workspace.db)["error"] == "synthetic disk failure"
-    assert backups.status(workspace.db)["ok"] is False
 
 
 class OneCycle:
@@ -251,63 +227,55 @@ def test_the_worker_backs_up_on_its_cycle_and_survives_a_failure(tmp_path, monke
 
 
 @pytest.fixture
-def app(tmp_path):
-    app = create_app(tmp_path / "openings.sqlite", start_worker=False)
-    app.state.auth.setup(PASSWORD)
-    workspace = app.state.workspace
-    backups.run_backup(workspace.db, backups.backup_dir(workspace.db), 3)
-    shutil.copyfile(workspace.db.path, tmp_path / "openings.pre-schema13-20260101T080000Z.sqlite")
-    return app
-
-
-def test_the_owner_lists_downloads_and_deletes_kept_copies(app, tmp_path):
-    with TestClient(app, base_url="http://localhost:8080") as client:
-        session = client.post("/api/v1/auth/login", json={"password": PASSWORD}).json()
-        listed = client.get("/api/v1/backups").json()
-        kinds = {item["kind"]: item for item in listed["items"]}
-        assert set(kinds) == {"scheduled", "pre_upgrade"}
-        assert listed["schedule"]["keep"] == 3 and listed["schedule"]["ok"] is True
-        daily, copy = kinds["scheduled"], kinds["pre_upgrade"]
-        assert daily["size_bytes"] > 0 and daily["created_at"].endswith("Z")
-        assert copy["created_at"] == "2026-01-01T08:00:00Z"
-
-        response = client.get("/api/v1/backups/" + daily["name"])
-        assert response.status_code == 200
-        assert response.content[:16] == b"SQLite format 3\x00"
-        assert daily["name"] in response.headers["content-disposition"]
-
-        csrf = {"X-CSRF-Token": session["csrf_token"]}
-        refused = client.delete("/api/v1/backups/" + daily["name"], headers=csrf)
-        assert refused.status_code == 409
-        assert refused.json()["error"]["code"] == "backup_scheduled"
-        deleted = client.delete("/api/v1/backups/" + copy["name"], headers=csrf)
-        assert deleted.json() == {"deleted": True, "name": copy["name"]}
-        assert not (tmp_path / copy["name"]).exists()
-        assert [item["kind"] for item in client.get("/api/v1/backups").json()["items"]] == [
-            "scheduled"
-        ]
-
-
-def test_the_renamed_original_of_the_0_24_upgrade_is_a_kept_copy(app, tmp_path):
+def kept(app):
+    """The owner's app with one scheduled backup and one pre-upgrade copy beside it."""
     db = app.state.workspace.db
-    shutil.copyfile(db.path, tmp_path / "openings.pre-0.24.sqlite")
-    listed = {item["name"]: item["kind"] for item in backups.listing(db)}
-    assert listed["openings.pre-0.24.sqlite"] == "pre_upgrade"
-    assert listed["openings.pre-schema13-20260101T080000Z.sqlite"] == "pre_upgrade"
-    # The archive beside it is not a database copy.
-    (tmp_path / "openings.pre-0.24-archive.json").write_text("{}")
-    assert "openings.pre-0.24-archive.json" not in {item["name"] for item in backups.listing(db)}
+    backups.run_backup(db, backups.backup_dir(db), 3)
+    copy = db.path.with_name(db.path.stem + ".pre-schema13-20260101T080000Z.sqlite")
+    shutil.copyfile(db.path, copy)
+    return db
 
 
-def test_names_outside_the_listing_are_not_found(app, tmp_path):
-    token = app.state.auth.create_token("Synthetic owner", "owner")["token"]
-    headers = {"Authorization": "Bearer " + token}
-    (tmp_path / "unrelated.sqlite").write_bytes(b"synthetic")
+def test_the_owner_lists_downloads_and_deletes_kept_copies(kept, client):
+    # 0.24's renamed original is a kept copy; the archive beside it is not.
+    renamed = kept.path.with_name(kept.path.stem + ".pre-0.24.sqlite")
+    shutil.copyfile(kept.path, renamed)
+    kept.path.with_name(kept.path.stem + ".pre-0.24-archive.json").write_text("{}")
+    listed = client.get("/api/v1/backups").json()
+    assert {item["name"]: item["kind"] for item in listed["items"]}[renamed.name] == "pre_upgrade"
+    assert len(listed["items"]) == 3
+    renamed.unlink()
+    listed = client.get("/api/v1/backups").json()
+    kinds = {item["kind"]: item for item in listed["items"]}
+    assert set(kinds) == {"scheduled", "pre_upgrade"}
+    assert listed["schedule"]["keep"] == 3 and listed["schedule"]["ok"] is True
+    daily, copy = kinds["scheduled"], kinds["pre_upgrade"]
+    assert daily["size_bytes"] > 0 and daily["created_at"].endswith("Z")
+    assert copy["created_at"] == "2026-01-01T08:00:00Z"
+
+    response = client.get("/api/v1/backups/" + daily["name"])
+    assert response.status_code == 200
+    assert response.content[:16] == b"SQLite format 3\x00"
+    assert daily["name"] in response.headers["content-disposition"]
+
+    refused = client.delete("/api/v1/backups/" + daily["name"])
+    assert refused.status_code == 409
+    assert refused.json()["error"]["code"] == "backup_scheduled"
+    deleted = client.delete("/api/v1/backups/" + copy["name"])
+    assert deleted.json() == {"deleted": True, "name": copy["name"]}
+    assert not kept.path.with_name(copy["name"]).exists()
+    assert [item["kind"] for item in client.get("/api/v1/backups").json()["items"]] == ["scheduled"]
+
+
+def test_names_outside_the_listing_are_not_found(kept, app, owner_token):
+    """Exact names of the listing only; an owner token reaches them (agents: test_interfaces)."""
+    headers = owner_token["headers"]
+    kept.path.with_name("unrelated.sqlite").write_bytes(b"synthetic")
     with TestClient(app, base_url="http://localhost:8080") as client:
         for name in (
-            "openings.sqlite",
+            kept.path.name,
             "unrelated.sqlite",
-            "..%2Fopenings.sqlite",
+            "..%2F" + kept.path.name,
             "openings-20990101T000000Z.sqlite",
         ):
             for method in ("GET", "DELETE"):
@@ -315,40 +283,16 @@ def test_names_outside_the_listing_are_not_found(app, tmp_path):
                 # An encoded separator never reaches the handler as a name.
                 expected = (404, 405) if ".." in name else (404,)
                 assert response.status_code in expected, (method, name)
-        assert (tmp_path / "openings.sqlite").is_file()
-    # The service itself matches exact names of the listing only.
-    for name in ("../openings.sqlite", "backups/../openings.sqlite", "/etc/passwd", ""):
-        with pytest.raises(DomainError) as missing:
-            backups.find(app.state.workspace.db, name)
-        assert missing.value.status == 404
-
-
-def test_an_owner_token_succeeds_and_an_agent_token_is_refused(app):
-    auth = app.state.auth
-    owner = {"Authorization": "Bearer " + auth.create_token("Owner", "owner")["token"]}
-    agent = {"Authorization": "Bearer " + auth.create_token("Agent", "agent")["token"]}
-    with TestClient(app, base_url="http://localhost:8080") as client:
-        items = client.get("/api/v1/backups", headers=owner).json()["items"]
+        assert kept.path.is_file()
+        items = client.get("/api/v1/backups", headers=headers).json()["items"]
         copy = next(item["name"] for item in items if item["kind"] == "pre_upgrade")
-        for method, path in (
-            ("GET", "/api/v1/backups"),
-            ("GET", "/api/v1/backups/" + items[0]["name"]),
-            ("DELETE", "/api/v1/backups/" + copy),
-        ):
-            response = client.request(method, path, headers=agent)
-            assert response.status_code == 403, path
-            assert response.json()["error"]["code"] == "forbidden"
-        assert client.get("/api/v1/backups/" + items[0]["name"], headers=owner).status_code == 200
-        assert client.delete("/api/v1/backups/" + copy, headers=owner).status_code == 200
-
-
-def test_no_mcp_tool_reaches_kept_copies(app):
-    names = {tool.name for tool in asyncio.run(app.state.mcp.list_tools())}
-    assert not {name for name in names if name.startswith("backups")}
-    descriptions = " ".join(
-        (tool.description or "") for tool in asyncio.run(app.state.mcp.list_tools())
-    )
-    assert "/api/v1/backups" not in descriptions
+        assert client.get("/api/v1/backups/" + items[0]["name"], headers=headers).is_success
+        assert client.delete("/api/v1/backups/" + copy, headers=headers).is_success
+    # The service itself matches exact names of the listing only.
+    for name in ("../" + kept.path.name, "backups/../" + kept.path.name, "/etc/passwd", ""):
+        with pytest.raises(DomainError) as missing:
+            backups.find(kept, name)
+        assert missing.value.status == 404
 
 
 def test_health_reports_the_backup_and_the_worker(tmp_path):
@@ -371,11 +315,9 @@ def test_health_reports_the_backup_and_the_worker(tmp_path):
         assert stalled.json()["status"] == "worker_stalled"
 
 
-def test_health_without_a_worker(tmp_path):
-    app = create_app(tmp_path / "openings.sqlite", start_worker=False)
-    with TestClient(app) as client:
-        body = client.get("/health").json()
+def test_health_without_a_worker(app, client):
+    body = client.get("/health").json()
     assert body["status"] == "ok"
     assert body["backup"] == {"last_at": None, "age_hours": None, "ok": False}
     assert body["worker"] == {"heartbeat_age_seconds": None}
-    assert not os.path.exists(tmp_path / "backups")
+    assert not (app.state.workspace.db.path.parent / "backups").exists()

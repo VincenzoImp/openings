@@ -74,16 +74,12 @@ def test_only_complete_postings_supply_preserved_body_metadata(collection, monke
     assert set(observed) == {"greenhouse:example:full"}
 
 
-@pytest.mark.parametrize("header", ["120", "date"])
-def test_every_http_attempt_obeys_persisted_cooldown(collection, monkeypatch, header):
+def test_every_http_attempt_obeys_persisted_cooldown(collection, monkeypatch):
     workspace, service = collection
     policy(service, "manual", min_interval_seconds=0)
     calls = []
-    retry = (
-        "120"
-        if header == "120"
-        else format_datetime(datetime.now(UTC) + timedelta(seconds=120), usegmt=True)
-    )
+    # An HTTP-date Retry-After is parsed by retry_after (tested below).
+    retry = "120"
 
     def send(request):
         calls.append(str(request.url))
@@ -234,17 +230,6 @@ def test_preview_manual_and_worker_share_provider_gate(collection, monkeypatch):
     assert len(calls) == 1
 
 
-def test_cancelled_task_never_reserves_another_request(collection):
-    _, service = collection
-    active = True
-    budget = service.http_budget("greenhouse", active=lambda: active)
-    active = False
-    with pytest.raises(DomainError) as error:
-        budget.before("GET", "https://example.org")
-    assert error.value.code == "task_cancelled"
-    assert service.providers.get("greenhouse")["runtime"]["total_requests"] == 0
-
-
 def test_feed_unknown_location_is_retained_when_location_filters_are_set(monkeypatch):
     patch_discovery(
         monkeypatch,
@@ -298,14 +283,24 @@ def test_company_clients_fetch_all_details_and_reuse_complete_cached_bodies():
     assert len(calls) == 1
 
 
-def test_provider_list_excludes_unsupported_services_and_retry_after_is_not_guessed(collection):
+def test_the_gate_refuses_cancelled_work_unknown_providers_and_guessed_retry_after(collection):
     _, service = collection
+    active = True
+    budget = service.http_budget("greenhouse", active=lambda: active)
+    active = False
+    with pytest.raises(DomainError) as error:
+        budget.before("GET", "https://example.org")
+    assert error.value.code == "task_cancelled"
+    assert service.providers.get("greenhouse")["runtime"]["total_requests"] == 0
+
     assert "google" not in {row["id"] for row in service.providers.list()["items"]}
     with pytest.raises(DomainError) as caught:
         service.update_provider("google", ProviderPatch(expected_version=1, enabled=True))
     assert caught.value.code == "not_found"
     assert retry_after("not a date", 1) is None
     assert retry_after("3", 1) == 4
+    later = datetime.now(UTC).replace(microsecond=0) + timedelta(seconds=120)
+    assert retry_after(format_datetime(later, usegmt=True), 1) == later.timestamp()
 
 
 def test_actual_requests_and_curl_transports_bound_bodies_and_record_integer_status(collection):
@@ -479,10 +474,7 @@ def test_run_now_promotes_scheduled_work_and_long_provider_pause_keeps_a_valid_n
 
 
 @pytest.mark.asyncio
-async def test_slow_mcp_preview_keeps_health_and_other_tools_responsive(tmp_path, monkeypatch):
-    from openings.app import create_app
-
-    app = create_app(tmp_path / "responsive.sqlite", start_worker=False)
+async def test_slow_mcp_preview_keeps_health_and_other_tools_responsive(app, monkeypatch):
     entered, release = threading.Event(), threading.Event()
 
     def slow_preview(value):

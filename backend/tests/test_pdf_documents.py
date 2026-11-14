@@ -3,7 +3,6 @@
 import hashlib
 
 import pytest
-from fastapi.testclient import TestClient
 
 from document_fixtures import PDF, tex, text_pdf
 from openings.documents import DocumentCreate
@@ -107,19 +106,16 @@ def test_an_inline_source_binds_the_pdf_grant_to_its_hash(setup):
     assert read["complete"] and read["text"] == "Second letter."
 
 
-@pytest.mark.parametrize(
-    "value",
-    [
+def test_inputs_of_a_cv_or_letter_only_are_refused_elsewhere(setup):
+    client, _, _, application = setup
+    for value in (
         {"kind": "answers", "content": {}, "pdf": {"name": "a.pdf", "size": 1}},
         {"kind": "cv", "source": "x", "source_file": {"name": "cv.tex", "size": 1}},
         {"kind": "cv", "source": "x" * (256 * 1024 + 1)},
         {"kind": "resume"},
-    ],
-)
-def test_inputs_of_a_cv_or_letter_only_are_refused_elsewhere(setup, value):
-    client, _, _, application = setup
-    refused = client.post("/api/v1/documents", json={"application_id": application["id"], **value})
-    assert refused.status_code == 422
+    ):
+        body = {"application_id": application["id"], **value}
+        assert client.post("/api/v1/documents", json=body).status_code == 422, value["kind"]
 
 
 def test_text_of_a_pdf_stored_without_text_is_read_on_first_read(setup):
@@ -143,7 +139,7 @@ def test_text_of_a_pdf_stored_without_text_is_read_on_first_read(setup):
     assert stored["text"] == "Synthetic upgraded CV"
 
 
-def test_retried_creates_return_fresh_grants_for_an_incomplete_revision(app):
+def test_retried_creates_return_fresh_grants_for_an_incomplete_revision(app, client):
     workspace, documents = app.state.workspace, app.state.documents
     job = workspace.ingest_job({"title": "Synthetic engineer", "posting": "Build services."})
     application = workspace.create_application({"job_id": job["id"]})
@@ -157,7 +153,6 @@ def test_retried_creates_return_fresh_grants_for_an_incomplete_revision(app):
     retry = documents.create_document(value)
     assert retry["id"] == first["id"]
     assert retry["uploads"]["pdf"]["headers"] != first["uploads"]["pdf"]["headers"]
-    with TestClient(app) as client:
-        assert put(client, retry["uploads"]["pdf"], PDF).status_code == 200
+    assert put(client, retry["uploads"]["pdf"], PDF).status_code == 200
     # Once complete, a retry returns the revision without grants to use.
     assert documents.create_document(value)["uploads"] == {"pdf": None, "source": None}
