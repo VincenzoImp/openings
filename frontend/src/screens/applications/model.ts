@@ -3,6 +3,26 @@
 // actions valid for a selection, what is missing before Ready, the send queue
 // and the history. No React: tests/applications.test.mjs runs it directly.
 import { plural } from "../../ui/format.ts";
+import {
+  dayOf,
+  daysBetween,
+  deadlinePhrase,
+  deadlineLabel,
+  shortDay,
+  toned,
+  type Phrase,
+} from "./days.ts";
+
+export {
+  dayOf,
+  daysBetween,
+  deadlineLabel,
+  deadlinePhrase,
+  isoDay,
+  shortDay,
+  type Phrase,
+  type Tone,
+} from "./days.ts";
 
 export type StageKey =
   "shortlisted" | "ready" | "applied" | "interview" | "offer" | "closed";
@@ -70,76 +90,6 @@ export function stageOf(app: Pick<AppFacts, "status" | "ready">): StageKey {
 export const isSent = (status: string) =>
   ["applied", "interview", "offer"].includes(status);
 
-const MONTHS = "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split(" ");
-const WEEKDAYS = "Sun Mon Tue Wed Thu Fri Sat".split(" ");
-const DAY_MS = 86_400_000;
-
-/** A calendar day from "2026-11-12" or a moment; local, at midnight. */
-export function dayOf(value: string | Date) {
-  if (value instanceof Date)
-    return new Date(value.getFullYear(), value.getMonth(), value.getDate());
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    const [year, month, date] = value.split("-").map(Number);
-    return new Date(year, month - 1, date);
-  }
-  return dayOf(new Date(value));
-}
-
-/** "2026-11-14": the local calendar day, as the API takes dates. */
-export function isoDay(date = new Date()) {
-  return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
-  ].join("-");
-}
-
-/** Whole calendar days from one day to another (negative when earlier). */
-export function daysBetween(from: string | Date, to: string | Date) {
-  return Math.round((dayOf(to).getTime() - dayOf(from).getTime()) / DAY_MS);
-}
-
-/** "12 Oct", with the year only when it is not the current one. */
-export function shortDay(value: string | Date, now = new Date()) {
-  const day = dayOf(value);
-  const text = `${day.getDate()} ${MONTHS[day.getMonth()]}`;
-  return day.getFullYear() === now.getFullYear()
-    ? text
-    : `${text} ${day.getFullYear()}`;
-}
-
-export type Tone = "warning" | "danger";
-export interface Phrase {
-  text: string;
-  tone?: Tone;
-}
-/** A phrase, with its tone only when it has one. */
-const toned = (text: string, tone?: Tone): Phrase =>
-  tone ? { text, tone } : { text };
-
-/**
- * A deadline as a row reads it: "due today", "due Fri" within a week, "due
- * 28 Nov", "overdue 3 days". Warning within three days, danger once passed.
- */
-export function deadlinePhrase(
-  deadline: string | null | undefined,
-  now = new Date(),
-): Phrase | null {
-  if (!deadline) return null;
-  const days = daysBetween(now, deadline);
-  if (days < 0)
-    return { text: `overdue ${plural(-days, "day")}`, tone: "danger" };
-  const text =
-    days === 0
-      ? "due today"
-      : days === 1
-        ? "due tomorrow"
-        : days < 7
-          ? `due ${WEEKDAYS[dayOf(deadline).getDay()]}`
-          : `due ${shortDay(deadline, now)}`;
-  return toned(text, days <= 3 ? "warning" : undefined);
-}
-
 const DOCUMENT_WORDS: Record<string, string> = { cv: "CV", letter: "letter" };
 
 /** "Missing: CV, letter" or "Missing: 1 requirement"; empty when nothing is. */
@@ -163,15 +113,19 @@ const replyDate = (app: AppFacts) =>
 /**
  * The one status phrase of a row, by stage: "Missing: letter", "Ready · due
  * Fri", "Applied 12 Oct · no reply 32 days", "Interview 4 Nov", "Closed ·
- * rejected". A wait longer than the no-reply period is a warning.
+ * rejected". A wait longer than the no-reply period is a warning. Where the
+ * stage is already said (a Ready group or tab), Ready reads only its deadline.
  */
 export function statusPhrase(
   app: AppFacts,
   noReplyDays: number,
   now = new Date(),
+  { stageShown = false } = {},
 ): Phrase {
   const stage = stageOf(app);
   const deadline = deadlinePhrase(app.deadline, now);
+  if (stage === "ready" && stageShown)
+    return deadlineLabel(app.deadline, now) ?? { text: "" };
   if (stage === "ready")
     return deadline
       ? toned(`Ready · ${deadline.text}`, deadline.tone)
@@ -240,7 +194,7 @@ export function needsRank(
 export const NEEDS_GROUPS = [
   "Ready to send",
   "Shortlisted with a deadline",
-  "Waiting too long for a reply",
+  "Waiting for a reply",
   "Everything else",
 ];
 

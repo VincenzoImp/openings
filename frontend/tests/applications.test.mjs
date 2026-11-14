@@ -298,3 +298,15 @@ test("the current revision of a kind is the one nothing replaces", () => {
   assert.equal(model.currentOf(revisions, "letter").id, "3");
   assert.equal(model.currentOf(revisions, "other"), null);
 });
+
+test("where the stage is already said, a Ready row reads only its deadline", () => {
+  const shown = (fields) =>
+    model.statusPhrase(app(fields), 45, now, { stageShown: true });
+  assert.deepEqual(shown({ ready: true, deadline: "2026-11-16" }), {
+    text: "Due Mon",
+    tone: "warning",
+  });
+  assert.deepEqual(shown({ ready: true }), { text: "" });
+  assert.deepEqual(shown({ missing: ["letter"] }), { text: "Missing: letter" });
+  assert.equal(model.NEEDS_GROUPS[2], "Waiting for a reply");
+});

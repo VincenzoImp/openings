@@ -18,13 +18,9 @@ import {
   useRequirementTexts,
   type Application,
 } from "./data";
-import {
-  daysSince,
-  deadlineText,
-  missingText,
-  roleOf,
-  type Row,
-} from "./model";
+import { deadlineLabel } from "../applications/days";
+import { HighPriority } from "../applications/priority";
+import { daysSince, missingText, roleOf, type Row } from "./model";
 
 // The reply form loads when it is first opened; Today itself stays small.
 const RecordReply = lazy(() =>
@@ -92,38 +88,6 @@ function Rows({
   );
 }
 
-/**
- * Priority as a leading glyph: three bars, as many filled as the priority is
- * high (1 fills three, 3 fills one). Neutral, so the deadline stays the row's
- * one signal.
- */
-function Priority({ value }: { value?: number | null }) {
-  if (value == null || value > 3) return null;
-  const filled = 4 - value;
-  return (
-    <svg
-      className="today-priority"
-      viewBox="0 0 14 14"
-      width="14"
-      height="14"
-      role="img"
-      aria-label={`Priority ${value}`}
-    >
-      {[0, 1, 2].map((bar) => (
-        <rect
-          key={bar}
-          x={2 + bar * 4}
-          y={9 - bar * 3}
-          width="2.5"
-          height={3 + bar * 3}
-          rx="1"
-          data-on={bar < filled || undefined}
-        />
-      ))}
-    </svg>
-  );
-}
-
 /** Ready to apply: the send queue, closest deadline first. */
 export function Ready({
   page,
@@ -151,13 +115,13 @@ export function Ready({
       <Rows label="Ready applications" ids={page.items.map((row) => row.id)}>
         {page.items.map((row) => {
           const { title, company } = roleOf(row);
-          const deadline = deadlineText(row.deadline);
+          const deadline = deadlineLabel(row.deadline);
           return (
             <ListRow
               key={row.id}
               id={row.id}
               href={applicationHref(row.id)}
-              leading={<Priority value={row.priority} />}
+              leading={<HighPriority priority={row.priority} />}
               title={title}
               sub={company}
               meta={
@@ -200,7 +164,7 @@ export function Attention({ rows }: { rows: Row[] }) {
       >
         {shown.map((row) => {
           const { title, company } = roleOf(row);
-          const deadline = deadlineText(row.deadline);
+          const deadline = deadlineLabel(row.deadline);
           const missing = missingText(row, texts);
           return (
             <ListRow
@@ -352,7 +316,6 @@ export function Waiting({ rows, days }: { rows: Application[]; days: number }) {
               key={row.id}
               id={row.id}
               href={applicationHref(row.id)}
-              leading={<StatusGlyph stage="applied" />}
               title={title}
               sub={[
                 company,
@@ -392,12 +355,11 @@ type JobPage = { items: Schema<"JobSummary">[]; total: number };
 
 /** New jobs: how many, the first three, and the way to triage them. */
 export function NewJobs({ jobs, recent }: { jobs: JobPage; recent: number }) {
+  // The count is in the heading; the line says only what it does not.
   const line =
-    recent > 0
+    recent > 0 && recent < jobs.total
       ? `${formatNumber(recent)} since yesterday`
-      : jobs.total === 1
-        ? "1 job to go through"
-        : `${formatNumber(jobs.total)} jobs to go through`;
+      : null;
   return (
     <Section
       title="New jobs"
@@ -412,7 +374,7 @@ export function NewJobs({ jobs, recent }: { jobs: JobPage; recent: number }) {
         </Button>
       }
     >
-      <p className="today-note">{line}</p>
+      {line && <p className="today-note">{line}</p>}
       <ul
         className="ui-list-rows today-list today-jobs"
         aria-label="Newest jobs"

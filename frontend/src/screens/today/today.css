@@ -73,6 +73,10 @@
     display: flex;
     flex: none;
   }
+  /* A ghost action's text ends where a bordered button's edge does. */
+  .today-section-action .ui-btn[data-variant="ghost"] {
+    margin-right: -10px;
+  }
   .today-note {
     margin: calc(var(--s-2) * -1) 0 var(--s-2);
     color: var(--text-3);
@@ -118,13 +122,6 @@
   .today-more:hover {
     color: var(--text);
     text-decoration: none;
-  }
-
-  .today-priority rect {
-    fill: var(--border-strong);
-  }
-  .today-priority rect[data-on] {
-    fill: var(--text-2);
   }
 
   /* The setup checklist */
