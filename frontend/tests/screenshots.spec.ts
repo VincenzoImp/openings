@@ -21,7 +21,33 @@ type Screen = {
   /** The file name under docs/images, for an image the docs embed. */
   docs?: string;
   signedOut?: boolean;
+  /** Prepare the page before the screen is opened (a replaced response). */
+  before?: (page: Page) => Promise<void>;
+  /** On a phone the state is a full-screen sheet: capture the viewport. */
+  sheet?: boolean;
 };
+
+/** Open the editor of the entry with this title on the Profile. */
+const editEntry = (title: string) => async (page: Page) => {
+  await page
+    .getByRole("button", { name: `Edit ${title}`, exact: true })
+    .click();
+  await expect(page.locator("form.pf-entry-form")).toBeVisible();
+};
+
+const SAMPLE_CV = `# Jordan Example
+Platform engineer
+Lisbon · jordan@example.test
+
+## Experience
+### Platform engineer — Example Grid
+2021 – Present · Lisbon
+- Cut deploy time from 40 to 6 minutes.
+- Ran the on-call rotation for four teams.
+
+## Education
+### BSc Computer Science — Example University
+2014 – 2017`;
 
 /** Today with nothing to do: no Ready, attention or waiting rows. */
 async function caughtUp(page: Page) {
@@ -138,7 +164,70 @@ const SCREENS: Screen[] = [
       await expect(page.locator("dialog[open]")).toBeVisible();
     },
   },
-  { name: "profile", route: "profile?section=knowledge", docs: "career" },
+  { name: "profile", route: "profile", docs: "career" },
+  {
+    name: "profile-edit-header",
+    sheet: true,
+    route: "profile",
+    open: async (page) => {
+      await page.getByRole("button", { name: "Edit header" }).click();
+      await page.getByLabel("Headline").fill("Senior data engineer, energy");
+    },
+  },
+  {
+    name: "profile-edit-entry",
+    sheet: true,
+    route: "profile",
+    open: editEntry("Senior data engineer"),
+  },
+  {
+    name: "profile-add-entry",
+    sheet: true,
+    route: "profile",
+    open: async (page) => {
+      await page.getByRole("button", { name: "Add experience" }).click();
+      await expect(page.locator("form.pf-entry-form")).toBeVisible();
+    },
+  },
+  {
+    name: "profile-import",
+    route: "profile",
+    open: async (page) => {
+      await page
+        .getByRole("button", { name: "Import CV text" })
+        .first()
+        .click();
+      await page.getByRole("textbox", { name: "CV text" }).fill(SAMPLE_CV);
+      await page.getByRole("button", { name: "Preview" }).click();
+      await expect(page.getByText("Check what was found")).toBeVisible();
+    },
+  },
+  {
+    name: "profile-empty",
+    route: "profile",
+    before: async (page) => {
+      const empty = { items: [], total: 0, limit: 200, offset: 0 };
+      await page.route(/\/api\/v1\/career\/(knowledge|claims)\?/, (route) =>
+        route.fulfill({ json: empty }),
+      );
+      await page.route(/\/api\/v1\/career\/profile$/, async (route) => {
+        const response = await route.fetch();
+        const profile = await response.json();
+        await route.fulfill({
+          response,
+          json: {
+            ...profile,
+            name: "",
+            headline: "",
+            summary: "",
+            email: "",
+            location: "",
+            links: [],
+          },
+        });
+      });
+    },
+  },
   { name: "preferences", route: "preferences", docs: "preferences" },
   {
     name: "preferences-editing",
@@ -207,6 +296,7 @@ async function capture(page: Page, screen: Screen, path: string) {
   if (!screen.signedOut) await page.context().addCookies(ownerSession());
   // Open a page of the app first, so a route can read the workspace.
   await page.goto("/");
+  await screen.before?.(page);
   const route =
     typeof screen.route === "string" ? screen.route : await screen.route(page);
   await screen.prepare?.(page);
@@ -220,7 +310,8 @@ async function capture(page: Page, screen: Screen, path: string) {
   // full-page image the frame grows with the content instead: the sidebar
   // spans the whole height and the phone's bars sit above and below it.
   await page.addStyleTag({ content: FULL_PAGE });
-  await page.screenshot({ path, fullPage: true, animations: "disabled" });
+  const fullPage = !(screen.sheet && (page.viewportSize()?.width ?? 0) < 720);
+  await page.screenshot({ path, fullPage, animations: "disabled" });
 }
 
 const FULL_PAGE = `
