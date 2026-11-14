@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { test, expect, type Page } from "./fixtures";
 import { call, go, ownerSession } from "./session";
@@ -20,7 +21,33 @@ type Screen = {
   /** The file name under docs/images, for an image the docs embed. */
   docs?: string;
   signedOut?: boolean;
+  /** Prepare the page before the screen is opened (a replaced response). */
+  before?: (page: Page) => Promise<void>;
+  /** On a phone the state is a full-screen sheet: capture the viewport. */
+  sheet?: boolean;
 };
+
+/** Open the editor of the entry with this title on the Profile. */
+const editEntry = (title: string) => async (page: Page) => {
+  await page
+    .getByRole("button", { name: `Edit ${title}`, exact: true })
+    .click();
+  await expect(page.locator("form.pf-entry-form")).toBeVisible();
+};
+
+const SAMPLE_CV = `# Jordan Example
+Platform engineer
+Lisbon · jordan@example.test
+
+## Experience
+### Platform engineer — Example Grid
+2021 – Present · Lisbon
+- Cut deploy time from 40 to 6 minutes.
+- Ran the on-call rotation for four teams.
+
+## Education
+### BSc Computer Science — Example University
+2014 – 2017`;
 
 /** Today with nothing to do: no Ready, attention or waiting rows. */
 async function caughtUp(page: Page) {
@@ -66,6 +93,18 @@ async function emptyWorkspace(page: Page) {
 
 const first = async (page: Page, path: string) =>
   (await call(page, path)).items[0].id as string;
+
+/** The default CV, given the example source so its views have content. */
+async function exampleCv(page: Page) {
+  const cv = (await call(page, "/templates?kind=cv&limit=200")).items.find(
+    (template: { is_default: boolean }) => template.is_default,
+  );
+  await call(page, `/templates/${cv.id}`, "PATCH", {
+    expected_version: cv.version,
+    tex: readFileSync(join(ROOT, "examples/cv.tex"), "utf8"),
+  });
+  return cv.id as string;
+}
 
 const SCREENS: Screen[] = [
   { name: "sign-in", route: "today", signedOut: true },
@@ -125,9 +164,120 @@ const SCREENS: Screen[] = [
       await expect(page.locator("dialog[open]")).toBeVisible();
     },
   },
-  { name: "profile", route: "profile?section=knowledge", docs: "career" },
+  { name: "profile", route: "profile", docs: "career" },
+  {
+    name: "profile-edit-header",
+    sheet: true,
+    route: "profile",
+    open: async (page) => {
+      await page.getByRole("button", { name: "Edit header" }).click();
+      await page.getByLabel("Headline").fill("Senior data engineer, energy");
+    },
+  },
+  {
+    name: "profile-edit-entry",
+    sheet: true,
+    route: "profile",
+    open: editEntry("Senior data engineer"),
+  },
+  {
+    name: "profile-add-entry",
+    sheet: true,
+    route: "profile",
+    open: async (page) => {
+      await page.getByRole("button", { name: "Add experience" }).click();
+      await expect(page.locator("form.pf-entry-form")).toBeVisible();
+    },
+  },
+  {
+    name: "profile-import",
+    route: "profile",
+    open: async (page) => {
+      await page
+        .getByRole("button", { name: "Import CV text" })
+        .first()
+        .click();
+      await page.getByRole("textbox", { name: "CV text" }).fill(SAMPLE_CV);
+      await page.getByRole("button", { name: "Preview" }).click();
+      await expect(page.getByText("Check what was found")).toBeVisible();
+    },
+  },
+  {
+    name: "profile-empty",
+    route: "profile",
+    before: async (page) => {
+      const empty = { items: [], total: 0, limit: 200, offset: 0 };
+      await page.route(/\/api\/v1\/career\/(knowledge|claims)\?/, (route) =>
+        route.fulfill({ json: empty }),
+      );
+      await page.route(/\/api\/v1\/career\/profile$/, async (route) => {
+        const response = await route.fetch();
+        const profile = await response.json();
+        await route.fulfill({
+          response,
+          json: {
+            ...profile,
+            name: "",
+            headline: "",
+            summary: "",
+            email: "",
+            location: "",
+            links: [],
+          },
+        });
+      });
+    },
+  },
   { name: "preferences", route: "preferences", docs: "preferences" },
-  { name: "templates", route: "templates", docs: "templates" },
+  {
+    name: "preferences-editing",
+    route: "preferences",
+    open: async (page) => {
+      const rules = page.getByRole("list", { name: "Writing rules" });
+      await rules.getByRole("listitem").nth(2).focus();
+      await page.keyboard.press("Enter");
+      await expect(
+        page.getByRole("textbox", { name: "Statement" }),
+      ).toBeFocused();
+    },
+  },
+  {
+    name: "preferences-empty",
+    route: async (page) => {
+      for (const section of (await call(page, "/preferences")).sections)
+        await call(page, `/preferences/${section.section}`, "PUT", {
+          expected_version: section.version,
+          items: [],
+        });
+      return "preferences";
+    },
+  },
+  {
+    name: "templates",
+    route: async (page) => `templates?template=${await exampleCv(page)}`,
+    docs: "templates",
+  },
+  {
+    name: "templates-source",
+    route: async (page) =>
+      `templates?template=${await exampleCv(page)}&tab=source`,
+  },
+  {
+    name: "templates-empty",
+    route: async (page) => {
+      // Deleting a default makes another one the default: read again each time.
+      for (;;) {
+        const [template] = (await call(page, "/templates?limit=1")).items;
+        if (!template) break;
+        await call(
+          page,
+          `/templates/${template.id}?expected_version=${template.version}`,
+          "DELETE",
+        );
+      }
+      return "templates";
+    },
+  },
   { name: "sources", route: "sources", docs: "collection" },
   { name: "settings", route: "settings" },
   { name: "skills", route: "settings?section=skills", docs: "skills" },
@@ -146,6 +296,7 @@ async function capture(page: Page, screen: Screen, path: string) {
   if (!screen.signedOut) await page.context().addCookies(ownerSession());
   // Open a page of the app first, so a route can read the workspace.
   await page.goto("/");
+  await screen.before?.(page);
   const route =
     typeof screen.route === "string" ? screen.route : await screen.route(page);
   await screen.prepare?.(page);
@@ -159,7 +310,8 @@ async function capture(page: Page, screen: Screen, path: string) {
   // full-page image the frame grows with the content instead: the sidebar
   // spans the whole height and the phone's bars sit above and below it.
   await page.addStyleTag({ content: FULL_PAGE });
-  await page.screenshot({ path, fullPage: true, animations: "disabled" });
+  const fullPage = !(screen.sheet && (page.viewportSize()?.width ?? 0) < 720);
+  await page.screenshot({ path, fullPage, animations: "disabled" });
 }
 
 const FULL_PAGE = `
