@@ -1,6 +1,11 @@
-# Setup and first use
+# Getting started
 
-Install Docker with Compose v2, then start the published images:
+This page takes you from nothing to your first application, by hand, without an
+agent. [How it works](how-it-works.md) explains the words used here.
+
+## Install
+
+You need Docker with Compose v2. The host needs no Python, Node or TeX.
 
 ```bash
 git clone https://github.com/VincenzoImp/openings.git
@@ -10,9 +15,9 @@ docker compose pull
 docker compose up -d --no-build
 ```
 
-Images support Linux amd64 and arm64. Docker Compose pins the release; the host
-needs no Python, Node or TeX installation. [Contributing](../../CONTRIBUTING.md)
-covers local builds.
+Open **http://127.0.0.1:8080** and choose an owner password of at least 10
+characters (or set `OPENINGS_PASSWORD` in `.env` before the first start). To reach
+Openings from other devices, see [Operations](operations.md#reach-it-from-other-devices).
 
 ## Set up your workspace
 
@@ -37,14 +42,9 @@ are read from the workspace, so every browser shows the same state.
 
 ![The setup guide: About you, the first of four steps](../images/setup.png)
 
-## Finding your way
+## Find your way
 
-The navigation has three groups. **Work** holds Today, Applications, Jobs (the
-tabs New, Shortlisted, Dismissed and All, each with the selected job beside
-the list; after you shortlist or dismiss a job in New, the next job of the list
-is shown). **Library** holds Career, Preferences and Templates. **System** holds
-Collection and Settings. The number beside Applications counts the
-applications ready to apply.
+The navigation has three parts:
 
 **Today** is the first screen: a greeting with one line of counts, then
 
@@ -62,88 +62,72 @@ applications ready to apply.
 
 When nothing needs you, Today says so.
 
-You talk to your agent in its own chat; **Settings › Skills** lists what you can
-ask it. How your applications fare is under **Applications**, **Stats**.
+## Add your first job
 
-On a phone the bottom bar shows the four Work destinations and **More**, which
-opens Library and System. The top bar switches between the light and dark theme;
-the choice is remembered in the browser, and the theme follows the system until
-you choose one.
-
-## Your first job
-
-1. Sign in at `http://127.0.0.1:8080` (see above for the first start).
-2. In **Jobs** (it opens on **New**), choose **Add a job**. Paste a URL
-   or enter the title, company and full posting. The address is looked up first:
-   a job already in your workspace is shown instead of a copy. If URL extraction
-   cannot obtain the text, paste it yourself.
-3. Select the job to read its posting and signals beside the list, then choose
-   **Shortlist** or **Dismiss…**. Shortlisting starts the job's application in
-   stage Shortlisted, needing a CV and a letter; undoing it removes that
-   application while nothing has been added to it. **Dismiss…** keeps its identity and history and asks for an
-   optional reason.
-4. In **Collection**, add a saved search or company board, preview it, then enable
-   its schedule. New sources start paused.
-5. Add [career entries and claims](career.md), templates and writing rules.
-   Follow [Application documents](applications.md) to prepare and review files.
+1. Choose **Add a job**. Paste the job's URL, or enter the title, company and the
+   whole posting. If a job with that address exists, it is shown instead of a copy.
+   When a page cannot be read, paste the text yourself.
+2. In **Jobs**, the **New** tab lists jobs waiting for a decision. Select one to
+   read it beside the list. Choose **Shortlist** to pursue it, or **Dismiss...**
+   to set it aside with an optional reason. Dismissed jobs stay under
+   **Dismissed** and can be restored.
 
 ![Jobs to review beside the selected job, with its signals, posting and timeline](../images/jobs.png)
 
-Career data, search settings and files live in SQLite. Configure them in the
-dashboard, REST or MCP. `.env` controls installation settings such as the host
-address and image selection. Search settings need no YAML file.
+Shortlisting starts the job's application. Undoing it removes that application
+while nothing has been added to it.
 
-## Deployment modes and resources
+## Add a source
 
-The single `openings` container has a Compose budget of **0.5 CPU / 512 MiB**.
-This is an enforced container limit, not a measured host requirement. Allow
-resources for the operating system, Docker and other services.
+Jobs can also arrive by themselves. Under **Sources**, choose **Add a search**
+(a query and a place on LinkedIn, Indeed or Glassdoor) or **Add a company board**,
+then **Preview results**. A preview saves nothing. Save the source and turn its
+schedule on: new sources start paused. [Jobs and sources](jobs-and-sources.md)
+explains every setting.
 
-## LAN access
+## Prepare your first application
 
-Edit `.env` with the address clients can reach:
+You can do this without an agent or LaTeX. Have your CV and letter ready as PDFs.
 
-```dotenv
-OPENINGS_BIND=0.0.0.0
-OPENINGS_PORT=8080
-OPENINGS_PUBLIC_URL=http://openings.example:8080
-```
+1. Open **Applications** and select the application you just started. Its page
+   says what is missing and has a slot for the CV and one for the letter.
+2. Drop each PDF on its slot, or choose **Upload PDF**. If you built it from
+   LaTeX, add the `.tex` source too.
+3. If the employer sets conditions, such as a required reference, add them under
+   **Requirements** and mark the ones that must be settled first as **Blocking**.
+4. When both documents are stored and nothing blocks the application, the page
+   becomes the **Ready** page and Today lists it under **Ready to apply**.
+5. Choose **Download CV + Letter**, then **Apply on employer's site**.
+6. Back in Openings, choose **Mark applied**. **Undo** is offered, and the next
+   Ready application opens.
 
-Replace `openings.example` with your hostname or LAN address. Run
-`docker compose up -d --no-build` after edits. The public URL controls MCP host
-checks and relative file-transfer links; it must match the client origin. Set the
-owner password before opening access to other devices. Use HTTPS through a
-trusted reverse proxy across untrusted networks.
+![The Ready page: before you send, the posting, the CV and the letter, and Mark applied](../images/review.png)
 
-Behind a reverse proxy, list the proxy's address as seen by the container in
-`.env`, so sign-in limits and secure cookies use each browser's real address:
+When the employer answers, choose **Record reply**, say what happened and give the
+date. After the no-reply period (30 days unless you change it in
+[Preferences](profile-preferences-templates.md#settings)) Today lists the
+silent ones, and you can close them as **No reply**. Nothing closes by itself.
 
-```dotenv
-OPENINGS_TRUSTED_PROXIES=172.18.0.2
-```
+[Applications](applications.md) has the details.
 
-Use comma-separated IP addresses or CIDR ranges. When it is empty (the default),
-`X-Forwarded-For` and `X-Forwarded-Proto` are ignored and all proxied clients
-share the proxy's sign-in limit. Trust only proxies that overwrite these headers.
+## Fill in your record
 
-The core listens on port 8080 inside its container. `OPENINGS_PORT` changes the
-host port; update `OPENINGS_PUBLIC_URL` to match.
+Under **You**, add your **Profile** and career entries, state what you want in
+**Preferences**, and add a CV and letter **Template** if an agent will write your
+documents. None of this is needed to apply by hand.
+[Profile, Preferences and Templates](profile-preferences-templates.md) explains
+each. Synthetic examples are in the `examples/` folder.
 
-## Storage and checks
+## Optional: an agent
 
-The `workspace` volume holds `/data/openings.sqlite`, live journals and all uploaded
-file bytes. The core runs as UID/GID 10001. A bind-mounted `/data` directory must be
-writable by that identity; the default named volume handles this automatically.
+If you want an agent to triage jobs and write documents, follow
+[Work with an agent](agents.md).
+
+## Check that it runs
 
 ```bash
 docker compose ps
-docker compose logs --tail=100 openings
 curl --fail http://127.0.0.1:8080/health
 ```
 
-Health checks the core and SQLite. [Operations](operations.md) covers
-backups, restore and service lifecycle. Before upgrading, read the release notes:
-pre-1.0 releases can change APIs and database format. A release upgrades the
-workspace to its format automatically on start; back up before upgrading.
-Workspaces older than 0.23 must be opened once with 0.23 first; release history
-is in [CHANGELOG.md](../../CHANGELOG.md).
+Back up before you upgrade: see [Operations](operations.md).

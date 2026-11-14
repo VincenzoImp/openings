@@ -20,7 +20,7 @@ export const LOADERS: Record<RouteId, () => Module> = {
   jobs: () => import("../pages/Jobs"),
   applications: () => import("../screens/applications/Applications"),
   application: () => import("../screens/application/Page"),
-  profile: () => import("../pages/Career"),
+  profile: () => import("../screens/profile/Profile"),
   preferences: () => import("../pages/Preferences"),
   templates: () => import("../pages/Templates"),
   sources: () => import("../pages/Collection"),
@@ -43,7 +43,6 @@ export function preload(id: RouteId) {
 // their issue rebuilds them (#222–#227); a rebuilt screen leaves this list.
 const LEGACY = new Set<RouteId>([
   "jobs",
-  "profile",
   "preferences",
   "templates",
   "sources",
