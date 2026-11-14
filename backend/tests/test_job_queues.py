@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 
 from openings.app import create_app
 from openings.errors import DomainError
+from openings.interfaces.operation import without_empty
 from openings.workspace import Workspace
 
 
@@ -89,7 +90,7 @@ async def test_rest_mcp_triage_filters_before_totals_facets_and_pagination(tmp_p
             {"triage": "shortlisted", "sort": "title", "limit": 1, "offset": 1},
         )
         structured = json.loads(mcp.content[0].text)
-        assert structured == result
+        assert structured == without_empty(result)
         assert client.get("/api/v1/jobs?queue=shortlist").status_code == 422
         job = result["items"][0]
         stale = client.post(

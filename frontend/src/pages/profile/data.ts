@@ -6,8 +6,8 @@ import { POLL_MS, queryClient } from "../../query/query";
 import { shellKeys } from "../../query/shell";
 
 export type Profile = Schema<"Profile">;
-export type Entry = Schema<"Knowledge">;
-export type Highlight = Schema<"Claim">;
+export type Entry = Schema<"CareerEntry">;
+export type Highlight = Schema<"Highlight">;
 export type EntryFile = Schema<"WorkspaceFile">;
 export type EntryInput = Schema<"KnowledgeCreate">;
 export type ProfileLink = { label: string; url: string };
@@ -16,7 +16,7 @@ export const keys = {
   profile: shellKeys.profile,
   entries: ["career", "entries"] as const,
   highlights: ["career", "highlights"] as const,
-  files: ["files", "knowledge"] as const,
+  files: ["files", "career"] as const,
 };
 
 const PAGE = 200;
@@ -82,7 +82,7 @@ export function useEntryFiles() {
         call(
           api.GET("/api/v1/files", {
             params: {
-              query: { owner_type: "knowledge", limit: PAGE, offset },
+              query: { owner_type: "career", limit: PAGE, offset },
             },
             signal,
           }),
@@ -108,16 +108,16 @@ export const writes = {
     call(api.POST("/api/v1/career/knowledge", { body })),
   updateEntry: (id: string, body: Schema<"KnowledgeUpdate">) =>
     call(
-      api.PATCH("/api/v1/career/knowledge/{knowledge_id}", {
-        params: { path: { knowledge_id: id } },
+      api.PATCH("/api/v1/career/knowledge/{career_id}", {
+        params: { path: { career_id: id } },
         body,
       }),
     ),
   deleteEntry: (id: string, version: number) =>
     call(
-      api.DELETE("/api/v1/career/knowledge/{knowledge_id}", {
+      api.DELETE("/api/v1/career/knowledge/{career_id}", {
         params: {
-          path: { knowledge_id: id },
+          path: { career_id: id },
           query: { expected_version: version },
         },
       }),
@@ -126,16 +126,16 @@ export const writes = {
     call(api.POST("/api/v1/career/claims", { body })),
   updateHighlight: (id: string, body: Schema<"ClaimUpdate">) =>
     call(
-      api.PATCH("/api/v1/career/claims/{claim_id}", {
-        params: { path: { claim_id: id } },
+      api.PATCH("/api/v1/career/claims/{highlight_id}", {
+        params: { path: { highlight_id: id } },
         body,
       }),
     ),
   deleteHighlight: (id: string, version: number) =>
     call(
-      api.DELETE("/api/v1/career/claims/{claim_id}", {
+      api.DELETE("/api/v1/career/claims/{highlight_id}", {
         params: {
-          path: { claim_id: id },
+          path: { highlight_id: id },
           query: { expected_version: version },
         },
       }),
@@ -172,7 +172,7 @@ export async function attachFile(entryId: string, file: File) {
   const grant = await call(
     api.POST("/api/v1/files/uploads", {
       body: {
-        owner_type: "knowledge",
+        owner_type: "career",
         owner_id: entryId,
         name: file.name,
         size: file.size,

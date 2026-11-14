@@ -4,7 +4,7 @@ import pytest
 
 from openings.actors import OWNER, SYSTEM, acting_as, batch, current_batch, token_actor
 from openings.events import EventLog
-from openings.removed import REMOVED_TOOLS
+from openings.removed import TOOLS
 
 
 def add_jobs(workspace, count, prefix="Synthetic role"):
@@ -112,8 +112,9 @@ def test_an_agent_triage_of_fifty_jobs_is_one_batch_the_owner_restores(app, mcp,
         mine = workspace.set_triage(
             add_jobs(workspace, 1, "Owner role")[0]["id"], "dismissed", 1, "Mine."
         )
-    _, error = mcp.call("jobs_bulk", bulk(jobs, "dismissed", reason="Too junior."))
-    assert error is None, error
+    items = [{"job_id": job["id"], "to": "dismissed", "reason": "Too junior."} for job in jobs]
+    result, error = mcp.call("jobs_triage", {"items": items})
+    assert error is None and result["succeeded"] == 50, error
     triaged = events_of(app, kind="triage_changed", actor="agent:Synthetic agent")
     assert len(triaged) == 50
     (batch_id,) = {item["batch_id"] for item in triaged}
@@ -162,14 +163,14 @@ def test_one_mcp_tool_call_is_one_batch(app, mcp):
     ("tool", "replacement"),
     [
         ("runs_start", "Report what you did in the chat"),
-        ("questions_ask", "ask the owner in the chat"),
+        ("questions_ask", "Talk to the owner in your chat"),
         ("requests_list", "notes_create"),
         ("skill_notes_update", "working_with_me"),
     ],
 )
 def test_removed_agent_tools_name_their_replacement(mcp, tool, replacement):
     _, error = mcp.call(tool, {})
-    assert error["code"] == "tool_removed" and error["details"] == {"tool": tool}
+    assert error["code"] == "removed" and error["details"]["tool"] == tool
     assert replacement.lower() in error["message"].lower()
 
 
@@ -177,9 +178,7 @@ def test_no_removed_tool_or_route_remains(app, mcp, owner_token):
     client = Owner(mcp.client, owner_token)
     listed = {tool["name"] for tool in mcp.rpc("tools/list")["tools"]}
     removed = {
-        name
-        for name in REMOVED_TOOLS
-        if name.split("_")[0] in ("runs", "questions", "requests", "skill")
+        name for name in TOOLS if name.split("_")[0] in ("runs", "questions", "requests", "skill")
     }
     assert len(removed) == 19 and not removed & listed
     for path in ("/api/v1/runs", "/api/v1/questions", "/api/v1/requests", "/api/v1/skills/x/notes"):

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from .batches import CareerBatches
 from .claims import ClaimOperations
 from .entries import EntryOperations
 from .imports import ImportOperations
@@ -12,7 +13,12 @@ from .templates import TemplateOperations
 
 
 class CareerService(
-    ProfileOperations, EntryOperations, ClaimOperations, TemplateOperations, ImportOperations
+    ProfileOperations,
+    EntryOperations,
+    ClaimOperations,
+    TemplateOperations,
+    ImportOperations,
+    CareerBatches,
 ):
     def __init__(self, workspace):
         self.workspace = workspace

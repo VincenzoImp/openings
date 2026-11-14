@@ -493,7 +493,7 @@ async def test_slow_mcp_preview_keeps_health_and_other_tools_responsive(tmp_path
     monkeypatch.setattr(app.state.discovery, "preview_source", slow_preview)
     task = asyncio.create_task(
         app.state.mcp.call_tool(
-            "sources_preview", {"kind": "rss", "url": "https://example.org/feed"}
+            "sources_run", {"preview": True, "kind": "rss", "url": "https://example.org/feed"}
         )
     )
     try:

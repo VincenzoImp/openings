@@ -10,16 +10,16 @@ export interface paths {
       cookie?: never;
     };
     /**
-     * Search application summaries.
-     * @description Pages with stage counts; each row has ready, missing and last_reply. Filter by job_id, text, stage (ready: Shortlisted and Ready), outcome, company, needs and applied dates. no_reply gives the period and the overdue count.
+     * Search application summaries with stage counts.
+     * @description Each with ready, missing and last_reply. Filter by stage (ready: Shortlisted and Ready), needs (documents, reply_overdue), job_id, q, outcome, company, applied dates.
      */
     get: operations["applications_list"];
     put?: never;
     /**
-     * Start an application.
-     * @description Stage Shortlisted; shortlists its job. Optional required_documents (default cv and letter), priority, deadline, questions and requirements. Never sends an application.
+     * Start one application in stage Shortlisted; shortlists its job.
+     * @description Start one application in stage Shortlisted; shortlists its job.
      */
-    post: operations["applications_create"];
+    post: operations["applications_start"];
     delete?: never;
     options?: never;
     head?: never;
@@ -35,43 +35,23 @@ export interface paths {
     };
     /**
      * Read an application in full.
-     * @description Its job, requirements, questions and answers, required_documents, ready and missing, replies and pinned_note (the owner's guidance).
+     * @description Read an application in full.
      */
-    get: operations["applications_get"];
+    get: operations["applications_read"];
     put?: never;
     post?: never;
     /**
-     * Delete an application.
-     * @description Deletes it with its documents and history; the job and other applications stay.
+     * Delete an application permanently, only on the owner's explicit request.
+     * @description With its documents and history; the job stays.
      */
     delete: operations["applications_delete"];
     options?: never;
     head?: never;
     /**
-     * Update an application.
-     * @description Stage, reply, outcome, priority, deadline, documents, requirements, answers. Mark applied (status=applied) only when the owner says it was sent. A reply moves the stage. Close as no_response only when the owner asks.
+     * Update one application, with its version.
+     * @description Stage (status), reply, outcome, priority, deadline, documents, requirements, answers.
      */
-    patch: operations["applications_update"];
-    trace?: never;
-  };
-  "/api/v1/applications/{application_id}/events": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * Read an application's recorded changes.
-     * @description timeline_get lists them with its notes and its job's entries.
-     */
-    get: operations["applications_history"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
+    patch: operations["applications_change"];
     trace?: never;
   };
   "/api/v1/applications/{application_id}/timeline": {
@@ -83,7 +63,7 @@ export interface paths {
     };
     /**
      * Read the timeline of a job or an application.
-     * @description Give job_id or application_id. Notes and recorded changes, pinned notes first, then newest first, each with kind, scope, actor and batch_id. Filter by kinds, who, scope and dates; counts per kind.
+     * @description Notes and recorded changes, pinned notes first, then newest first.
      */
     get: operations["timeline_get_1"];
     put?: never;
@@ -92,6 +72,34 @@ export interface paths {
     options?: never;
     head?: never;
     patch?: never;
+    trace?: never;
+  };
+  "/api/v1/applications/batch": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Read up to 20 applications in full.
+     * @description Job summary, required documents, ready and missing, requirements, questions, answers, replies, revisions and notes (the pinned one is the owner's guidance).
+     */
+    get: operations["applications_get"];
+    put?: never;
+    /**
+     * Start applications for up to 50 jobs (stage Shortlisted; shortlists the job).
+     * @description A job's open application is returned (created false) and takes the item's fields while Shortlisted. Never sends anything.
+     */
+    post: operations["applications_create"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Update up to 200 applications: stage, outcome, reply, fields.
+     * @description A reply moves the stage. Set stage applied only when the owner says they applied. Ready is computed. Each item has its own result.
+     */
+    patch: operations["applications_update"];
     trace?: never;
   };
   "/api/v1/applications/bulk": {
@@ -105,7 +113,7 @@ export interface paths {
     put?: never;
     /**
      * Close, reopen or delete selected applications.
-     * @description Up to 200 ids with versions, one result each. close takes an outcome (no_response only for a sent application, when the owner asks); reopen a stage. Record replies with applications_update.
+     * @description Up to 200 ids with versions, one result each.
      */
     post: operations["applications_bulk"];
     delete?: never;
@@ -249,8 +257,8 @@ export interface paths {
     get?: never;
     put?: never;
     /**
-     * Reserve a backup download.
-     * @description A two-minute GET grant for a consistent SQLite backup with file bytes. With an agent token the backup omits the password hash, session secret and tokens; it still restores.
+     * Reserve a backup download; take one before any permanent bulk clean-up.
+     * @description A two-minute GET grant (curl line given). An agent's backup leaves out the password hash, session secret and tokens.
      */
     post: operations["workspace_backup"];
     delete?: never;
@@ -353,6 +361,30 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/career/batch": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Read up to 50 career entries in full, with highlights and files.
+     * @description By ids, or the entries matching q and kind.
+     */
+    get: operations["career_get"];
+    put?: never;
+    /**
+     * Add or update up to 50 career entries.
+     * @description An item with career_id and expected_version updates; without, adds. Facts come from the owner, never from a job posting.
+     */
+    post: operations["career_save"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/career/claims": {
     parameters: {
       query?: never;
@@ -361,23 +393,23 @@ export interface paths {
       cookie?: never;
     };
     /**
-     * Search highlights.
-     * @description By entry (knowledge_id), approval or text (q). summary=true (default) bounds previews and omits metadata; always_include is always returned.
+     * Search highlights by entry (career_id), approval or text (q).
+     * @description Search highlights by entry (career_id), approval or text (q).
      */
-    get: operations["claims_list"];
+    get: operations["highlights_list"];
     put?: never;
     /**
-     * Add a highlight.
-     * @description Reusable wording tied to a career entry; not approved by default. always_include puts it in every CV unless the job gives a reason to leave it out.
+     * Add a highlight; not approved by default.
+     * @description Add a highlight; not approved by default.
      */
-    post: operations["claims_create"];
+    post: operations["highlights_create"];
     delete?: never;
     options?: never;
     head?: never;
     patch?: never;
     trace?: never;
   };
-  "/api/v1/career/claims/{claim_id}": {
+  "/api/v1/career/claims/{highlight_id}": {
     parameters: {
       query?: never;
       header?: never;
@@ -388,21 +420,41 @@ export interface paths {
      * Read a highlight and its entry id.
      * @description Read a highlight and its entry id.
      */
-    get: operations["claims_get"];
+    get: operations["highlights_read"];
     put?: never;
     post?: never;
     /**
-     * Delete a highlight.
-     * @description Permanently; document revisions keep the ids they cite.
+     * Delete a highlight permanently.
+     * @description With its version; document revisions keep the ids they cite.
      */
-    delete: operations["claims_delete"];
+    delete: operations["highlights_delete"];
     options?: never;
     head?: never;
     /**
-     * Edit or approve a highlight.
-     * @description With its version. Writing documents never approves new facts.
+     * Edit or approve a highlight, with its version.
+     * @description Edit or approve a highlight, with its version.
      */
-    patch: operations["claims_update"];
+    patch: operations["highlights_update"];
+    trace?: never;
+  };
+  "/api/v1/career/highlights": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Add, update or approve up to 100 highlights.
+     * @description Reusable wording on a career entry (career_id). highlight_id with expected_version updates. always_include puts it in every CV unless the job gives a reason not to.
+     */
+    post: operations["highlights_save"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
     trace?: never;
   };
   "/api/v1/career/import": {
@@ -415,8 +467,10 @@ export interface paths {
     get?: never;
     put?: never;
     /**
-     * Import previewed career entries.
+     * Import previewed career entries (owner only).
      * @description Appends the entries and, with the profile's version, applies the profile fields.
+     *
+     *     Owner only: an agent token is refused with 403 forbidden; not an MCP tool.
      */
     post: operations["career_import"];
     delete?: never;
@@ -435,8 +489,10 @@ export interface paths {
     get?: never;
     put?: never;
     /**
-     * Preview a career import.
+     * Preview a career import (owner only).
      * @description Parses JSON or plain text into entries and profile fields without storing anything.
+     *
+     *     Owner only: an agent token is refused with 403 forbidden; not an MCP tool.
      */
     post: operations["career_preview_import"];
     delete?: never;
@@ -453,23 +509,23 @@ export interface paths {
       cookie?: never;
     };
     /**
-     * Search career entries.
-     * @description By q (title, organization, narrative) and kind. summary=true (default) returns previews and counts, summary=false full records; knowledge_get reads one.
+     * Search career entries by q and kind; summary=false returns full records.
+     * @description Search career entries by q and kind; summary=false returns full records.
      */
-    get: operations["knowledge_list"];
+    get: operations["career_list"];
     put?: never;
     /**
      * Add a career entry.
-     * @description Facts come from the owner, never from a job posting.
+     * @description Add a career entry.
      */
-    post: operations["knowledge_create"];
+    post: operations["career_create"];
     delete?: never;
     options?: never;
     head?: never;
     patch?: never;
     trace?: never;
   };
-  "/api/v1/career/knowledge/{knowledge_id}": {
+  "/api/v1/career/knowledge/{career_id}": {
     parameters: {
       query?: never;
       header?: never;
@@ -480,21 +536,21 @@ export interface paths {
      * Read a career entry with its full narrative and metadata.
      * @description Read a career entry with its full narrative and metadata.
      */
-    get: operations["knowledge_get"];
+    get: operations["career_read"];
     put?: never;
     post?: never;
     /**
-     * Delete a career entry.
-     * @description Permanently, with its highlights and files; document revisions are unchanged.
+     * Delete a career entry permanently, with its highlights and files.
+     * @description Only on the owner's explicit request; document revisions are unchanged.
      */
-    delete: operations["knowledge_delete"];
+    delete: operations["career_delete"];
     options?: never;
     head?: never;
     /**
-     * Edit a career entry.
-     * @description With its version; dates=null clears the dates. Document revisions keep the ids they cite.
+     * Edit a career entry, with its version; dates=null clears the dates.
+     * @description Edit a career entry, with its version; dates=null clears the dates.
      */
-    patch: operations["knowledge_update"];
+    patch: operations["career_update"];
     trace?: never;
   };
   "/api/v1/career/profile": {
@@ -515,10 +571,30 @@ export interface paths {
     options?: never;
     head?: never;
     /**
-     * Edit the profile.
-     * @description Name, contact, headline, summary, links and metadata, with the profile's version.
+     * Edit the profile, with its version.
+     * @description Name, contact, headline, location, summary, links and metadata; omitted fields stay.
      */
     patch: operations["profile_update"];
+    trace?: never;
+  };
+  "/api/v1/changes": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List recorded changes, newest first.
+     * @description Each with actor (owner, agent:<name>, system), batch_id and subject. Filter by job_id, application_id, subject, actor, batch_id or dates.
+     */
+    get: operations["changes_list"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
     trace?: never;
   };
   "/api/v1/collection": {
@@ -529,8 +605,8 @@ export interface paths {
       cookie?: never;
     };
     /**
-     * Read the collection switch, counts and next queued run.
-     * @description Read the collection switch, counts and next queued run.
+     * Read the collection switch, its version, counts and failing sources.
+     * @description include: kinds (source kinds and config fields), providers (limits, cooldowns), fetches (running, queued, failed).
      */
     get: operations["collection_get"];
     put?: never;
@@ -539,8 +615,8 @@ export interface paths {
     options?: never;
     head?: never;
     /**
-     * Pause or resume scheduled collection.
-     * @description With its version; running a source by hand stays available.
+     * Turn scheduled collection on or off, change provider limits, stop or retry fetches.
+     * @description With the collection's version; results has one result per provider, cancel, retry.
      */
     patch: operations["collection_update"];
     trace?: never;
@@ -553,8 +629,8 @@ export interface paths {
       cookie?: never;
     };
     /**
-     * List collection runs.
-     * @description With provider counts and timing, by source_id or state. summary=false adds source snapshots and full task records.
+     * List collection runs by source or state.
+     * @description List collection runs by source or state.
      */
     get: operations["collection_runs_list"];
     put?: never;
@@ -573,8 +649,8 @@ export interface paths {
       cookie?: never;
     };
     /**
-     * Read a collection run.
-     * @description Its frozen settings, progress and provider tasks.
+     * Read a collection run with its frozen settings and fetches.
+     * @description Read a collection run with its frozen settings and fetches.
      */
     get: operations["collection_runs_get"];
     put?: never;
@@ -595,8 +671,8 @@ export interface paths {
     get?: never;
     put?: never;
     /**
-     * Stop a collection run.
-     * @description Jobs already archived stay.
+     * Stop a collection run; jobs already archived stay.
+     * @description Stop a collection run; jobs already archived stay.
      */
     post: operations["collection_runs_cancel"];
     delete?: never;
@@ -613,14 +689,14 @@ export interface paths {
       cookie?: never;
     };
     /**
-     * List document revisions.
-     * @description By application and kind (cv, letter, answers, other), each with complete; q searches titles, notes and text. summary=false adds text, content and files.
+     * List document revisions by application and kind; q searches their text.
+     * @description List document revisions by application and kind; q searches their text.
      */
     get: operations["documents_list"];
     put?: never;
     /**
-     * Create a document revision.
-     * @description A CV or letter gives pdf (name, size) and optionally its TeX source; PUT the bytes to the returned uploads grants, source first. Complete once its PDF is stored. Never sends.
+     * Create a CV, letter or answers revision of an application.
+     * @description CV/letter: pdf {name, size}, optional TeX source; PUT the PDF to uploads.pdf (curl line given). Complete once its PDF is stored. Never sends.
      */
     post: operations["documents_create"];
     delete?: never;
@@ -637,15 +713,15 @@ export interface paths {
       cookie?: never;
     };
     /**
-     * Read a document revision.
-     * @description complete, readable text and text_from (tex or pdf), cited evidence, note and files; for other kinds the structured content.
+     * Read a revision: complete, readable text, cited ids, note and files.
+     * @description compare_to adds a line diff against that revision (previous for the one it replaces).
      */
     get: operations["documents_get"];
     put?: never;
     post?: never;
     /**
-     * Delete a document revision.
-     * @description Permanently, with its files and version; other revisions stay.
+     * Delete a revision permanently, with its files; other revisions stay.
+     * @description Delete a revision permanently, with its files; other revisions stay.
      */
     delete: operations["documents_delete"];
     options?: never;
@@ -661,30 +737,10 @@ export interface paths {
       cookie?: never;
     };
     /**
-     * Compare two revisions line by line.
-     * @description With other_id, or by default the revision it replaces; CV and letter compare their text.
+     * Compare two revisions line by line (by default with the one it replaces).
+     * @description Compare two revisions line by line (by default with the one it replaces).
      */
     get: operations["documents_compare"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/v1/events": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * List recorded changes.
-     * @description Newest first, each with its actor label, batch_id and subject. Filter by actor, batch_id, dates, job, application, subject or kind; system changes only with actor=system or include_system.
-     */
-    get: operations["events_list"];
     put?: never;
     post?: never;
     delete?: never;
@@ -742,7 +798,9 @@ export interface paths {
     };
     /**
      * Export
-     * @description Download the workspace records as JSON, without file bytes or credentials.
+     * @description Download the workspace records as JSON, without file bytes or credentials (owner only).
+     *
+     *     Owner only: an agent token is refused with 403 forbidden; not an MCP tool.
      */
     get: operations["export_api_v1_export_get"];
     put?: never;
@@ -763,8 +821,10 @@ export interface paths {
     get?: never;
     put?: never;
     /**
-     * Reserve a records export.
-     * @description A two-minute GET grant for redacted JSON records, without file bytes or installation authentication; a backup is the full snapshot.
+     * Reserve a records export (owner only).
+     * @description A two-minute GET grant for the JSON records, without file bytes or credentials.
+     *
+     *     Owner only: an agent token is refused with 403 forbidden; not an MCP tool.
      */
     post: operations["workspace_export"];
     delete?: never;
@@ -781,8 +841,8 @@ export interface paths {
       cookie?: never;
     };
     /**
-     * List file metadata.
-     * @description By owner, name, media type or an application's revisions. Bytes go through transfers.
+     * List file metadata by owner, name, media type or an application's revisions.
+     * @description List file metadata by owner, name, media type or an application's revisions.
      */
     get: operations["files_list"];
     put?: never;
@@ -808,8 +868,8 @@ export interface paths {
     put?: never;
     post?: never;
     /**
-     * Delete a file.
-     * @description A career entry, template or job file, with version 1. Revision files are immutable: delete the revision.
+     * Delete a career, template or job file (version 1).
+     * @description A revision's files go with the revision (documents_delete).
      */
     delete: operations["files_delete"];
     options?: never;
@@ -847,10 +907,10 @@ export interface paths {
     get?: never;
     put?: never;
     /**
-     * Reserve a file download.
-     * @description A short-lived GET grant for one file; resolve its url against this workspace.
+     * Reserve a download of a file.
+     * @description A short-lived GET grant: fetch its url with its headers (curl line given).
      */
-    post: operations["files_reserve_download"];
+    post: operations["files_download"];
     delete?: never;
     options?: never;
     head?: never;
@@ -867,10 +927,10 @@ export interface paths {
     get?: never;
     put?: never;
     /**
-     * Reserve a file upload.
-     * @description A short-lived PUT grant for one owner, name and size: send the raw bytes to its url with its headers. sha256 is verified when given.
+     * Reserve an upload for a career, template, job or revision file.
+     * @description Returns a one-shot grant: PUT the exact bytes to its url with its headers (curl line given). sha256 is checked when given.
      */
-    post: operations["files_reserve_upload"];
+    post: operations["files_upload"];
     delete?: never;
     options?: never;
     head?: never;
@@ -886,13 +946,13 @@ export interface paths {
     };
     /**
      * Search job summaries.
-     * @description Compact pages filtered by triage, text, company, location, source, dates, signals (language, required languages, likely duplicate, no longer listed), who dismissed them or batch_id. include_counts and include_facets add totals; jobs_get has the text.
+     * @description Filter by triage, q, url, signal, requires, posting_language, hide_unspoken_required, dismissed_by, batch_id; include_counts adds totals. jobs_get has the posting.
      */
     get: operations["jobs_list"];
     put?: never;
     /**
      * Add a job from a URL, pasted text or fields.
-     * @description A URL is read through the provider gate. A known identity adds to its job's history; a new job gets its signals. A retry with the same idempotency_key returns the same job.
+     * @description A URL is read through the provider gate. A known job is returned (created false); a retry with the same idempotency_key returns the same job.
      */
     post: operations["jobs_create"];
     delete?: never;
@@ -910,21 +970,21 @@ export interface paths {
     };
     /**
      * Read a job in full.
-     * @description Posting text, metadata, version, observations (unlisted_at when a board stopped listing one), signals and dismissal.
+     * @description Read a job in full.
      */
-    get: operations["jobs_get"];
+    get: operations["jobs_read"];
     put?: never;
     post?: never;
     /**
-     * Forget a job permanently.
-     * @description Deletes the job, its applications and files; acquiring it again later makes a new job.
+     * Delete a job permanently, only on the owner's explicit request.
+     * @description With its applications, documents and files; collecting it again makes a new job.
      */
     delete: operations["jobs_delete"];
     options?: never;
     head?: never;
     /**
      * Correct a job's fields.
-     * @description With the version jobs_get returned; returns the compact summary.
+     * @description title, company, location, url, posting or metadata, with the job's version.
      */
     patch: operations["jobs_update"];
     trace?: never;
@@ -940,9 +1000,29 @@ export interface paths {
     put?: never;
     /**
      * Mark a likely duplicate as a different vacancy.
-     * @description The duplicate flag against other_id is cleared for good. Merge verified duplicates with jobs_merge instead.
+     * @description Mark a likely duplicate as a different vacancy.
      */
     post: operations["jobs_distinct"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/jobs/{job_id}/link": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Decide a likely duplicate.
+     * @description same merges job_id into other_id (other_id survives, with postings, applications and notes); different clears the flag for good. Returns the job that remains.
+     */
+    post: operations["jobs_link"];
     delete?: never;
     options?: never;
     head?: never;
@@ -959,8 +1039,8 @@ export interface paths {
     get?: never;
     put?: never;
     /**
-     * Merge verified duplicate jobs.
-     * @description Merges the job into target_id, keeping postings, applications and notes.
+     * Merge a job into target_id, keeping postings, applications and notes.
+     * @description Merge a job into target_id, keeping postings, applications and notes.
      */
     post: operations["jobs_merge"];
     delete?: never;
@@ -978,13 +1058,13 @@ export interface paths {
     };
     /**
      * List the notes of a job and its applications.
-     * @description Pinned first, each with its scope and author. timeline_get lists them with the changes.
+     * @description List the notes of a job and its applications.
      */
     get: operations["notes_list"];
     put?: never;
     /**
-     * Add a note to a job or one of its applications.
-     * @description application_id puts it on the application. pinned=true lists it first and unpins the previous one; an application's pinned note is the owner's guidance for its documents.
+     * Add a note to a job, or to its application (application_id).
+     * @description pinned lists it first and unpins the other; an application's pinned note is the owner's guidance for its documents.
      */
     post: operations["notes_create"];
     delete?: never;
@@ -1002,7 +1082,7 @@ export interface paths {
     };
     /**
      * Read the timeline of a job or an application.
-     * @description Give job_id or application_id. Notes and recorded changes, pinned notes first, then newest first, each with kind, scope, actor and batch_id. Filter by kinds, who, scope and dates; counts per kind.
+     * @description Notes and recorded changes, pinned notes first, then newest first.
      */
     get: operations["timeline_get"];
     put?: never;
@@ -1023,10 +1103,30 @@ export interface paths {
     get?: never;
     put?: never;
     /**
-     * Shortlist, dismiss or return a job to review.
-     * @description shortlisted starts the job's application. Back to new or dismissed removes it only while it is empty (else 409 application_has_work). Give a short reason when dismissing; a dismissal can be restored.
+     * Shortlist, dismiss or return one job to review, with its version.
+     * @description Shortlist, dismiss or return one job to review, with its version.
      */
-    post: operations["jobs_triage"];
+    post: operations["jobs_triage_one"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/jobs/batch": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Read up to 20 jobs in full.
+     * @description Posting text, metadata, signals, dismissal, application and notes.
+     */
+    get: operations["jobs_get"];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -1044,7 +1144,7 @@ export interface paths {
     put?: never;
     /**
      * Shortlist, dismiss, restore or forget selected jobs.
-     * @description Up to 200 job ids with versions, one result each. shortlisted starts each application; new or dismissed undoes a shortlist whose application is empty; reason goes with dismissed; forget is permanent.
+     * @description Up to 200 ids with versions, one result each; forget is permanent.
      */
     post: operations["jobs_bulk"];
     delete?: never;
@@ -1062,7 +1162,7 @@ export interface paths {
     };
     /**
      * List candidate duplicate job groups.
-     * @description Most confident first, each with a confidence in [0,1], a tier and the signals that matched or conflicted. min_confidence defaults to 0.5 (0 lists all). Verify before jobs_merge; never merges.
+     * @description Most confident first, with the signals that matched. min_confidence defaults to 0.5.
      */
     get: operations["jobs_duplicates"];
     put?: never;
@@ -1082,11 +1182,31 @@ export interface paths {
     };
     /**
      * Look up archived jobs by URL or source key.
-     * @description Archived jobs matching a url or source_key, with triage and every application. Never ingests or fetches.
+     * @description With triage and every application. Never ingests or fetches.
      */
     get: operations["jobs_resolve"];
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/jobs/triage": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Triage up to 200 jobs: new, shortlisted or dismissed.
+     * @description shortlisted starts the job's application; dismissed needs a reason the owner reads. Each item has its own result.
+     */
+    post: operations["jobs_triage"];
     delete?: never;
     options?: never;
     head?: never;
@@ -1108,15 +1228,15 @@ export interface paths {
     put?: never;
     post?: never;
     /**
-     * Delete a note.
-     * @description With its version; the history records the deletion.
+     * Delete a note, with its version.
+     * @description Delete a note, with its version.
      */
     delete: operations["notes_delete"];
     options?: never;
     head?: never;
     /**
-     * Edit a note.
-     * @description Replaces its body, with its version.
+     * Edit a note's body, pin or unpin it, with its version.
+     * @description Edit a note's body, pin or unpin it, with its version.
      */
     patch: operations["notes_update"];
     trace?: never;
@@ -1131,8 +1251,8 @@ export interface paths {
     get?: never;
     put?: never;
     /**
-     * Pin or unpin a note.
-     * @description With its version. One pinned note per job and per application: pinning unpins the other.
+     * Pin or unpin a note, with its version.
+     * @description Pin or unpin a note, with its version.
      */
     post: operations["notes_pin"];
     delete?: never;
@@ -1150,7 +1270,7 @@ export interface paths {
     };
     /**
      * Read the owner's Preferences and settings.
-     * @description In the owner's words: looking_for, ruled_out, facts, writing (scope all, cv or letter) and working_with_me, each versioned; and no_reply_days and spoken_languages. Nothing acts automatically.
+     * @description The five sections with their versions, no_reply_days and spoken_languages.
      */
     get: operations["preferences_get"];
     put?: never;
@@ -1170,8 +1290,8 @@ export interface paths {
     };
     get?: never;
     /**
-     * Replace a Preferences section.
-     * @description The whole list of items with the section's version (on a conflict read again and merge). Keep the owner's wording; change only what the owner asked or confirmed.
+     * Replace one Preferences section's items, only when the owner asked.
+     * @description looking_for, ruled_out, facts, writing (scope all, cv, letter) or working_with_me, with its version. Keep the owner's wording.
      */
     put: operations["preferences_update"];
     post?: never;
@@ -1189,8 +1309,8 @@ export interface paths {
       cookie?: never;
     };
     /**
-     * List providers.
-     * @description Supported providers, their editable HTTP safeguards and the shared window and cooldown.
+     * List providers with their HTTP limits and the shared window and cooldown.
+     * @description List providers with their HTTP limits and the shared window and cooldown.
      */
     get: operations["providers_list"];
     put?: never;
@@ -1215,8 +1335,8 @@ export interface paths {
     options?: never;
     head?: never;
     /**
-     * Edit a provider's HTTP policy.
-     * @description With its version. Runtime and cooldown are read-only and shared by all runs.
+     * Edit a provider's HTTP policy, with its version.
+     * @description Edit a provider's HTTP policy, with its version.
      */
     patch: operations["providers_update"];
     trace?: never;
@@ -1235,8 +1355,8 @@ export interface paths {
     options?: never;
     head?: never;
     /**
-     * Change the no-reply period or the spoken languages.
-     * @description no_reply_days (1-365) or spoken_languages (ISO 639-1 codes, used by hide_unspoken_required), with the settings' version.
+     * Change no_reply_days (1-365) or spoken_languages, with the settings' version.
+     * @description spoken_languages are ISO 639-1 codes; jobs_list hide_unspoken_required uses them.
      */
     patch: operations["settings_update"];
     trace?: never;
@@ -1249,10 +1369,10 @@ export interface paths {
       cookie?: never;
     };
     /**
-     * List the shipped agent skills.
-     * @description Workflow skills for agents using Openings, with what the owner can ask and their reference files. Read one with skills_get.
+     * Read a skill, or without name the list of skills.
+     * @description A skill is the method for one kind of work; path reads one of its reference files.
      */
-    get: operations["skills_list"];
+    get: operations["skills_get"];
     put?: never;
     post?: never;
     delete?: never;
@@ -1269,10 +1389,10 @@ export interface paths {
       cookie?: never;
     };
     /**
-     * Read a skill or one of its reference files.
-     * @description SKILL.md or a listed reference file (path), as Markdown; relative links resolve against the skill's directory. The owner's instructions are in Preferences.
+     * Read a skill, or without name the list of skills.
+     * @description A skill is the method for one kind of work; path reads one of its reference files.
      */
-    get: operations["skills_get"];
+    get: operations["skills_get_1"];
     put?: never;
     post?: never;
     delete?: never;
@@ -1309,14 +1429,14 @@ export interface paths {
       cookie?: never;
     };
     /**
-     * List sources.
-     * @description Saved searches and company feeds with schedules, outcomes and counts of jobs found, shortlisted, applied and replied. summary=false adds run diagnostics.
+     * List sources with schedule, last outcome and job counts.
+     * @description Counts: found, shortlisted, applied, replied. sources_get has a source's recent checks.
      */
     get: operations["sources_list"];
     put?: never;
     /**
-     * Save a source.
-     * @description One saved search (query and location) or company feed; paused by default.
+     * Save a source; paused by default.
+     * @description Save a source; paused by default.
      */
     post: operations["sources_create"];
     delete?: never;
@@ -1333,22 +1453,22 @@ export interface paths {
       cookie?: never;
     };
     /**
-     * Read a source's configuration and version.
-     * @description Read a source's configuration and version.
+     * Read a source: its configuration, version and latest checks with their errors.
+     * @description Read a source: its configuration, version and latest checks with their errors.
      */
     get: operations["sources_get"];
     put?: never;
     post?: never;
     /**
-     * Delete a source.
-     * @description Archived jobs and collection history stay.
+     * Delete a source permanently; archived jobs and their history stay.
+     * @description Delete a source permanently; archived jobs and their history stay.
      */
     delete: operations["sources_delete"];
     options?: never;
     head?: never;
     /**
-     * Edit or pause a source.
-     * @description With its version.
+     * Edit or pause a source, with its version.
+     * @description Edit or pause a source, with its version.
      */
     patch: operations["sources_update"];
     trace?: never;
@@ -1363,10 +1483,30 @@ export interface paths {
     get?: never;
     put?: never;
     /**
-     * Run a source now.
-     * @description With its version and optional one-time overrides; the provider gate applies.
+     * Run a source now, with its version and optional one-time overrides.
+     * @description Run a source now, with its version and optional one-time overrides.
      */
-    post: operations["sources_run"];
+    post: operations["sources_run_one"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/sources/batch": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Add or update up to 50 sources (saved searches, company boards, feeds).
+     * @description source_id with expected_version updates; enabled false pauses. Preview a new source with sources_run first.
+     */
+    post: operations["sources_save"];
     delete?: never;
     options?: never;
     head?: never;
@@ -1383,8 +1523,8 @@ export interface paths {
     get?: never;
     put?: never;
     /**
-     * Enable, pause, run, configure or delete selected sources.
-     * @description Ids with versions, one result or error each.
+     * Enable, pause, run, configure or delete selected sources, one result each.
+     * @description Enable, pause, run, configure or delete selected sources, one result each.
      */
     post: operations["sources_bulk"];
     delete?: never;
@@ -1403,10 +1543,30 @@ export interface paths {
     get?: never;
     put?: never;
     /**
-     * Preview a source without storing jobs.
-     * @description Requests go through the provider gate (spacing and cooldowns).
+     * Preview a source without storing jobs, through the provider gate.
+     * @description Preview a source without storing jobs, through the provider gate.
      */
     post: operations["sources_preview"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/sources/run": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Fetch a saved source now, or preview (preview true) what a source would collect.
+     * @description Preview a saved source (source_id) or an unsaved one (url, kind, config); nothing is stored. Through the provider gate.
+     */
+    post: operations["sources_run"];
     delete?: never;
     options?: never;
     head?: never;
@@ -1421,8 +1581,8 @@ export interface paths {
       cookie?: never;
     };
     /**
-     * Describe source fields.
-     * @description Supported fields and defaults, schedule variants and run options of each kind.
+     * Describe the fields, schedules and run options of each source kind.
+     * @description Describe the fields, schedules and run options of each source kind.
      */
     get: operations["sources_schemas"];
     put?: never;
@@ -1442,7 +1602,7 @@ export interface paths {
     };
     /**
      * Read how employers answered.
-     * @description Applications sent in a period (90d, 12m, all): replies and interviews with rates, median days to the first reply, the funnel, and replies by source when there is enough data.
+     * @description For applications sent in a period (90d, 12m, all): replies, interviews, rates, median days to a reply, the funnel.
      */
     get: operations["stats_get"];
     put?: never;
@@ -1461,8 +1621,8 @@ export interface paths {
       cookie?: never;
     };
     /**
-     * List collection tasks.
-     * @description By state, kind, source or job, with labels and diagnostics.
+     * List collection fetches (tasks) by state, kind, source or job.
+     * @description List collection fetches (tasks) by state, kind, source or job.
      */
     get: operations["tasks_list"];
     put?: never;
@@ -1481,8 +1641,8 @@ export interface paths {
       cookie?: never;
     };
     /**
-     * Read a task.
-     * @description Inputs, result, HTTP diagnostics, lease and next run time.
+     * Read a fetch: inputs, result, HTTP diagnostics and next run time.
+     * @description Read a fetch: inputs, result, HTTP diagnostics and next run time.
      */
     get: operations["tasks_get"];
     put?: never;
@@ -1503,8 +1663,8 @@ export interface paths {
     get?: never;
     put?: never;
     /**
-     * Cancel a queued or running task.
-     * @description Jobs and documents already stored stay.
+     * Cancel a queued or running fetch.
+     * @description Cancel a queued or running fetch.
      */
     post: operations["tasks_cancel"];
     delete?: never;
@@ -1523,8 +1683,8 @@ export interface paths {
     get?: never;
     put?: never;
     /**
-     * Retry a failed or cancelled task.
-     * @description With its frozen inputs and saved progress.
+     * Retry a failed or cancelled fetch with its frozen inputs.
+     * @description Retry a failed or cancelled fetch with its frozen inputs.
      */
     post: operations["tasks_retry"];
     delete?: never;
@@ -1541,14 +1701,14 @@ export interface paths {
       cookie?: never;
     };
     /**
-     * List templates.
-     * @description By kind or q. summary=true (default) omits TeX, guidance and rules. Read the template before editing or compiling externally.
+     * List templates by kind or q; summary=false adds TeX, guidance and rules.
+     * @description List templates by kind or q; summary=false adds TeX, guidance and rules.
      */
     get: operations["templates_list"];
     put?: never;
     /**
      * Add a template.
-     * @description Source, guidance and rules; the first template of a kind becomes its default.
+     * @description Add a template.
      */
     post: operations["templates_create"];
     delete?: never;
@@ -1565,24 +1725,44 @@ export interface paths {
       cookie?: never;
     };
     /**
-     * Read a template.
-     * @description Its source, guidance and rules (limits and settings); fetch its files separately.
+     * Read a template: TeX source, guidance, limits and its files.
+     * @description Compile CV and letter from it on your machine.
      */
     get: operations["templates_get"];
     put?: never;
     post?: never;
     /**
-     * Delete a template.
-     * @description With its files; document revisions are unchanged.
+     * Delete a template permanently, with its files.
+     * @description Only on the owner's explicit request; document revisions are unchanged.
      */
     delete: operations["templates_delete"];
     options?: never;
     head?: never;
     /**
-     * Edit a template.
-     * @description Source, default, guidance or rules, with its version.
+     * Edit a template, with its version.
+     * @description Edit a template, with its version.
      */
     patch: operations["templates_update"];
+    trace?: never;
+  };
+  "/api/v1/templates/save": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Add a template, or update one (template_id, expected_version).
+     * @description TeX source, guidance, limits (rules) and is_default; the first of a kind is the default.
+     */
+    post: operations["templates_save"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
     trace?: never;
   };
   "/api/v1/tokens": {
@@ -1651,8 +1831,8 @@ export interface paths {
      * Upload
      * @description Upload raw file bytes with a grant.
      *
-     *     The second step of files_reserve_upload or of a revision's uploads: PUT the exact
-     *     bytes to the grant's url with its headers (X-Transfer-Token). Returns the file.
+     *     The second step of files_upload or of a revision's uploads: PUT the exact bytes to
+     *     the grant's url with its headers (X-Transfer-Token). Returns the file.
      */
     put: operations["upload_api_v1_transfers_put"];
     post?: never;
@@ -1671,9 +1851,29 @@ export interface paths {
     };
     /**
      * Read the workspace identity.
-     * @description The version and schema_version, who this token is (actor: owner or agent:<token name>, the label its changes carry), storage (size, free space, restore limit, retention) and the workflow. File bytes use REST transfer grants.
+     * @description Version, schema, this token's actor label, storage and the workflow.
      */
     get: operations["workspace_info"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/workspace/context": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Start here: what to know before deciding or writing.
+     * @description Counts, settings, profile, Preferences, career summary, templates, skills and feedback (the owner's corrections of agent work since your last read).
+     */
+    get: operations["workspace_context"];
     put?: never;
     post?: never;
     delete?: never;
@@ -1791,6 +1991,19 @@ export interface components {
       updated_at: string;
       /** Version */
       version: number;
+    } & {
+      [key: string]: unknown;
+    };
+    /** ApplicationBatch */
+    ApplicationBatch: {
+      /** Items */
+      items: components["schemas"]["Application"][];
+      /**
+       * Missing
+       * @description Requested ids that do not exist.
+       * @default []
+       */
+      missing: string[];
     } & {
       [key: string]: unknown;
     };
@@ -1914,7 +2127,7 @@ export interface components {
       questions?: components["schemas"]["Question"][];
       /**
        * Required Documents
-       * @description The documents Ready needs: a subset of cv and letter (both by default). Form answers never affect Ready.
+       * @description What Ready needs (default cv and letter).
        * @default [
        *       "cv",
        *       "letter"
@@ -1923,6 +2136,48 @@ export interface components {
       required_documents: ("cv" | "letter")[];
       /** Requirements */
       requirements?: components["schemas"]["Requirement"][];
+    };
+    /** ApplicationItem */
+    ApplicationItem: {
+      /** Answers */
+      answers?: {
+        [key: string]: unknown;
+      } | null;
+      /** Application Id */
+      application_id: string;
+      /**
+       * Applied On
+       * @description With applied: the day it was sent; today when omitted.
+       */
+      applied_on?: string | null;
+      /** Concluded On */
+      concluded_on?: string | null;
+      /** Deadline */
+      deadline?: string | null;
+      /** Outcome */
+      outcome?:
+        ("accepted" | "rejected" | "not_pursued" | "no_response") | null;
+      /** Priority */
+      priority?: number | null;
+      /** Questions */
+      questions?: components["schemas"]["Question"][] | null;
+      /** @description An employer reply: interview, offer and rejection move the stage; other never does. */
+      reply?: components["schemas"]["NewReply"] | null;
+      /** @description Correct or delete a recorded reply. */
+      reply_fix?: components["schemas"]["ReplyFix"] | null;
+      /** Required Documents */
+      required_documents?: ("cv" | "letter")[] | null;
+      /**
+       * Requirements
+       * @description Replaces the list; keep ids to keep items.
+       */
+      requirements?: components["schemas"]["Requirement"][] | null;
+      /**
+       * Stage
+       * @description applied only when the owner says they applied; closed needs outcome.
+       */
+      stage?:
+        ("shortlisted" | "applied" | "interview" | "offer" | "closed") | null;
     };
     /** ApplicationPage */
     ApplicationPage: {
@@ -1942,7 +2197,10 @@ export interface components {
     } & {
       [key: string]: unknown;
     };
-    /** ApplicationPatch */
+    /**
+     * ApplicationPatch
+     * @description A change of one application, with its version.
+     */
     ApplicationPatch: {
       /** Answers */
       answers?: {
@@ -1976,7 +2234,7 @@ export interface components {
       reply?: components["schemas"]["ReplyChange"] | null;
       /**
        * Required Documents
-       * @description The documents Ready needs: a subset of cv and letter (both by default). Form answers never affect Ready.
+       * @description What Ready needs (default cv and letter).
        */
       required_documents?: ("cv" | "letter")[] | null;
       /**
@@ -2064,6 +2322,16 @@ export interface components {
     } & {
       [key: string]: unknown;
     };
+    /** ApplicationsCreate */
+    ApplicationsCreate: {
+      /** Items */
+      items: components["schemas"]["ApplicationInput"][];
+    };
+    /** ApplicationsUpdate */
+    ApplicationsUpdate: {
+      /** Items */
+      items: components["schemas"]["ApplicationItem"][];
+    };
     /** BackupList */
     BackupList: {
       /** Items */
@@ -2088,8 +2356,11 @@ export interface components {
       error?: {
         [key: string]: unknown;
       } | null;
-      /** Id */
-      id: string;
+      /**
+       * Id
+       * @description The record; none for a failed create.
+       */
+      id?: string | null;
       /**
        * Index
        * @description The item's position in the request.
@@ -2116,7 +2387,7 @@ export interface components {
     BatchResult: {
       /**
        * Batch Id
-       * @description The batch of the recorded changes (events_list batch_id).
+       * @description The batch of the recorded changes (changes_list batch_id).
        */
       batch_id?: string | null;
       /** Failed */
@@ -2137,6 +2408,21 @@ export interface components {
       /** Id */
       id: string;
     };
+    /** CareerBatch */
+    CareerBatch: {
+      /**
+       * Items
+       * @description Full entries with highlights and files.
+       */
+      items: components["schemas"]["CareerEntry"][];
+      /**
+       * Missing
+       * @default []
+       */
+      missing: string[];
+    } & {
+      [key: string]: unknown;
+    };
     /** CareerDates */
     CareerDates: {
       /**
@@ -2154,45 +2440,123 @@ export interface components {
       /** Start */
       start: string;
     };
-    /** CareerImport */
-    CareerImport: {
-      /** Expected Profile Version */
-      expected_profile_version?: number | null;
-      /** Knowledge */
-      knowledge?: components["schemas"]["KnowledgeCreate"][];
-      /** Profile */
-      profile?: {
-        [key: string]: unknown;
-      } | null;
-    };
-    /** Claim */
-    Claim: {
-      /** Always Include */
-      always_include: boolean;
-      /** Approved */
-      approved: boolean;
+    /** CareerEntry */
+    CareerEntry: {
       /** Created At */
       created_at: string;
+      /** Dates */
+      dates?: {
+        [key: string]: unknown;
+      } | null;
+      /** File Count */
+      file_count?: number | null;
+      /** Highlight Count */
+      highlight_count?: number | null;
+      /** Highlight Preview */
+      highlight_preview?: string | null;
       /** Id */
       id: string;
-      /** Knowledge Id */
-      knowledge_id: string;
+      /** Kind */
+      kind: string;
       /** Metadata */
       metadata?: {
         [key: string]: unknown;
       } | null;
+      /** Narrative */
+      narrative?: string | null;
+      /** Narrative Preview */
+      narrative_preview?: string | null;
+      /** Organization */
+      organization: string;
       /** Position */
       position: number;
-      /** Text */
-      text?: string | null;
-      /** Text Preview */
-      text_preview?: string | null;
+      /**
+       * Skills
+       * @default []
+       */
+      skills: string[];
+      /** Title */
+      title: string;
       /** Updated At */
       updated_at: string;
       /** Version */
       version: number;
     } & {
       [key: string]: unknown;
+    };
+    /** CareerImport */
+    CareerImport: {
+      /** Entries */
+      entries?: components["schemas"]["KnowledgeCreate"][];
+      /** Expected Profile Version */
+      expected_profile_version?: number | null;
+      /** Profile */
+      profile?: {
+        [key: string]: unknown;
+      } | null;
+    };
+    /** CareerItem */
+    CareerItem: {
+      /**
+       * Career Id
+       * @description Update this entry; omit to add one.
+       */
+      career_id?: string | null;
+      dates?: components["schemas"]["CareerDates"] | null;
+      /**
+       * Expected Version
+       * @description Required to update.
+       */
+      expected_version?: number | null;
+      /** Idempotency Key */
+      idempotency_key?: string | null;
+      /** Kind */
+      kind?:
+        | (
+            | "experience"
+            | "project"
+            | "course"
+            | "education"
+            | "award"
+            | "publication"
+            | "fact"
+            | "skill"
+            | "language"
+            | "other"
+          )
+        | null;
+      /** Metadata */
+      metadata?: {
+        [key: string]: unknown;
+      } | null;
+      /** Narrative */
+      narrative?: string | null;
+      /** Organization */
+      organization?: string | null;
+      /** Position */
+      position?: number | null;
+      /** Skills */
+      skills?: string[] | null;
+      /** Title */
+      title?: string | null;
+    };
+    /** CareerPage */
+    CareerPage: {
+      /** Items */
+      items: components["schemas"]["CareerEntry"][];
+      /** Limit */
+      limit?: number | null;
+      /** Offset */
+      offset?: number | null;
+      /** Total */
+      total: number;
+    } & {
+      [key: string]: unknown;
+    };
+    /** CareerSave */
+    CareerSave: {
+      /** Items */
+      items: components["schemas"]["CareerItem"][];
     };
     /** ClaimCreate */
     ClaimCreate: {
@@ -2208,12 +2572,15 @@ export interface components {
        */
       approved: boolean;
       /**
+       * Career Id
+       * @description The career entry it belongs to.
+       */
+      career_id: string;
+      /**
        * Idempotency Key
-       * @description Retrying with the same key and request returns the record the first request created.
+       * @description A retry with the same key returns the first result.
        */
       idempotency_key?: string | null;
-      /** Knowledge Id */
-      knowledge_id: string;
       /**
        * Metadata
        * @description Free-form values the product does not act on, such as an agent's own selection hints.
@@ -2226,29 +2593,16 @@ export interface components {
       /** Text */
       text: string;
     };
-    /** ClaimPage */
-    ClaimPage: {
-      /** Items */
-      items: components["schemas"]["Claim"][];
-      /** Limit */
-      limit?: number | null;
-      /** Offset */
-      offset?: number | null;
-      /** Total */
-      total: number;
-    } & {
-      [key: string]: unknown;
-    };
     /** ClaimUpdate */
     ClaimUpdate: {
       /** Always Include */
       always_include?: boolean | null;
       /** Approved */
       approved?: boolean | null;
+      /** Career Id */
+      career_id?: string | null;
       /** Expected Version */
       expected_version: number;
-      /** Knowledge Id */
-      knowledge_id?: string | null;
       /** Metadata */
       metadata?: {
         [key: string]: unknown;
@@ -2264,14 +2618,32 @@ export interface components {
       enabled: boolean;
       /** Enabled Sources */
       enabled_sources: number;
+      /** Fetches */
+      fetches?: {
+        [key: string]: unknown;
+      } | null;
+      /** Kinds */
+      kinds?: {
+        [key: string]: unknown;
+      } | null;
       /** Next Run At */
       next_run_at?: string | null;
+      /** Providers */
+      providers?:
+        | {
+            [key: string]: unknown;
+          }[]
+        | null;
       /** Queued Tasks */
       queued_tasks: number;
+      /** @description collection_update: one result per provider, cancel, retry. */
+      results?: components["schemas"]["BatchResult"] | null;
       /** Running Tasks */
       running_tasks: number;
       /** Source Count */
       source_count: number;
+      /** Sources Failing */
+      sources_failing?: number | null;
       /** Version */
       version: number;
     } & {
@@ -2336,12 +2708,37 @@ export interface components {
     } & {
       [key: string]: unknown;
     };
-    /** CollectionWrite */
+    /**
+     * CollectionWrite
+     * @description The collection switch with its version; also provider limits and fetches to stop
+     *     or retry (each applied on its own, results in ``results``).
+     */
     CollectionWrite: {
-      /** Enabled */
-      enabled: boolean;
-      /** Expected Version */
+      /**
+       * Cancel
+       * @description Fetch (task) or run ids to stop.
+       */
+      cancel?: string[];
+      /**
+       * Enabled
+       * @description Scheduled collection on or off.
+       */
+      enabled?: boolean | null;
+      /**
+       * Expected Version
+       * @description The collection's version.
+       */
       expected_version: number;
+      /**
+       * Providers
+       * @description Provider limits, each with its own expected_version.
+       */
+      providers?: components["schemas"]["ProviderChange"][];
+      /**
+       * Retry
+       * @description Failed or cancelled fetch ids.
+       */
+      retry?: string[];
     };
     /** Comparison */
     Comparison: {
@@ -2422,10 +2819,10 @@ export interface components {
       /** Application Id */
       application_id: string;
       /**
-       * Claim Ids
+       * Career Ids
        * @default []
        */
-      claim_ids: string[];
+      career_ids: string[];
       /**
        * Complete
        * @description A CV or letter whose PDF is stored.
@@ -2444,15 +2841,15 @@ export interface components {
        * @default []
        */
       files: components["schemas"]["WorkspaceFile"][];
+      /**
+       * Highlight Ids
+       * @default []
+       */
+      highlight_ids: string[];
       /** Id */
       id: string;
       /** Kind */
       kind: string;
-      /**
-       * Knowledge Ids
-       * @default []
-       */
-      knowledge_ids: string[];
       /**
        * Note
        * @default
@@ -2483,20 +2880,25 @@ export interface components {
       /** Application Id */
       application_id: string;
       /**
-       * Claim Ids
-       * @description Approved claims the revision uses.
+       * Career Ids
+       * @description Career entries the revision uses.
        */
-      claim_ids?: string[];
+      career_ids?: string[];
       /**
        * Content
-       * @description Structured content of form answers or another document. Not accepted for a CV or letter (cv, letter): those are a PDF and an optional TeX source.
+       * @description answers or other: structured content. Not for cv or letter.
        */
       content?: {
         [key: string]: unknown;
       } | null;
       /**
+       * Highlight Ids
+       * @description Approved highlights the revision uses.
+       */
+      highlight_ids?: string[];
+      /**
        * Idempotency Key
-       * @description Retrying with the same key and request returns the record the first request created.
+       * @description A retry with the same key returns the first revision.
        */
       idempotency_key?: string | null;
       /**
@@ -2506,32 +2908,92 @@ export interface components {
        */
       kind: "cv" | "letter" | "answers" | "other";
       /**
-       * Knowledge Ids
-       * @description Career entries the revision uses.
-       */
-      knowledge_ids?: string[];
-      /**
        * Note
-       * @description An optional note on the revision.
        * @default
        */
       note: string;
-      /** @description CV or letter: the PDF to upload. The result's uploads.pdf is a one-shot grant: PUT the exact bytes to its url with its headers. The revision is incomplete until its PDF is stored, then complete and immutable. */
+      /** @description cv or letter: the PDF to PUT with uploads.pdf; complete and immutable once stored. */
       pdf?: components["schemas"]["FileSpec"] | null;
-      /** Previous Id */
+      /**
+       * Previous Id
+       * @description The revision this one replaces.
+       */
       previous_id?: string | null;
       /**
        * Source
-       * @description CV or letter, optional: the TeX source inline (UTF-8, at most 256 KB). Its readable text is derived from it; the PDF must then be built from it (the PDF grant names its SHA-256).
+       * @description cv or letter, optional: the TeX source inline (at most 256 KB); the PDF must be built from it.
        */
       source?: string | null;
-      /** @description CV or letter, optional, instead of source: a .tex file to upload with the grant uploads.source, before the PDF. */
+      /** @description Instead of source: a .tex file to PUT with uploads.source, before the PDF. */
       source_file?: components["schemas"]["FileSpec"] | null;
       /**
        * Title
        * @default
        */
       title: string;
+    };
+    /** DocumentDetail */
+    DocumentDetail: {
+      /** Application Id */
+      application_id: string;
+      /**
+       * Career Ids
+       * @default []
+       */
+      career_ids: string[];
+      /** @description With compare_to: the line diff against that revision. */
+      comparison?: components["schemas"]["Comparison"] | null;
+      /**
+       * Complete
+       * @description A CV or letter whose PDF is stored.
+       */
+      complete: boolean;
+      /** Content */
+      content?: {
+        [key: string]: unknown;
+      } | null;
+      /** Created At */
+      created_at: string;
+      /** File Count */
+      file_count?: number | null;
+      /**
+       * Files
+       * @default []
+       */
+      files: components["schemas"]["WorkspaceFile"][];
+      /**
+       * Highlight Ids
+       * @default []
+       */
+      highlight_ids: string[];
+      /** Id */
+      id: string;
+      /** Kind */
+      kind: string;
+      /**
+       * Note
+       * @default
+       */
+      note: string;
+      /** Previous Id */
+      previous_id?: string | null;
+      /** Revision Number */
+      revision_number: number;
+      /** Source Sha256 */
+      source_sha256?: string | null;
+      /** Text */
+      text?: string | null;
+      /**
+       * Text From
+       * @description tex or pdf
+       */
+      text_from?: string | null;
+      /** Title */
+      title: string;
+      /** Version */
+      version: number;
+    } & {
+      [key: string]: unknown;
     };
     /** DocumentPage */
     DocumentPage: {
@@ -2700,6 +3162,11 @@ export interface components {
     };
     /** FileGrant */
     FileGrant: {
+      /**
+       * Curl
+       * @description The same request as a shell line.
+       */
+      curl?: string | null;
       /** Expires At */
       expires_at: string;
       /** Headers */
@@ -2749,6 +3216,92 @@ export interface components {
       /** Titles */
       titles?: string[];
     };
+    /** Highlight */
+    Highlight: {
+      /** Always Include */
+      always_include: boolean;
+      /** Approved */
+      approved: boolean;
+      /** Career Id */
+      career_id: string;
+      /** Career Organization */
+      career_organization?: string | null;
+      /** Career Title */
+      career_title?: string | null;
+      /** Created At */
+      created_at: string;
+      /** Id */
+      id: string;
+      /** Metadata */
+      metadata?: {
+        [key: string]: unknown;
+      } | null;
+      /** Position */
+      position: number;
+      /** Text */
+      text?: string | null;
+      /** Text Preview */
+      text_preview?: string | null;
+      /** Updated At */
+      updated_at: string;
+      /** Version */
+      version: number;
+    } & {
+      [key: string]: unknown;
+    };
+    /** HighlightItem */
+    HighlightItem: {
+      /**
+       * Always Include
+       * @description In every CV unless the job gives a reason to leave it out.
+       */
+      always_include?: boolean | null;
+      /** Approved */
+      approved?: boolean | null;
+      /**
+       * Career Id
+       * @description Its entry; required to add one.
+       */
+      career_id?: string | null;
+      /**
+       * Expected Version
+       * @description Required to update.
+       */
+      expected_version?: number | null;
+      /**
+       * Highlight Id
+       * @description Update this one; omit to add one.
+       */
+      highlight_id?: string | null;
+      /** Idempotency Key */
+      idempotency_key?: string | null;
+      /** Metadata */
+      metadata?: {
+        [key: string]: unknown;
+      } | null;
+      /** Position */
+      position?: number | null;
+      /** Text */
+      text?: string | null;
+    };
+    /** HighlightPage */
+    HighlightPage: {
+      /** Items */
+      items: components["schemas"]["Highlight"][];
+      /** Limit */
+      limit?: number | null;
+      /** Offset */
+      offset?: number | null;
+      /** Total */
+      total: number;
+    } & {
+      [key: string]: unknown;
+    };
+    /** HighlightsSave */
+    HighlightsSave: {
+      /** Items */
+      items: components["schemas"]["HighlightItem"][];
+    };
     /** ImportPreview */
     ImportPreview: {
       /** Text */
@@ -2761,8 +3314,8 @@ export interface components {
     };
     /** ImportPreviewResult */
     ImportPreviewResult: {
-      /** Knowledge */
-      knowledge: {
+      /** Entries */
+      entries: {
         [key: string]: unknown;
       }[];
       /** Profile */
@@ -2780,7 +3333,7 @@ export interface components {
     /** ImportResult */
     ImportResult: {
       /** Items */
-      items: components["schemas"]["Knowledge"][];
+      items: components["schemas"]["CareerEntry"][];
       profile?: components["schemas"]["Profile"] | null;
       /** Total */
       total: number;
@@ -2867,6 +3420,19 @@ export interface components {
     } & {
       [key: string]: unknown;
     };
+    /** JobBatch */
+    JobBatch: {
+      /** Items */
+      items: components["schemas"]["Job"][];
+      /**
+       * Missing
+       * @description Requested ids that do not exist.
+       * @default []
+       */
+      missing: string[];
+    } & {
+      [key: string]: unknown;
+    };
     /** JobBulk */
     JobBulk: {
       /**
@@ -2908,7 +3474,7 @@ export interface components {
       company: string;
       /**
        * Idempotency Key
-       * @description Retrying with the same key and request returns the record the first request created.
+       * @description A retry with the same key returns the first result.
        */
       idempotency_key?: string | null;
       /**
@@ -3033,54 +3599,17 @@ export interface components {
     } & {
       [key: string]: unknown;
     };
-    /** Knowledge */
-    Knowledge: {
-      /** Claim Count */
-      claim_count?: number | null;
-      /** Created At */
-      created_at: string;
-      /** Dates */
-      dates?: {
-        [key: string]: unknown;
-      } | null;
-      /** File Count */
-      file_count?: number | null;
-      /** Id */
-      id: string;
-      /** Kind */
-      kind: string;
-      /** Metadata */
-      metadata?: {
-        [key: string]: unknown;
-      } | null;
-      /** Narrative */
-      narrative?: string | null;
-      /** Narrative Preview */
-      narrative_preview?: string | null;
-      /** Organization */
-      organization: string;
-      /** Position */
-      position: number;
-      /**
-       * Skills
-       * @default []
-       */
-      skills: string[];
-      /** Title */
-      title: string;
-      /** Updated At */
-      updated_at: string;
-      /** Version */
-      version: number;
-    } & {
-      [key: string]: unknown;
+    /** JobTriage */
+    JobTriage: {
+      /** Items */
+      items: components["schemas"]["TriageItem"][];
     };
     /** KnowledgeCreate */
     KnowledgeCreate: {
       dates?: components["schemas"]["CareerDates"] | null;
       /**
        * Idempotency Key
-       * @description Retrying with the same key and request returns the record the first request created.
+       * @description A retry with the same key returns the first result.
        */
       idempotency_key?: string | null;
       /**
@@ -3120,19 +3649,6 @@ export interface components {
       /** Title */
       title: string;
     };
-    /** KnowledgePage */
-    KnowledgePage: {
-      /** Items */
-      items: components["schemas"]["Knowledge"][];
-      /** Limit */
-      limit?: number | null;
-      /** Offset */
-      offset?: number | null;
-      /** Total */
-      total: number;
-    } & {
-      [key: string]: unknown;
-    };
     /** KnowledgeUpdate */
     KnowledgeUpdate: {
       dates?: components["schemas"]["CareerDates"] | null;
@@ -3168,6 +3684,30 @@ export interface components {
       /** Title */
       title?: string | null;
     };
+    /** LinkInput */
+    LinkInput: {
+      /**
+       * Decision
+       * @description same merges job_id into other_id (other_id survives); different clears the flag.
+       * @enum {string}
+       */
+      decision: "same" | "different";
+      /**
+       * Expected Version
+       * @description Required with same: job_id's version.
+       */
+      expected_version?: number | null;
+      /**
+       * Other Id
+       * @description The job flagged as its likely duplicate.
+       */
+      other_id: string;
+      /**
+       * Other Version
+       * @description With same, optional: other_id's version.
+       */
+      other_version?: number | null;
+    };
     /** MergeInput */
     MergeInput: {
       /** Expected Version */
@@ -3182,10 +3722,10 @@ export interface components {
       /** Application Id */
       application_id: string;
       /**
-       * Claim Ids
+       * Career Ids
        * @default []
        */
-      claim_ids: string[];
+      career_ids: string[];
       /**
        * Complete
        * @description A CV or letter whose PDF is stored.
@@ -3204,15 +3744,15 @@ export interface components {
        * @default []
        */
       files: components["schemas"]["WorkspaceFile"][];
+      /**
+       * Highlight Ids
+       * @default []
+       */
+      highlight_ids: string[];
       /** Id */
       id: string;
       /** Kind */
       kind: string;
-      /**
-       * Knowledge Ids
-       * @default []
-       */
-      knowledge_ids: string[];
       /**
        * Note
        * @default
@@ -3239,6 +3779,21 @@ export interface components {
       version: number;
     } & {
       [key: string]: unknown;
+    };
+    /** NewReply */
+    NewReply: {
+      /**
+       * Date
+       * @description YYYY-MM-DD; today when omitted.
+       */
+      date?: string | null;
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: "interview" | "rejection" | "offer" | "other";
+      /** Note */
+      note?: string | null;
     };
     /** NoReply */
     NoReply: {
@@ -3285,19 +3840,18 @@ export interface components {
     NoteInput: {
       /**
        * Application Id
-       * @description Write the note on this application of the job; omit for a note on the job itself.
+       * @description Put the note on this application of the job.
        */
       application_id?: string | null;
       /** Body */
       body: string;
       /**
        * Idempotency Key
-       * @description Retrying with the same key and request returns the record the first request created.
+       * @description A retry with the same key returns the first note.
        */
       idempotency_key?: string | null;
       /**
        * Pinned
-       * @description Pin the note: it is listed first in its timeline. A job and an application each have at most one pinned note; pinning another unpins it.
        * @default false
        */
       pinned: boolean;
@@ -3314,9 +3868,14 @@ export interface components {
     /** NotePatch */
     NotePatch: {
       /** Body */
-      body: string;
+      body?: string | null;
       /** Expected Version */
       expected_version: number;
+      /**
+       * Pinned
+       * @description true pins it (unpinning the other note of its job or application); false unpins it.
+       */
+      pinned?: boolean | null;
     };
     /** NotePin */
     NotePin: {
@@ -3354,6 +3913,11 @@ export interface components {
     };
     /** OperationGrant */
     OperationGrant: {
+      /**
+       * Curl
+       * @description The same request as a shell line.
+       */
+      curl?: string | null;
       /** Expires In */
       expires_in: number;
       /** Headers */
@@ -3387,12 +3951,12 @@ export interface components {
     PreferenceItem: {
       /**
        * Scope
-       * @description Writing rules only: all (the default), cv or letter. Other sections take none.
+       * @description writing only: all, cv or letter; all when omitted.
        */
       scope?: ("all" | "cv" | "letter") | null;
       /**
        * Text
-       * @description The statement in the owner's words.
+       * @description In the owner's words.
        */
       text: string;
     };
@@ -3440,7 +4004,7 @@ export interface components {
       expected_version: number;
       /**
        * Items
-       * @description Every statement of the section, in order (at most 200, each at most 2000 characters): {text, scope}.
+       * @description The whole section, in order (each at most 2000 characters).
        */
       items: components["schemas"]["PreferenceItem"][];
     };
@@ -3531,6 +4095,17 @@ export interface components {
       version: number;
     } & {
       [key: string]: unknown;
+    };
+    /** ProviderChange */
+    ProviderChange: {
+      /** Enabled */
+      enabled?: boolean | null;
+      /** Expected Version */
+      expected_version: number;
+      /** Min Interval Seconds */
+      min_interval_seconds?: number | null;
+      /** Provider Id */
+      provider_id: string;
     };
     /** ProviderList */
     ProviderList: {
@@ -3631,20 +4206,36 @@ export interface components {
        */
       remove: boolean;
     };
+    /** ReplyFix */
+    ReplyFix: {
+      /** Date */
+      date?: string | null;
+      /**
+       * Delete
+       * @default false
+       */
+      delete: boolean;
+      /** Kind */
+      kind?: ("interview" | "rejection" | "offer" | "other") | null;
+      /** Note */
+      note?: string | null;
+      /** Reply Id */
+      reply_id: string;
+    };
     /**
      * Requirement
-     * @description One employer requirement found in a posting or application form.
+     * @description An employer requirement from the posting or the form.
      */
     Requirement: {
       /**
        * Blocking
-       * @description True when documents must not be prepared or submitted until it is resolved.
+       * @description Blocks Ready until resolved.
        * @default false
        */
       blocking: boolean;
       /**
        * Id
-       * @description Stable identifier; assigned when omitted.
+       * @description Assigned when omitted.
        */
       id?: string | null;
       /**
@@ -3663,7 +4254,7 @@ export interface components {
         | "other";
       /**
        * Note
-       * @description Resolution, owner decision or open question.
+       * @description Resolution or open question.
        * @default
        */
       note: string;
@@ -3782,17 +4373,17 @@ export interface components {
     SettingsUpdate: {
       /**
        * Expected Version
-       * @description The settings' current version (0 before the first save).
+       * @description The settings' version (0 before the first save).
        */
       expected_version: number;
       /**
        * No Reply Days
-       * @description Days after which an application without an employer answer counts as no reply.
+       * @description Days without an answer after which an application is overdue.
        */
       no_reply_days?: number | null;
       /**
        * Spoken Languages
-       * @description Languages the owner speaks, as ISO 639-1 codes such as en or de (English names are accepted).
+       * @description ISO 639-1 codes such as en or de.
        */
       spoken_languages?: string[] | null;
     };
@@ -3964,7 +4555,7 @@ export interface components {
       filters?: components["schemas"]["Filters"];
       /**
        * Idempotency Key
-       * @description Retrying with the same key and request returns the record the first request created.
+       * @description A retry with the same key returns the first result.
        */
       idempotency_key?: string | null;
       /**
@@ -4003,6 +4594,127 @@ export interface components {
        * @default
        */
       url: string;
+    };
+    /** SourceDetail */
+    SourceDetail: {
+      /** Automatic Collection */
+      automatic_collection: boolean;
+      /** Config */
+      config: {
+        [key: string]: unknown;
+      };
+      /**
+       * Counts
+       * @description Jobs found, shortlisted, applied and replied.
+       * @default {}
+       */
+      counts: {
+        [key: string]: number;
+      };
+      /** Created At */
+      created_at: string;
+      /** Enabled */
+      enabled: boolean;
+      /** Filters */
+      filters: {
+        [key: string]: unknown;
+      };
+      /** Id */
+      id: string;
+      /** Kind */
+      kind: string;
+      /** Last Error */
+      last_error?: string | null;
+      /** Last Outcome */
+      last_outcome?: string | null;
+      /** Last Run */
+      last_run?: {
+        [key: string]: unknown;
+      } | null;
+      /** Name */
+      name: string;
+      /** Next Run At */
+      next_run_at?: string | null;
+      /**
+       * Recent Runs
+       * @description The latest checks, newest first.
+       * @default []
+       */
+      recent_runs: {
+        [key: string]: unknown;
+      }[];
+      /** Schedule */
+      schedule: {
+        [key: string]: unknown;
+      };
+      /** Updated At */
+      updated_at: string;
+      /** Url */
+      url: string;
+      /** Version */
+      version: number;
+    } & {
+      [key: string]: unknown;
+    };
+    /**
+     * SourceItem
+     * @description A source to create (no source_id) or update (source_id and expected_version).
+     */
+    SourceItem: {
+      /** Config */
+      config?: {
+        [key: string]: unknown;
+      } | null;
+      /**
+       * Enabled
+       * @description false pauses it.
+       */
+      enabled?: boolean | null;
+      /**
+       * Expected Version
+       * @description Required to update.
+       */
+      expected_version?: number | null;
+      filters?: components["schemas"]["Filters"] | null;
+      /** Idempotency Key */
+      idempotency_key?: string | null;
+      /** Kind */
+      kind?:
+        | (
+            | "auto"
+            | "jobspy"
+            | "rss"
+            | "greenhouse"
+            | "lever"
+            | "ashby"
+            | "recruitee"
+            | "personio"
+            | "workable"
+            | "breezy"
+            | "smartrecruiters"
+            | "bamboohr"
+            | "rippling"
+            | "workday"
+            | "oracle"
+            | "joincom"
+          )
+        | null;
+      /** Name */
+      name?: string | null;
+      /** Schedule */
+      schedule?:
+        | (
+            | components["schemas"]["IntervalSchedule"]
+            | components["schemas"]["DailySchedule"]
+          )
+        | null;
+      /**
+       * Source Id
+       * @description Update this source; omit to add.
+       */
+      source_id?: string | null;
+      /** Url */
+      url?: string | null;
     };
     /** SourcePage */
     SourcePage: {
@@ -4127,6 +4839,59 @@ export interface components {
       expected_version: number;
       overrides?: components["schemas"]["RunOverrides"];
     };
+    /**
+     * SourceRunInput
+     * @description Fetch a saved source now, or preview a saved or unsaved one without storing jobs.
+     */
+    SourceRunInput: {
+      /** Config */
+      config?: {
+        [key: string]: unknown;
+      } | null;
+      /**
+       * Expected Version
+       * @description Required to fetch a saved source.
+       */
+      expected_version?: number | null;
+      filters?: components["schemas"]["Filters"] | null;
+      /** Kind */
+      kind?:
+        | (
+            | "auto"
+            | "jobspy"
+            | "rss"
+            | "greenhouse"
+            | "lever"
+            | "ashby"
+            | "recruitee"
+            | "personio"
+            | "workable"
+            | "breezy"
+            | "smartrecruiters"
+            | "bamboohr"
+            | "rippling"
+            | "workday"
+            | "oracle"
+            | "joincom"
+          )
+        | null;
+      /** Name */
+      name?: string | null;
+      overrides?: components["schemas"]["RunOverrides"] | null;
+      /**
+       * Preview
+       * @description true: up to 20 postings it would collect, nothing stored.
+       * @default false
+       */
+      preview: boolean;
+      /**
+       * Source Id
+       * @description The saved source.
+       */
+      source_id?: string | null;
+      /** Url */
+      url?: string | null;
+    };
     /** SourceSchemas */
     SourceSchemas: {
       /** Items */
@@ -4143,6 +4908,11 @@ export interface components {
       };
     } & {
       [key: string]: unknown;
+    };
+    /** SourcesSave */
+    SourcesSave: {
+      /** Items */
+      items: components["schemas"]["SourceItem"][];
     };
     /** SourceVersion */
     SourceVersion: {
@@ -4260,6 +5030,11 @@ export interface components {
       created_at: string;
       /** File Count */
       file_count?: number | null;
+      /**
+       * Files
+       * @default []
+       */
+      files: components["schemas"]["WorkspaceFile"][];
       /** Guidance */
       guidance?: string | null;
       /** Id */
@@ -4292,7 +5067,7 @@ export interface components {
       guidance: string;
       /**
        * Idempotency Key
-       * @description Retrying with the same key and request returns the record the first request created.
+       * @description A retry with the same key returns the first result.
        */
       idempotency_key?: string | null;
       /**
@@ -4333,6 +5108,38 @@ export interface components {
       total: number;
     } & {
       [key: string]: unknown;
+    };
+    /** TemplateSave */
+    TemplateSave: {
+      /**
+       * Expected Version
+       * @description Required to update.
+       */
+      expected_version?: number | null;
+      /** Guidance */
+      guidance?: string | null;
+      /** Idempotency Key */
+      idempotency_key?: string | null;
+      /** Is Default */
+      is_default?: boolean | null;
+      /** Kind */
+      kind?: ("cv" | "letter") | null;
+      /** Name */
+      name?: string | null;
+      /**
+       * Rules
+       * @description Typed limits max_pages, max_bullets and max_bullet_chars; any other key (such as engine or date_format) is free-form. Writing rules belong in Preferences, not in a template.
+       */
+      rules?: {
+        [key: string]: unknown;
+      } | null;
+      /**
+       * Template Id
+       * @description Update this one; omit to add one.
+       */
+      template_id?: string | null;
+      /** Tex */
+      tex?: string | null;
     };
     /** TemplateUpdate */
     TemplateUpdate: {
@@ -4478,6 +5285,22 @@ export interface components {
        */
       triage: "new" | "shortlisted" | "dismissed";
     };
+    /** TriageItem */
+    TriageItem: {
+      /** Job Id */
+      job_id: string;
+      /**
+       * Reason
+       * @description Required with dismissed: one sentence the owner reads.
+       */
+      reason?: string | null;
+      /**
+       * To
+       * @description new, shortlisted (starts its application) or dismissed.
+       * @enum {string}
+       */
+      to: "new" | "shortlisted" | "dismissed";
+    };
     /** UploadReservation */
     UploadReservation: {
       /**
@@ -4493,14 +5316,14 @@ export interface components {
        * Owner Type
        * @enum {string}
        */
-      owner_type: "knowledge" | "template" | "document" | "job";
+      owner_type: "career" | "template" | "document" | "job";
       /** Sha256 */
       sha256?: string | null;
       /** Size */
       size: number;
       /**
        * Source Sha256
-       * @description For the PDF of a CV or letter revision that has a TeX source: the SHA-256 of that source (required then; a PDF naming another source is refused). A PDF-only revision names none.
+       * @description A revision's PDF built from a TeX source: that source's SHA-256 (required then).
        */
       source_sha256?: string | null;
     };
@@ -4508,6 +5331,54 @@ export interface components {
     Uploads: {
       pdf?: components["schemas"]["FileGrant"] | null;
       source?: components["schemas"]["FileGrant"] | null;
+    } & {
+      [key: string]: unknown;
+    };
+    /**
+     * WorkspaceContext
+     * @description workspace_context: what to know before deciding or writing.
+     */
+    WorkspaceContext: {
+      /** Career */
+      career: {
+        [key: string]: unknown;
+      }[];
+      /** Counts */
+      counts: {
+        [key: string]: number;
+      };
+      /**
+       * Feedback
+       * @description The owner's corrections of agent work since the previous read.
+       * @default []
+       */
+      feedback: {
+        [key: string]: unknown;
+      }[];
+      /** Preferences */
+      preferences: {
+        [key: string]: unknown;
+      };
+      /** Profile */
+      profile: {
+        [key: string]: unknown;
+      };
+      /** Settings */
+      settings: {
+        [key: string]: unknown;
+      };
+      /** Skills */
+      skills: {
+        [key: string]: unknown;
+      }[];
+      /** Templates */
+      templates: {
+        [key: string]: unknown;
+      }[];
+      /** Workspace */
+      workspace: {
+        [key: string]: unknown;
+      };
     } & {
       [key: string]: unknown;
     };
@@ -4577,14 +5448,14 @@ export interface operations {
   applications_list: {
     parameters: {
       query?: {
-        /** @description Only applications recorded as applied at or after this time. */
+        /** @description Applied at or after this time. */
         applied_since?: string | null;
-        /** @description Only applications recorded as applied at or before this time; with stage=applied, the ones still waiting for a reply. */
+        /** @description Applied at or before this time. */
         applied_until?: string | null;
         company?: string | null;
         job_id?: string | null;
         limit?: number;
-        /** @description documents: Shortlisted applications missing a required document; reply_overdue: Applied applications without a reply for longer than the no-reply period, to close as no_response by hand. */
+        /** @description documents: Shortlisted, missing a document; reply_overdue: Applied, no reply past no_reply_days. */
         needs?: ("documents" | "reply_overdue") | null;
         offset?: number;
         outcome?:
@@ -4599,7 +5470,7 @@ export interface operations {
           | "applied"
           | "deadline"
           | "priority";
-        /** @description Only applications in this stage; ready is the Shortlisted ones that are Ready (every required document complete, no open blocking requirement). */
+        /** @description ready: Shortlisted with every required document complete and nothing blocking. */
         stage?:
           | (
               | "shortlisted"
@@ -4655,7 +5526,7 @@ export interface operations {
       };
     };
   };
-  applications_create: {
+  applications_start: {
     parameters: {
       query?: never;
       header?: never;
@@ -4724,7 +5595,7 @@ export interface operations {
       };
     };
   };
-  applications_get: {
+  applications_read: {
     parameters: {
       query?: never;
       header?: never;
@@ -4851,7 +5722,7 @@ export interface operations {
       };
     };
   };
-  applications_update: {
+  applications_change: {
     parameters: {
       query?: never;
       header?: never;
@@ -4931,64 +5802,6 @@ export interface operations {
       };
     };
   };
-  applications_history: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        application_id: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["EventPage"];
-        };
-      };
-      /** @description unauthorized */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description forbidden */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description not_found */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description validation */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-    };
-  };
   timeline_get_1: {
     parameters: {
       query?: {
@@ -5042,6 +5855,194 @@ export interface operations {
       };
       /** @description not_found */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description validation */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+    };
+  };
+  applications_get: {
+    parameters: {
+      query: {
+        /** @description Up to 20 application ids. */
+        ids: string[];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApplicationBatch"];
+        };
+      };
+      /** @description unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description validation */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+    };
+  };
+  applications_create: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ApplicationsCreate"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["BatchResult"];
+        };
+      };
+      /** @description unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description request_size or file_size */
+      413: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description validation */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+    };
+  };
+  applications_update: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ApplicationsUpdate"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["BatchResult"];
+        };
+      };
+      /** @description unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description request_size or file_size */
+      413: {
         headers: {
           [name: string]: unknown;
         };
@@ -5570,15 +6571,13 @@ export interface operations {
       };
     };
   };
-  claims_list: {
+  career_get: {
     parameters: {
       query?: {
-        approved?: boolean | null;
-        knowledge_id?: string;
-        limit?: number;
-        offset?: number;
+        /** @description Up to 50 entry ids; omit to search q and kind. */
+        ids?: string[] | null;
+        kind?: string;
         q?: string;
-        summary?: boolean;
       };
       header?: never;
       path?: never;
@@ -5592,7 +6591,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": components["schemas"]["ClaimPage"];
+          "application/json": components["schemas"]["CareerBatch"];
         };
       };
       /** @description unauthorized */
@@ -5624,7 +6623,7 @@ export interface operations {
       };
     };
   };
-  claims_create: {
+  career_save: {
     parameters: {
       query?: never;
       header?: never;
@@ -5633,17 +6632,17 @@ export interface operations {
     };
     requestBody: {
       content: {
-        "application/json": components["schemas"]["ClaimCreate"];
+        "application/json": components["schemas"]["CareerSave"];
       };
     };
     responses: {
       /** @description Successful Response */
-      201: {
+      200: {
         headers: {
           [name: string]: unknown;
         };
         content: {
-          "application/json": components["schemas"]["Claim"];
+          "application/json": components["schemas"]["BatchResult"];
         };
       };
       /** @description unauthorized */
@@ -5693,12 +6692,135 @@ export interface operations {
       };
     };
   };
-  claims_get: {
+  highlights_list: {
+    parameters: {
+      query?: {
+        approved?: boolean | null;
+        career_id?: string;
+        limit?: number;
+        offset?: number;
+        q?: string;
+        summary?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HighlightPage"];
+        };
+      };
+      /** @description unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description validation */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+    };
+  };
+  highlights_create: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ClaimCreate"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Highlight"];
+        };
+      };
+      /** @description unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description request_size or file_size */
+      413: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description validation */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+    };
+  };
+  highlights_read: {
     parameters: {
       query?: never;
       header?: never;
       path: {
-        claim_id: string;
+        highlight_id: string;
       };
       cookie?: never;
     };
@@ -5710,7 +6832,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": components["schemas"]["Claim"];
+          "application/json": components["schemas"]["Highlight"];
         };
       };
       /** @description unauthorized */
@@ -5751,14 +6873,14 @@ export interface operations {
       };
     };
   };
-  claims_delete: {
+  highlights_delete: {
     parameters: {
       query: {
         expected_version: number;
       };
       header?: never;
       path: {
-        claim_id: string;
+        highlight_id: string;
       };
       cookie?: never;
     };
@@ -5820,12 +6942,12 @@ export interface operations {
       };
     };
   };
-  claims_update: {
+  highlights_update: {
     parameters: {
       query?: never;
       header?: never;
       path: {
-        claim_id: string;
+        highlight_id: string;
       };
       cookie?: never;
     };
@@ -5841,7 +6963,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": components["schemas"]["Claim"];
+          "application/json": components["schemas"]["Highlight"];
         };
       };
       /** @description unauthorized */
@@ -5864,6 +6986,75 @@ export interface operations {
       };
       /** @description not_found */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description request_size or file_size */
+      413: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description validation */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+    };
+  };
+  highlights_save: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["HighlightsSave"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["BatchResult"];
+        };
+      };
+      /** @description unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description forbidden */
+      403: {
         headers: {
           [name: string]: unknown;
         };
@@ -6009,6 +7200,15 @@ export interface operations {
           "application/json": components["schemas"]["Error"];
         };
       };
+      /** @description conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
       /** @description request_size or file_size */
       413: {
         headers: {
@@ -6029,7 +7229,7 @@ export interface operations {
       };
     };
   };
-  knowledge_list: {
+  career_list: {
     parameters: {
       query?: {
         kind?: string;
@@ -6050,7 +7250,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": components["schemas"]["KnowledgePage"];
+          "application/json": components["schemas"]["CareerPage"];
         };
       };
       /** @description unauthorized */
@@ -6082,7 +7282,7 @@ export interface operations {
       };
     };
   };
-  knowledge_create: {
+  career_create: {
     parameters: {
       query?: never;
       header?: never;
@@ -6101,7 +7301,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": components["schemas"]["Knowledge"];
+          "application/json": components["schemas"]["CareerEntry"];
         };
       };
       /** @description unauthorized */
@@ -6151,12 +7351,12 @@ export interface operations {
       };
     };
   };
-  knowledge_get: {
+  career_read: {
     parameters: {
       query?: never;
       header?: never;
       path: {
-        knowledge_id: string;
+        career_id: string;
       };
       cookie?: never;
     };
@@ -6168,7 +7368,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": components["schemas"]["Knowledge"];
+          "application/json": components["schemas"]["CareerEntry"];
         };
       };
       /** @description unauthorized */
@@ -6209,14 +7409,14 @@ export interface operations {
       };
     };
   };
-  knowledge_delete: {
+  career_delete: {
     parameters: {
       query: {
         expected_version: number;
       };
       header?: never;
       path: {
-        knowledge_id: string;
+        career_id: string;
       };
       cookie?: never;
     };
@@ -6278,12 +7478,12 @@ export interface operations {
       };
     };
   };
-  knowledge_update: {
+  career_update: {
     parameters: {
       query?: never;
       header?: never;
       path: {
-        knowledge_id: string;
+        career_id: string;
       };
       cookie?: never;
     };
@@ -6299,7 +7499,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": components["schemas"]["Knowledge"];
+          "application/json": components["schemas"]["CareerEntry"];
         };
       };
       /** @description unauthorized */
@@ -6474,9 +7674,77 @@ export interface operations {
       };
     };
   };
+  changes_list: {
+    parameters: {
+      query?: {
+        /** @description owner, agent, agent:<token name>, system or unknown. */
+        actor?: string | null;
+        application_id?: string | null;
+        /** @description The changes of one call (b_...) or of an agent run before 0.24 (run:...). */
+        batch_id?: string | null;
+        /** @description Also the system's changes (left out unless actor=system). */
+        include_system?: boolean;
+        job_id?: string | null;
+        kind?: string | null;
+        limit?: number;
+        offset?: number;
+        since?: string | null;
+        subject_id?: string | null;
+        subject_type?: string | null;
+        /** @description Changes to these kinds of record, such as document and file. */
+        subject_types?: string[] | null;
+        until?: string | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["EventPage"];
+        };
+      };
+      /** @description unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description validation */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+    };
+  };
   collection_get: {
     parameters: {
-      query?: never;
+      query?: {
+        /** @description kinds: source kinds and their config fields; providers: limits and cooldowns; fetches: active and failed fetches. */
+        include?: ("kinds" | "providers" | "fetches")[];
+      };
       header?: never;
       path?: never;
       cookie?: never;
@@ -6581,6 +7849,15 @@ export interface operations {
       };
       /** @description validation */
       422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description rate_limited */
+      429: {
         headers: {
           [name: string]: unknown;
         };
@@ -6902,7 +8179,9 @@ export interface operations {
   };
   documents_get: {
     parameters: {
-      query?: never;
+      query?: {
+        compare_to?: string;
+      };
       header?: never;
       path: {
         document_id: string;
@@ -6917,7 +8196,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": components["schemas"]["Document"];
+          "application/json": components["schemas"]["DocumentDetail"];
         };
       };
       /** @description unauthorized */
@@ -7087,71 +8366,6 @@ export interface operations {
       };
     };
   };
-  events_list: {
-    parameters: {
-      query?: {
-        /** @description Only changes by owner, agent (any agent token), agent:<token name>, system or unknown (before 0.17). */
-        actor?: string | null;
-        application_id?: string | null;
-        /** @description Only the changes of one REST request or MCP tool call (b_...), or of one agent run before 0.24 (run:...). */
-        batch_id?: string | null;
-        /** @description Also list changes by the system (collection, worker, upgrade); they are left out unless actor=system. */
-        include_system?: boolean;
-        job_id?: string | null;
-        kind?: string | null;
-        limit?: number;
-        offset?: number;
-        since?: string | null;
-        subject_id?: string | null;
-        subject_type?: string | null;
-        /** @description Changes to any of these kinds of record, for example document and file. */
-        subject_types?: string[] | null;
-        until?: string | null;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["EventPage"];
-        };
-      };
-      /** @description unauthorized */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description forbidden */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description validation */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-    };
-  };
   examples_api_v1_examples_get: {
     parameters: {
       query?: never;
@@ -7257,6 +8471,15 @@ export interface operations {
           "application/json": components["schemas"]["Error"];
         };
       };
+      /** @description conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
       /** @description request_size or file_size */
       413: {
         headers: {
@@ -7285,7 +8508,7 @@ export interface operations {
         media_type?: string;
         offset?: number;
         owner_id?: string;
-        owner_type?: ("knowledge" | "template" | "document" | "job") | null;
+        owner_type?: ("career" | "template" | "document" | "job") | null;
         q?: string;
         summary?: boolean;
       };
@@ -7493,7 +8716,7 @@ export interface operations {
       };
     };
   };
-  files_reserve_download: {
+  files_download: {
     parameters: {
       query?: never;
       header?: never;
@@ -7540,15 +8763,6 @@ export interface operations {
           "application/json": components["schemas"]["Error"];
         };
       };
-      /** @description conflict */
-      409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
       /** @description request_size or file_size */
       413: {
         headers: {
@@ -7569,7 +8783,7 @@ export interface operations {
       };
     };
   };
-  files_reserve_upload: {
+  files_upload: {
     parameters: {
       query?: never;
       header?: never;
@@ -7641,33 +8855,33 @@ export interface operations {
   jobs_list: {
     parameters: {
       query?: {
-        /** @description Only jobs changed by one REST request or MCP tool call (its batch_id, as events_list and histories show it). Restore an agent's dismissals with jobs_bulk action inbox. */
+        /** @description Jobs changed by one call (its batch_id in changes_list). */
         batch_id?: string | null;
         company?: string | null;
         complete?: boolean | null;
         created_since?: string | null;
         created_until?: string | null;
-        /** @description Only dismissed jobs, by who dismissed them: agent (any agent token), agent:<token name>, owner (dashboard or owner token) or system (job sources, or before 0.21 without a record). */
+        /** @description Dismissed by owner, agent, agent:<token name> or system. */
         dismissed_by?: string | null;
-        /** @description true: leave out jobs that require a language outside the owner's spoken_languages (settings); nothing is dismissed. With true or false the response's unspoken_required gives how many jobs of these filters require such a language. No effect while spoken_languages is empty. */
+        /** @description true hides jobs requiring a language outside spoken_languages; unspoken_required counts them. */
         hide_unspoken_required?: boolean | null;
-        /** @description Also return counts: jobs by triage (new, shortlisted, dismissed, all) and dismissed jobs by who dismissed them, for the same search, company, location, source, date and signal filters. */
+        /** @description Also totals by triage and by who dismissed. */
         include_counts?: boolean;
-        /** @description Also return up to 200 distinct companies/locations/sources/job types matching the filters. */
+        /** @description Also distinct companies, locations, sources and job types. */
         include_facets?: boolean;
         job_type?: string | null;
         limit?: number;
         location?: string | null;
         offset?: number;
-        /** @description Only postings written in this language (ISO 639-1 code such as de, or a name such as German). */
+        /** @description Written in this language (ISO 639-1 code or name). */
         posting_language?: string | null;
-        /** @description Only postings whose detected language is another one; postings of unknown language are left out. */
+        /** @description Written in another known language. */
         posting_language_not?: string | null;
         q?: string;
         remote?: boolean | null;
-        /** @description Only postings that state this language as required (alone or as one of alternatives). */
+        /** @description Postings that require this language. */
         requires?: string | null;
-        /** @description Only jobs with this ingest signal: likely_duplicate (flagged as a copy of an earlier job), no_longer_listed (the board stopped listing it), language_required (the posting states a required language) or pending (signals not computed yet). */
+        /** @description likely_duplicate, no_longer_listed, language_required or pending (not computed yet). */
         signal?:
           | (
               | "likely_duplicate"
@@ -7676,13 +8890,15 @@ export interface operations {
               | "pending"
             )
           | null;
-        /** @description Only jobs dismissed at or after this time. */
+        /** @description Dismissed at or after this time. */
         since?: string | null;
-        /** @description dismissed: most recently dismissed first. */
+        /** @description dismissed: latest dismissal first. */
         sort?: "newest" | "oldest" | "company" | "title" | "dismissed";
         source?: string | null;
-        /** @description new (to review), shortlisted (each has an application), dismissed, or active (not dismissed). */
+        /** @description new, shortlisted, dismissed or active (not dismissed). */
         triage?: ("new" | "shortlisted" | "dismissed" | "active") | null;
+        /** @description Jobs posted at this URL (board and redirect variants too). */
+        url?: string | null;
       };
       header?: never;
       path?: never;
@@ -7806,7 +9022,7 @@ export interface operations {
       };
     };
   };
-  jobs_get: {
+  jobs_read: {
     parameters: {
       query?: never;
       header?: never;
@@ -8025,6 +9241,86 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": components["schemas"]["DistinctInput"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["JobSummary"];
+        };
+      };
+      /** @description unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description not_found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description request_size or file_size */
+      413: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description validation */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+    };
+  };
+  jobs_link: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        job_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["LinkInput"];
       };
     };
     responses: {
@@ -8382,7 +9678,7 @@ export interface operations {
       };
     };
   };
-  jobs_triage: {
+  jobs_triage_one: {
     parameters: {
       query?: never;
       header?: never;
@@ -8444,6 +9740,56 @@ export interface operations {
       };
       /** @description request_size or file_size */
       413: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description validation */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+    };
+  };
+  jobs_get: {
+    parameters: {
+      query: {
+        /** @description Up to 20 job ids. */
+        ids: string[];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["JobBatch"];
+        };
+      };
+      /** @description unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description forbidden */
+      403: {
         headers: {
           [name: string]: unknown;
         };
@@ -8618,6 +9964,75 @@ export interface operations {
       };
       /** @description forbidden */
       403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description validation */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+    };
+  };
+  jobs_triage: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["JobTriage"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["BatchResult"];
+        };
+      };
+      /** @description unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description request_size or file_size */
+      413: {
         headers: {
           [name: string]: unknown;
         };
@@ -9247,9 +10662,12 @@ export interface operations {
       };
     };
   };
-  skills_list: {
+  skills_get: {
     parameters: {
-      query?: never;
+      query?: {
+        name?: string;
+        path?: string;
+      };
       header?: never;
       path?: never;
       cookie?: never;
@@ -9262,7 +10680,8 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": components["schemas"]["SkillList"];
+          "application/json":
+            components["schemas"]["Skill"] | components["schemas"]["SkillList"];
         };
       };
       /** @description unauthorized */
@@ -9294,7 +10713,7 @@ export interface operations {
       };
     };
   };
-  skills_get: {
+  skills_get_1: {
     parameters: {
       query?: {
         path?: string;
@@ -9313,7 +10732,8 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": components["schemas"]["Skill"];
+          "application/json":
+            components["schemas"]["Skill"] | components["schemas"]["SkillList"];
         };
       };
       /** @description unauthorized */
@@ -9532,7 +10952,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": components["schemas"]["Source"];
+          "application/json": components["schemas"]["SourceDetail"];
         };
       };
       /** @description unauthorized */
@@ -9731,7 +11151,7 @@ export interface operations {
       };
     };
   };
-  sources_run: {
+  sources_run_one: {
     parameters: {
       query?: never;
       header?: never;
@@ -9775,6 +11195,84 @@ export interface operations {
       };
       /** @description not_found */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description request_size or file_size */
+      413: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description validation */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description rate_limited */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+    };
+  };
+  sources_save: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["SourcesSave"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["BatchResult"];
+        };
+      };
+      /** @description unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description forbidden */
+      403: {
         headers: {
           [name: string]: unknown;
         };
@@ -9931,6 +11429,86 @@ export interface operations {
       };
       /** @description forbidden */
       403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description request_size or file_size */
+      413: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description validation */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description rate_limited */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+    };
+  };
+  sources_run: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["SourceRunInput"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | components["schemas"]["SourcePreviewResult"]
+            | components["schemas"]["Task"];
+        };
+      };
+      /** @description unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description conflict */
+      409: {
         headers: {
           [name: string]: unknown;
         };
@@ -10666,6 +12244,75 @@ export interface operations {
       };
     };
   };
+  templates_save: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["TemplateSave"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Template"];
+        };
+      };
+      /** @description unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description request_size or file_size */
+      413: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description validation */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+    };
+  };
   tokens_list: {
     parameters: {
       query?: never;
@@ -10914,6 +12561,58 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["WorkspaceInfo"];
+        };
+      };
+      /** @description unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description validation */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+    };
+  };
+  workspace_context: {
+    parameters: {
+      query?: {
+        /** @description Owner corrections since then (default: your previous read). */
+        feedback_since?: string | null;
+        /** @description career_full: full narratives and approved highlights; templates_full: TeX and guidance. */
+        include?: ("career_full" | "templates_full")[];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["WorkspaceContext"];
         };
       };
       /** @description unauthorized */

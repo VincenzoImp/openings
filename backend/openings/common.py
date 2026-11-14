@@ -24,6 +24,46 @@ def check_version(row, expected):
         conflict(details=details)
 
 
+def error_body(error):
+    return {
+        "code": error.code,
+        "message": error.message,
+        "status": error.status,
+        "details": error.details,
+    }
+
+
+def run_items(db, items, key, apply, collect=False):
+    """Apply each item of a batch on its own and return the BatchResult.
+
+    ``key(item)`` is the item's record id (None for a create, whose id comes from
+    its result). A rule or validation failure fails that item only; nothing is
+    rolled back across items. ``collect`` removes unused file bytes once at the end.
+    """
+    from pydantic import ValidationError
+
+    from .errors import invalid
+
+    results = []
+    try:
+        for item in items:
+            identifier = key(item)
+            try:
+                with db.lock:
+                    result = apply(item)
+                identifier = identifier or (result or {}).get("id")
+                results.append({"id": identifier, "ok": True, "result": result})
+            except DomainError as error:
+                results.append({"id": identifier, "ok": False, "error": error_body(error)})
+            except ValidationError as error:
+                failure = error_body(invalid(error))
+                results.append({"id": identifier, "ok": False, "error": failure})
+    finally:
+        if collect and any(result["ok"] for result in results):
+            db.collect_blobs()
+    return batch_result(results)
+
+
 def batch_result(items):
     """A batch's results (BatchResult): each ``{id, ok, result | error}`` numbered in
     request order, with the record's new version and the batch of the changes."""

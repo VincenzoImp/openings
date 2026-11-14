@@ -56,8 +56,8 @@ class RevisionOperations:
     """Creating, reading, reviewing, comparing and deleting document revisions."""
 
     @staticmethod
-    def _validate_evidence(conn, claim_ids, knowledge_ids):
-        """Cited claims are approved and cited Career entries exist."""
+    def _validate_evidence(conn, highlight_ids, career_ids):
+        """Cited highlights are approved and cited Career entries exist."""
 
         def existing(table, ids, extra=""):
             if not ids:
@@ -68,21 +68,21 @@ class RevisionOperations:
                 for row in conn.execute(f"SELECT id FROM {table} WHERE id IN ({marks}){extra}", ids)
             }
 
-        claims = existing("claims", claim_ids, " AND approved=1")
-        entries = existing("knowledge", knowledge_ids)
-        if not set(claim_ids) <= claims:
+        highlights = existing("claims", highlight_ids, " AND approved=1")
+        entries = existing("knowledge", career_ids)
+        if not set(highlight_ids) <= highlights:
             raise DomainError(
                 422,
-                "unapproved_claim",
-                "The revision cites claims that are not approved or do not exist.",
-                {"claim_ids": sorted(set(claim_ids) - claims)},
+                "unapproved_highlight",
+                "The revision cites highlights that are not approved or do not exist.",
+                {"highlight_ids": sorted(set(highlight_ids) - highlights)},
             )
-        if not set(knowledge_ids) <= entries:
+        if not set(career_ids) <= entries:
             raise DomainError(
                 422,
                 "unknown_evidence",
                 "The revision cites Career entries that do not exist.",
-                {"knowledge_ids": sorted(set(knowledge_ids) - entries)},
+                {"career_ids": sorted(set(career_ids) - entries)},
             )
 
     def create_document(self, value: DocumentCreate) -> dict:
@@ -98,7 +98,7 @@ class RevisionOperations:
                 "without content and upload the files with the grants it returns.",
             )
         content = encode({} if source_kind else value.content or {})
-        claim_ids, knowledge_ids = encode(value.claim_ids), encode(value.knowledge_ids)
+        claim_ids, knowledge_ids = encode(value.highlight_ids), encode(value.career_ids)
         digest = fingerprint(value)
         with self.db.transaction() as conn:
             document_id = replay(conn, "documents", value.idempotency_key, digest)
@@ -118,7 +118,7 @@ class RevisionOperations:
                         "revision_parent",
                         "A previous revision must belong to the same application and document kind.",
                     )
-                self._validate_evidence(conn, value.claim_ids, value.knowledge_ids)
+                self._validate_evidence(conn, value.highlight_ids, value.career_ids)
                 # A retry returns the revision it created: for a CV or letter, only while
                 # that revision has no file yet.
                 old = conn.execute(
@@ -288,8 +288,8 @@ class RevisionOperations:
             content = result.pop("content")
             if result["kind"] not in SOURCE_KINDS:
                 result["content"] = json.loads(content)
-            for key in ("claim_ids", "knowledge_ids"):
-                result[key] = json.loads(result[key])
+            for column, key in (("claim_ids", "highlight_ids"), ("knowledge_ids", "career_ids")):
+                result[key] = json.loads(result.pop(column))
             result["files"] = files[result["id"]]
             sources = [
                 file for file in result["files"] if is_tex_source(file["name"], file["media_type"])
