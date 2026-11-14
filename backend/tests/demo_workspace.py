@@ -5,9 +5,9 @@ with the example Preferences, three templates, three collection sources, an
 agent token named "Claude Code" and fifteen jobs at fictional companies: new
 jobs (one a likely duplicate of a job with an application, one that requires
 German), two dismissals (by the owner and by the agent) and applications in
-every stage. The Ready application's CV and letter are the real PDFs built from
-examples/cv.tex and examples/letter.tex (tests/fixtures/demo-*.pdf), with those
-exact sources. All dates are relative to now, so the screens always look current.
+every stage. The CVs and the Ready application's letter are real PDFs built
+with Tectonic from tests/fixtures/demo-cv.tex and demo-letter.tex (the layout
+of examples/cv.tex and letter.tex), stored with those exact sources. All dates are relative to now, so the screens always look current.
 Everything is fictional and uses example domains.
 """
 
@@ -467,14 +467,15 @@ def seed_demo(app, client):
                 }
             )
 
-    def revisions(application, company, days, letter=True):
-        """The agent's CV (and letter) for an application: the demo PDFs with their sources."""
-        kinds = [("cv", cv_tex, "demo-cv.pdf")]
+    def revisions(application, company, days, letter=False):
+        """The agent's CV (and the Voltline letter) for an application, with their sources."""
+        kinds = [("cv", "demo-cv")]
         if letter:
-            kinds.append(("letter", letter_tex, "demo-letter.pdf"))
+            kinds.append(("letter", "demo-letter"))
         with moment(days=days), acting_as(agent), batch():
-            for kind, tex, pdf in kinds:
-                data = (FIXTURES / pdf).read_bytes()
+            for kind, name in kinds:
+                tex = (FIXTURES / f"{name}.tex").read_text()
+                data = (FIXTURES / f"{name}.pdf").read_bytes()
                 document = documents.create_document(
                     DocumentCreate(
                         application_id=application["id"],
@@ -592,7 +593,7 @@ def seed_demo(app, client):
         ready = workspace.create_application(
             {"job_id": voltline["id"], "priority": 1, "deadline": day(12)}
         )
-    revisions(ready, voltline["company"], 1)
+    revisions(ready, voltline["company"], 1, letter=True)
     with moment(hours=20), acting_as(agent):
         workspace.add_note(
             voltline["id"],
@@ -642,7 +643,7 @@ def seed_demo(app, client):
                 }
             ],
         )
-    revisions(carbon_app, carbon["company"], 2, letter=False)
+    revisions(carbon_app, carbon["company"], 2)
 
     # Shortlisted by the owner, no documents yet: Tessellate Maps, which requires Italian.
     tessellate = collect(
