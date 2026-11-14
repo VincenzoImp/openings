@@ -41,7 +41,7 @@ from openings import backups
 from openings.actors import OWNER, acting_as
 from openings.app import create_app
 from openings.auth import COOKIE
-from openings.career import ClaimCreate, KnowledgeCreate, ProfileUpdate, TemplateCreate
+from openings.career import EntryCreate, HighlightCreate, ProfileUpdate, TemplateCreate
 from today_fixtures import seed_today
 
 RESET_PATH = "/__e2e__/reset"
@@ -144,8 +144,8 @@ def seed_library(app, agent):
             [],
         ),
     ):
-        entry = career.create_knowledge(
-            KnowledgeCreate(
+        entry = career.create_entry(
+            EntryCreate(
                 kind=kind,
                 title=title,
                 organization=organization,
@@ -170,8 +170,8 @@ def seed_library(app, agent):
                 ("Introduced on-call handbooks used by all three platform teams.", 1, 0),
                 ("Led the migration of 14 pipelines to a new scheduler.", 0, 0),
             ):
-                career.create_claim(
-                    ClaimCreate(
+                career.create_highlight(
+                    HighlightCreate(
                         career_id=entry["id"],
                         text=text,
                         approved=bool(approved),
@@ -223,8 +223,8 @@ def seed(path, jobs=60, applications=53):
     with TestClient(app) as client:
         client.post("/api/v1/auth/setup", json={"password": PASSWORD})
         for index in range(35):
-            evidence = career.create_knowledge(
-                KnowledgeCreate(
+            evidence = career.create_entry(
+                EntryCreate(
                     kind="project",
                     title=f"Synthetic project {index:02d}",
                     organization="Example Labs",
@@ -232,8 +232,8 @@ def seed(path, jobs=60, applications=53):
                     skills=["Python"],
                 )
             )
-            career.create_claim(
-                ClaimCreate(
+            career.create_highlight(
+                HighlightCreate(
                     career_id=evidence["id"],
                     text=f"Synthetic claim {index:02d}",
                     approved=True,
@@ -283,7 +283,7 @@ def seed(path, jobs=60, applications=53):
                     application["id"],
                     {
                         "expected_version": application["version"],
-                        "status": stage,
+                        "stage": stage,
                         **({"outcome": "rejected"} if stage == "closed" else {}),
                     },
                 )

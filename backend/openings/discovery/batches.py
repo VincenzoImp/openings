@@ -13,7 +13,6 @@ from __future__ import annotations
 
 from pydantic import ValidationError
 
-from ..collectors.policy import ProviderPatch
 from ..common import run_items
 from ..errors import DomainError, invalid
 from .models import (
@@ -133,8 +132,7 @@ class SourceBatches:
         def apply(entry):
             identifier, action, change = entry
             if action == "provider":
-                patch = change.model_dump(exclude_unset=True, exclude={"provider_id"})
-                result = self.update_provider(identifier, ProviderPatch(**patch))
+                result = self.update_provider(identifier, change.patch(), change.clear_cooldown)
                 return {"id": identifier, "version": result["version"]}
             if action == "retry":
                 task = self.retry_task(identifier)

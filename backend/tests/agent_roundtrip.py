@@ -319,16 +319,19 @@ async def exercise(base, agent_token, owner_token, folder, tectonic):
                 },
             )
             checks["reply_moves_the_stage"] = (
-                sent["items"][0]["result"]["status"] == "applied"
-                and replied["items"][0]["result"]["status"] == "interview"
+                sent["items"][0]["result"]["stage"] == "applied"
+                and replied["items"][0]["result"]["stage"] == "interview"
             )
 
             # The owner restores one dismissal; the agent reads it as feedback.
             dismissed = next(item for item in decisions if item["to"] == "dismissed")
             job = (await owner.get(f"{base}/api/v1/jobs/{dismissed['job_id']}")).json()
             restored = await owner.post(
-                f"{base}/api/v1/jobs/{job['id']}/triage",
-                json={"triage": "new", "expected_version": job["version"]},
+                f"{base}/api/v1/jobs/bulk",
+                json={
+                    "action": "new",
+                    "items": [{"id": job["id"], "expected_version": job["version"]}],
+                },
             )
             feedback = (await call("workspace_context"))["feedback"]
             checks["owner_correction_is_feedback"] = restored.status_code == 200 and any(

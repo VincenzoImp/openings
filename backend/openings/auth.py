@@ -22,7 +22,7 @@ from .actors import (
     token_actor,
 )
 from .common import new_id, now
-from .errors import DomainError
+from .errors import DomainError, missing
 from .idempotency import fingerprint, remember, replay
 
 COOKIE = "openings_session"
@@ -65,13 +65,17 @@ class Auth:
                 "auth", {"password_hash": password_hash(password), "secret": secrets.token_hex(32)}
             )
 
-    def change_password(self, password):
+    def change_password(self, current, password):
+        """Replace the owner password; ``current`` must be the password in use."""
         require_owner("change the owner password")
         if not 10 <= len(password) <= 1024:
             raise DomainError(422, "password_length", "Use a password of at least 10 characters.")
         with self.workspace.db.lock:
             if not self.configured():
                 raise DomainError(409, "not_configured", "Set up the workspace owner first.")
+            stored = self.workspace.get_settings("auth")["data"]["password_hash"]
+            if not password_matches(current, stored):
+                raise DomainError(422, "current_password", "The current password is incorrect.")
             self.workspace.set_settings(
                 "auth", {"password_hash": password_hash(password), "secret": secrets.token_hex(32)}
             )
@@ -197,15 +201,13 @@ class Auth:
         require_owner("revoke API tokens")
         with self.workspace.db.transaction() as conn:
             row = conn.execute("SELECT name FROM api_tokens WHERE id=?", (record_id,)).fetchone()
+            if row is None:
+                missing("Token")
             conn.execute("DELETE FROM api_tokens WHERE id=?", (record_id,))
-            if row:
-                events.record(
-                    conn,
-                    "token_revoked",
-                    subject=("token", record_id),
-                    payload={"name": row["name"]},
-                )
-        return {"deleted": True}
+            events.record(
+                conn, "token_revoked", subject=("token", record_id), payload={"name": row["name"]}
+            )
+        return {"deleted": True, "id": record_id}
 
     def operation_serializer(self):
         """Operational grants use their own salt, so they never verify as sessions."""

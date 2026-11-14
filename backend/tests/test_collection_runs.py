@@ -300,7 +300,7 @@ def test_pause_and_delete_preserve_run_history(collection, monkeypatch):
     assert run["state"] == "succeeded" and workspace.list_jobs()["total"] == 0
 
 
-def test_rest_versions_overrides_and_schema_discovery(client):
+def test_rest_versions_overrides_and_schema_discovery(app, client):
     source = client.post(
         "/api/v1/sources",
         json={
@@ -323,12 +323,8 @@ def test_rest_versions_overrides_and_schema_discovery(client):
     )
     assert response.status_code == 200
     run_id = response.json()["run_id"]
-    assert (
-        client.get(f"/api/v1/collection/runs/{run_id}").json()["source_snapshot"]["config"][
-            "hours_old"
-        ]
-        == 168
-    )
+    run = app.state.workspace.discovery.get_run(run_id)
+    assert run["source_snapshot"]["config"]["hours_old"] == 168
     assert client.get(f"/api/v1/sources/{source['id']}").json()["config"]["hours_old"] == 72
     schemas = client.get("/api/v1/sources/schemas").json()
     assert schemas["items"][0]["config_schema"]["properties"]["results_wanted"]["default"] == 20

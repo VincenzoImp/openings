@@ -21,7 +21,8 @@ and its result is compact JSON without empty fields (``compact_result``).
 
 Owner-only operations (``OWNER``) are REST only. So is an operation declared with
 ``mcp="<tool>"``: a REST route kept for the dashboard or scripts whose work the
-named MCP tool does (a batch tool covering a one-record route, for example).
+named MCP tool does (a batch tool covering a one-record route, for example). A
+route whose actions several tools cover names them all (``mcp=("a", "b")``).
 """
 
 import functools
@@ -72,12 +73,12 @@ class Operation:
     open_world: bool
     summary: str
     description: str
-    covered_by: str | None = None  # REST only: the MCP tool that does this work
+    covered_by: tuple[str, ...] = ()  # REST only: the MCP tools that do this work
     tool: Any = None  # (Tool, split), built once and shared by every application
 
     @property
     def on_mcp(self):
-        return self.access != OWNER and self.covered_by is None
+        return self.access != OWNER and not self.covered_by
 
     @property
     def method(self):
@@ -94,16 +95,17 @@ OPERATIONS: list[Operation] = []
 def operation(*routes, access=READ, tags=(), status=None, open_world=False, mcp=None):
     """Declare an operation on ``"METHOD /path"`` (a second route is a REST alias).
 
-    ``mcp`` names the MCP tool that does this operation's work: the operation is
-    then REST only.
+    ``mcp`` names the MCP tool (or tools) that do this operation's work: the
+    operation is then REST only.
     """
+    covered = (mcp,) if isinstance(mcp, str) else tuple(mcp or ())
 
     def register(fn):
         summary, _, rest = inspect.getdoc(fn).partition("\n")
         pairs = [tuple(route.split(" ", 1)) for route in routes]
         flags = (access, list(tags), status, open_world)
         description = " ".join(rest.split())
-        OPERATIONS.append(Operation(fn.__name__, pairs, fn, *flags, summary, description, mcp))
+        OPERATIONS.append(Operation(fn.__name__, pairs, fn, *flags, summary, description, covered))
         return fn
 
     return register
@@ -152,7 +154,7 @@ def bind_rest(router, errors):
                 response_model_exclude_unset=True,
                 dependencies=[_owner_only(action)] if op.access == OWNER else None,
                 openapi_extra={"x-openings-access": op.access}
-                | ({"x-openings-mcp": op.covered_by} if op.covered_by else {}),
+                | ({"x-openings-mcp": ", ".join(op.covered_by)} if op.covered_by else {}),
                 **({"status_code": op.status} if op.status else {}),
             )
 
@@ -298,7 +300,7 @@ def bind_mcp(mcp, workspace):
     """Add the tool of every operation on MCP; ``ws`` is ``workspace``.
 
     An owner-only or REST-only operation is remembered with its route (and the
-    tool that covers it), so a call by its name is answered with where to go.
+    tools that cover it), so a call by its name is answered with where to go.
     """
     mcp.owner_only, mcp.rest_only = {}, {}
     for op in OPERATIONS:
@@ -325,9 +327,9 @@ def bind_mcp(mcp, workspace):
 
 def capability_entries():
     """One ``{name, method, path, access}`` entry per operation, relative to ``/api/v1``;
-    a REST-only operation names the MCP tool that does its work (``mcp``)."""
+    a REST-only operation names the MCP tools that do its work (``mcp``)."""
     return [
         {"name": op.name, "method": op.method, "path": op.path, "access": op.access}
-        | ({"mcp": op.covered_by} if op.covered_by else {})
+        | ({"mcp": ", ".join(op.covered_by)} if op.covered_by else {})
         for op in OPERATIONS
     ]

@@ -69,7 +69,19 @@ class SourcePatch(Input):
         return self
 
 
-class ProviderChange(ProviderPatch):
+class ProviderUpdate(ProviderPatch):
+    clear_cooldown: bool = Field(
+        default=False,
+        description="true lifts a pause the provider asked for (Retry-After) now.",
+    )
+
+    def patch(self):
+        """The policy change, without the cooldown switch."""
+        fields = self.model_dump(exclude_unset=True, exclude={"clear_cooldown", "provider_id"})
+        return ProviderPatch(**fields)
+
+
+class ProviderChange(ProviderUpdate):
     provider_id: str = Field(min_length=1, max_length=100)
 
 
@@ -180,8 +192,8 @@ class CollectionRunQuery(Query):
 
 
 class SourceQuery(Query):
-    limit: int = 100
-    offset: int = 0
+    limit: int = Field(default=100, ge=1)
+    offset: int = Field(default=0, ge=0)
     summary: bool = True
 
 

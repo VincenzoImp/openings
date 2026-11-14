@@ -261,12 +261,22 @@ def test_a_cv_is_its_source_and_the_pdf_built_from_it(app, client):
     application = workspace.create_application({"job_id": job["id"]})
     refused = client.post(
         "/api/v1/documents",
-        json={"application_id": application["id"], "kind": "cv", "content": {"text": "CV"}},
+        json={
+            "application_id": application["id"],
+            "kind": "cv",
+            "content": {"text": "CV"},
+            "pdf": {"name": "cv.pdf", "size": len(PDF)},
+        },
     )
     assert code(refused) == (422, "content_not_accepted")
     created = client.post(
         "/api/v1/documents",
-        json={"application_id": application["id"], "title": "CV", "note": "First draft."},
+        json={
+            "application_id": application["id"],
+            "title": "CV",
+            "note": "First draft.",
+            "pdf": {"name": "cv.pdf", "size": len(PDF)},
+        },
     )
     assert created.status_code == 201
     cv = created.json()
@@ -326,7 +336,12 @@ def test_a_cv_is_its_source_and_the_pdf_built_from_it(app, client):
     # A new revision is compared with the one it replaces, line by line.
     revised = client.post(
         "/api/v1/documents",
-        json={"application_id": application["id"], "title": "CV", "previous_id": cv["id"]},
+        json={
+            "application_id": application["id"],
+            "title": "CV",
+            "previous_id": cv["id"],
+            "pdf": {"name": "cv.pdf", "size": len(PDF)},
+        },
     ).json()
     changed = SOURCE.replace("Python, SQL.", "Python, SQL, Rust.").encode()
     assert send(client, revised["id"], "cv.tex", changed, "application/x-tex").status_code == 200
@@ -392,7 +407,9 @@ def test_a_retry_returns_only_a_revision_without_files(app, client):
     workspace, documents = app.state.workspace, app.state.documents
     job = workspace.ingest_job({"title": "Synthetic engineer", "posting": "Build services."})
     application = workspace.create_application({"job_id": job["id"]})
-    value = DocumentCreate(application_id=application["id"], title="CV")
+    value = DocumentCreate(
+        application_id=application["id"], title="CV", pdf={"name": "cv.pdf", "size": 1}
+    )
     first = documents.create_document(value)
     assert documents.create_document(value)["id"] == first["id"]
     upload(documents, client.put, first["id"], "cv.tex", tex(), "application/x-tex")

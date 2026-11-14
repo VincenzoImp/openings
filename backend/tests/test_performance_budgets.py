@@ -24,7 +24,7 @@ from fastapi.testclient import TestClient
 
 from large_fixtures import seed_large, seed_signals
 from openings.app import create_app
-from openings.career import ClaimCreate, KnowledgeCreate, TemplateCreate
+from openings.career import EntryCreate, HighlightCreate, TemplateCreate
 from timeline_fixtures import guided_application
 
 pytestmark = pytest.mark.performance
@@ -61,16 +61,18 @@ def client(tmp_path_factory):
     seed_large(workspace, JOBS, APPLICATIONS, sources=SOURCES)
     seed_signals(workspace)
     for index in range(20):
-        entry = career.create_knowledge(
-            KnowledgeCreate(
+        entry = career.create_entry(
+            EntryCreate(
                 kind="project",
                 title=f"Synthetic project {index:02d}",
                 narrative="Built reliable services.",
                 skills=["Python"],
             )
         )
-        career.create_claim(
-            ClaimCreate(career_id=entry["id"], text=f"Synthetic claim {index:02d}", approved=True)
+        career.create_highlight(
+            HighlightCreate(
+                career_id=entry["id"], text=f"Synthetic claim {index:02d}", approved=True
+            )
         )
     career.create_template(
         TemplateCreate(name="Synthetic CV", tex="Synthetic TeX", is_default=True)

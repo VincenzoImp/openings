@@ -151,13 +151,7 @@ class ContextService:
                 },
                 "profile": ws.career.get_profile(),
                 "preferences": {
-                    section["section"]: {
-                        "version": section["version"],
-                        "items": [
-                            item if section["section"] == "writing" else item["text"]
-                            for item in section["items"]
-                        ],
-                    }
+                    section["section"]: {"version": section["version"], "items": section["items"]}
                     for section in sections
                 },
                 "career": self._career(conn, full="career_full" in include),
@@ -178,8 +172,7 @@ class ContextService:
             "version": collection["version"],
         }
         result["skills"] = [
-            {"name": item["name"], "use": item["summary"] or item["description"][:200]}
-            for item in ws.skills.list()
+            {"name": item["name"], "use": item["description"]} for item in ws.skills.list()
         ]
         if token_id:
             self.db.execute("UPDATE api_tokens SET context_read_at=? WHERE id=?", (now(), token_id))

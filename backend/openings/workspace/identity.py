@@ -86,7 +86,7 @@ class JobIdentity:
         }
 
     def _job_summaries(self, connection, job_ids):
-        """Compact job rows plus every attempt's id/status/outcome/version."""
+        """Compact job rows plus every attempt's id/stage/outcome/version."""
         if not job_ids:
             return []
         placeholders = ",".join("?" for _ in job_ids)
@@ -98,7 +98,7 @@ class JobIdentity:
         ).fetchall()
         attempts = {}
         for row in connection.execute(
-            "SELECT id,job_id,status,outcome,version,applied_at FROM applications "
+            "SELECT id,job_id,status AS stage,outcome,version,applied_at FROM applications "
             f"WHERE job_id IN ({placeholders}) ORDER BY created_at DESC,id DESC",
             job_ids,
         ):
@@ -346,7 +346,7 @@ class JobIdentity:
             reference = min(
                 items,
                 key=lambda item: (
-                    not any(a["status"] != "closed" for a in item["applications"]),
+                    not any(a["stage"] != "closed" for a in item["applications"]),
                     not item["applications"],
                     item["triage"] != "shortlisted",
                     item["created_at"],
@@ -373,7 +373,7 @@ class JobIdentity:
                 attempt["id"]
                 for item in items
                 for attempt in item["applications"]
-                if attempt["status"] != "closed"
+                if attempt["stage"] != "closed"
             ]
             result.append(
                 {

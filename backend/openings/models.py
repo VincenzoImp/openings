@@ -78,13 +78,6 @@ def dismiss_reason():
 Triage = Literal["new", "shortlisted", "dismissed"]
 
 
-class TriageInput(Versioned):
-    triage: Triage = Field(
-        description="new (to review), shortlisted (starts an application in stage Shortlisted when the job has no open one) or dismissed. Moving a shortlisted job back to new or dismissed removes the application its shortlist started while it is still empty; otherwise 409 application_has_work."
-    )
-    reason: str | None = dismiss_reason()
-
-
 class DistinctInput(Input):
     other_id: str = Field(
         min_length=1,
@@ -110,13 +103,6 @@ class NoteInput(Input):
         default=None, description="Put the note on this application of the job."
     )
     pinned: bool = False
-
-
-class NotePin(Versioned):
-    pinned: bool = Field(
-        default=True,
-        description="True pins the note (unpinning the note pinned in the same scope); false unpins it.",
-    )
 
 
 class Question(Input):
@@ -290,7 +276,7 @@ class ReplyChange(Input):
 class ApplicationFields(Input):
     """The fields of an application change; ApplicationPatch adds its version."""
 
-    status: Stage | None = Field(
+    stage: Stage | None = Field(
         default=None,
         description="applied is Mark applied (applied_at defaults to now); shortlisted again undoes it while the application has no reply, clearing applied_at. Record an employer reply with reply, which sets the stage itself.",
     )
@@ -328,7 +314,7 @@ class ApplicationFields(Input):
     @model_validator(mode="after")
     def reject_null_fields(self):
         for key in self.model_fields_set & {
-            "status",
+            "stage",
             "questions",
             "answers",
             "requirements",
@@ -410,15 +396,21 @@ def unique_items(items, label):
 class ApplicationBulk(Input):
     action: Literal["close", "reopen", "delete"]
     items: list[BulkItem] = Field(min_length=1, max_length=200)
-    outcome: Outcome | None = None
-    status: Literal["shortlisted", "applied", "interview", "offer"] | None = None
+    outcome: Outcome | None = Field(default=None, description="With close: how it ended.")
+    stage: Literal["shortlisted", "applied", "interview", "offer"] | None = Field(
+        default=None, description="With reopen: the stage to return to."
+    )
 
     @model_validator(mode="after")
     def valid_options(self):
-        if (self.action == "close") != (self.outcome is not None):
-            raise ValueError("An outcome is required only for close.")
-        if (self.action == "reopen") != (self.status is not None):
-            raise ValueError("A non-Closed stage is required only for reopen.")
+        if self.action == "close" and self.outcome is None:
+            raise ValueError("Close needs an outcome.")
+        if self.action != "close" and self.outcome is not None:
+            raise ValueError("An outcome goes with close only.")
+        if self.action == "reopen" and self.stage is None:
+            raise ValueError("Reopen needs a stage: shortlisted, applied, interview or offer.")
+        if self.action != "reopen" and self.stage is not None:
+            raise ValueError("A stage goes with reopen only.")
         unique_items(self.items, "application")
         return self
 
@@ -464,14 +456,27 @@ class JobQuery(Input):
         default=None,
         description="new, shortlisted, dismissed or active (not dismissed).",
     )
-    company: str | None = Field(default=None, max_length=300)
-    location: str | None = Field(default=None, max_length=500)
-    source: str | None = Field(default=None, max_length=300)
-    remote: bool | None = None
-    complete: bool | None = None
-    job_type: str | None = Field(default=None, max_length=100)
-    created_since: Since | None = None
-    created_until: Until | None = None
+    company: str | None = Field(
+        default=None, max_length=300, description="Exactly this company name."
+    )
+    location: str | None = Field(
+        default=None, max_length=500, description="Exactly this location text."
+    )
+    source: str | None = Field(
+        default=None,
+        max_length=300,
+        description="The source a job summary names: a board or ATS (such as greenhouse), or manual.",
+    )
+    remote: bool | None = Field(default=None, description="Remote (true) or on site (false).")
+    complete: bool | None = Field(
+        default=None,
+        description="true: the posting text is complete; false: it still needs text (needs_text).",
+    )
+    job_type: str | None = Field(
+        default=None, max_length=100, description="Such as fulltime or internship."
+    )
+    created_since: Since | None = Field(default=None, description="Added at or after this time.")
+    created_until: Until | None = Field(default=None, description="Added at or before this time.")
     signal: (
         Literal["likely_duplicate", "no_longer_listed", "language_required", "pending"] | None
     ) = Field(
@@ -504,7 +509,9 @@ class JobQuery(Input):
         max_length=100,
         description="Jobs changed by one call (its batch_id in changes_list).",
     )
-    since: Since | None = Field(default=None, description="Dismissed at or after this time.")
+    dismissed_since: Since | None = Field(
+        default=None, description="Dismissed at or after this time."
+    )
     hide_unspoken_required: bool | None = Field(
         default=None,
         description="true hides jobs requiring a language outside spoken_languages; unspoken_required counts them.",
@@ -624,8 +631,24 @@ class ReplyFix(Input):
     delete: bool = False
 
 
+# Fields of an application that only change with the version read (applications_get).
+VERSIONED_FIELDS = (
+    "priority",
+    "deadline",
+    "required_documents",
+    "requirements",
+    "questions",
+    "answers",
+)
+
+
 class ApplicationItem(Input):
     application_id: Identifier
+    expected_version: int | None = Field(
+        default=None,
+        ge=1,
+        description="The version read; required to change priority, deadline, documents, requirements, questions or answers.",
+    )
     stage: Stage | None = Field(
         default=None,
         description="applied only when the owner says they applied; closed needs outcome.",
@@ -650,6 +673,14 @@ class ApplicationItem(Input):
     )
     questions: list[Question] | None = Field(default=None, max_length=100)
     answers: dict[str, Any] | None = None
+
+    @model_validator(mode="after")
+    def version_for_fields(self):
+        if self.expected_version is None and self.model_fields_set & set(VERSIONED_FIELDS):
+            raise ValueError(
+                "Give expected_version (from applications_get) to change these fields."
+            )
+        return self
 
 
 class ApplicationsUpdate(Input):

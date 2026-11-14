@@ -1,8 +1,7 @@
 """Hand-written routes: bytes, streams, browser sessions and protocol plumbing.
 
 Each is listed in ``TRANSPORT_ONLY`` with the reason it is not an operation
-(``test_parity.py`` checks the list against the served routes). Routes removed
-in 0.24 answer ``410 Gone`` with what replaces them (``removed.py``).
+(``test_parity.py`` checks the list against the served routes).
 """
 
 import os
@@ -18,7 +17,6 @@ from ..auth import COOKIE, MAX_AGE
 from ..db import SCHEMA_VERSION
 from ..errors import DomainError
 from ..operations import backup_file_for, restore_upload
-from ..removed import ROUTES
 from ..skills import SKILL_FILE, read_skill
 from ..snapshots import RecordsResponse, export_records
 from .operation import API_PREFIX, capability_entries
@@ -44,6 +42,8 @@ TRANSPORT_ONLY = (
     ("POST", "/mcp/", "The MCP streamable HTTP endpoint (tools/list, tools/call)."),
 )
 EXAMPLES = ("career.json", "preferences.json", "cv.tex", "letter.tex")
+# Documented with the Error model by openapi.py.
+NOT_FOUND = {404: {"description": "not_found"}}
 
 
 def _examples():
@@ -68,7 +68,12 @@ def register_transport(app, router, public_url):
         )
         return response
 
-    @router.get(API_PREFIX + "/auth/session", tags=["workspace"], openapi_extra={"security": []})
+    @router.get(
+        API_PREFIX + "/auth/session",
+        tags=["workspace"],
+        operation_id="auth_session",
+        openapi_extra={"security": []},
+    )
     def session(request: Request):
         """Read the browser session state and its CSRF token."""
         state = auth.session(request)
@@ -78,24 +83,34 @@ def register_transport(app, router, public_url):
             "csrf_token": state["csrf"] if state else None,
         }
 
-    @router.post(API_PREFIX + "/auth/setup", tags=["workspace"], openapi_extra={"security": []})
+    @router.post(
+        API_PREFIX + "/auth/setup",
+        tags=["workspace"],
+        operation_id="auth_setup",
+        openapi_extra={"security": []},
+    )
     def setup(request: Request, value: PasswordInput):
         """Set the owner password once and sign the browser in."""
         return signed_in(request, value.password, True)
 
-    @router.post(API_PREFIX + "/auth/login", tags=["workspace"], openapi_extra={"security": []})
+    @router.post(
+        API_PREFIX + "/auth/login",
+        tags=["workspace"],
+        operation_id="auth_login",
+        openapi_extra={"security": []},
+    )
     def login(request: Request, value: PasswordInput):
         """Sign the browser in with the owner password."""
         return signed_in(request, value.password)
 
-    @router.post(API_PREFIX + "/auth/logout", tags=["workspace"])
+    @router.post(API_PREFIX + "/auth/logout", tags=["workspace"], operation_id="auth_logout")
     def logout():
         """Sign out every browser session; API and MCP tokens stay valid."""
         response = JSONResponse(auth.logout())
         response.delete_cookie(COOKIE, path="/")
         return response
 
-    @router.get(API_PREFIX + "/capabilities", tags=["workspace"])
+    @router.get(API_PREFIX + "/capabilities", tags=["workspace"], operation_id="capabilities_get")
     def capabilities():
         """Read the version, schema, this token's kind and each operation's route and access."""
         actor = current_actor()
@@ -107,7 +122,12 @@ def register_transport(app, router, public_url):
             "operations": capability_entries(),
         }
 
-    @router.get(API_PREFIX + "/backup", tags=["workspace"], response_class=FileResponse)
+    @router.get(
+        API_PREFIX + "/backup",
+        tags=["workspace"],
+        operation_id="backup_download",
+        response_class=FileResponse,
+    )
     def backup():
         """Download a consistent SQLite backup with file bytes.
 
@@ -123,7 +143,10 @@ def register_transport(app, router, public_url):
         )
 
     @router.post(
-        API_PREFIX + "/backup/restore", tags=["owner"], openapi_extra={"x-openings-access": "owner"}
+        API_PREFIX + "/backup/restore",
+        tags=["owner"],
+        operation_id="backup_restore",
+        openapi_extra={"x-openings-access": "owner"},
     )
     async def restore(request: Request):
         """Replace the workspace data with a SQLite backup (owner only).
@@ -136,6 +159,7 @@ def register_transport(app, router, public_url):
     @router.get(
         API_PREFIX + "/backups/{name}",
         tags=["owner"],
+        operation_id="backups_download",
         response_class=FileResponse,
         openapi_extra={"x-openings-access": "owner"},
     )
@@ -146,14 +170,17 @@ def register_transport(app, router, public_url):
         return FileResponse(path, media_type="application/vnd.sqlite3", filename=path.name)
 
     @router.get(
-        API_PREFIX + "/export", tags=["owner"], openapi_extra={"x-openings-access": "owner"}
+        API_PREFIX + "/export",
+        tags=["owner"],
+        operation_id="export_download",
+        openapi_extra={"x-openings-access": "owner"},
     )
     def export():
         """Download the workspace records as JSON, without file bytes or credentials (owner only)."""
         require_owner("export the records")
         return RecordsResponse(export_records(workspace.db))
 
-    @router.get(API_PREFIX + "/examples", tags=["workspace"])
+    @router.get(API_PREFIX + "/examples", tags=["workspace"], operation_id="examples_list")
     def examples():
         """List the shipped example files."""
         directory = _examples()
@@ -165,7 +192,13 @@ def register_transport(app, router, public_url):
             ]
         }
 
-    @router.get(API_PREFIX + "/examples/{name}", tags=["workspace"], response_class=FileResponse)
+    @router.get(
+        API_PREFIX + "/examples/{name}",
+        tags=["workspace"],
+        operation_id="examples_get",
+        response_class=FileResponse,
+        responses=NOT_FOUND,
+    )
     def example_file(name: str):
         """Download a shipped example file."""
         path = _examples() / name
@@ -173,7 +206,12 @@ def register_transport(app, router, public_url):
             raise DomainError(404, "not_found", "Example not found.")
         return FileResponse(path, filename=name)
 
-    @router.put(API_PREFIX + "/transfers", tags=["files"], openapi_extra={"security": []})
+    @router.put(
+        API_PREFIX + "/transfers",
+        tags=["files"],
+        operation_id="transfers_upload",
+        openapi_extra={"security": []},
+    )
     async def upload(request: Request):
         """Upload raw file bytes with a grant.
 
@@ -182,22 +220,37 @@ def register_transport(app, router, public_url):
         """
         return await app.state.documents.upload(request)
 
-    @router.get(API_PREFIX + "/transfers", tags=["files"], openapi_extra={"security": []})
+    @router.get(
+        API_PREFIX + "/transfers",
+        tags=["files"],
+        operation_id="transfers_download",
+        openapi_extra={"security": []},
+    )
     def download(request: Request):
         """Download raw file bytes with a grant (X-Transfer-Token)."""
         return app.state.documents.download(request)
 
-    @router.get(API_PREFIX + "/files/{file_id}/content", tags=["files"])
+    @router.get(
+        API_PREFIX + "/files/{file_id}/content",
+        tags=["files"],
+        operation_id="files_content",
+        responses=NOT_FOUND,
+    )
     def file_content(file_id: str, inline: bool = True):
         """Read a file's bytes; inline=false downloads it."""
         return app.state.documents.file_response(file_id, inline)
 
-    @router.get(API_PREFIX + "/skills/{name}/files/{path:path}", tags=["workspace"])
+    @router.get(
+        API_PREFIX + "/skills/{name}/files/{path:path}",
+        tags=["workspace"],
+        operation_id="skills_file",
+        responses=NOT_FOUND,
+    )
     def skill_file(name: str, path: str):
         """Read a skill's reference file by path, as skills_get with path."""
         return read_skill(app.state.skills, name, path)
 
-    @app.get("/health", tags=["workspace"], openapi_extra={"security": []})
+    @app.get("/health", tags=["workspace"], operation_id="health", openapi_extra={"security": []})
     def health():
         """Report liveness, the last backup and the worker heartbeat."""
         workspace.db.one("SELECT 1")
@@ -215,20 +268,6 @@ def register_transport(app, router, public_url):
             return JSONResponse({**body, "status": "worker_stalled"}, status_code=503)
         return body
 
-    for item in ROUTES:
-        for route in item.routes:
-            method, path = route.split(" ", 1)
-            router.add_api_route(
-                API_PREFIX + path, _gone(item), methods=[method], include_in_schema=False
-            )
-
-
-def _gone(item):
-    def gone():
-        raise DomainError(410, "removed", item.message, {"use": item.use})
-
-    return gone
-
 
 def register_prompts(mcp, library):
     """Each shipped skill as an MCP prompt (its instructions) and as resources.
@@ -245,7 +284,7 @@ def register_prompts(mcp, library):
             mcp.resource(
                 uri,
                 name=name if path == SKILL_FILE else f"{name}/{path}",
-                description=item["summary"] if path == SKILL_FILE else None,
+                description=item["description"] if path == SKILL_FILE else None,
                 mime_type="text/markdown",
             )(_resource(library, name, path))
 
@@ -266,7 +305,7 @@ def _prompt(library, name):
         skill = read_skill(library, name)["content"]
         return (
             f"Follow the Openings `{name}` skill below. Read referenced files with "
-            f"skills_get(name, path); `../<skill>/...` links name another skill.\n\n{skill}"
+            f"skills_get(name, path), a `../<skill>/...` path included.\n\n{skill}"
         )
 
     instructions.__name__ = instructions.__qualname__ = name.replace("-", "_")

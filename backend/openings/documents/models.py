@@ -86,7 +86,7 @@ class DocumentCreate(Input):
     )
     pdf: FileSpec | None = Field(
         default=None,
-        description="cv or letter: the PDF to PUT with uploads.pdf; complete and immutable once stored.",
+        description="cv or letter, required: the PDF to PUT with uploads.pdf; complete and immutable once stored.",
     )
     source: str | None = Field(
         default=None,
@@ -94,7 +94,7 @@ class DocumentCreate(Input):
     )
     source_file: FileSpec | None = Field(
         default=None,
-        description="Instead of source: a .tex file to PUT with uploads.source, before the PDF.",
+        description="Instead of source: a .tex file (name, size, sha256) to PUT with uploads.source, before the PDF.",
     )
     highlight_ids: list[str] = Field(
         default_factory=list,
@@ -144,6 +144,12 @@ class DocumentCreate(Input):
             self.pdf or self.source is not None or self.source_file
         ):
             raise ValueError("pdf, source and source_file belong to a CV or letter revision.")
+        if self.kind in SOURCE_KINDS and self.pdf is None:
+            raise ValueError("A CV or letter revision needs pdf: the name and size of its PDF.")
+        if self.source_file is not None and self.source_file.sha256 is None:
+            raise ValueError(
+                "source_file needs its sha256: the PDF names the source it was built from."
+            )
         return self
 
 

@@ -6,9 +6,9 @@ from pydantic import ValidationError
 from openings.career import (
     CareerDates,
     CareerService,
-    ClaimCreate,
-    ClaimUpdate,
-    KnowledgeCreate,
+    EntryCreate,
+    HighlightCreate,
+    HighlightUpdate,
 )
 
 VALID_DATES = [
@@ -43,9 +43,7 @@ def test_dates_keep_only_supplied_precision_and_refuse_contradictions():
 
 
 def test_skills_and_headers_normalize_without_alias_guessing():
-    value = KnowledgeCreate(
-        title="  Languages  ", skills=[" Python ", "python", "JS", "JavaScript"]
-    )
+    value = EntryCreate(title="  Languages  ", skills=[" Python ", "python", "JS", "JavaScript"])
     assert value.title == "Languages"
     assert value.skills == ["Python", "JS", "JavaScript"]
     for fields in [
@@ -55,40 +53,44 @@ def test_skills_and_headers_normalize_without_alias_guessing():
         {"metadata": {"organization": "Duplicate"}},
     ]:
         with pytest.raises(ValidationError):
-            KnowledgeCreate.model_validate({"title": "Entry", **fields})
+            EntryCreate.model_validate({"title": "Entry", **fields})
 
 
 def test_summary_claim_preview_is_ordered_bounded_and_independent_of_description(workspace):
     career = CareerService(workspace)
-    owner = career.create_knowledge(KnowledgeCreate(title="Languages", narrative="User context."))
-    assert career.list_knowledge(summary=True)["items"][0]["highlight_preview"] is None
-    first = career.create_claim(ClaimCreate(career_id=owner["id"], text="Python, SQL."))
-    later = career.create_claim(ClaimCreate(career_id=owner["id"], text="Long wording " * 100))
-    assert career.list_knowledge(summary=True)["items"][0]["highlight_preview"] == first["text"]
-    career.update_claim(first["id"], ClaimUpdate(expected_version=first["version"], position=2))
-    row = career.list_knowledge(summary=True)["items"][0]
+    owner = career.create_entry(EntryCreate(title="Languages", narrative="User context."))
+    assert career.list_entries(summary=True)["items"][0]["highlight_preview"] is None
+    first = career.create_highlight(HighlightCreate(career_id=owner["id"], text="Python, SQL."))
+    later = career.create_highlight(
+        HighlightCreate(career_id=owner["id"], text="Long wording " * 100)
+    )
+    assert career.list_entries(summary=True)["items"][0]["highlight_preview"] == first["text"]
+    career.update_highlight(
+        first["id"], HighlightUpdate(expected_version=first["version"], position=2)
+    )
+    row = career.list_entries(summary=True)["items"][0]
     assert row["highlight_preview"] == later["text"][:240]
     assert row["narrative_preview"] == "User context."
-    assert career.get_knowledge(owner["id"])["narrative"] == "User context."
+    assert career.get_entry(owner["id"])["narrative"] == "User context."
 
 
 def test_a_claim_is_always_included_or_not_and_keeps_other_hints_in_metadata(workspace):
     career = CareerService(workspace)
-    entry = career.create_knowledge(KnowledgeCreate(title="Synthetic entry", narrative="Built."))
-    claim = career.create_claim(
-        ClaimCreate(career_id=entry["id"], text="Built APIs.", metadata={"role": "core"})
+    entry = career.create_entry(EntryCreate(title="Synthetic entry", narrative="Built."))
+    claim = career.create_highlight(
+        HighlightCreate(career_id=entry["id"], text="Built APIs.", metadata={"role": "core"})
     )
     assert claim["always_include"] is False and claim["metadata"] == {"role": "core"}
-    claim = career.update_claim(
-        claim["id"], ClaimUpdate(expected_version=claim["version"], always_include=True)
+    claim = career.update_highlight(
+        claim["id"], HighlightUpdate(expected_version=claim["version"], always_include=True)
     )
     assert claim["always_include"] is True and claim["metadata"] == {"role": "core"}
-    listed = career.list_claims()["items"][0]
+    listed = career.list_highlights()["items"][0]
     assert listed["always_include"] is True
     assert not {"role", "group", "default_in_cv"} & set(listed) & set(claim)
     for removed in ({"role": "core"}, {"group": "Scale"}, {"default_in_cv": True}):
         with pytest.raises(ValidationError):
-            ClaimCreate.model_validate({"career_id": entry["id"], "text": "X.", **removed})
+            HighlightCreate.model_validate({"career_id": entry["id"], "text": "X.", **removed})
 
 
 def test_complete_entry_workflow_headers_and_order(client):
@@ -106,7 +108,7 @@ def test_complete_entry_workflow_headers_and_order(client):
 
     first = call(
         "POST",
-        "/career/knowledge",
+        "/career/entries",
         {
             "title": "Engineer",
             "organization": "Example Cloud",
@@ -114,11 +116,9 @@ def test_complete_entry_workflow_headers_and_order(client):
             "dates": {"kind": "period", "start": "2024-08", "current": True},
         },
     )
-    second = call(
-        "POST", "/career/knowledge", {"title": "Languages", "kind": "skill", "position": 0}
-    )
+    second = call("POST", "/career/entries", {"title": "Languages", "kind": "skill", "position": 0})
     assert first["narrative"] == "" and first["position"] == 0 and first["skills"] == ["Python"]
-    summary = call("GET", "/career/knowledge", {"q": "Cloud", "summary": True})
+    summary = call("GET", "/career/entries", {"q": "Cloud", "summary": True})
     assert summary["total"] == 1
     row = summary["items"][0]
     assert row["organization"] == "Example Cloud" and row["dates"]["start"] == "2024-08"
@@ -126,27 +126,27 @@ def test_complete_entry_workflow_headers_and_order(client):
 
     c1 = call(
         "POST",
-        "/career/claims",
+        "/career/highlights",
         {"career_id": first["id"], "text": "First wording.", "approved": True},
     )
     c2 = call(
         "POST",
-        "/career/claims",
+        "/career/highlights",
         {"career_id": first["id"], "text": "Earlier wording.", "approved": True},
     )
     assert c2["position"] == c1["position"] + 1
     c1 = call(
         "PATCH",
-        "/career/claims/" + c1["id"],
+        "/career/highlights/" + c1["id"],
         {"expected_version": c1["version"], "position": 5},
     )
-    rows = call("GET", "/career/claims", {"q": "Cloud", "summary": True})["items"]
+    rows = call("GET", "/career/highlights", {"q": "Cloud", "summary": True})["items"]
     assert [row["id"] for row in rows] == [c2["id"], c1["id"]]
     assert rows[0]["career_organization"] == "Example Cloud"
 
     changed = call(
         "PATCH",
-        "/career/knowledge/" + first["id"],
+        "/career/entries/" + first["id"],
         {
             "expected_version": first["version"],
             "dates": None,
@@ -156,7 +156,7 @@ def test_complete_entry_workflow_headers_and_order(client):
         },
     )
     assert changed["dates"] is None and changed["skills"] == [] and changed["organization"] == ""
-    ordered = call("GET", "/career/knowledge")["items"]
+    ordered = call("GET", "/career/entries")["items"]
     assert [row["id"] for row in ordered] == [second["id"], first["id"]]
     imported = call(
         "POST",

@@ -4,6 +4,7 @@
 dashboard's TypeScript types are generated from it (``npm run api:gen``).
 """
 
+import inspect
 import json
 import sys
 import tempfile
@@ -17,11 +18,10 @@ from .auth import COOKIE
 from .interfaces.operation import OWNER, READ
 
 ERROR_CODES = {
-    401: "unauthorized: sign in or send a valid bearer token (also transfer_token, transfer_expired).",
+    401: "unauthorized: sign in or send a valid bearer token (also transfer_token, transfer_expired, transfer_used: a grant works once).",
     403: "forbidden: an agent token on an owner-only operation; csrf: a browser write without its X-CSRF-Token header.",
-    404: "not_found: the record or route does not exist.",
+    404: "not_found: the record or route does not exist, including a record the body names (application_id, career_id...).",
     409: "conflict: the record changed (details.current_version and details.id); also constraint, application_has_work and similar rule conflicts.",
-    410: "removed: a route removed in 0.24; details.use names its replacement.",
     413: "request_size or file_size: the body or file is over its limit.",
     422: "validation: details lists {field, message, type} per invalid field; other codes name a rule.",
     429: "rate_limited: the shared provider gate is waiting; details.retry_after_seconds and the Retry-After header give the wait.",
@@ -34,7 +34,7 @@ class ErrorBody(BaseModel):
     message: str = Field(description="A sentence for a person.")
     details: Any = Field(
         default=None,
-        description="Structured details: field errors for validation, current_version and id for a version conflict, use for a removed route.",
+        description="Structured details: field errors for validation, current_version and id for a version conflict.",
     )
 
 
@@ -49,10 +49,21 @@ class Error(BaseModel):
     error: ErrorBody
 
 
+def _names_a_record(op):
+    """Whether a write's body names a record that must exist (application_id, career_id...)."""
+    if op.method not in ("POST", "PUT", "PATCH"):
+        return False
+    for parameter in inspect.signature(op.fn, eval_str=True).parameters.values():
+        model = parameter.annotation
+        if isinstance(model, type) and issubclass(model, BaseModel):
+            return any(name.endswith("_id") for name in model.model_fields)
+    return False
+
+
 def errors(op, path):
     """The error responses an operation documents."""
     statuses = [401, 403, 422]
-    if "{" in path:
+    if "{" in path or _names_a_record(op):
         statuses.append(404)
     if op.access != READ:
         statuses.append(409)
@@ -195,10 +206,12 @@ def build(app):
         components["schemas"].pop(name, None)
     for item in schema["paths"].values():
         for operation in item.values():
-            # A transport route's validation error is the Error model too.
-            invalid = operation["responses"].get("422")
-            if invalid and "HTTPValidationError" in json.dumps(invalid):
-                invalid["content"] = error
+            # A transport route's errors are the Error model too.
+            for code, response in operation["responses"].items():
+                if code[0] in "45" and (
+                    "content" not in response or "HTTPValidationError" in json.dumps(response)
+                ):
+                    response["content"] = error
             if operation.get("operationId") in EXAMPLES:
                 body = operation["requestBody"]["content"]["application/json"]
                 body["examples"] = EXAMPLES[operation["operationId"]]

@@ -1,140 +1,9 @@
-"""The agent's tools: batch reads and writes, per-item results, versions and the 0.23 names."""
+"""The agent's tools: batch reads and writes, per-item results, versions and refusals."""
+
+import json
+from datetime import UTC, datetime, timedelta
 
 from openings.interfaces import OPERATIONS
-from openings.removed import TOOLS
-
-# The MCP tools of 0.23.0, frozen: each is a tool of 0.24 or answers with its replacement.
-TOOLS_0_23 = [
-    "applications_bulk",
-    "applications_create",
-    "applications_delete",
-    "applications_get",
-    "applications_history",
-    "applications_list",
-    "applications_ready",
-    "applications_update",
-    "capabilities_get",
-    "career_import",
-    "career_preview_import",
-    "claims_create",
-    "claims_delete",
-    "claims_get",
-    "claims_list",
-    "claims_update",
-    "collection_get",
-    "collection_runs_cancel",
-    "collection_runs_get",
-    "collection_runs_list",
-    "collection_update",
-    "contexts_create",
-    "contexts_get",
-    "contexts_list",
-    "documents_compare",
-    "documents_create",
-    "documents_delete",
-    "documents_get",
-    "documents_list",
-    "documents_review",
-    "events_list",
-    "files_delete",
-    "files_get",
-    "files_list",
-    "files_reserve_download",
-    "files_reserve_upload",
-    "insights_get",
-    "instructions_get",
-    "instructions_update",
-    "jobs_bulk",
-    "jobs_create",
-    "jobs_delete",
-    "jobs_distinct",
-    "jobs_duplicates",
-    "jobs_get",
-    "jobs_list",
-    "jobs_merge",
-    "jobs_resolve",
-    "jobs_triage",
-    "jobs_update",
-    "knowledge_create",
-    "knowledge_delete",
-    "knowledge_get",
-    "knowledge_list",
-    "knowledge_update",
-    "notes_create",
-    "notes_delete",
-    "notes_get",
-    "notes_list",
-    "notes_pin",
-    "notes_update",
-    "overview_get",
-    "owner_password_update",
-    "policy_add",
-    "policy_confirm",
-    "policy_get",
-    "policy_move",
-    "policy_remove",
-    "policy_reorder",
-    "policy_rule_preview",
-    "policy_update",
-    "profile_get",
-    "profile_update",
-    "providers_list",
-    "providers_update",
-    "questions_answer",
-    "questions_ask",
-    "questions_get",
-    "questions_list",
-    "questions_withdraw",
-    "requests_complete",
-    "requests_create",
-    "requests_decline",
-    "requests_get",
-    "requests_list",
-    "requests_take",
-    "requests_withdraw",
-    "responses_create",
-    "responses_delete",
-    "responses_list",
-    "responses_update",
-    "runs_finish",
-    "runs_get",
-    "runs_list",
-    "runs_start",
-    "runs_update",
-    "skill_notes_get",
-    "skill_notes_update",
-    "skills_get",
-    "skills_list",
-    "sources_bulk",
-    "sources_create",
-    "sources_delete",
-    "sources_get",
-    "sources_list",
-    "sources_preview",
-    "sources_run",
-    "sources_schemas",
-    "sources_update",
-    "sources_yield",
-    "staleness_get",
-    "staleness_list",
-    "tasks_cancel",
-    "tasks_get",
-    "tasks_list",
-    "tasks_retry",
-    "templates_create",
-    "templates_delete",
-    "templates_get",
-    "templates_list",
-    "templates_update",
-    "timeline_get",
-    "tokens_create",
-    "tokens_list",
-    "tokens_revoke",
-    "workspace_backup",
-    "workspace_export",
-    "workspace_info",
-    "workspace_restore",
-]
 
 
 def ok(result):
@@ -152,24 +21,27 @@ def jobs(app, count, prefix="Synthetic role"):
     ]
 
 
-async def test_every_0_23_tool_is_a_tool_or_names_its_replacement(app, mcp):
+async def test_a_name_that_is_not_a_tool_says_what_to_use(app, mcp):
     tools = {tool.name for tool in await app.state.mcp.list_tools()}
-    assert len(TOOLS_0_23) == 129
-    assert set(TOOLS_0_23) <= tools | set(TOOLS)
-    assert not tools & set(TOOLS)
-    owner = {op.name for op in OPERATIONS if op.access == "owner"}
-    for name, gone in TOOLS.items():
-        assert gone.code in ("renamed", "removed", "owner_only"), name
-        assert not gone.use or gone.use in tools, name
+    owner = [op.name for op in OPERATIONS if op.access == "owner"]
+    for name in owner:
+        # An owner operation names its REST route instead of being a tool.
         _, error = mcp.call(name, {})
-        assert error["details"] == {"tool": name, "use": gone.use or None}, name
-        assert error["code"] == ("owner_only" if name in owner else gone.code), name
-        if name in owner:
-            # An owner operation names its REST route instead of being a tool.
-            assert "/api/v1/" in error["message"], name
-    # A REST-only operation answers with the tool that does its work.
-    _, error = mcp.call("jobs_read", {"job_id": "x"})
-    assert (error["code"], error["details"]["use"]) == ("renamed", "jobs_get")
+        assert error["code"] == "owner_only" and "/api/v1/" in error["message"], name
+    for op in OPERATIONS:
+        if op.covered_by:
+            _, error = mcp.call(op.name, {})
+            assert error["code"] == "rest_only", op.name
+            assert error["details"]["use"] == list(op.covered_by), op.name
+            assert set(op.covered_by) <= tools, op.name
+    # A bulk route names every tool that does its work, deleting included.
+    _, error = mcp.call("applications_bulk", {})
+    assert error["message"] == (
+        "applications_bulk is REST only: use applications_update or applications_delete."
+    )
+    _, error = mcp.call("made_up_tool", {})
+    assert (error["code"], error["status"]) == ("unknown_tool", 404)
+    assert "tools/list" in error["message"]
 
 
 def test_jobs_get_reads_many_and_names_the_missing(app, mcp):
@@ -277,7 +149,7 @@ def test_applications_create_and_update_in_batches(app, mcp):
         )
     )
     new, started, refused = created["items"]
-    assert new["result"]["created"] is True and new["result"]["status"] == "shortlisted"
+    assert new["result"]["created"] is True and new["result"]["stage"] == "shortlisted"
     # Shortlisting started this one: it is returned with the item's fields, not doubled.
     assert started["result"]["created"] is False and started["result"]["missing"] == ["cv"]
     assert refused["ok"] is False and refused["error"]["status"] == 409
@@ -296,13 +168,13 @@ def test_applications_create_and_update_in_batches(app, mcp):
                 "items": [
                     {"application_id": new["id"], "stage": "applied", "applied_on": "2026-01-05"},
                     {"application_id": started["id"], "stage": "closed"},
-                    {"application_id": "missing", "priority": 1},
+                    {"application_id": "missing", "expected_version": 1, "priority": 1},
                 ]
             },
         )
     )
     applied, unclosed, unknown = updated["items"]
-    assert applied["result"]["status"] == "applied" and applied["version"]
+    assert applied["result"]["stage"] == "applied" and applied["version"]
     assert unclosed["error"]["code"] == "application_outcome" and unknown["error"]["status"] == 404
     replied = ok(
         mcp.call(
@@ -314,7 +186,7 @@ def test_applications_create_and_update_in_batches(app, mcp):
             },
         )
     )["items"][0]["result"]
-    assert (replied["status"], replied["last_reply"]) == ("interview", "interview")
+    assert (replied["stage"], replied["last_reply"]) == ("interview", "interview")
     read = ok(mcp.call("applications_get", {"ids": [new["id"]]}))["items"][0]
     assert read["applied_at"].startswith("2026-01-05") and read["replies"][0]["note"] == "Monday."
     fixed = ok(
@@ -336,6 +208,41 @@ def test_applications_create_and_update_in_batches(app, mcp):
         "applications_update", {"items": [{"application_id": new["id"], "ready": True}]}
     )
     assert error["code"] == "validation"
+
+
+def test_application_fields_change_only_with_the_version_read(app, mcp):
+    """Requirements, questions and answers are never overwritten blind."""
+    (job,) = jobs(app, 1)
+    workspace = app.state.workspace
+    application = workspace.create_application({"job_id": job["id"]})
+    requirement = {"text": "Synthetic portfolio link.", "blocking": True}
+    _, error = mcp.call(
+        "applications_update",
+        {"items": [{"application_id": application["id"], "requirements": [requirement]}]},
+    )
+    assert error["code"] == "validation" and "expected_version" in error["details"][0]["message"]
+    # The owner resolves something meanwhile: the agent's stale version is refused per item.
+    owner = workspace.update_application(
+        application["id"], {"expected_version": application["version"], "priority": 1}
+    )
+    item = {"application_id": application["id"], "requirements": [requirement]}
+    stale = ok(mcp.call("applications_update", {"items": [item | {"expected_version": 1}]}))
+    assert stale["items"][0]["error"]["code"] == "conflict"
+    assert stale["items"][0]["error"]["details"]["current_version"] == owner["version"]
+    fresh = ok(
+        mcp.call("applications_update", {"items": [item | {"expected_version": owner["version"]}]})
+    )
+    assert fresh["items"][0]["ok"] and fresh["items"][0]["result"]["missing"][-1].startswith(
+        "requirement:"
+    )
+    # Stage and replies stay version-free.
+    moved = ok(
+        mcp.call(
+            "applications_update",
+            {"items": [{"application_id": application["id"], "stage": "applied"}]},
+        )
+    )
+    assert moved["items"][0]["result"]["stage"] == "applied"
 
 
 def test_career_and_highlights_are_saved_in_batches_with_versions(app, mcp):
@@ -453,3 +360,58 @@ def test_sources_and_collection_through_the_agent_tools(app, mcp):
     assert changed["enabled"] is False and changed["results"]["items"][0]["error"]["status"] == 404
     _, stale = mcp.call("collection_update", {"expected_version": collection["version"]})
     assert stale["status"] == 409 and stale["details"]["id"] == "collection"
+
+
+def test_agent_reads_and_writes_say_what_to_do_next(app, mcp, monkeypatch):
+    # A URL whose posting cannot be read keeps the job and says the text is needed.
+    async def unreadable(body, discovery):
+        return body.model_copy(update={"metadata": {"extraction": "needs_text"}})
+
+    monkeypatch.setattr("openings.fetching.complete_input", unreadable)
+    bare = ok(mcp.call("jobs_create", {"url": "https://example.test/jobs/1"}))
+    assert bare["needs_text"] is True
+    full = ok(mcp.call("jobs_create", {"title": "Synthetic role 2", "posting": "Build APIs."}))
+    assert full["needs_text"] is False
+    # Skills are listed with the description an agent chooses by.
+    context = ok(mcp.call("workspace_context"))
+    skills = {item["name"]: item["use"] for item in context["skills"]}
+    listed = {item["name"]: item for item in app.state.workspace.skills.list()}
+    assert skills["triage-jobs"] == listed["triage-jobs"]["description"]
+    # A skill's link to another skill's file resolves.
+    linked = ok(
+        mcp.call(
+            "skills_get",
+            {"name": "maintain-career", "path": "../prepare-applications/references/writing.md"},
+        )
+    )
+    assert linked["name"] == "prepare-applications"
+    _, error = mcp.call("sources_list", {"limit": 0})
+    assert error["code"] == "validation"
+
+
+def test_a_provider_pause_is_lifted_over_rest_and_mcp(app, mcp):
+    client = mcp.client
+    client.headers.update(mcp.token["headers"])
+    discovery = app.state.workspace.discovery
+    later = (datetime.now(UTC) + timedelta(hours=2)).isoformat(timespec="microseconds")
+    app.state.workspace.db.execute(
+        "UPDATE providers SET runtime=? WHERE id IN ('linkedin','indeed')",
+        (json.dumps({"cooldown_until": later}),),
+    )
+    providers = client.get("/api/v1/providers").json()["items"]
+    linkedin = next(item for item in providers if item["id"] == "linkedin")
+    assert linkedin["runtime"]["cooldown_until"] == later
+    lifted = client.patch(
+        "/api/v1/providers/linkedin",
+        json={"expected_version": linkedin["version"], "clear_cooldown": True},
+    ).json()
+    assert lifted["runtime"]["cooldown_until"] is None
+    change = {
+        "provider_id": "indeed",
+        "expected_version": discovery.providers.get("indeed")["version"],
+        "clear_cooldown": True,
+    }
+    version = discovery.get_collection()["version"]
+    result = ok(mcp.call("collection_update", {"expected_version": version, "providers": [change]}))
+    assert result["results"]["items"][0]["ok"]
+    assert discovery.providers.get("indeed")["runtime"]["cooldown_until"] is None
