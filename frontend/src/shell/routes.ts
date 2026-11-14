@@ -9,7 +9,7 @@ export interface Destination {
   /** Routes shown under this destination (the two queues of Jobs). */
   routes?: string[];
   /** Which number the navigation shows beside the label. */
-  count?: "ready" | "questions" | "inbox";
+  count?: "ready" | "inbox";
 }
 export interface NavGroup {
   group: string;
@@ -30,7 +30,6 @@ export const NAV: NavGroup[] = [
       },
       // To review (the old Inbox), Shortlist, Dismissed and All are tabs of Jobs.
       { id: "jobs", label: "Jobs", count: "inbox" },
-      { id: "activity", label: "Activity", count: "questions" },
     ],
   },
   {
@@ -51,7 +50,7 @@ export const NAV: NavGroup[] = [
 ];
 
 /** The destinations of the bottom bar on narrow screens; the rest is under More. */
-export const TAB_BAR = ["today", "applications", "jobs", "activity"];
+export const TAB_BAR = ["today", "applications", "jobs", "career"];
 
 /** Titles of the screens, by route. */
 export const SCREENS: Record<string, string> = {
@@ -59,7 +58,6 @@ export const SCREENS: Record<string, string> = {
   applications: "Applications",
   review: "Application review",
   jobs: "Jobs",
-  activity: "Activity",
   career: "Career",
   preferences: "Preferences",
   templates: "Templates",
@@ -70,10 +68,12 @@ export const SCREENS: Record<string, string> = {
 
 /**
  * Other names of a screen: the one it had in an earlier version (Overview is
- * now Today) and the design's name of the setup guide (Onboarding).
+ * now Today; the removed Activity page opens Today) and the design's name of
+ * the setup guide (Onboarding).
  */
 export const ALIASES: Record<string, string> = {
   overview: "today",
+  activity: "today",
   inbox: "jobs",
   shortlist: "jobs",
   skills: "settings",

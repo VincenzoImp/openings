@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { actorChip, type ActorLike } from "./actor";
+import { actorPhrase } from "./actor";
 import { cx, tagClass, type Tone } from "./classes";
 
 /** A short state or signal. The text carries the meaning; the tone supports it. */
@@ -40,28 +40,14 @@ export function Count({
   );
 }
 
-/** Who did it: the owner, an agent with its token name, the system or unknown. */
-export function ActorChip({
+/** Who did it, in plain words: "by you", "by <token name>", "by job sources". */
+export function ActorPhrase({
   actor,
-  detail,
   className,
 }: {
-  actor?: ActorLike | null;
-  /** What the actor was doing, for example the workflow of a run. */
-  detail?: string;
+  actor?: string | null;
   className?: string;
 }) {
-  const chip = actorChip(actor);
-  return (
-    <span
-      className={cx(
-        "actor",
-        chip.tone === "system" ? "" : chip.tone,
-        className,
-      )}
-    >
-      {chip.text}
-      {detail ? ` · ${detail}` : ""}
-    </span>
-  );
+  const text = actorPhrase(actor);
+  return text ? <span className={cx("caption", className)}>{text}</span> : null;
 }

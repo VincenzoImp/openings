@@ -8,7 +8,7 @@ import {
   type ResponseKind,
 } from "../../api";
 import {
-  ActorChip,
+  actorPhrase,
   Button,
   ErrorBanner,
   Field,
@@ -142,7 +142,11 @@ export function Responses({
               movable={false}
               editing={editing === response.id}
               label={`${responseLabels[response.kind as ResponseKind]} · ${day(response.date)}`}
-              caption={<ActorChip actor={response.created_by} />}
+              caption={
+                actorPhrase(response.created_by)
+                  ? `Recorded ${actorPhrase(response.created_by)}`
+                  : undefined
+              }
               actions={
                 <>
                   <Button

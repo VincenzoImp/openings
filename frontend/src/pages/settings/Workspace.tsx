@@ -133,8 +133,8 @@ export function Workspace({
                 : "Finished collection runs and tasks are kept."}
             </p>
             <p className="muted">
-              Jobs, applications, documents, notes and agent run reports are
-              never removed automatically.
+              Jobs, applications, documents and notes are never removed
+              automatically.
             </p>
             <p className="caption">
               Set by the installation with OPENINGS_RETENTION_DAYS (0 keeps

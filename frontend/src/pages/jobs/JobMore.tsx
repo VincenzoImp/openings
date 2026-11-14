@@ -12,8 +12,7 @@ import { ConfirmDialog } from "../../library/common";
 import { dayTime } from "../../library/time";
 import { useFresh } from "../../library/useFresh";
 import { useWorkspace } from "../../state";
-import type { Links } from "../activity/records";
-import { AskAgent } from "../review/AskAgent";
+import type { Links } from "../../library/records";
 import { reasonsLine } from "./Duplicate";
 import { EditJob } from "./EditJob";
 import { MergeDialog, type Candidate } from "./MergeDialog";
@@ -146,13 +145,12 @@ function Copies({
 
 /**
  * What is kept with the job and changed less often: its details, the sources
- * that saw it, possible copies, files, requests for the agent, and forgetting
- * it for good.
+ * that saw it, possible copies, files, and forgetting it for good.
  */
 export function JobMore({
   job,
   onGone,
-  ...links
+  onOpenJob,
 }: Links & { job: Job; onGone: () => void }) {
   const { mutate } = useWorkspace();
   const [forgetting, setForgetting] = useState(false);
@@ -169,7 +167,7 @@ export function JobMore({
       </details>
       <details>
         <summary>Possible copies and merging</summary>
-        <Copies job={job} onOpenJob={links.onOpenJob} />
+        <Copies job={job} onOpenJob={onOpenJob} />
       </details>
       <details>
         <summary>Files</summary>
@@ -181,10 +179,6 @@ export function JobMore({
             note="Screenshots or a saved copy of the posting."
           />
         </div>
-      </details>
-      <details>
-        <summary>Ask your agent</summary>
-        <AskAgent subjectType="job" subjectId={job.id} {...links} />
       </details>
       <div className="row">
         <Button

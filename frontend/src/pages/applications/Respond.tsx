@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { api, localToday, newId, type Application } from "../../api";
 import { ResponseForm } from "../../design";
-import { useAct } from "../activity/records";
+import { useAct } from "../../library/records";
 import { CHOICES, likelyChoice, respondPlan, type Choice } from "./recording";
 
 /**

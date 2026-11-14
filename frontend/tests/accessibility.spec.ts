@@ -24,12 +24,9 @@ const SCREENS = [
   "jobs",
   "jobs?section=shortlist",
   "jobs?section=dismissed",
+  "jobs?section=dismissed&dismissed_by=agent",
   "jobs?section=all",
   "jobs?signal=likely_duplicate",
-  "activity",
-  "activity?section=requests",
-  "activity?section=runs",
-  "activity?section=timeline",
   "career",
   "career?section=knowledge",
   "career?section=claims",
@@ -45,7 +42,6 @@ const SCREENS = [
   "collection?section=providers",
   "settings",
   "settings?section=skills",
-  "settings?section=skills&skill=prepare-shortlist",
   "settings?section=backup",
   "settings?section=workspace",
   "setup",
@@ -121,41 +117,6 @@ async function settled(page: Page) {
   await page.waitForLoadState("networkidle");
   await expect(page.locator(".loading")).toHaveCount(0);
 }
-
-// The navigation with an open agent run shows a status line; check it too.
-test("an agent opens a run and the navigation shows its status line", async ({
-  page,
-}, info) => {
-  await page.context().addCookies(cookies);
-  await go(page, "today");
-  const workflow = `accessibility ${info.project.name} ${Date.now()}`;
-  await page.evaluate(async (workflow) => {
-    const json = { "Content-Type": "application/json" };
-    const session = await fetch("/api/v1/auth/session").then((response) =>
-      response.json(),
-    );
-    const agent = await fetch("/api/v1/tokens", {
-      method: "POST",
-      headers: { ...json, "X-CSRF-Token": session.csrf_token },
-      body: JSON.stringify({ name: `Agent ${workflow}`, kind: "agent" }),
-    }).then((response) => response.json());
-    const run = await fetch("/api/v1/runs", {
-      method: "POST",
-      credentials: "omit",
-      headers: { ...json, Authorization: "Bearer " + agent.token },
-      body: JSON.stringify({ workflow, scope: "Synthetic open run." }),
-    });
-    if (!run.ok) throw Error(await run.text());
-  }, workflow);
-  await page.reload();
-  if (isNarrow(page))
-    await page.getByRole("button", { name: "More", exact: true }).click();
-  const status = page.locator(".sidebar-foot");
-  await expect(status).toContainText("Run in progress:");
-  await expect(status.locator(".actor")).toHaveClass(/agent/);
-  await expect(status.locator(".actor")).toContainText("Agent accessibility");
-  expect(await findings(page, "status")).toEqual([]);
-});
 
 for (const theme of ["light", "dark"]) {
   test.describe(`${theme} theme`, () => {
@@ -363,7 +324,7 @@ for (const theme of ["light", "dark"]) {
     }) => {
       test.skip(!isNarrow(page), "The More sheet exists on narrow screens.");
       await page.context().addCookies(cookies);
-      await go(page, "career");
+      await go(page, "templates");
       await page.getByRole("button", { name: "More", exact: true }).click();
       await expect(page.locator("#more-sheet")).toBeVisible();
       expect(await findings(page, "more")).toEqual([]);

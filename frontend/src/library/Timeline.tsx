@@ -1,14 +1,13 @@
 import { useState, type FormEvent } from "react";
 import {
   api,
-  type Activity,
   type ResponseKind,
   type TimelineItem,
   type TimelineKind,
   type TimelinePage,
 } from "../api";
 import {
-  ActorChip,
+  ActorPhrase,
   Button,
   Chips,
   Dialog,
@@ -20,7 +19,7 @@ import {
   Loading,
   Tag,
 } from "../design";
-import { changeDetail, changeLabel } from "../pages/activity/wording";
+import { changeDetail, changeLabel } from "./changes";
 import { useWorkspace } from "../state";
 import { ConfirmDialog, Pager } from "./common";
 import { readyReason } from "./ready";
@@ -47,8 +46,6 @@ const SCOPES = [
   "documents",
   "contexts",
   "files",
-  "questions",
-  "requests",
 ];
 const TITLES: Record<string, string> = {
   job_added: "Collected",
@@ -79,11 +76,6 @@ const RESPONSES: Record<ResponseKind, string> = {
 };
 
 type Event = NonNullable<TimelineItem["event"]>;
-const asActivity = (event: Event, at: string): Activity => ({
-  kind: event.kind,
-  payload: event.payload,
-  created_at: at,
-});
 
 /** What a change is called on a timeline. */
 export function eventTitle(event: Event) {
@@ -101,7 +93,7 @@ export function eventTitle(event: Event) {
 }
 
 /** The line under a change: the response and its day, the reason, the fields. */
-export function eventDetail(event: Event, at: string) {
+export function eventDetail(event: Event) {
   const payload = event.payload || {};
   if (event.kind.startsWith("response_") && payload.kind) {
     const kind =
@@ -117,7 +109,7 @@ export function eventDetail(event: Event, at: string) {
   }
   if (event.kind === "application_ready_cleared") return readyReason(payload);
   if (event.kind === "triage_changed") return "";
-  return changeDetail(asActivity(event, at));
+  return changeDetail(event);
 }
 
 const KIND_FILTERS: { id: string; label: string; kinds: TimelineKind[] }[] = [
@@ -284,7 +276,7 @@ export function RecordTimeline({
             <option value="">By anyone</option>
             <option value="owner">By you</option>
             <option value="agent">By an agent</option>
-            <option value="system">By the system</option>
+            <option value="system">By job sources</option>
             <option value="unknown">Not recorded</option>
           </select>
           {applicationId && (
@@ -426,14 +418,14 @@ function Entry({
   const marked = applicationId
     ? item.scope.type === "job"
     : item.scope.type === "application";
-  // Under the text: the response and scope tags, who made it and when, so a
-  // narrow pane keeps the text wide.
+  // Under the text: the response and scope tags, when and who made it, in
+  // plain words ("Today 09:12 by you"), so a narrow pane keeps the text wide.
   const line = (
     <div className="row entry-line">
       {item.kind === "response" && <Tag tone="info">Response</Tag>}
       {marked && <Tag>{item.scope.type === "job" ? "Job" : "Application"}</Tag>}
-      <ActorChip actor={item.actor} detail={item.run?.workflow || undefined} />
       <span className="caption num">{dayTime(item.created_at)}</span>
+      <ActorPhrase actor={item.actor} />
     </div>
   );
   if (item.note) {
@@ -466,7 +458,7 @@ function Entry({
     );
   }
   const event = item.event as Event;
-  const detail = eventDetail(event, item.created_at);
+  const detail = eventDetail(event);
   return (
     <li>
       <div className="grow">

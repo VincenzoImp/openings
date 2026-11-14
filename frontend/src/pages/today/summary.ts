@@ -5,7 +5,6 @@ const count = (n: number, one: string, many = one + "s") =>
 
 export interface TodayCounts {
   ready: number;
-  questions: number;
   blocked: number;
   /** Applications that waited more than `days` for a reply. */
   waiting: number;
@@ -30,11 +29,8 @@ function sentence(clauses: string[]) {
   return capital(text) + ".";
 }
 
-/** `lastRun` says what the agent last did, for the day nothing is waiting. */
-export function todaySummary(counts: TodayCounts, lastRun = ""): Summary {
+export function todaySummary(counts: TodayCounts): Summary {
   const clauses: string[] = [];
-  if (counts.questions)
-    clauses.push(`your agent has ${count(counts.questions, "question")}`);
   if (counts.blocked)
     clauses.push(
       `${count(counts.blocked, "application")} ${counts.blocked === 1 ? "is" : "are"} blocked by a requirement`,
@@ -55,5 +51,5 @@ export function todaySummary(counts: TodayCounts, lastRun = ""): Summary {
       rest: sentence(clauses.slice(1)),
       quiet: false,
     };
-  return { lead: "Nothing is waiting for you.", rest: lastRun, quiet: true };
+  return { lead: "Nothing is waiting for you.", rest: "", quiet: true };
 }
