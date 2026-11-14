@@ -27,12 +27,12 @@ from .resolution import automatic_collection_supported, require_automatic_collec
 # application), applied (an application was sent) and replied (an employer reply).
 SOURCE_COUNTS = """
 SELECT p.source_id,count(*) AS found,
- coalesce(sum(j.triage='saved' OR EXISTS(SELECT 1 FROM applications a WHERE a.job_id=p.job_id)),0)
+ coalesce(sum(j.triage='shortlisted' OR EXISTS(SELECT 1 FROM applications a WHERE a.job_id=p.job_id)),0)
   AS shortlisted,
  coalesce(sum(EXISTS(SELECT 1 FROM applications a WHERE a.job_id=p.job_id AND (a.applied_at IS NOT
-  NULL OR a.status IN ('applied','interview','offer') OR EXISTS(SELECT 1 FROM responses r WHERE
+  NULL OR a.status IN ('applied','interview','offer') OR EXISTS(SELECT 1 FROM replies r WHERE
   r.application_id=a.id)))),0) AS applied,
- coalesce(sum(EXISTS(SELECT 1 FROM applications a JOIN responses r ON r.application_id=a.id
+ coalesce(sum(EXISTS(SELECT 1 FROM applications a JOIN replies r ON r.application_id=a.id
   WHERE a.job_id=p.job_id)),0) AS replied
 FROM postings p JOIN jobs j ON j.id=p.job_id
 WHERE p.source_id IN ({ids}) AND NOT EXISTS(SELECT 1 FROM postings q WHERE q.source_id=p.source_id

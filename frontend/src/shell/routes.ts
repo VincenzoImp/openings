@@ -8,7 +8,7 @@ export interface Destination {
   /** Routes shown under this destination (the two queues of Jobs). */
   routes?: string[];
   /** Which number the navigation shows beside the label. */
-  count?: "ready" | "questions" | "inbox";
+  count?: "ready" | "questions" | "new";
 }
 export interface NavGroup {
   group: string;
@@ -27,8 +27,8 @@ export const NAV: NavGroup[] = [
         routes: ["applications", "review"],
         count: "ready",
       },
-      // To review (the old Inbox), Shortlist, Dismissed and All are tabs of Jobs.
-      { id: "jobs", label: "Jobs", count: "inbox" },
+      // New (the old Inbox), Shortlisted, Dismissed and All are tabs of Jobs.
+      { id: "jobs", label: "Jobs", count: "new" },
       { id: "activity", label: "Activity", count: "questions" },
     ],
   },

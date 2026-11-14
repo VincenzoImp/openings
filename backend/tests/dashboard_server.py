@@ -182,7 +182,7 @@ def seed_library(app, agent):
     career.create_template(
         TemplateCreate(
             name="Synthetic letter",
-            kind="cover_letter",
+            kind="letter",
             tex="Synthetic letter TeX",
             guidance="Three short paragraphs.",
             rules={
@@ -278,8 +278,8 @@ def seed(path, jobs=60, applications=53):
                     "answers": {"motivation": "Synthetic motivation."},
                 },
             )
-            stage = ["draft", "applied", "interview", "offer", "closed"][index % 5]
-            if stage != "draft":
+            stage = ["shortlisted", "applied", "interview", "offer", "closed"][index % 5]
+            if stage != "shortlisted":
                 workspace.update_application(
                     application["id"],
                     {
@@ -291,7 +291,7 @@ def seed(path, jobs=60, applications=53):
             if index == 0:
                 app.state.documents.prepare_context(ContextCreate(application_id=application["id"]))
         elif index < applications + 3:
-            workspace.set_triage(job["id"], "saved", job["version"])
+            workspace.set_triage(job["id"], "shortlisted", job["version"])
     # One daily backup, and copies kept before earlier upgrades for the
     # browser tests to download and delete.
     daily = backups.run_backup(workspace.db, backups.backup_dir(workspace.db), 3)

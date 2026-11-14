@@ -7,7 +7,7 @@ compatibility: Requires access to the Openings MCP server or REST API, as descri
 # Manage sources
 
 Use this workflow to keep collection effective: measure quality, add or tune
-searches, add companies worth monitoring, and reduce Inbox noise. It is standing
+searches, add companies worth monitoring, and reduce noise among New jobs. It is standing
 work under the [operating mandate](../openings-workspace/references/operating-mandate.md). Never change sources as a side
 effect of triage or preparation; record each change and its reason.
 
@@ -46,12 +46,12 @@ Dismissals were made by agents applying the Preferences, so a high dismissal
 rate measures collected text outside them, not the owner's taste. A source
 whose jobs mostly require languages the owner does not speak (`jobs_list` with
 `hide_unspoken_required` reports the count) is better narrowed by place or
-language, so that collection stops paying for them. Drafts
+language, so that collection stops paying for them. Applications
 the owner closed without applying are not preference evidence either: postings
 close or become unfeasible. Derive every filter from the Preferences and Career
 records, and use dismissed titles only to find recurring clear mismatches
 (unrelated domains, sales, roles the owner rules out). Check each candidate term
-against saved jobs so a filter never removes work the owner is looking for.
+against shortlisted jobs so a filter never removes work the owner is looking for.
 
 ## Tune
 
@@ -59,9 +59,9 @@ Prefer the narrowest change that removes a measured, recurring mismatch:
 
 - a more specific query or location for keyword searches;
 - excluded title terms (whole words) for recurring unrelated roles, when the
-  service supports them, checked against the saved sample;
+  service supports them, checked against the shortlisted sample;
 - include-only title terms for company boards with many unrelated departments;
-- a company board source for an employer that appears repeatedly among saved jobs,
+- a company board source for an employer that appears repeatedly among shortlisted jobs,
   or that the Profile and Career evidence make a strong target.
 
 Read the current source schemas before writing; a source's service is fixed after

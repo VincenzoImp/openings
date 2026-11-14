@@ -46,6 +46,7 @@ import os
 import re
 import shutil
 import sqlite3
+import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -121,24 +122,76 @@ def _repairs(**columns):
     return columns
 
 
+# #214 Applications and documents: the words of a job's triage, an application's
+# stage and a document's kind; the stored Ready mark and per-document review leave
+# the schema (archived), responses become replies, and every shortlisted job without
+# an open application gets one (FOLDS_214).
+TRIAGE_214 = (
+    "CASE o.triage WHEN 'inbox' THEN 'new' WHEN 'saved' THEN 'shortlisted' ELSE o.triage END"
+)
+STATUS_214 = "CASE o.status WHEN 'draft' THEN 'shortlisted' ELSE o.status END"
+KIND_214 = "CASE o.kind WHEN 'resume' THEN 'cv' WHEN 'cover_letter' THEN 'letter' ELSE o.kind END"
+DOCUMENTS_214 = {
+    "kind": KIND_214,
+    # Text stored before 0.24 was always derived from the revision's TeX source.
+    "text_from": "CASE WHEN o.text IS NOT NULL THEN 'tex' END",
+}
+REPLIES_214 = {
+    # The 0.20 upgrade dated some responses from updated_at; the mark becomes text.
+    "note": "CASE WHEN o.estimated=1 THEN o.note || CASE WHEN o.note='' THEN '' "
+    "ELSE ' ' END || '(day estimated during the 0.20 upgrade)' ELSE o.note END",
+}
+READY_COLUMNS_214 = (
+    "ready_at",
+    "ready_by_kind",
+    "ready_by_id",
+    "ready_by_name",
+    "ready_by_token_kind",
+)
+SECTIONS_214 = (
+    # The stored Ready mark of each application that had one (Ready is computed in 0.24).
+    Section(
+        "applications_ready",
+        "SELECT id," + ",".join(READY_COLUMNS_214) + " FROM old.applications "
+        "WHERE ready_at IS NOT NULL ORDER BY id",
+        shape="map",
+    ),
+    # The review state of every document revision (per-document approval is removed).
+    Section(
+        "document_review_states",
+        "SELECT id,review_state FROM old.documents ORDER BY id",
+        shape="map",
+    ),
+)
+NOT_ARCHIVED_214 = {
+    **{
+        f"applications.{name}": "in the archive section applications_ready"
+        for name in READY_COLUMNS_214
+    },
+    "documents.review_state": "in the archive section document_review_states",
+}
+
+
 # Every schema-15 table, parents before the tables that reference them.
 TABLES = (
     # #213: the general instructions become Writing rules (``PREFERENCE_SECTIONS``).
     Table("settings", where="o.key<>'instructions'"),
     Table("api_tokens"),
     # #213: the label of the policy rule that dismissed a job becomes its reason.
+    # #214: the triage words of 0.24.
     Table(
         "jobs",
         columns={
             "dismissed_reason": "CASE WHEN o.dismissed_reason='' AND o.dismissed_rule_label "
-            "IS NOT NULL THEN o.dismissed_rule_label ELSE o.dismissed_reason END"
+            "IS NOT NULL THEN o.dismissed_rule_label ELSE o.dismissed_reason END",
+            "triage": TRIAGE_214,
         },
     ),
     Table("sources"),
     Table("postings"),
     Table("job_identities"),
     Table("posting_details"),
-    Table("applications"),
+    Table("applications", columns={"status": STATUS_214}),
     Table("runs"),
     Table("events"),
     Table("notes"),
@@ -146,17 +199,19 @@ TABLES = (
     # #211: default_in_cv becomes always_include; role and group fold into metadata.
     Table("claims", columns={"always_include": "o.default_in_cv"}),
     # #213: rule statements leave the template for Writing rules; the rest stays.
+    # #214: the template kinds of 0.24.
     Table(
         "templates",
         columns={
             "rules": "CASE WHEN o.rules IS NOT NULL AND json_valid(o.rules) THEN "
             "CASE WHEN json_type(o.rules,'$.statements') IS NULL THEN o.rules "
-            "ELSE json_remove(o.rules,'$.statements') END ELSE '{}' END"
+            "ELSE json_remove(o.rules,'$.statements') END ELSE '{}' END",
+            "kind": KIND_214,
         },
     ),
     Table("contexts"),
     Table("context_inputs"),
-    Table("documents"),
+    Table("documents", columns=DOCUMENTS_214),
     Table("blobs"),
     Table("files"),
     Table("transfer_grants"),
@@ -169,14 +224,7 @@ TABLES = (
     Table("snapshot_list_items"),
     Table("context_parts"),
     Table("preference_sections", fresh=True),
-    Table(
-        "responses",
-        columns={
-            # The 0.20 upgrade dated some responses from updated_at; the mark becomes text.
-            "note": "CASE WHEN o.estimated=1 THEN o.note || CASE WHEN o.note='' THEN '' "
-            "ELSE ' ' END || '(day estimated during the 0.20 upgrade)' ELSE o.note END",
-        },
-    ),
+    Table("replies", source="responses", columns=REPLIES_214),
     Table("skill_notes"),
     Table("job_signals"),
     Table("idempotency_keys"),
@@ -206,10 +254,10 @@ JSON_REPAIRS = {
 # ``repaired_json`` (stored texts that were not JSON) and ``dropped_tables``
 # (every row of a schema-14 table nothing copies or archives). Each removal adds
 # its section here with the tables it archives whole.
-SECTIONS = ()
+SECTIONS = (*SECTIONS_214,)
 
 # Dropped columns not written to ``dropped_columns``, each with the reason.
-NOT_ARCHIVED = {}
+NOT_ARCHIVED = {**NOT_ARCHIVED_214}
 
 # --- #213 Preferences replace Policy -------------------------------------------------
 #
@@ -517,14 +565,110 @@ def fold_claim_fields(conn):
 # Functions run after the copy in the same transaction, in order. Each takes the
 # connection (schema 15 as ``main``, schema 14 as ``old``) and returns the number
 # of rows it created per schema-15 table, which the row-count check adds.
-FOLDS = (fold_preferences, fold_claim_fields)
+
+
+# #214: every shortlisted job without an open application gets one, as shortlisting
+# starts it in 0.24; each stored Ready mark leaves an event dated when it was set.
+def _start_shortlisted(conn):
+    """A Shortlisted application for every shortlisted job without an open one."""
+    stamp = datetime.now(UTC).isoformat(timespec="microseconds")
+    jobs = [
+        row[0]
+        for row in conn.execute(
+            "SELECT id FROM main.jobs j WHERE triage='shortlisted' AND NOT EXISTS("
+            "SELECT 1 FROM main.applications a WHERE a.job_id=j.id AND a.status<>'closed') "
+            "ORDER BY created_at,id"
+        )
+    ]
+    for job_id in jobs:
+        application_id = uuid.uuid4().hex
+        conn.execute(
+            "INSERT INTO main.applications(id,job_id,status,from_shortlist,created_at,updated_at) "
+            "VALUES(?,?,'shortlisted',1,?,?)",
+            (application_id, job_id, stamp, stamp),
+        )
+        conn.execute(
+            "INSERT INTO main.events(id,job_id,application_id,kind,payload,created_at,"
+            "subject_type,subject_id,actor_kind) VALUES(?,?,?,'application_created',?,?,"
+            "'application',?,'system')",
+            (
+                uuid.uuid4().hex,
+                job_id,
+                application_id,
+                json.dumps({"status": "shortlisted", "by": "upgrade"}),
+                stamp,
+                application_id,
+            ),
+        )
+    return {"applications": len(jobs), "events": len(jobs)}
+
+
+def _archive_ready_marks(conn):
+    """An event per stored Ready mark, dated and attributed as the mark was."""
+    rows = conn.execute(
+        "SELECT id,job_id," + ",".join(READY_COLUMNS_214) + " FROM old.applications "
+        "WHERE ready_at IS NOT NULL ORDER BY id"
+    ).fetchall()
+    for application_id, job_id, ready_at, kind, actor_id, name, token_kind in rows:
+        conn.execute(
+            "INSERT INTO main.events(id,job_id,application_id,kind,payload,created_at,"
+            "subject_type,subject_id,actor_kind,actor_id,actor_name,actor_token_kind) "
+            "VALUES(?,?,?,'application_ready_mark_archived',?,?,'application',?,?,?,?,?)",
+            (
+                uuid.uuid4().hex,
+                job_id,
+                application_id,
+                json.dumps({"ready_at": ready_at, "by": "upgrade"}),
+                ready_at,
+                application_id,
+                kind,
+                actor_id,
+                name,
+                token_kind,
+            ),
+        )
+    return {"events": len(rows)}
+
+
+FOLDS_214 = (_start_shortlisted, _archive_ready_marks)
+FOLDS = (fold_preferences, fold_claim_fields, *FOLDS_214)
 
 # Values the upgrade must keep: (what, query over schema 15, query over schema 14).
 INVARIANTS = (
     (
+        # Without the applications the upgrade starts for shortlisted jobs (#214).
         "applications that are not Closed",
-        "SELECT count(*) FROM main.applications WHERE status<>'closed'",
+        (
+            "SELECT count(*) FROM main.applications a WHERE status<>'closed' AND NOT EXISTS("
+            "SELECT 1 FROM main.events e WHERE e.application_id=a.id "
+            "AND e.kind='application_created' AND json_extract(e.payload,'$.by')='upgrade')"
+        ),
         "SELECT count(*) FROM old.applications WHERE status<>'closed'",
+    ),
+    # #214
+    (
+        "shortlisted jobs",
+        "SELECT count(*) FROM main.jobs WHERE triage='shortlisted'",
+        "SELECT count(*) FROM old.jobs WHERE triage='saved'",
+    ),
+    (
+        "shortlisted jobs without an open application",
+        (
+            "SELECT count(*) FROM main.jobs j WHERE triage='shortlisted' AND NOT EXISTS(SELECT 1 "
+            "FROM main.applications a WHERE a.job_id=j.id AND a.status<>'closed')"
+        ),
+        "SELECT 0",
+    ),
+    (
+        "CV and letter revisions with a PDF",
+        (
+            "SELECT count(*) FROM main.documents d WHERE kind IN ('cv','letter') AND EXISTS("
+            "SELECT 1 FROM main.files f WHERE f.document_id=d.id AND f.media_type='application/pdf')"
+        ),
+        (
+            "SELECT count(*) FROM old.documents d WHERE kind IN ('resume','cover_letter') AND EXISTS("
+            "SELECT 1 FROM old.files f WHERE f.document_id=d.id AND f.media_type='application/pdf')"
+        ),
     ),
     (
         "dismissed jobs (#213 keeps rule dismissals)",

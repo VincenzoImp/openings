@@ -58,7 +58,7 @@ def test_unsupported_formats_are_rejected_without_modifying_the_database(tmp_pat
     assert target.get_job(job["id"])["posting"] == "Build APIs"
 
 
-def test_approval_checks_file_set_but_parallel_upload_grants_remain_valid(tmp_path):
+def test_parallel_upload_grants_remain_valid_until_a_revision_is_complete(tmp_path):
     workspace = Workspace(tmp_path / "review.sqlite")
     documents = DocumentService(workspace)
     job = workspace.ingest_job({"posting": "Build APIs"})
@@ -93,13 +93,26 @@ def test_approval_checks_file_set_but_parallel_upload_grants_remain_valid(tmp_pa
             == 200
         )
         assert documents.get_document(doc["id"])["version"] == 3
-        path = f"/api/v1/documents/{doc['id']}/review"
-        assert client.post(path, json={"expected_version": doc["version"]}).status_code == 409
-        assert client.post(path, json={"expected_review_state": "draft"}).status_code == 422
-        approved = client.post(path, json={"expected_version": current["version"]})
-        assert approved.status_code == 200 and approved.json()["version"] == 4
+        # A file of another kind of revision may still be added.
         assert (
             client.put(grants[2]["url"], headers=grants[2]["headers"], content=b"abc").status_code
-            == 409
+            == 200
         )
-        assert len(documents.get_document(doc["id"])["files"]) == 2
+        assert len(documents.get_document(doc["id"])["files"]) == 3
+        # A CV is complete once its PDF is stored: a grant reserved before is refused.
+        cv = documents.create_document(
+            DocumentCreate(
+                application_id=application["id"], kind="cv", pdf={"name": "cv.pdf", "size": 8}
+            )
+        )
+        late = documents.reserve_upload(
+            UploadReservation(owner_type="document", owner_id=cv["id"], name="photo.png", size=3)
+        )
+        pdf = cv["uploads"]["pdf"]
+        assert (
+            client.put(pdf["url"], headers=pdf["headers"], content=b"%PDF-1.4").status_code == 200
+        )
+        assert documents.get_document(cv["id"])["complete"]
+        refused = client.put(late["url"], headers=late["headers"], content=b"abc")
+        assert refused.status_code == 409 and refused.json()["error"]["code"] == "revision_complete"
+        assert len(documents.get_document(cv["id"])["files"]) == 1

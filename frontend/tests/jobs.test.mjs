@@ -23,7 +23,7 @@ const job = (fields = {}) => ({
   location: "Zurich",
   url: "",
   posting: "",
-  triage: "inbox",
+  triage: "new",
   metadata: {},
   source: "linkedin",
   complete: true,
@@ -38,14 +38,14 @@ const filters = (fields = {}) => ({ ...model.DEFAULTS, ...fields });
 
 test("each tab reads its queue, and only Dismissed filters by who dismissed", () => {
   const review = model.listQuery(filters(), 200);
-  assert.equal(review.get("queue"), "inbox");
+  assert.equal(review.get("triage"), "new");
   assert.equal(review.get("sort"), "newest");
   assert.equal(review.get("limit"), "200");
   const dismissed = model.listQuery(
     filters({ section: "dismissed", dismissed_by: "agent" }),
     200,
   );
-  assert.equal(dismissed.get("queue"), "dismissed");
+  assert.equal(dismissed.get("triage"), "dismissed");
   assert.equal(dismissed.get("sort"), "dismissed");
   assert.equal(dismissed.get("dismissed_by"), "agent");
   const all = model.listQuery(
@@ -57,20 +57,23 @@ test("each tab reads its queue, and only Dismissed filters by who dismissed", ()
     }),
     50,
   );
-  assert.equal(all.get("queue"), null);
+  assert.equal(all.get("triage"), null);
   assert.equal(all.get("dismissed_by"), null);
   assert.equal(all.get("sort"), "newest");
   assert.equal(all.get("q"), "rust");
-  assert.equal(model.sectionOf("nonsense"), "review");
+  assert.equal(model.sectionOf("nonsense"), "new");
+  // The tab names of earlier versions.
+  assert.equal(model.sectionOf("review"), "new");
+  assert.equal(model.sectionOf("shortlist"), "shortlisted");
   const counts = {
     all: 9,
-    inbox: 4,
-    shortlist: 2,
-    applications: 1,
+    new: 4,
+    shortlisted: 2,
     dismissed: 3,
     dismissed_by: { agent: 1, owner: 2, other: 0 },
   };
-  assert.equal(model.sectionCount("review", counts), 4);
+  assert.equal(model.sectionCount("new", counts), 4);
+  assert.equal(model.sectionCount("shortlisted", counts), 2);
   assert.equal(model.sectionCount("all", counts), undefined);
 });
 
@@ -201,9 +204,9 @@ test("where a job came from and where it is now", () => {
     model.foundLine(job({ created_at: "2026-11-13T09:30:00" }), now),
     /^LinkedIn · Today \d\d:\d\d$/,
   );
-  assert.deepEqual(model.placeTag(job()), { text: "To review" });
-  assert.deepEqual(model.placeTag(job({ triage: "saved" })), {
-    text: "Shortlist",
+  assert.deepEqual(model.placeTag(job()), { text: "New" });
+  assert.deepEqual(model.placeTag(job({ triage: "shortlisted" })), {
+    text: "Shortlisted",
   });
   assert.deepEqual(
     model.placeTag(
@@ -222,5 +225,5 @@ test("a job that leaves its list gives way to the next row, or the previous one"
   assert.equal(model.neighbour(ids, "c"), "b");
   assert.equal(model.neighbour(["a"], "a"), "");
   assert.equal(model.neighbour(ids, "gone"), "a");
-  assert.deepEqual(model.QUEUE_SECTIONS, ["review", "shortlist"]);
+  assert.deepEqual(model.QUEUE_SECTIONS, ["new", "shortlisted"]);
 });

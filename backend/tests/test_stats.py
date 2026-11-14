@@ -43,7 +43,7 @@ def sent(workspace, source_id=None, days=10, replies=(), status="applied", appli
         for kind, after in replies:
             day = (datetime.now(UTC) - timedelta(days=days - after)).date().isoformat()
             conn.execute(
-                "INSERT INTO responses(id,application_id,kind,date,created_at,updated_at) "
+                "INSERT INTO replies(id,application_id,kind,date,created_at,updated_at) "
                 "VALUES(?,?,?,?,?,?)",
                 (new_id(), application["id"], kind, day, now(), now()),
             )
@@ -115,7 +115,7 @@ def test_sources_list_counts_what_each_source_found(app, client):
     workspace = app.state.workspace
     first, second = source(workspace, "Data roles"), source(workspace, "Example board")
     sent(workspace, first, replies=[("rejection", 3)])
-    sent(workspace, first, status="draft", applied=False)
+    sent(workspace, first, status="shortlisted", applied=False)
     job, _ = sent(workspace, second)
     shortlisted = workspace.ingest_job({"title": "Kept", "posting": "Build."})
     with workspace.db.transaction() as conn:
@@ -130,7 +130,7 @@ def test_sources_list_counts_what_each_source_found(app, client):
             "last_seen_at) VALUES(?,?,?,?,'x',?,?)",
             (new_id(), shortlisted["id"], second, new_id(), now(), now()),
         )
-    workspace.set_triage(shortlisted["id"], "saved", shortlisted["version"])
+    workspace.set_triage(shortlisted["id"], "shortlisted", shortlisted["version"])
     source(workspace, "Quiet source")
     items = {item["name"]: item["counts"] for item in client.get("/api/v1/sources").json()["items"]}
     assert items == {

@@ -6,7 +6,7 @@ import { Pipeline } from "./applications/Pipeline";
 import { Stats } from "./applications/Stats";
 
 /**
- * Every application from its first Draft to the employer's answer: the
+ * Every application from its shortlist to the employer's reply: the
  * pipeline, and Stats on the applications sent. `#applications?stage=…`
  * opens a stage and `section=stats` the stats.
  */
@@ -17,8 +17,8 @@ export default function ApplicationsPage() {
   return (
     <>
       <PageHead title="Applications">
-        Every attempt, from the first Draft to the employer's answer. You send
-        each application yourself; here you record what happened.
+        Every attempt, from the shortlist to the employer's reply. You send each
+        application yourself; here you record what happened.
       </PageHead>
       <Tabs
         id="applications"

@@ -75,7 +75,7 @@ class Services:
     def draft(self, application_id):
         """A CV and a letter written from one new context."""
         context = self.documents.prepare_context(ContextCreate(application_id=application_id))
-        for kind in ("resume", "cover_letter"):
+        for kind in ("cv", "letter"):
             self.documents.create_document(
                 DocumentCreate(
                     application_id=application_id,
@@ -135,7 +135,7 @@ def test_edits_documents_never_use_leave_drafts_current(drafted):
     services.write("facts", [*reversed(facts)])
     services.replace("writing", "British spelling.", "British   spelling. ")
     services.career.create_template(
-        TemplateCreate(name="Second CV", kind="resume", tex="Synthetic", is_default=True)
+        TemplateCreate(name="Second CV", kind="cv", tex="Synthetic", is_default=True)
     )
     report = services.report(application_id)
     assert report["stale"] is False, report["changes"]
@@ -179,11 +179,11 @@ def test_statements_are_compared_by_content_and_scope(drafted):
     assert change["section"] == "facts" and change["id"].startswith("facts:")
     assert (change["frozen_version"], change["current_version"]) == (1, 2)
     assert per_document(report) == {
-        "cover_letter": [
+        "letter": [
             ("preferences", "Work authorization: EU, no visa."),
             ("preferences", "Work authorization: EU citizen."),
         ],
-        "resume": [
+        "cv": [
             ("preferences", "Work authorization: EU, no visa."),
             ("preferences", "Work authorization: EU citizen."),
         ],
@@ -191,8 +191,8 @@ def test_statements_are_compared_by_content_and_scope(drafted):
     # A writing rule scoped to the CV concerns the CV only.
     services.replace("writing", "One page.", "One page, no photo.")
     documents = per_document(services.report(application_id))
-    assert ("preferences", "One page, no photo.") in documents["resume"]
-    assert ("preferences", "One page, no photo.") not in documents["cover_letter"]
+    assert ("preferences", "One page, no photo.") in documents["cv"]
+    assert ("preferences", "One page, no photo.") not in documents["letter"]
     # A rule moved from the letter to all documents concerns both.
     services.remove("writing", "Sign off with Kind regards.")
     services.add("writing", "Sign off with Kind regards.", scope="all")
@@ -202,7 +202,7 @@ def test_statements_are_compared_by_content_and_scope(drafted):
         ("Sign off with Kind regards.", "added"),
     } <= states
     documents = per_document(services.report(application_id))
-    assert ("preferences", "Sign off with Kind regards.") in documents["resume"]
+    assert ("preferences", "Sign off with Kind regards.") in documents["cv"]
 
 
 @pytest.mark.asyncio
@@ -210,7 +210,7 @@ async def test_rest_mcp_and_application_summaries_report_the_same_parts(tmp_path
     app = create_app(tmp_path / "interfaces.sqlite", start_worker=False)
     services = Services(app.state.workspace)
     services.career.create_template(
-        TemplateCreate(name="MASTER CV", kind="resume", tex="Synthetic", is_default=True)
+        TemplateCreate(name="MASTER CV", kind="cv", tex="Synthetic", is_default=True)
     )
     services.write("facts", [{"text": "Work authorization: EU citizen."}])
     job = services.workspace.ingest_job({"title": "Synthetic role", "posting": "Build APIs."})
@@ -261,7 +261,7 @@ def test_records_are_compared_by_the_content_documents_use(tmp_path):
     services = Services(app.state.workspace)
     career = services.career
     template = career.create_template(
-        TemplateCreate(name="MASTER CV", kind="resume", tex="Synthetic", is_default=True)
+        TemplateCreate(name="MASTER CV", kind="cv", tex="Synthetic", is_default=True)
     )
     entry = career.create_knowledge(
         KnowledgeCreate(title="Backend Engineer", narrative="Built services.")

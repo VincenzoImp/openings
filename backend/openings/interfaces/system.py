@@ -469,7 +469,7 @@ def register_system(router, mcp, workspace, auth, public_url):
 
     @router.get("/examples")
     def examples():
-        names = ["career.json", "preferences.json", "resume.tex", "cover-letter.tex"]
+        names = ["career.json", "preferences.json", "cv.tex", "letter.tex"]
         directory = Path(
             os.environ.get("OPENINGS_EXAMPLES", Path(__file__).resolve().parents[3] / "examples")
         )
@@ -483,7 +483,7 @@ def register_system(router, mcp, workspace, auth, public_url):
 
     @router.get("/examples/{name}")
     def example_file(name: str):
-        if name not in {"career.json", "preferences.json", "resume.tex", "cover-letter.tex"}:
+        if name not in {"career.json", "preferences.json", "cv.tex", "letter.tex"}:
             raise DomainError(404, "not_found", "Example not found.")
         path = (
             Path(
@@ -504,7 +504,7 @@ def register_system(router, mcp, workspace, auth, public_url):
                 "jobs": ["metadata", "overrides"],
                 "job_signals": ["required", "distinct_from"],
                 "postings": ["payload"],
-                "applications": ["questions", "answers", "requirements"],
+                "applications": ["questions", "answers", "requirements", "required_documents"],
                 "events": ["payload"],
                 "runs": ["report", "change_counts"],
                 "questions": ["choices"],
@@ -521,7 +521,7 @@ def register_system(router, mcp, workspace, auth, public_url):
                 "job_signals",
                 "postings",
                 "applications",
-                "responses",
+                "replies",
                 "notes",
                 "events",
                 "runs",

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   calendarDate,
-  readinessLabels,
   type Application,
   type BulkResult,
   type ListResult,
@@ -31,13 +30,12 @@ import {
 import { COLUMNS, HEAD, Row } from "./Row";
 
 const NONE = { items: [], total: 0 };
-const SCOPES = ["applications", "jobs", "documents", "files", "responses"];
+const SCOPES = ["applications", "jobs", "documents", "files"];
 const LIMIT = 200;
 const SORTS: Record<string, string> = {
   updated: "Recently updated",
   deadline: "Deadline, soonest first",
   priority: "Priority, highest first",
-  ready: "Ready longest",
   applied: "Sent, newest first",
   newest: "Newest first",
   oldest: "Oldest first",
@@ -98,7 +96,7 @@ export function Pipeline({
       return changed ? next : selected;
     });
   }, [list.data]);
-  const scope = [filters.stage, q, filters.outcome, filters.readiness].join();
+  const scope = [filters.stage, q, filters.outcome].join();
   useEffect(() => {
     setSelection({});
     setFailures([]);
@@ -110,7 +108,6 @@ export function Pipeline({
   const filtered =
     q ||
     filters.outcome ||
-    filters.readiness ||
     filters.applied_since ||
     filters.applied_until ||
     filters.waiting;
@@ -118,7 +115,6 @@ export function Pipeline({
     setFilters({
       q: "",
       outcome: "",
-      readiness: "",
       applied_since: "",
       applied_until: "",
       waiting: "",
@@ -156,7 +152,7 @@ export function Pipeline({
   );
   const rows = list.data.items;
   const firstReady = rows.find(
-    (item) => item.status === "draft" && item.ready_at,
+    (item) => item.status === "shortlisted" && item.ready,
   );
   return (
     <div className="stack">
@@ -186,24 +182,6 @@ export function Pipeline({
         </div>
       </div>
       <div className="filterbar" role="group" aria-label="Filters">
-        <label className="toggle">
-          <span className="muted">Readiness</span>
-          <select
-            aria-label="Readiness"
-            className="input"
-            value={filters.readiness}
-            onChange={(event) =>
-              setFilters({ readiness: event.target.value, offset: "0" })
-            }
-          >
-            <option value="">Any</option>
-            {Object.entries(readinessLabels).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
         <label className="toggle">
           <span className="muted">Outcome</span>
           <select
@@ -307,15 +285,15 @@ export function Pipeline({
               filtered ? (
                 <Button onClick={clear}>Clear filters</Button>
               ) : (
-                <a className="btn" href="#jobs?section=shortlist">
-                  Open the Shortlist
+                <a className="btn" href="#jobs?section=new">
+                  Open new jobs
                 </a>
               )
             }
           >
             {filtered || filters.stage !== "all"
               ? "Try another stage or search, or clear the filters."
-              : "An application starts from a shortlisted job. Your agent prepares its documents; you send it and record what happened here."}
+              : "Shortlisting a job starts its application. Upload its CV and letter, send it, and record what happened here."}
           </EmptyState>
         ) : (
           <>

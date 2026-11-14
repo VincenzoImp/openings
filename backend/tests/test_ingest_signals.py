@@ -185,10 +185,10 @@ def test_triage_reasons_and_who_dismissed(services):
         owner = workspace.set_triage(second["id"], "dismissed", second["version"], "Too far.")
     assert owner["dismissal"]["category"] == "owner" and owner["dismissal"]["reason"] == "Too far."
     counts = workspace.list_jobs(include_counts=True)["counts"]
-    assert counts["dismissed"] == 2 and counts["inbox"] == 1
+    assert counts["dismissed"] == 2 and counts["new"] == 1
     assert counts["dismissed_by"] == {"agent": 1, "owner": 1, "other": 0}
     with pytest.raises(Exception, match="reason"):
-        workspace.set_triage(third["id"], "saved", third["version"], "Nice")
+        workspace.set_triage(third["id"], "shortlisted", third["version"], "Nice")
 
 
 def test_a_board_that_stops_listing_a_posting_marks_it_and_dismisses_nothing(tmp_path, monkeypatch):
@@ -227,16 +227,16 @@ def test_a_board_that_stops_listing_a_posting_marks_it_and_dismisses_nothing(tmp
     assert run()["state"] == "succeeded"
     jobs = {item["title"]: item for item in workspace.list_jobs()["items"]}
     assert not any(item["signals"]["no_longer_listed"] for item in jobs.values())
-    workspace.set_triage(jobs["Engineer 3"]["id"], "saved", jobs["Engineer 3"]["version"])
+    workspace.set_triage(jobs["Engineer 3"]["id"], "shortlisted", jobs["Engineer 3"]["version"])
     listed["value"] = ["1"]
     second = run()
     assert second["state"] == "succeeded" and second["result"]["unlisted"] == 2
     after = {item["title"]: item for item in workspace.list_jobs()["items"]}
     assert after["Engineer 2"]["signals"]["no_longer_listed"]
     # A label only: the job waits in the Inbox.
-    assert after["Engineer 2"]["triage"] == "inbox"
+    assert after["Engineer 2"]["triage"] == "new"
     assert (
-        after["Engineer 3"]["triage"] == "saved"
+        after["Engineer 3"]["triage"] == "shortlisted"
         and after["Engineer 3"]["signals"]["no_longer_listed"]
     )
     assert not after["Engineer 1"]["signals"]["no_longer_listed"]

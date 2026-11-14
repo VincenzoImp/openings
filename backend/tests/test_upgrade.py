@@ -8,6 +8,7 @@ import gzip
 import hashlib
 import json
 import re
+import runpy
 import sqlite3
 import stat
 from contextlib import closing
@@ -89,6 +90,35 @@ def counts(path):
         }
 
 
+# Tables the upgrade renames: schema-15 name -> schema-14 name.
+RENAMED = {"replies": "responses"}  # #214
+
+
+def created_by_upgrade(pre_upgrade):
+    """Rows the upgrade's folds add, per schema-15 table, counted on the original."""
+    created = {}
+    # #214: an application (and its event) per shortlisted job without an open one,
+    # and an event per stored Ready mark.
+    started = query(
+        pre_upgrade,
+        "SELECT count(*) FROM jobs j WHERE triage='saved' AND NOT EXISTS(SELECT 1 FROM "
+        "applications a WHERE a.job_id=j.id AND a.status<>'closed')",
+    )[0][0]
+    marks = query(pre_upgrade, "SELECT count(*) FROM applications WHERE ready_at IS NOT NULL")[0][0]
+    created["applications"] = created.get("applications", 0) + started
+    created["events"] = created.get("events", 0) + started + marks
+    return created
+
+
+def expected_counts(original, pre_upgrade):
+    """The row counts of the upgraded file: the original's, renamed, plus folded rows."""
+    renamed = {old: new for new, old in RENAMED.items()}
+    expected = {renamed.get(name, name): number for name, number in original.items()}
+    for name, number in created_by_upgrade(pre_upgrade).items():
+        expected[name] += number
+    return expected
+
+
 @pytest.fixture
 def upgraded(tmp_path):
     """The fixture upgraded at startup: (database, pre-upgrade copy, archive, input digest)."""
@@ -111,7 +141,7 @@ def test_the_original_is_kept_byte_for_byte_and_every_row_is_copied(upgraded):
     path, pre_upgrade, archive, before, original = upgraded
     assert digest(pre_upgrade) == before
     assert query(pre_upgrade, "PRAGMA user_version") == [(14,)]
-    assert counts(path) == original
+    assert counts(path) == expected_counts(original, pre_upgrade)
     assert query(path, "SELECT count(*) FROM jobs_fts WHERE jobs_fts MATCH 'engineer'")[0][0] > 0
     assert sorted(p.name for p in path.parent.iterdir()) == sorted(
         [path.name, pre_upgrade.name, archive.name]
@@ -124,23 +154,24 @@ def test_the_original_is_kept_byte_for_byte_and_every_row_is_copied(upgraded):
 def test_generic_changes_keep_every_value(upgraded):
     path, pre_upgrade = upgraded[:2]
     # Ids, versions and every kept value are copied unchanged.
+    # Rows an upgrade fold adds (#214) are not in the original.
     for table, columns in (
-        ("jobs", "id,title,company,posting,triage,version,created_at"),
-        ("applications", "id,job_id,status,outcome,version,questions,answers,requirements"),
+        ("jobs", "id,title,company,posting,version,created_at"),
+        ("applications", "id,job_id,outcome,version,questions,answers,requirements"),
         ("events", "id,job_id,application_id,kind,payload,actor_kind,actor_name,run_id"),
-        ("documents", "id,kind,previous_id,review_state,text,legacy_content,claim_ids"),
+        ("documents", "id,previous_id,text,legacy_content,claim_ids"),
         ("blobs", "sha256,content,size"),
     ):
         sql = f"SELECT rowid,{columns} FROM {table} ORDER BY rowid"
         if table == "blobs":
             sql = f"SELECT {columns} FROM {table} ORDER BY sha256"
-        assert query(path, sql) == query(pre_upgrade, sql)
+        assert query(path, sql)[: len(old := query(pre_upgrade, sql))] == old
     # An estimated response day becomes text on the response.
     old = query(pre_upgrade, "SELECT id,note FROM responses WHERE estimated=1")
     assert old
     for response_id, note in old:
         expected = (note + " " if note else "") + "(day estimated during the 0.20 upgrade)"
-        assert query(path, "SELECT note FROM responses WHERE id=?", (response_id,)) == [(expected,)]
+        assert query(path, "SELECT note FROM replies WHERE id=?", (response_id,)) == [(expected,)]
     assert query(path, "SELECT count(*) FROM pragma_table_info('notes') WHERE name='origin'") == [
         (0,)
     ]
@@ -161,6 +192,114 @@ def test_text_that_is_not_json_is_repaired_and_archived(tmp_path):
     archive = json.loads(m15.files(path).archive.read_text())
     assert archive["repaired_json"]["jobs.overrides"] == [{"id": job_id, "value": "not json"}]
     assert archive["counts"]["repaired_json.jobs.overrides"] == 1
+
+
+# #214 Applications and documents.
+
+
+def test_applications_and_documents_take_the_words_of_0_24(upgraded):
+    path, pre_upgrade, archive_path = upgraded[:3]
+    archive = json.loads(archive_path.read_text())
+    # Triage, stage and kinds.
+    triage = {"inbox": "new", "saved": "shortlisted", "dismissed": "dismissed"}
+    old_jobs = dict(query(pre_upgrade, "SELECT id,triage FROM jobs"))
+    assert dict(query(path, "SELECT id,triage FROM jobs")) == {
+        key: triage[value] for key, value in old_jobs.items()
+    }
+    old_status = dict(query(pre_upgrade, "SELECT id,status FROM applications"))
+    new_status = dict(query(path, "SELECT id,status FROM applications"))
+    assert {key: new_status[key] for key in old_status} == {
+        key: "shortlisted" if value == "draft" else value for key, value in old_status.items()
+    }
+    assert query(path, "SELECT DISTINCT required_documents FROM applications") == [
+        ('["cv","letter"]',)
+    ]
+    kinds = {"resume": "cv", "cover_letter": "letter"}
+    for table in ("documents", "templates"):
+        old_kinds = dict(query(pre_upgrade, f"SELECT id,kind FROM {table}"))
+        assert dict(query(path, f"SELECT id,kind FROM {table}")) == {
+            key: kinds.get(value, value) for key, value in old_kinds.items()
+        }
+    # Text derived from TeX is kept and says so; review states go to the archive.
+    assert query(path, "SELECT count(*) FROM documents WHERE text IS NOT NULL") == query(
+        path, "SELECT count(*) FROM documents WHERE text_from='tex'"
+    )
+    assert archive["document_review_states"] == dict(
+        query(pre_upgrade, "SELECT id,review_state FROM documents")
+    )
+    # Replies are the responses, copied with their ids.
+    assert query(path, "SELECT id,application_id,kind,date,version FROM replies ORDER BY id") == (
+        query(pre_upgrade, "SELECT id,application_id,kind,date,version FROM responses ORDER BY id")
+    )
+
+
+def test_every_shortlisted_job_has_an_open_application_after_the_upgrade(upgraded):
+    path, pre_upgrade = upgraded[:2]
+    waiting = {
+        row[0]
+        for row in query(
+            pre_upgrade,
+            "SELECT id FROM jobs j WHERE triage='saved' AND NOT EXISTS(SELECT 1 FROM "
+            "applications a WHERE a.job_id=j.id AND a.status<>'closed')",
+        )
+    }
+    assert waiting
+    old_ids = {row[0] for row in query(pre_upgrade, "SELECT id FROM applications")}
+    started = [
+        row[1:]
+        for row in query(
+            path,
+            "SELECT a.id,a.job_id,a.status,a.from_shortlist,e.actor_kind,"
+            "json_extract(e.payload,'$.by') FROM applications a JOIN events e "
+            "ON e.application_id=a.id AND e.kind='application_created'",
+        )
+        if row[0] not in old_ids
+    ]
+    assert {row[0] for row in started} == waiting and len(started) == len(waiting)
+    assert {row[1:] for row in started} == {("shortlisted", 1, "system", "upgrade")}
+    assert query(
+        path,
+        "SELECT count(*) FROM jobs j WHERE triage='shortlisted' AND NOT EXISTS(SELECT 1 FROM "
+        "applications a WHERE a.job_id=j.id AND a.status<>'closed')",
+    ) == [(0,)]
+
+
+def test_stored_ready_marks_are_archived_with_an_event_and_ready_is_computed(upgraded):
+    path, pre_upgrade, archive_path = upgraded[:3]
+    archive = json.loads(archive_path.read_text())
+    marks = query(
+        pre_upgrade,
+        "SELECT id,ready_at,ready_by_kind,ready_by_name FROM applications WHERE ready_at IS NOT NULL",
+    )
+    assert marks
+    assert {
+        key: (value["ready_at"], value["ready_by_kind"], value["ready_by_name"])
+        for key, value in archive["applications_ready"].items()
+    } == {row[0]: row[1:] for row in marks}
+    events = query(
+        path,
+        "SELECT application_id,created_at,actor_kind,actor_name FROM events "
+        "WHERE kind='application_ready_mark_archived'",
+    )
+    assert sorted(events) == sorted(marks)
+    # Ready is computed: the upgraded workspace lists what the rehearsal's rule
+    # computes on the original, and the rehearsal counts where the stored marks differ.
+    verify = runpy.run_path(str(Path(__file__).parents[2] / "scripts" / "verify_m15.py"))
+    computed = {
+        row[0]
+        for row in query(
+            pre_upgrade, "SELECT id FROM applications a WHERE " + verify["COMPUTED_READY"]
+        )
+    }
+    listed = Workspace(path).list_applications(stage="ready", limit=200)
+    assert {item["id"] for item in listed["items"]} == computed
+    assert listed["stage_counts"]["ready"] == len(computed)
+    stored = {row[0] for row in marks}
+    assert verify["aggregates"](pre_upgrade)["ready"] == {
+        "stored and computed": len(stored & computed),
+        "stored, not computed": len(stored - computed),
+        "computed, not stored": len(computed - stored),
+    }
 
 
 # #213 Preferences replace Policy.
@@ -421,7 +560,7 @@ def test_a_backup_of_the_previous_schema_is_restored_upgraded(tmp_path):
     assert restore_database(workspace, backup)["restored"]
     assert digest(backup) == before
     # Restore keeps the destination's tokens and drops transfer grants.
-    restored, uploaded = counts(workspace.db.path), counts(backup)
+    restored, uploaded = counts(workspace.db.path), expected_counts(counts(backup), backup)
     for name in ("api_tokens", "transfer_grants"):
         restored.pop(name), uploaded.pop(name)
     assert restored == uploaded
@@ -450,7 +589,8 @@ def test_a_stop_between_the_two_renames_is_finished_at_the_next_start(tmp_path, 
     assert not path.exists() and files.next.exists() and files.pre_upgrade.exists()
     monkeypatch.undo()
     Database(path)
-    assert counts(path) == original and digest(files.pre_upgrade) == before
+    assert counts(path) == expected_counts(original, files.pre_upgrade)
+    assert digest(files.pre_upgrade) == before
     assert not files.next.exists()
 
 
@@ -468,7 +608,8 @@ def test_a_stop_before_the_swap_leaves_the_original_and_runs_again(tmp_path, mon
     assert digest(path) == before and files.next.exists()
     monkeypatch.undo()
     Database(path)
-    assert counts(path) == original and digest(files.pre_upgrade) == before
+    assert counts(path) == expected_counts(original, files.pre_upgrade)
+    assert digest(files.pre_upgrade) == before
     assert not files.next.exists()
 
 

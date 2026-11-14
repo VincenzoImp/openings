@@ -1,6 +1,6 @@
 ---
 name: maintain-career
-description: Maintain the Openings Career record - integrate new owner facts into entries, keep claims deduplicated and linked to evidence, and improve the MASTER and templates and propagate changes to Drafts, as standing maintenance under the operating mandate.
+description: Maintain the Openings Career record - integrate new owner facts into entries, keep claims deduplicated and linked to evidence, and improve the MASTER and templates and propagate changes to Shortlisted applications, as standing maintenance under the operating mandate.
 compatibility: Requires access to the Openings MCP server or REST API, as described in the openings-workspace skill.
 ---
 
@@ -83,21 +83,21 @@ and record why. Compile and check the
 full PDF and extracted text, then update the template source, rules, guidance and
 assets together with the expected version.
 
-Existing Drafts keep their frozen contexts. After the change, list stale Drafts
+Existing applications keep their frozen contexts. After the change, list stale applications
 with `staleness_list` (REST `GET /staleness`); each report names the
 changed Profile part, Preferences statement (of `facts` or `writing`, added
 or removed), template, entry or claim and the affected revisions. Only what
 documents use counts: Profile metadata, the other Preferences sections,
 template names, entry and claim order, claim selection fields, free-form
-metadata and spacing never make a Draft stale, and a writing rule scoped to the
-CV or the letter concerns that document only. Contexts prepared before 0.24
-froze no Preferences, so Preferences changes are not compared for them
+metadata and spacing never make an application stale, and a writing rule scoped
+to the CV or the letter concerns that document only. Contexts prepared before
+0.24 froze no Preferences, so Preferences changes are not compared for them
 (`comparison.preferences: "not_frozen"`).
-Propagate the change to Drafts the owner has not yet submitted when it improves
+Propagate the change to applications the owner has not yet submitted when it improves
 them: prepare a new context with the same deliberate selections, save new
 revisions linked with `previous_id`, check them like new work, keep earlier
-revisions and report each updated Draft. Re-run `staleness_get` to confirm
-the new leaves are current. Leave a Draft stale when the change does not matter to
+revisions and report each updated application. Re-run `staleness_get` to confirm
+the new leaves are current. Leave an application stale when the change does not matter to
 it, and say so in the report.
 
 Report with the shared [run report](../openings-workspace/references/run-report.md),

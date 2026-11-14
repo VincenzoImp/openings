@@ -183,13 +183,13 @@ def test_the_no_reply_period_comes_from_the_settings(services):
     old = attempt("Synthetic old", "applied", 40)
     recent = attempt("Synthetic recent", "applied", 10)
     attempt("Synthetic interview", "interview", 60)
-    due = workspace.list_applications(no_reply_due=True)
+    due = workspace.list_applications(needs="reply_overdue")
     assert [item["id"] for item in due["items"]] == [old["id"]]
-    assert due["no_reply"] == {"days": 30, "source": "default", "due": 1}
+    assert due["no_reply"] == {"days": 30, "source": "default", "overdue": 1}
     preferences.update_settings({"expected_version": 0, "no_reply_days": 7})
-    listed = workspace.list_applications(no_reply_due=True)
+    listed = workspace.list_applications(needs="reply_overdue")
     assert {item["id"] for item in listed["items"]} == {old["id"], recent["id"]}
-    assert listed["no_reply"] == {"days": 7, "source": "settings", "due": 2}
+    assert listed["no_reply"] == {"days": 7, "source": "settings", "overdue": 2}
     # A text that names a period does nothing: only the setting counts.
     write(preferences, "facts", [{"text": "No reply: 45 days."}])
     with workspace.db.connect() as conn:
@@ -231,7 +231,7 @@ def test_the_languages_filter_hides_jobs_and_never_dismisses_them(services):
         "count": 1,
         "hidden": True,
     }
-    assert shown["counts"]["inbox"] == 3
+    assert shown["counts"]["new"] == 3
     # Off: every job is listed, with how many the filter would hide.
     everything = workspace.list_jobs(hide_unspoken_required=False)
     assert everything["total"] == 4 and everything["unspoken_required"]["count"] == 1
@@ -251,7 +251,7 @@ def test_the_languages_filter_hides_jobs_and_never_dismisses_them(services):
         == 0
     )
     # Nothing was dismissed.
-    assert {job["triage"] for job in workspace.list_jobs()["items"]} == {"inbox"}
+    assert {job["triage"] for job in workspace.list_jobs()["items"]} == {"new"}
 
 
 def test_rest_and_mcp_read_and_write_preferences_alike(app, agent_token, mcp):

@@ -81,8 +81,8 @@ Call `runs_finish` with the run's current `expected_version` and the report:
 
 1. **summary**: what the run achieved, in two or three sentences, starting with
    the owner's requests it completed or declined.
-2. **changes**: your account of the changes with record IDs, for example saved,
-   dismissed, Drafts created or completed, revisions approved, sources changed,
+2. **changes**: your account of the changes with record IDs, for example
+   shortlisted, dismissed, revisions completed, applications now Ready, sources changed,
    and the result of each request handled.
    Openings adds the counts by kind from the recorded changes; do not count by
    hand.
@@ -90,7 +90,7 @@ Call `runs_finish` with the run's current `expected_version` and the report:
    (unresolved fact, employer requirement, failed check, conflict, missing
    capability, a request left open for another workflow or still taken), with `subject_type` and `subject_id` when it is a job, an
    application or a Career entry.
-4. **checks**: what was verified (final queue query, file hashes, PDF checks),
+4. **checks**: what was verified (final list query, file hashes, PDF checks),
    and with `verified: false` what could not be verified.
 5. **limits**: no application submitted, no employer contacted, no Applied
    recorded, unless the owner explicitly did or reported that.

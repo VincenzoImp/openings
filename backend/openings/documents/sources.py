@@ -1,9 +1,15 @@
-"""The source and PDF of a revision: which file is which, their pairing and the derived text.
+"""The PDF and optional TeX source of a CV or letter revision, and its readable text.
 
-A CV or letter revision has one TeX source and one PDF built from it. The PDF
-upload names the source's SHA-256 (``source_sha256``), so a PDF compiled from
-another source is refused before its bytes are stored. The revision's readable
-text is derived from its source when the source arrives (``text.py``).
+A CV or letter revision is complete once its PDF is stored; until then it is
+incomplete and never counts for Ready. A complete revision is immutable: a change
+is a new revision. When the revision has a TeX source, its PDF upload names the
+source's SHA-256 (``source_sha256``), so a PDF compiled from another source is
+refused before its bytes are stored; a PDF-only revision names none.
+
+The readable text comes from the TeX source when there is one (``text.py``,
+``text_from='tex'``), otherwise from the PDF (``pdf.py``, ``text_from='pdf'``). A
+PDF whose text cannot be read leaves no text and does not stop the revision being
+complete.
 """
 
 from __future__ import annotations
@@ -36,12 +42,36 @@ def _files(conn, document_id):
     ]
 
 
-def check_upload(conn, document, name, media_type, sha256, source_sha256):
+def is_complete(conn, document) -> bool:
+    """Whether a CV or letter revision has its PDF stored (other kinds are never incomplete)."""
+    if document["kind"] not in SOURCE_KINDS:
+        return True
+    return (
+        conn.execute(
+            "SELECT 1 FROM files WHERE document_id=? AND media_type=? LIMIT 1",
+            (document["id"], PDF),
+        ).fetchone()
+        is not None
+    )
+
+
+def source_hash(conn, document_id) -> str | None:
+    """The SHA-256 of the revision's TeX source, or None without one."""
+    hashes = [
+        file["sha256"]
+        for file in _files(conn, document_id)
+        if is_tex_source(file["name"], file["media_type"])
+    ]
+    return hashes[0] if len(hashes) == 1 else None
+
+
+def check_upload(conn, document, name, media_type, sha256, source_sha256, pending_source=None):
     """Refuse a file that would give a revision a second source or an unpaired PDF.
 
     Called when the upload is reserved (``sha256`` may be unknown) and again with
     the received bytes' hash. Re-sending a file under its own name is left to the
-    caller's idempotent path.
+    caller's idempotent path. ``pending_source`` is the hash of a source the same
+    create is granting: its PDF grant may name it before the source arrives.
     """
     files = [file for file in _files(conn, document["id"]) if file["name"] != name]
     sources = [file for file in files if is_tex_source(file["name"], file["media_type"])]
@@ -82,21 +112,25 @@ def check_upload(conn, document, name, media_type, sha256, source_sha256):
                 f"This revision already has its PDF ({others[0]['name']}). "
                 "Create a new revision for another PDF.",
             )
-        if source_sha256 is None:
+        if sources and source_sha256 is None:
             raise DomainError(
                 422,
-                "source_required",
-                "Upload the revision's .tex source first, then the PDF with source_sha256, "
-                "the SHA-256 of the source it was built from.",
+                "source_sha256_required",
+                "This revision has a TeX source: upload the PDF built from it with "
+                "source_sha256, the source's SHA-256.",
+                {"source_sha256": sorted(file["sha256"] for file in sources)},
             )
     if source_sha256 is None:
         return
     hashes = {file["sha256"] for file in sources}
+    if not hashes and pending_source and source_sha256.lower() == pending_source.lower():
+        return
     if not hashes:
         raise DomainError(
             409,
             "source_required",
-            "The revision has no .tex source yet. Upload the source before its PDF.",
+            "The PDF names a TeX source the revision does not have yet. Upload the source "
+            "before its PDF, or upload the PDF without source_sha256 for a PDF-only revision.",
         )
     if source_sha256.lower() not in hashes:
         raise DomainError(
@@ -132,31 +166,15 @@ def sources_of(conn, document_id) -> list[tuple[str, str]]:
 
 
 def refresh_text(conn, document_id):
-    """Store the text derived from the revision's sources (NULL without one)."""
+    """Store the text derived from the revision's TeX sources, when it has one."""
+    text = revision_text(sources_of(conn, document_id))
+    if text is not None:
+        conn.execute("UPDATE documents SET text=?,text_from='tex' WHERE id=?", (text, document_id))
+
+
+def store_pdf_text(conn, document_id, text):
+    """Store text read from the revision's PDF, unless its TeX source gave the text."""
     conn.execute(
-        "UPDATE documents SET text=? WHERE id=?",
-        (revision_text(sources_of(conn, document_id)), document_id),
+        "UPDATE documents SET text=?,text_from=? WHERE id=? AND text_from IS NOT 'tex'",
+        (text, "pdf" if text is not None else None, document_id),
     )
-
-
-def approval_problem(conn, document) -> DomainError | None:
-    """Why a CV or letter revision cannot be approved yet, if it cannot."""
-    if document["kind"] not in SOURCE_KINDS:
-        return None
-    files = _files(conn, document["id"])
-    sources = [file for file in files if is_tex_source(file["name"], file["media_type"])]
-    pdfs = [file for file in files if media(file["media_type"]) == PDF]
-    if not sources:
-        return DomainError(
-            409,
-            "source_required",
-            "Upload the revision's .tex source before approving it: its text is what you review.",
-        )
-    if not pdfs:
-        return DomainError(
-            409, "pdf_required", "Upload the PDF built from the source before approving it."
-        )
-    hashes = {file["sha256"] for file in sources}
-    if any(file["source_sha256"] and file["source_sha256"] not in hashes for file in pdfs):
-        return DomainError(409, "source_mismatch", "The PDF was built from another source.")
-    return None

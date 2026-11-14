@@ -1,7 +1,7 @@
 """Stats: how employers answered the applications the owner sent.
 
 An application counts as sent when it has ``applied_at``, is in Applied,
-Interview or Offer, or has an employer reply (``responses``). With a period of
+Interview or Offer, or has an employer reply (``replies``). With a period of
 ``90d`` or ``12m`` only applications sent (``applied_at``) since then count;
 ``all`` counts every sent application.
 
@@ -31,17 +31,17 @@ OTHER_SOURCE = "Added by hand or removed source"
 
 _SENT = """
 SELECT a.id,a.status,a.outcome,a.applied_at,
- (SELECT min(r.date) FROM responses r WHERE r.application_id=a.id) AS first_reply,
- EXISTS(SELECT 1 FROM responses r WHERE r.application_id=a.id
+ (SELECT min(r.date) FROM replies r WHERE r.application_id=a.id) AS first_reply,
+ EXISTS(SELECT 1 FROM replies r WHERE r.application_id=a.id
   AND r.kind IN ('interview','offer')) AS interview_reply,
- EXISTS(SELECT 1 FROM responses r WHERE r.application_id=a.id AND r.kind='offer') AS offer_reply,
+ EXISTS(SELECT 1 FROM replies r WHERE r.application_id=a.id AND r.kind='offer') AS offer_reply,
  (SELECT group_concat(DISTINCT json_extract(e.payload,'$.to')) FROM events e
   WHERE e.application_id=a.id AND e.kind='application_updated') AS stages,
  (SELECT s.name FROM postings p JOIN sources s ON s.id=p.source_id WHERE p.job_id=a.job_id
   ORDER BY p.first_seen_at,p.id LIMIT 1) AS source
 FROM applications a
 WHERE (a.applied_at IS NOT NULL OR a.status IN ('applied','interview','offer')
- OR EXISTS(SELECT 1 FROM responses r WHERE r.application_id=a.id)) {period}
+ OR EXISTS(SELECT 1 FROM replies r WHERE r.application_id=a.id)) {period}
 """
 
 
