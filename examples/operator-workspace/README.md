@@ -36,11 +36,14 @@ from disk, run `python3 .agents/scripts/fetch_skills.py` from a launched shell.
 ## First session
 
 Ask the agent to set up your workspace. It follows the `setup-openings` skill:
-it imports your CV or LinkedIn export into the Career record, asks about your
-target roles, locations and constraints, writes your Profile, records your
-Preferences in your words, builds your CV and letter templates, adds searches and companies to
-follow, and prepares a first application so you can see the result.
+it builds your Profile and Career record from your CV or LinkedIn export, asks
+about your target roles, places and constraints and records them in your
+Preferences in your words, builds your CV and letter templates, adds searches
+and companies to follow, and prepares a first application so you can see the
+result.
 
-Afterwards, ask in plain language: "what should I apply to today?", "I have an
-interview at X", "add these companies". You can narrow the agent's mandate by
-editing `AGENTS.md`.
+Afterwards, ask in plain language: "empty my inbox", "prepare CV and letter
+for every shortlisted job", "Northstar Labs replied", "update my profile from
+this CV", "follow these companies". Tell the agent how you want it to work
+under Preferences › Working with me in Openings; it reads that at the start of
+every session.
