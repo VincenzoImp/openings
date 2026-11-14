@@ -1,46 +1,8 @@
-/* Two columns, pipeline strip, filter chips, stats and plain lists: what
-   Today and the lists of other screens are made of. */
-.cols {
-  display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
-  gap: var(--s5);
-  align-items: start;
-}
-/* The home screen has more air: its cards use the next step of the scale. */
-.roomy {
-  --s4: var(--s5);
-}
-.roomy > * + * {
-  margin-top: var(--s5);
-}
-
-.pipeline {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 1px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--line);
-  overflow: hidden;
-}
-.pipeline a {
-  padding: var(--s3) var(--s4);
-  background: var(--card);
-  text-decoration: none;
-}
-.pipeline a:hover {
-  background: var(--hover);
-}
-.pipeline a:focus-visible {
-  outline-offset: -2px;
-}
-.pipeline strong,
+/* Stats, filter chips and plain lists: what the lists of the screens not
+   yet rebuilt are made of. */
 .stat strong {
   display: block;
   font: 600 var(--fs-xl) / 1.2 var(--font);
-}
-.pipeline .is-ready strong {
-  color: var(--ready);
 }
 .stats {
   display: grid;
@@ -121,13 +83,6 @@
   color: var(--ink);
 }
 @media (max-width: 860px) {
-  .cols {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .pipeline a {
-    padding: var(--s3) var(--s1);
-    text-align: center;
-  }
   .chip {
     min-height: 44px;
   }

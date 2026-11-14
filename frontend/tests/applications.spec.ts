@@ -151,7 +151,26 @@ test("keyboard only: a ready application is reviewed from Today and marked appli
     }
     return false;
   };
-  expect(await reached(new RegExp(`^Review ${title}$`))).toBe(true);
+  // Tab reaches Today's Ready list; j moves to this application's row.
+  const readyRow = async () =>
+    page.evaluate(
+      (title) =>
+        Boolean(
+          document.activeElement?.closest("[aria-label='Ready applications']"),
+        ) && Boolean(document.activeElement?.textContent?.includes(title)),
+      title,
+    );
+  const inReady = () =>
+    page.evaluate(() =>
+      Boolean(
+        document.activeElement?.closest("[aria-label='Ready applications']"),
+      ),
+    );
+  for (let index = 0; index < 120 && !(await inReady()); index++)
+    await page.keyboard.press(tabKey(page));
+  for (let index = 0; index < 5 && !(await readyRow()); index++)
+    await page.keyboard.press("j");
+  expect(await readyRow()).toBe(true);
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(new RegExp(`#applications/${application.id}$`));
   await expect(page.locator("h1:visible")).toHaveText(title);
