@@ -5,23 +5,13 @@ import {
   go,
   isPhone,
   ownerSession,
-  type Cookies,
+  settled,
 } from "./session";
 
 // Today, the first screen, on the synthetic workspace of
 // backend/tests/today_fixtures.py: Ready applications with deadlines, sent
 // ones of different ages and new jobs. Each test starts from the seeded
 // workspace (fixtures.ts).
-const cookies: Cookies = ownerSession();
-const errors = new WeakMap<Page, string[]>();
-test.beforeEach(async ({ page }) => {
-  errors.set(page, []);
-  page.on("pageerror", (error) => errors.get(page)!.push(error.message));
-  await page.context().addCookies(cookies);
-});
-test.afterEach(async ({ page }) => {
-  expect(errors.get(page)).toEqual([]);
-});
 
 /** A section of Today, by its heading (which ends with its count). */
 const section = (page: Page, name: string) =>
@@ -38,10 +28,6 @@ const localDay = (offset = 0) => {
     String(day.getDate()).padStart(2, "0"),
   ].join("-");
 };
-async function settled(page: Page) {
-  await page.waitForLoadState("networkidle");
-  await expect(page.locator(".ui-skeleton-rows")).toHaveCount(0);
-}
 
 test("Today says what to do now, with one filled button, and Start applying opens the first Ready application", async ({
   page,
@@ -232,11 +218,12 @@ test("the setup checklist comes from server facts: two browsers agree", async ({
     baseURL,
     viewport: page.viewportSize()!,
   });
-  await other.addCookies(cookies);
+  await other.addCookies(ownerSession());
   const second = await other.newPage();
   for (const view of [page, second]) {
     // A new page load reads the workspace again.
     await go(view, "today");
+    await settled(view);
     await view.reload();
     const checklist = section(view, "Set up your workspace");
     await expect(checklist).toContainText("2 of 3 done");
@@ -267,6 +254,7 @@ test("the setup checklist comes from server facts: two browsers agree", async ({
 
   for (const view of [page, second]) {
     await go(view, "today");
+    await settled(view);
     await view.reload();
     await expect(section(view, "Set up your workspace")).toHaveCount(0);
     await expect(view.getByRole("link", { name: "Finish setup" })).toHaveCount(

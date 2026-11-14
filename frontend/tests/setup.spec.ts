@@ -1,26 +1,9 @@
 import { test, expect, type Page } from "./fixtures";
-import {
-  call,
-  fitsViewport,
-  go,
-  heading,
-  ownerSession,
-  type Cookies,
-} from "./session";
+import { call, fitsViewport, go, heading } from "./session";
 
 // The first-run guide (#setup): About you, Find jobs, Your CV, Done. Every
 // step writes through an existing operation and reaches Today in four steps.
 // The browser-test workspace is populated; each test starts from it.
-const cookies: Cookies = ownerSession();
-const errors = new WeakMap<Page, string[]>();
-test.beforeEach(async ({ page }) => {
-  errors.set(page, []);
-  page.on("pageerror", (error) => errors.get(page)!.push(error.message));
-  await page.context().addCookies(cookies);
-});
-test.afterEach(async ({ page }) => {
-  expect(errors.get(page)).toEqual([]);
-});
 
 const unique = (name: string) =>
   `${name} ${test.info().project.name} ${Date.now()}`;

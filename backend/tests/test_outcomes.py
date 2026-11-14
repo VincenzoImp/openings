@@ -228,3 +228,13 @@ def test_the_no_reply_period_lists_overdue_applications_and_closes_nothing(works
     listed = workspace.list_applications(needs="reply_overdue")
     assert {item["id"] for item in listed["items"]} == {old["id"], recent["id"]}
     assert listed["no_reply"] == {"days": 7, "source": "settings", "overdue": 2}
+    # A preference that names a period does nothing: only the setting counts.
+    preferences = PreferencesService(workspace)
+    facts = next(s for s in preferences.get_preferences()["sections"] if s["section"] == "facts")
+    with acting_as(OWNER):
+        preferences.update_preferences(
+            "facts",
+            {"expected_version": facts["version"], "items": [{"text": "No reply: 45 days."}]},
+        )
+    with workspace.db.connect() as conn:
+        assert no_reply_period(conn)["days"] == 7

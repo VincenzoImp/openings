@@ -1,26 +1,11 @@
 import { test, expect, type Page } from "./fixtures";
-import {
-  call,
-  go,
-  heading,
-  isPhone,
-  ownerSession,
-  type Cookies,
-} from "./session";
+import { call, go, heading, isPhone, settled, tabKey } from "./session";
 
 // The shell: the sidebar and the phone's bars, the routes, the account menu
 // and the theme, the global keyboard, the ⌘K palette and Add job, and the
 // screens loaded on demand inside it.
-const cookies: Cookies = ownerSession();
-const errors = new WeakMap<Page, string[]>();
 test.beforeEach(async ({ page }) => {
-  errors.set(page, []);
-  page.on("pageerror", (error) => errors.get(page)!.push(error.message));
-  await page.context().addCookies(cookies);
   await go(page, "today");
-});
-test.afterEach(async ({ page }) => {
-  expect(errors.get(page)).toEqual([]);
 });
 
 const main = (page: Page) => page.locator("main#content");
@@ -36,7 +21,7 @@ test("keyboard only: skip link, sidebar navigation and focus on the new screen",
   page,
 }) => {
   test.skip(isPhone(page), "The sidebar exists on wide screens.");
-  await page.keyboard.press("Tab");
+  await page.keyboard.press(tabKey(page));
   await expect(
     page.getByRole("link", { name: "Skip to content" }),
   ).toBeFocused();
@@ -378,14 +363,17 @@ test("each screen has one address; an unknown or retired one opens Today", async
   }
 });
 
-test("a screen that fails to load offers a reload", async ({ page }) => {
+test("a screen that fails to load offers a reload", async ({
+  page,
+  pageErrors,
+}) => {
   await page.route("**/assets/Templates-*.js", (route) => route.abort());
-  errors.set(page, []);
-  page.removeAllListeners("pageerror");
   await page.goto("/#templates");
   await expect(
     page.getByRole("alert").filter({ hasText: "could not be loaded" }),
   ).toBeVisible();
+  // The aborted chunk is the page's uncaught error, on purpose.
+  pageErrors.splice(0);
   await page.unroute("**/assets/Templates-*.js");
   await page
     .getByRole("button", { name: "Reload the dashboard", exact: true })
@@ -441,8 +429,7 @@ for (const width of [360, 390, 719, 720, 1024, 1600])
     ]) {
       await page.goto("/#" + route);
       await expect(heading(page)).toHaveText(title);
-      await expect(page.locator(".ui-skeleton-rows")).toHaveCount(0);
-      await page.waitForLoadState("networkidle");
+      await settled(page);
       const [page_, content] = await page.evaluate(() => {
         const box = document.getElementById("content")!;
         return [

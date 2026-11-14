@@ -6,10 +6,10 @@ from datetime import UTC, datetime
 import pytest
 import requests
 
-from discovery_fixtures import patch_discovery
+from discovery_fixtures import open_gate, patch_discovery
 from openings._vendor.jobspy import glassdoor, linkedin
 from openings.collectors import policy
-from openings.collectors.policy import ProviderDeferred, ProviderPatch
+from openings.collectors.policy import ProviderDeferred
 from openings.common import now
 from openings.discovery import DiscoveryService, SourceCreate
 from openings.workspace import Workspace
@@ -60,13 +60,10 @@ def run_next(service):
     return service.get_task(task["id"])
 
 
-def test_complete_jobs_only_across_batch_cooldown_and_restart(tmp_path, monkeypatch):
-    workspace = Workspace(tmp_path / "complete.sqlite")
-    service = DiscoveryService(workspace)
-    workspace.discovery = service
+def test_complete_jobs_only_across_batch_cooldown_and_restart(collection, monkeypatch):
+    workspace, service = collection
     workspace.set_settings("profile", {"summary": "Backend engineer"})
-    service.update_provider("linkedin", ProviderPatch(expected_version=1, min_interval_seconds=0))
-    patch_discovery(monkeypatch, "public_url", lambda url: url)
+    open_gate(service, "linkedin")
     monkeypatch.setattr(policy, "REQUEST_BATCH_SIZE", 2)
     clock = [datetime.fromtimestamp(policy.time.time(), UTC).timestamp()]
     monkeypatch.setattr(policy.time, "time", lambda: clock[0])
@@ -126,11 +123,9 @@ def test_complete_jobs_only_across_batch_cooldown_and_restart(tmp_path, monkeypa
 
 
 @pytest.mark.parametrize("status,path", [(403, "/jobs/view/1"), (200, "/authwall")])
-def test_linkedin_provider_access_failure_stops_detail_loop(tmp_path, monkeypatch, status, path):
-    workspace = Workspace(tmp_path / "access.sqlite")
-    service = DiscoveryService(workspace)
-    service.update_provider("linkedin", ProviderPatch(expected_version=1, min_interval_seconds=0))
-    patch_discovery(monkeypatch, "public_url", lambda url: url)
+def test_linkedin_provider_access_failure_stops_detail_loop(collection, monkeypatch, status, path):
+    workspace, service = collection
+    open_gate(service, "linkedin")
     calls = []
 
     def send(method, url, **kwargs):
@@ -160,12 +155,10 @@ def test_linkedin_provider_access_failure_stops_detail_loop(tmp_path, monkeypatc
 # A failed status and a failed transport take the two retry paths.
 @pytest.mark.parametrize("failure", [503, requests.Timeout])
 def test_transient_detail_failure_retries_the_run_without_spending_posting_attempts(
-    tmp_path, monkeypatch, failure
+    collection, monkeypatch, failure
 ):
-    workspace = Workspace(tmp_path / "transient.sqlite")
-    service = DiscoveryService(workspace)
-    service.update_provider("linkedin", ProviderPatch(expected_version=1, min_interval_seconds=0))
-    patch_discovery(monkeypatch, "public_url", lambda url: url)
+    workspace, service = collection
+    open_gate(service, "linkedin")
     calls = []
     fail_once = True
 
@@ -207,13 +200,11 @@ def test_transient_detail_failure_retries_the_run_without_spending_posting_attem
 
 
 def test_removed_individual_postings_finish_unavailable_without_retrying_the_provider(
-    tmp_path, monkeypatch
+    collection, monkeypatch
 ):
     status = 410
-    workspace = Workspace(tmp_path / "removed.sqlite")
-    service = DiscoveryService(workspace)
-    service.update_provider("linkedin", ProviderPatch(expected_version=1, min_interval_seconds=0))
-    patch_discovery(monkeypatch, "public_url", lambda url: url)
+    workspace, service = collection
+    open_gate(service, "linkedin")
     calls = []
 
     def send(method, url, **kwargs):
@@ -260,12 +251,10 @@ def glassdoor_checkpoint(service, task_id):
 # A transport failure of a detail batch is covered by the LinkedIn test above.
 @pytest.mark.parametrize("failure", [503, "graphql"])
 def test_glassdoor_failed_detail_batch_retains_all_candidates_for_retry(
-    tmp_path, monkeypatch, failure
+    collection, monkeypatch, failure
 ):
-    workspace = Workspace(tmp_path / "glassdoor.sqlite")
-    service = DiscoveryService(workspace)
-    service.update_provider("glassdoor", ProviderPatch(expected_version=1, min_interval_seconds=0))
-    patch_discovery(monkeypatch, "public_url", lambda url: url)
+    workspace, service = collection
+    open_gate(service, "glassdoor")
     calls = []
     fail_once = True
 
@@ -322,11 +311,9 @@ def test_glassdoor_failed_detail_batch_retains_all_candidates_for_retry(
     assert workspace.list_jobs(complete=True)["total"] == 2 and calls == ["JobDetails"] * 2
 
 
-def test_glassdoor_valid_empty_detail_results_finish_as_unavailable(tmp_path, monkeypatch):
-    workspace = Workspace(tmp_path / "glassdoor-empty.sqlite")
-    service = DiscoveryService(workspace)
-    service.update_provider("glassdoor", ProviderPatch(expected_version=1, min_interval_seconds=0))
-    patch_discovery(monkeypatch, "public_url", lambda url: url)
+def test_glassdoor_valid_empty_detail_results_finish_as_unavailable(collection, monkeypatch):
+    workspace, service = collection
+    open_gate(service, "glassdoor")
     calls = []
 
     def send(method, url, **kwargs):
