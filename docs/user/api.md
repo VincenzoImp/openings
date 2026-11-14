@@ -12,7 +12,7 @@ operation's MCP name, route and access.
 
 ## Authentication
 
-Create a token in **Settings › Agent access** and keep it outside source control.
+Create a token in **Settings › API & agents** and keep it outside source control.
 Send it as `Authorization: Bearer <token>`. Revoke it independently of any other.
 
 | Kind | Can do |

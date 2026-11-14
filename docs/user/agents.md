@@ -19,7 +19,7 @@ Everything the dashboard does, except owner-only actions. Typical requests:
 - Add and tune sources, and keep your Profile, career entries and highlights current.
 - Record a reply or close silent applications when you tell it to.
 
-**Settings › Skills** lists what you can ask, with an example for each, and
+**Settings › API & agents** lists what you can ask, with an example for each, and
 changes with the version you run. Say it in your own words.
 
 ## What you need
@@ -34,7 +34,7 @@ changes with the version you run. Say it in your own words.
 
 ## Connect
 
-1. In **Settings › Agent access**, create a token of kind **Agent** and copy it
+1. In **Settings › API & agents**, create a token of kind **Agent** and copy it
    once. Give it a name that says which agent holds it; histories show that name.
 2. Put the token in the environment variable `OPENINGS_TOKEN` of the agent's
    machine. Keep it out of files.
@@ -61,7 +61,7 @@ changes with the version you run. Say it in your own words.
    `workspace_context` read, loads the skill for the task and asks you for what it
    does not know.
 
-![Settings, Agent access: the tokens, the token form and the client configuration](../images/agent-access.png)
+![Settings, API & agents: the three steps, the tokens and the client configuration](../images/agent-access.png)
 
 For a persistent setup, an optional [operator workspace](../../examples/operator-workspace/README.md)
 holds the connection setup, a skills list and launcher scripts for six clients. You do not need it.

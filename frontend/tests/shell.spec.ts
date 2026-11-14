@@ -417,13 +417,11 @@ for (const width of [360, 390, 600, 719, 720, 1024, 1280, 1600])
       ["templates", "Templates"],
       ["templates?tab=source", "Templates"],
       ["templates?tab=limits", "Templates"],
-      ["sources", "Sources"],
-      ["sources?section=runs", "Sources"],
-      ["sources?section=providers", "Sources"],
+      ["sources", "Job sources"],
       ["settings", "Settings"],
-      ["settings?section=skills", "Settings"],
-      ["settings?section=backup", "Settings"],
-      ["settings?section=workspace", "Settings"],
+      ["settings?section=agents", "Settings"],
+      ["settings?section=data", "Settings"],
+      ["settings?section=advanced", "Settings"],
     ]) {
       await page.goto("/#" + route);
       await expect(heading(page)).toHaveText(title);

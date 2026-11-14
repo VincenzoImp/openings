@@ -1,0 +1,41 @@
+@layer ui {
+  .ui-disclosure-summary {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    min-height: var(--control-h);
+    padding: var(--s-1) 0;
+    border-radius: var(--r-md);
+    color: var(--text);
+    font: var(--t-md);
+    font-weight: var(--w-semibold);
+    letter-spacing: var(--tr-md);
+    list-style: none;
+    cursor: pointer;
+    user-select: none;
+  }
+  .ui-disclosure-summary::-webkit-details-marker {
+    display: none;
+  }
+  .ui-disclosure-summary:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+  }
+  .ui-disclosure-chevron {
+    color: var(--text-3);
+    transition: rotate var(--d-base) var(--ease);
+  }
+  .ui-disclosure[open] > .ui-disclosure-summary .ui-disclosure-chevron {
+    rotate: 90deg;
+  }
+  .ui-disclosure-note {
+    color: var(--text-3);
+    font: var(--t-xs);
+    font-weight: var(--w-medium);
+    letter-spacing: 0;
+    font-variant-numeric: tabular-nums;
+  }
+  .ui-disclosure-body {
+    padding-top: var(--s-2);
+  }
+}

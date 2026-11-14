@@ -66,10 +66,6 @@
   margin-top: var(--s1);
 }
 /* A list whose items start with a tag instead of a bullet */
-.tagged {
-  padding: 0;
-  list-style: none;
-}
 /* Records to pick one from, inside a form */
 .picks {
   border: 1px solid var(--line);

@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { THEME_KEY, readTheme, type ThemeMode } from "../ui/theme";
 
 const DARK = "(prefers-color-scheme: dark)";
+const CHANGED = "openings:theme";
 
 /** The theme in effect for a choice and the system's preference. */
 export function resolveTheme(
@@ -54,9 +55,16 @@ export function useTheme() {
     media.addEventListener("change", follow);
     return () => media.removeEventListener("change", follow);
   }, [mode]);
+  // The account menu and Settings › Account choose the same theme.
+  useEffect(() => {
+    const follow = () => setMode(readTheme());
+    window.addEventListener(CHANGED, follow);
+    return () => window.removeEventListener(CHANGED, follow);
+  }, []);
   const choose = useCallback((next: ThemeMode) => {
     remember(next);
     setMode(next);
+    window.dispatchEvent(new Event(CHANGED));
   }, []);
   return [mode, choose] as const;
 }

@@ -58,7 +58,7 @@ your first application.
 
 ## Connect an agent (optional)
 
-1. In **Settings › Agent access**, create an agent token and copy it once.
+1. In **Settings › API & agents**, create an agent token and copy it once.
 2. Put it in the environment variable `OPENINGS_TOKEN`, then copy the shown
    configuration for Claude Code, Codex or another client into your agent. The
    address is `http://127.0.0.1:8080/mcp/`.
