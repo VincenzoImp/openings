@@ -18,8 +18,8 @@ type Module = Promise<{ default: ComponentType }>;
 export const LOADERS: Record<RouteId, () => Module> = {
   today: () => import("../pages/Today"),
   jobs: () => import("../pages/Jobs"),
-  applications: () => import("../pages/Applications"),
-  application: () => import("../pages/Review"),
+  applications: () => import("../screens/applications/Applications"),
+  application: () => import("../screens/application/Page"),
   profile: () => import("../pages/Career"),
   preferences: () => import("../pages/Preferences"),
   templates: () => import("../pages/Templates"),
@@ -44,8 +44,6 @@ export function preload(id: RouteId) {
 const LEGACY = new Set<RouteId>([
   "today",
   "jobs",
-  "applications",
-  "application",
   "profile",
   "preferences",
   "templates",
