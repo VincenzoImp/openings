@@ -3,8 +3,8 @@
 Read the [architecture](docs/developer/architecture.md) and relevant
 [user guide](docs/README.md) before changing behavior. Keep business logic in
 shared services. Parity runs one way: every dashboard action is a REST operation,
-and every operation that is not owner-only is also an MCP tool; REST and MCP may
-offer more than the dashboard. Code, UI and documentation
+and every operation that is not owner-only is an MCP tool or names the MCP tool
+that does its work; REST is the superset. Code, UI and documentation
 are English; public examples/screenshots contain synthetic data only. Participation
 follows the [code of conduct](CODE_OF_CONDUCT.md); report vulnerabilities privately
 as described in [SECURITY.md](SECURITY.md).
@@ -169,13 +169,23 @@ there is no pixel comparison.
 ### Parity
 
 Parity runs one way: every dashboard action is a REST operation, and every
-operation that is not owner-only is also an MCP tool. REST and MCP may offer
-more than the dashboard; an owner-only operation is REST only.
-An operation is one typed function with `@operation` in
-`backend/openings/interfaces/` (see the architecture guide).
+operation that is not owner-only is an MCP tool, or a REST-only route declared
+with `mcp="<tool>"` naming the MCP tool that does its work (a one-record route
+the dashboard uses, whose batch tool an agent uses). REST is the superset; an
+owner-only operation is REST only. An operation is one typed function with
+`@operation` in `backend/openings/interfaces/` (see the architecture guide).
 `backend/tests/test_parity.py` checks that every `/api/v1` route is exactly one
-operation or a `TRANSPORT_ONLY` route with a one-line reason, and that the MCP
-tools are exactly the operations that are not owner-only.
+operation or a `TRANSPORT_ONLY` route with a one-line reason, that the MCP tools
+are exactly the operations on MCP and that each REST-only route names a tool.
+
+### MCP budget
+
+`backend/tests/test_mcp_budget.py` keeps the agent's fixed cost small: `tools/list`
+fails above 40,000 characters (and warns above 36,000), each tool description is
+at most 250 characters, the server instructions at most 1,500, `workspace_context`
+of a realistic synthetic workspace at most 16,000, and every default a
+description states is the schema's. Add a tool only when no existing tool can
+take the work as an argument; shorten descriptions before raising a limit.
 
 ### API types
 
@@ -194,7 +204,11 @@ before committing it.
 
 ### Agent round trip
 
-The manual MCP/file/backup driver requires an external Tectonic executable:
+`backend/tests/agent_roundtrip.py` drives the agent's workflow over real MCP and
+HTTP: the start read, a triage of 50 jobs in batches, CV and letter for one
+application with their PDF uploads, computed Ready, a reply, the change log of a
+batch and the owner's correction read back as feedback. CI runs it with a
+synthetic PDF; compile the CV from the example template with Tectonic locally:
 
 ```bash
 uv run python backend/tests/agent_roundtrip.py --tectonic /path/to/tectonic

@@ -79,7 +79,7 @@ export function EntryList({
             {entries
               .filter((entry) => entry.kind === kind)
               .map((entry) => {
-                const claims = entry.claim_count ?? 0;
+                const claims = entry.highlight_count ?? 0;
                 return (
                   <li
                     key={entry.id}
@@ -147,7 +147,7 @@ export function AllClaims({
 }) {
   const query = useDebounce(filters.q);
   const { data, setData, loading, error, reload } = useFresh<ListResult<Claim>>(
-    `/career/claims?summary=true&limit=30&offset=${filters.offset}&q=${encodeURIComponent(query)}${filters.approved ? `&approved=${filters.approved}` : ""}${filters.knowledge_id ? `&knowledge_id=${filters.knowledge_id}` : ""}`,
+    `/career/claims?summary=true&limit=30&offset=${filters.offset}&q=${encodeURIComponent(query)}${filters.approved ? `&approved=${filters.approved}` : ""}${filters.knowledge_id ? `&career_id=${filters.knowledge_id}` : ""}`,
     { items: [], total: 0 },
     ["career"],
   );
