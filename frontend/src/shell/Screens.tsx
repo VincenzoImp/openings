@@ -17,7 +17,7 @@ import { ROUTES, type RouteId } from "./routes";
 type Module = Promise<{ default: ComponentType }>;
 export const LOADERS: Record<RouteId, () => Module> = {
   today: () => import("../pages/Today"),
-  jobs: () => import("../pages/Jobs"),
+  jobs: () => import("../screens/Jobs"),
   applications: () => import("../pages/Applications"),
   application: () => import("../pages/Review"),
   profile: () => import("../pages/Career"),
@@ -43,7 +43,6 @@ export function preload(id: RouteId) {
 // their issue rebuilds them (#222–#227); a rebuilt screen leaves this list.
 const LEGACY = new Set<RouteId>([
   "today",
-  "jobs",
   "applications",
   "application",
   "profile",
