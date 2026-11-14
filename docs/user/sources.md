@@ -1,22 +1,28 @@
-# Collection
+# Job sources
 
-**Collection** combines saved portal searches and selected company boards. Sources
-store their settings in SQLite. New sources start paused; preview one, review its
-results and enable the schedule when ready. You can run a paused source manually.
+**Sources** (page title "Job sources") says where new jobs come from and
+whether that works. Sources store their settings in SQLite. A source added in
+the dashboard is checked on the schedule straight away; one added over REST or
+MCP starts paused unless it says otherwise.
 
-The screen has a switch for scheduled collection and three tabs:
+- **The top line:** "Checked every [24 h] · next check 14:00", with **Check all
+  now**. The interval applies to every source; `…` pauses or resumes every
+  automatic check.
+- **One row per source:** its name and kind (search, company page or feed),
+  what it searches ("Data engineer · Zurich · LinkedIn, Indeed"), how its last
+  check went ("Checked 2h ago · 4 new", or in red "Last check failed: … ·
+  Details") and what its jobs became. A paused source is greyed. On hover,
+  **Check now** and `…` (Edit, Pause or Resume, Duplicate, Delete
+  permanently…); the letters `j`/`k`, `e`, `c` and `p` do the same from the
+  keyboard.
+- **Add source** opens the form: the kind first (Search, Company careers page,
+  RSS feed), then its own fields. **Test** shows the first ten results through
+  the shared request gate before anything is saved.
+- **Recent checks**, collapsed at the bottom: the last 20 checks with what they
+  found or why they failed, with Stop for one in progress and Retry for one
+  that failed.
 
-- **Sources:** saved searches and company boards in one table, filtered by kind
-  and searchable. Each row has its on/off switch, providers, schedule and last
-  run, with Run once, Edit, Run with options and Remove. **Add a search** and
-  **Add a company board** open the form below the table; every setting has its
-  own control.
-- **Runs and tasks:** collection runs with their results and state, filtered by
-  state and source. **Tasks** opens a run's provider tasks and the settings the
-  run froze; **All tasks** lists tasks with their own filters (kind, job).
-- **Providers:** the shared request gate of each provider (see Request pacing).
-
-![Collection with saved searches, schedule summaries and acquisition results](../images/collection.png)
+![Job sources with the schedule line, source rows and their status](../images/collection.png)
 
 ## Choose what to collect
 
@@ -113,11 +119,12 @@ filter; it never dismisses a job.
 
 ## Set the schedule
 
-Choose one schedule mode:
+The top line sets one interval for every source. Over REST and MCP each source
+can keep its own schedule, in one of two modes:
 
 - **Interval:** every configured number of minutes; default 1440 (one day), range
   15–43200. The first scheduled run waits that interval after enabling; use
-  Run once to collect immediately. Useful when exact wall-clock times do not matter.
+  Check now to collect immediately. Useful when exact wall-clock times do not matter.
 - **Daily times:** one to twelve unique local `HH:MM` times plus an IANA timezone,
   such as `08:00, 16:00` in `Europe/Berlin`. The timezone keeps local times meaningful
   across daylight-saving changes. The daily schedule defaults to `07:00` in `UTC`.
@@ -126,18 +133,19 @@ The next execution is shown on the source. Daily slots are tracked independently
 from actual start/finish times. Delayed work continues as one active invocation;
 missed slots coalesce instead of creating a queue of duplicate runs.
 
-Turning off **Scheduled collection** preserves source settings and prevents new
-scheduled runs. Queued or current runs continue; **Stop run** cancels a selected
-active run. Pausing one source controls its future automation. Manual runs remain
+Pausing every automatic check preserves source settings and prevents new
+scheduled runs. Queued or current checks continue; **Stop** under Recent checks
+cancels one in progress. Pausing one source controls its future automation. Manual runs remain
 available under the same provider pacing and cooldowns.
 
-## Run once or change settings in bulk
+## Check now or change settings in bulk
 
-**Run once** uses the saved settings. **Run with options** changes the lookback or
-result limit for that invocation only. The run freezes its source
+**Check now** uses the saved settings. Over REST and MCP a run can change the
+lookback or result limit for that invocation only. The run freezes its source
 configuration when queued; later source edits affect subsequent runs.
 
-Select sources to enable, pause, run, configure or delete them together. Bulk
+REST `POST /sources/bulk` and MCP enable, pause, run, configure or delete
+several sources together. Bulk
 configuration changes only the chosen compatible fields and preserves untouched
 settings. Configuration and filter keys merge; an empty filter list clears that
 filter. A schedule replaces the whole schedule variant. Each source reports its
@@ -161,19 +169,18 @@ from stored progress, including after a provider cooldown. Counts are cumulative
 
 Provider status distinguishes active work, a wait with a resume time,
 failed work and cancellation. Processing time measures active attempts; waiting
-time and total elapsed time explain longer runs. Under **Runs and tasks**, a
-run's **Tasks** show each provider task with its error and next attempt, and the
-source settings and run-only limits the run froze. A **Partial** run reports bounded coverage or
+time and total elapsed time explain longer runs. REST `GET /collection/runs`
+and `GET /tasks` show each provider task with its error and next attempt, and
+the source settings and run-only limits the run froze. A **Partial** run reports bounded coverage or
 unavailable descriptions; completion does not imply every matching job was fetched.
 
 ![Saved search form with query, portal selection, role filters and excluded role terms](../images/collection-settings.png)
 
 ## What each source found
 
-Each row under **Sources** shows what the source found, for example "31 found ·
-9 shortlisted · 3 applied · 1 replied": the jobs it found (each once), how many
-of them you shortlisted or started an application for, sent an application to,
-and got an employer reply for. Zero counts are left out. A source that finds
+Each source row shows what the source found, for example "31 found ·
+9 shortlisted · 3 applied": the jobs it found (each once), how many of them you
+shortlisted or started an application for, and sent an application to. Zero counts are left out. A source that finds
 many jobs and few you keep is a candidate to narrow or pause. **Applications →
 Stats** shows replies by source once two sources have enough applications.
 
@@ -181,7 +188,9 @@ REST `GET /sources` and MCP `sources_list` return the same numbers as `counts`.
 
 ## Request pacing
 
-**Collection → Providers** stores two provider-wide controls for previews, URL
+**Settings › Advanced › Request limits per job site** shows the job sites your
+sources use, with their state and the spacing between requests (saved when you
+leave the field). The gate stores two provider-wide controls for previews, URL
 imports, scheduled/manual runs, redirects and detail fetches, and shows where the
 gate stands for each provider (ready, spacing requests, paused by the provider
 until a time, off):

@@ -79,7 +79,8 @@ export function shortUrl(url: string) {
   }
 }
 
-const text = (value: unknown) => (typeof value === "string" ? value.trim() : "");
+const text = (value: unknown) =>
+  typeof value === "string" ? value.trim() : "";
 const list = (value: unknown) =>
   Array.isArray(value)
     ? value.filter((item): item is string => typeof item === "string")
@@ -156,7 +157,10 @@ export const isActive = (state: unknown) =>
 
 /** The first sentence of an error, as the tail of "Last check failed: …". */
 export function reason(error: string) {
-  const first = error.trim().split(/(?<=[.!?])\s/)[0].replace(/[.!]$/, "");
+  const first = error
+    .trim()
+    .split(/(?<=[.!?])\s/)[0]
+    .replace(/[.!]$/, "");
   return first ? first[0].toLowerCase() + first.slice(1) : "no reason given";
 }
 
@@ -297,8 +301,12 @@ export function detectBoard(
   if (/^(jobs|api)(\.eu)?\.lever\.co$/.test(host))
     return { kind: "lever", board: parts[0] === "v0" ? parts[2] : parts[0] };
   if (/^(jobs|api)\.ashbyhq\.com$/.test(host))
-    return { kind: "ashby", board: host.startsWith("api") ? parts[2] : parts[0] };
-  if (host === "apply.workable.com") return { kind: "workable", board: parts[0] };
+    return {
+      kind: "ashby",
+      board: host.startsWith("api") ? parts[2] : parts[0],
+    };
+  if (host === "apply.workable.com")
+    return { kind: "workable", board: parts[0] };
   if (/^(jobs|careers)\.smartrecruiters\.com$/.test(host))
     return { kind: "smartrecruiters", board: parts[0] };
   if (host === "ats.rippling.com") return { kind: "rippling", board: parts[0] };

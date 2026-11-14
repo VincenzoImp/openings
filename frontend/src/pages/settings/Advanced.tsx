@@ -7,11 +7,7 @@ import { useToast } from "../../ui/Toast";
 import { sitesInUse } from "../sources/model";
 import { useSources } from "../sources/queries";
 import { gateOf, spacing } from "./model";
-import {
-  useProviders,
-  useUpdateProvider,
-  useWorkspaceInfo,
-} from "./queries";
+import { useProviders, useUpdateProvider, useWorkspaceInfo } from "./queries";
 import { SettingsGroup, SettingsSection } from "./Rows";
 
 type Provider = {
@@ -79,7 +75,9 @@ function Limits() {
   return (
     <div className="set-table-wrap">
       <table className="set-table">
-        <caption className="ui-sr">Request limits of the job sites in use</caption>
+        <caption className="ui-sr">
+          Request limits of the job sites in use
+        </caption>
         <thead>
           <tr>
             <th scope="col">Job site</th>
@@ -164,7 +162,9 @@ function LimitRow({ provider }: { provider: Provider }) {
           inputMode="decimal"
           aria-label={`Seconds between requests to ${provider.name}`}
           aria-invalid={invalid || undefined}
-          aria-describedby={invalid ? `${provider.id}-spacing-error` : undefined}
+          aria-describedby={
+            invalid ? `${provider.id}-spacing-error` : undefined
+          }
           value={shown}
           disabled={provider.capability.supported === false}
           onChange={(event) => {

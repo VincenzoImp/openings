@@ -425,7 +425,7 @@ test("signals filter the list and Collection counts what each source found", asy
   await expect(page.getByRole("tab", { name: /^New/ })).toContainText(
     String(counts.new),
   );
-  // Collection: each source says what its jobs became, without zeros.
+  // Job sources: each source says what its jobs became, without zeros.
   await go(page, "sources");
   await settled(page);
   const sources = (await call(page, "/sources?summary=false")).items as {
@@ -433,21 +433,23 @@ test("signals filter the list and Collection counts what each source found", asy
     counts: Record<string, number>;
   }[];
   const line = (counts: Record<string, number>) =>
-    ["found", "shortlisted", "applied", "replied"]
+    ["found", "shortlisted", "applied"]
       .filter((key) => counts[key] > 0)
       .map((key) => `${counts[key]} ${key}`)
       .join(" · ");
   const counted = sources.filter((source) => line(source.counts));
   expect(counted.length).toBeGreaterThan(0);
-  const table = page.getByRole("table", { name: "Sources" });
+  const list = page.getByRole("region", { name: "Job sources" });
+  const row = (name: string) =>
+    list.locator(".src-row", {
+      has: page.getByRole("button", { name, exact: true }),
+    });
   for (const source of counted)
-    await expect(
-      table.locator("tr", { hasText: source.name }).locator(".source-counts"),
-    ).toHaveText(line(source.counts));
+    await expect(row(source.name).locator(".src-row-counts")).toHaveText(
+      line(source.counts),
+    );
   for (const source of sources.filter((item) => !line(item.counts)))
-    await expect(
-      table.locator("tr", { hasText: source.name }).locator(".source-counts"),
-    ).toHaveCount(0);
+    await expect(row(source.name).locator(".src-row-counts")).toHaveCount(0);
   await expect(page.getByRole("tab", { name: "Yield" })).toHaveCount(0);
   await fitsViewport(page);
 });

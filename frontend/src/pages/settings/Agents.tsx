@@ -274,12 +274,7 @@ export function NewTokenDialog({
           }
         />
       ) : (
-        <form
-          id="token-form"
-          className="set-form"
-          noValidate
-          onSubmit={save}
-        >
+        <form id="token-form" className="set-form" noValidate onSubmit={save}>
           <Field
             label="Name"
             hint="Which agent uses it, such as Claude Code on my laptop."
@@ -379,8 +374,7 @@ function AskList() {
   if (!skills.data.length)
     return (
       <p className="set-row-desc">
-        This installation serves no skills; your agent can still use every
-        tool.
+        This installation serves no skills; your agent can still use every tool.
       </p>
     );
   return (

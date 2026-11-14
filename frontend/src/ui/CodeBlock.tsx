@@ -46,10 +46,7 @@ export function CodeBlock({
 }) {
   const [copied, setCopied] = useState(false);
   return (
-    <div
-      className={cx("ui-code", className)}
-      data-inline={inline || undefined}
-    >
+    <div className={cx("ui-code", className)} data-inline={inline || undefined}>
       <pre role="region" aria-label={label} tabIndex={0}>
         <code>{code}</code>
       </pre>

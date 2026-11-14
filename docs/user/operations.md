@@ -2,7 +2,7 @@
 
 ## Portable backup
 
-Use **Settings → Backup and restore → Download a backup**, authenticated `GET /api/v1/backup`, or the MCP
+Use **Settings › Data → Download backup**, authenticated `GET /api/v1/backup`, or the MCP
 `workspace_backup` download grant. These create a consistent SQLite snapshot while
 the service runs, including PDF/source bytes, templates, career data, job history
 and settings.
@@ -46,7 +46,7 @@ cron job or any setup:
   the room either needs, the server does not start and says how much space it
   needs; the workspace file is not touched.
 
-**Settings → Backup and restore → Automatic backups** (owner only) shows when the
+**Settings › Data → Automatic backups** (owner only) shows when the
 last daily backup was written and how many are kept, lists every copy with
 Download, and lets you delete a copy taken before an upgrade once you no longer
 need to go back (daily backups rotate by themselves). Over REST, as the owner or
@@ -75,7 +75,7 @@ restic -r sftp:backup-host:openings-restic backup \
 ## Restore or move hosts
 
 On the destination host, install the same Openings release and set its owner
-password. Restore under **Settings → Backup and restore** (marked Owner only:
+password. Restore under **Settings › Data** (marked Owner only:
 choose the file and type RESTORE to confirm) or `POST /api/v1/backup/restore` with the raw
 SQLite body, as the owner or with an owner token; an agent token is refused.
 Restore accepts the current database format and checks integrity and
@@ -99,7 +99,7 @@ needs 3 × *B* + *D* + 64 MiB free, plus *B* − *D* when the backup is the larg
 one: about four times the size when you restore a workspace over itself. A larger
 upload is refused before it is written, with `413 backup_size` and the backup
 size, the free space and the space needed in the error details; the room is
-checked again before the database is replaced. **Settings → Backup and restore** and
+checked again before the database is replaced. **Settings › Data** and
 `GET /api/v1/workspace` (`workspace_info`) show the database size, the free space
 and the largest backup that fits now (`storage`). `OPENINGS_MAX_RESTORE_MB` is an
 optional upper bound, unset by default; it can only lower the limit. Copies left
@@ -243,7 +243,7 @@ in, so an upgraded workspace has exactly the layout of a new one:
 If the process stops during the upgrade, the next start either finishes the last
 step or removes `openings.sqlite.next` and runs the upgrade again; the original
 is never written. `openings.pre-0.24.sqlite` stays until you delete it in
-**Settings → Backup and restore → Automatic backups**. To go back, follow [Roll
+**Settings › Data → Automatic backups**. To go back, follow [Roll
 back an upgrade](#roll-back-an-upgrade) with that file and the 0.23 image;
 changes made after the upgrade are not in it. Restoring a 0.23 backup into 0.24
 upgrades a copy the same way: the uploaded file is not changed and the archive is

@@ -15,10 +15,146 @@ type Screen = {
   route: string | ((page: Page) => Promise<string>);
   /** Make the state to capture once the screen is shown. */
   open?: (page: Page) => Promise<void>;
+  /** Before the screen opens, such as a route that answers for the server. */
+  before?: (page: Page) => Promise<void>;
   /** The file name under docs/images, for an image the docs embed. */
   docs?: string;
   signedOut?: boolean;
 };
+
+// Job sources and Settings (#227). The browser-test server collects nothing,
+// so a failing source and a Test answer are given by a route.
+const failingSources = async (page: Page) =>
+  page.route(
+    (url) => url.pathname === "/api/v1/sources",
+    async (route) => {
+      const response = await route.fetch();
+      const body = await response.json();
+      const at = new Date(Date.now() - 2 * 3600_000).toISOString();
+      body.items = body.items.map(
+        (item: Record<string, unknown>, index: number) =>
+          index === 0
+            ? {
+                ...item,
+                last_error:
+                  "Blocked by the site (HTTP 403). It may allow requests again later.",
+                last_outcome: "failed",
+                last_run: { id: "run-1", state: "failed", started_at: at },
+              }
+            : index === 1
+              ? {
+                  ...item,
+                  enabled: false,
+                }
+              : {
+                  ...item,
+                  last_run: {
+                    id: `run-${index}`,
+                    state: "succeeded",
+                    started_at: at,
+                    finished_at: at,
+                    counts: { received: 24, created: 4 },
+                  },
+                },
+      );
+      await route.fulfill({ response, json: body });
+    },
+  );
+const SOURCES_AND_SETTINGS: Screen[] = [
+  { name: "sources", route: "sources", docs: "collection" },
+  { name: "sources-states", route: "sources", before: failingSources },
+  {
+    name: "sources-empty",
+    route: "sources",
+    before: (page) =>
+      page.route(
+        (url) => url.pathname === "/api/v1/sources",
+        (route) =>
+          route.fulfill({
+            json: { items: [], total: 0, limit: 500, offset: 0 },
+          }),
+      ),
+  },
+  {
+    name: "sources-checks",
+    route: "sources",
+    open: async (page) => {
+      await page.getByText("Recent checks", { exact: true }).click();
+      await expect(
+        page.getByRole("list", { name: "Recent checks" }),
+      ).toBeVisible();
+    },
+  },
+  {
+    name: "sources-editor-test",
+    route: "sources",
+    before: (page) =>
+      page.route("**/api/v1/sources/preview", (route) =>
+        route.fulfill({
+          json: {
+            kind: "jobspy",
+            total: 14,
+            preview_limit: 20,
+            items: [
+              ["Data Engineer", "Northstar Labs", "Zurich"],
+              ["Senior Data Engineer", "Fjord Analytics", "Zurich"],
+              ["Analytics Engineer", "Meridian Grid", "Zurich · Hybrid"],
+              ["Data Platform Engineer", "Kestrel Robotics", "Zurich"],
+              ["Machine Learning Engineer", "Orbit Works", "Zurich"],
+              ["Data Engineer, Payments", "Lumen Health", "Zurich"],
+            ].map(([title, company, location]) => ({
+              title,
+              company,
+              location,
+            })),
+            diagnostics: [
+              {
+                provider: "indeed",
+                message: "Waiting 5 seconds between requests.",
+              },
+            ],
+          },
+        }),
+      ),
+    open: async (page) => {
+      await page.getByRole("button", { name: "Add source" }).first().click();
+      const editor = page.getByRole("dialog", { name: "Add a source" });
+      await editor.getByLabel("Keywords").fill("data engineer");
+      await editor.getByLabel("Location", { exact: true }).fill("Zurich");
+      await editor.getByLabel("Country").fill("switzerland");
+      await editor.getByRole("button", { name: "Test" }).click();
+      await expect(editor.getByText("14 jobs found")).toBeVisible();
+    },
+  },
+  { name: "settings", route: "settings" },
+  { name: "settings-account", route: "settings?section=account" },
+  { name: "settings-agents", route: "settings?section=agents", docs: "skills" },
+  {
+    name: "settings-token",
+    route: "settings?section=agents",
+    open: async (page) => {
+      await page.getByRole("button", { name: "New token" }).click();
+      const dialog = page.getByRole("dialog", { name: "New token" });
+      await dialog.getByLabel("Name", { exact: true }).fill("Claude Code");
+      await dialog.getByRole("button", { name: "Create token" }).click();
+      await expect(
+        page.getByRole("dialog", { name: "Copy your token" }),
+      ).toBeVisible();
+    },
+  },
+  { name: "settings-data", route: "settings?section=data" },
+  {
+    name: "settings-restore",
+    route: "settings?section=data",
+    open: async (page) => {
+      await page.getByRole("button", { name: "Restore from backup…" }).click();
+      await expect(
+        page.getByRole("dialog", { name: "Restore from backup" }),
+      ).toBeVisible();
+    },
+  },
+  { name: "settings-advanced", route: "settings?section=advanced" },
+];
 
 const first = async (page: Page, path: string) =>
   (await call(page, path)).items[0].id as string;
@@ -79,10 +215,7 @@ const SCREENS: Screen[] = [
   { name: "profile", route: "profile?section=knowledge", docs: "career" },
   { name: "preferences", route: "preferences", docs: "preferences" },
   { name: "templates", route: "templates", docs: "templates" },
-  { name: "sources", route: "sources", docs: "collection" },
-  { name: "settings", route: "settings" },
-  { name: "skills", route: "settings?section=skills", docs: "skills" },
-  { name: "backup", route: "settings?section=backup" },
+  ...SOURCES_AND_SETTINGS,
 ];
 
 const ROOT = resolve(import.meta.dirname, "../..");
@@ -95,6 +228,7 @@ const THEMES = ["light", "dark"] as const;
 
 async function capture(page: Page, screen: Screen, path: string) {
   if (!screen.signedOut) await page.context().addCookies(ownerSession());
+  await screen.before?.(page);
   // Open a page of the app first, so a route can read the workspace.
   await page.goto("/");
   const route =

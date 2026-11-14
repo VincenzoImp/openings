@@ -24,7 +24,7 @@ did it:
 
 1. **Connect your agent.** Create an agent token, copy it once, and add the
    configuration for Claude Code, Codex or another MCP client (the same as
-   Settings, **Agent access**). Then tell your agent "Set up my Openings
+   Settings › **API & agents**). Then tell your agent "Set up my Openings
    workspace." The step says whether the agent has called yet, and updates by
    itself.
 2. **Your record.** What the agent builds with you: the Profile, Preferences,
@@ -65,7 +65,7 @@ cards below show:
   **Record replies** to open them and **Close as no reply**, one by one or all
   together. Nothing closes by itself.
 
-You talk to your agent in its own chat; **Settings › Skills** lists what you can
+You talk to your agent in its own chat; **Settings › API & agents** lists what you can
 ask it. How your applications fare is under **Applications**, **Stats**.
 
 On a phone the bottom bar shows the four Work destinations and **More**, which
