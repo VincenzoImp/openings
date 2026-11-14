@@ -1,0 +1,10 @@
+{
+  "name": "openings-openapi-tools",
+  "private": true,
+  "description": "Generates frontend/src/api/schema.d.ts (npm run api:gen). openapi-typescript needs TypeScript 5, the dashboard builds with TypeScript 7.",
+  "type": "module",
+  "devDependencies": {
+    "openapi-typescript": "7.13.0",
+    "typescript": "5.9.3"
+  }
+}

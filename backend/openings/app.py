@@ -222,7 +222,7 @@ def create_app(database=None, start_worker=True):
     if (static / "assets").is_dir():
         app.mount("/assets", StaticFiles(directory=static / "assets"), name="assets")
 
-    @app.get("/{path:path}")
+    @app.get("/{path:path}", include_in_schema=False)
     def dashboard(path: str):
         if path.startswith(("api/", "mcp", "health")):
             raise DomainError(404, "not_found", "This endpoint does not exist.")
