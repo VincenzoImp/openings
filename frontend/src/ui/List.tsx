@@ -102,7 +102,8 @@ export function List({
 }) {
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     const key = plainKey(event.nativeEvent);
-    if (!key) return;
+    // A row's open menu keeps its own keys.
+    if (!key || (event.target as HTMLElement).closest?.("[role=menu]")) return;
     const rows = [
       ...event.currentTarget.querySelectorAll<HTMLElement>("[data-row-id]"),
     ];
@@ -283,6 +284,7 @@ export function ListRow({
   swipe,
   onLongPress,
   href,
+  menu,
   dense = false,
 }: {
   id: string;
@@ -297,6 +299,11 @@ export function ListRow({
   onLongPress?: () => void;
   /** A link row (opens a page) instead of a selecting row. */
   href?: string;
+  /**
+   * The row's `…` menu, after its actions and shown with them; it gets the
+   * tab index the actions have (0 on the selected row, else -1).
+   */
+  menu?: (tabIndex: number) => ReactNode;
   dense?: boolean;
 }) {
   const list = useContext(ListContext);
@@ -350,7 +357,7 @@ export function ListRow({
       data-selected={selected || undefined}
       data-checked={checked || undefined}
       data-dense={dense || undefined}
-      data-has-actions={actions.length ? "" : undefined}
+      data-has-actions={actions.length || menu ? "" : undefined}
       data-swipe={swipe ? "" : undefined}
       data-swiping={gesture.dx ? "" : undefined}
       style={
@@ -379,10 +386,10 @@ export function ListRow({
           {body}
         </button>
       )}
-      {(meta || actions.length > 0) && (
+      {(meta || actions.length > 0 || menu) && (
         <span className="ui-row-end">
           {meta && <span className="ui-row-meta">{meta}</span>}
-          {actions.length > 0 && (
+          {(actions.length > 0 || menu) && (
             <span className="ui-row-actions">
               {actions.slice(0, 2).map((action) => (
                 <IconButton
@@ -397,6 +404,7 @@ export function ListRow({
                   onClick={action.onClick}
                 />
               ))}
+              {menu?.(selected ? 0 : -1)}
             </span>
           )}
         </span>

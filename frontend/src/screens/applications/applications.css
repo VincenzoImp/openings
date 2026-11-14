@@ -1,0 +1,287 @@
+/* Applications: the list by stage and Stats; the shared parts of the
+   application page (status, priority glyph, dialogs). */
+@layer screens {
+  .ap-screen {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+  }
+  .ap-body {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+  .ap-pad {
+    padding: var(--s-4) var(--pane-pad);
+  }
+  .ap-muted {
+    color: var(--text-3);
+  }
+  .ap-caption {
+    font: var(--t-xs);
+    color: var(--text-3);
+    letter-spacing: 0;
+  }
+
+  /* Toolbar: the stage chips scroll; the tools keep their room. */
+  .ap-toolbar {
+    gap: var(--s-4);
+  }
+  .ap-chips {
+    display: flex;
+    flex: 1;
+    gap: 2px;
+    min-width: 0;
+    padding: var(--s-2) 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .ap-chips::-webkit-scrollbar {
+    display: none;
+  }
+  .ap-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-1-5);
+    flex: none;
+    height: 28px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: var(--r-full);
+    background: transparent;
+    color: var(--text-2);
+    font: 500 13px/1 var(--font);
+    letter-spacing: 0;
+    white-space: nowrap;
+    transition:
+      background-color var(--d-fast) var(--ease),
+      color var(--d-fast) var(--ease);
+  }
+  .ap-chip:hover {
+    background: var(--hover);
+    color: var(--text);
+  }
+  .ap-chip[aria-pressed="true"] {
+    background: var(--selected);
+    color: var(--text);
+  }
+  .ap-tools {
+    display: flex;
+    align-items: center;
+    flex: none;
+    gap: var(--s-1);
+  }
+  .ap-tools .ui-search {
+    width: 200px;
+    margin-right: var(--s-1);
+  }
+  .ap-search-row {
+    display: none;
+  }
+
+  /* Rows */
+  .ap-status {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-1-5);
+    color: var(--text-2);
+  }
+  .ap-sub-status {
+    display: none;
+  }
+  .ap-priority {
+    flex: none;
+  }
+  .ap-priority rect {
+    fill: var(--border-strong);
+  }
+  .ap-priority rect[data-on] {
+    fill: var(--text-2);
+  }
+
+  /* Stats */
+  .ap-body[data-view="stats"] {
+    padding: var(--s-6) var(--pane-pad) var(--s-12);
+  }
+  .ap-stats {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-10);
+    max-width: 880px;
+  }
+  .ap-numbers {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--s-6);
+    margin: 0;
+  }
+  .ap-number {
+    display: flex;
+    flex-direction: column-reverse;
+    gap: var(--s-1);
+  }
+  .ap-number dd {
+    margin: 0;
+    font: var(--t-3xl);
+    font-weight: var(--w-semibold);
+    letter-spacing: var(--tr-3xl);
+    font-variant-numeric: tabular-nums;
+  }
+  .ap-number dt {
+    color: var(--text-3);
+    font: var(--t-xs);
+    font-weight: var(--w-medium);
+    letter-spacing: 0;
+  }
+  .ap-section-title {
+    font: var(--t-md);
+    font-weight: var(--w-semibold);
+    letter-spacing: var(--tr-md);
+  }
+  .ap-funnel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    max-width: 640px;
+    margin: var(--s-3) 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .ap-funnel li {
+    display: grid;
+    grid-template-columns: 88px minmax(0, 1fr) 48px;
+    align-items: center;
+    gap: var(--s-3);
+    min-height: 28px;
+    font: var(--t-sm);
+  }
+  .ap-funnel-label {
+    color: var(--text-2);
+  }
+  .ap-funnel-track {
+    height: 8px;
+    border-radius: var(--r-full);
+    background: var(--hover);
+    overflow: hidden;
+  }
+  .ap-funnel-bar {
+    display: block;
+    height: 100%;
+    min-width: 4px;
+    border-radius: var(--r-full);
+    background: var(--text-2);
+  }
+  .ap-funnel-count {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .ap-stats .ui-table {
+    margin-top: var(--s-3);
+  }
+
+  /* Dialogs */
+  .ap-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+    padding-bottom: var(--s-1);
+  }
+  .ap-checks {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+  }
+  .ap-link {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--accent-text);
+    font: inherit;
+    font-weight: var(--w-medium);
+    cursor: pointer;
+  }
+  .ap-link:hover {
+    text-decoration: underline;
+  }
+
+  @container app (max-width: 719px) {
+    .ap-toolbar {
+      padding: 0 var(--s-4);
+    }
+    .ap-tools {
+      display: none;
+    }
+    .ap-chips {
+      gap: var(--s-1-5);
+      padding: 10px 0;
+    }
+    .ap-chip {
+      height: 30px;
+      padding: 0 var(--s-3);
+      background: var(--hover);
+      position: relative;
+    }
+    .ap-chip::before {
+      content: "";
+      position: absolute;
+      inset: -7px -3px;
+    }
+    .ap-chip[aria-pressed="true"] {
+      background: var(--primary);
+      color: var(--on-primary);
+    }
+    .ap-chip[aria-pressed="true"] .ui-count {
+      color: inherit;
+      opacity: 0.75;
+    }
+    .ap-search-row {
+      display: block;
+      padding: var(--s-2) var(--s-4);
+      border-bottom: 1px solid var(--border);
+    }
+    .ap-search-row .ui-search {
+      width: 100%;
+    }
+    .ui-row-meta .ap-status {
+      display: none;
+    }
+    .ap-sub-status {
+      display: inline;
+    }
+    .ap-sub-place {
+      display: none;
+    }
+    .ap-body[data-view="stats"] {
+      padding: var(--s-4) var(--s-4) var(--s-12);
+    }
+    .ap-numbers {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: var(--s-5) var(--s-4);
+    }
+  }
+}
+
+/* At rest the list shows content only: the active row (the Tab stop) shows
+   its fill and actions once the list has focus, or on hover. */
+@layer screens {
+  .ap-body .ui-list:not(:focus-within) .ui-row[data-selected]:not(:hover) {
+    background: var(--bg);
+  }
+  .ap-body .ui-list:not(:focus-within) .ui-row[data-selected]::before {
+    display: none;
+  }
+  .ap-body
+    .ui-list:not(:focus-within)
+    .ui-row[data-selected]:not(:hover)
+    .ui-row-actions {
+    display: none;
+  }
+  .ap-body
+    .ui-list:not(:focus-within)
+    .ui-row[data-selected]:not(:hover)
+    .ui-row-meta {
+    display: flex;
+  }
+}

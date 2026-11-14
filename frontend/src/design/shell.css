@@ -31,8 +31,7 @@
   .legacy-screen {
     padding: var(--s4);
   }
-  .legacy-screen .page-head h1,
-  .legacy-screen .review-head h1 {
+  .legacy-screen .page-head h1 {
     display: none;
   }
   .legacy-screen .page-head p {
