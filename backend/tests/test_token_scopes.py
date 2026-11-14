@@ -96,6 +96,12 @@ def test_an_agent_backup_carries_no_installation_credentials(app, client, tmp_pa
     agent = auth.create_token("Synthetic agent", "agent")
     owner = auth.create_token("Synthetic owner token", "owner")
     job = workspace.ingest_job({"title": "Kept job", "company": "Example", "posting": "Build."})
+    # Earlier versions of the credential rows sit in free pages of the live database.
+    with acting_as(OWNER):
+        for index in range(200):
+            auth.revoke_token(auth.create_token(f"Revoked {index}", "agent")["id"])
+    for _ in range(20):
+        auth.logout()
     secrets = workspace.get_settings("auth")["data"]
     needles = [
         secrets["password_hash"].encode(),
