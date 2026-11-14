@@ -2,7 +2,7 @@
 
 /** The review page of an application, optionally on one of its tabs. */
 export const reviewHref = (id: string, tab = "") =>
-  `#review?application=${encodeURIComponent(id)}${tab ? "&tab=" + tab : ""}`;
+  `#applications/${encodeURIComponent(id)}${tab ? "?tab=" + tab : ""}`;
 
 /** The Ready stage in Today's order: closest deadline first, then priority. */
 export const READY_QUEUE = "#applications?stage=ready&sort=deadline";

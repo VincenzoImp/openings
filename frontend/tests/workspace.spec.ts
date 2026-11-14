@@ -47,7 +47,7 @@ async function call(page: Page, path: string, method = "GET", body?: unknown) {
 }
 async function go(page: Page, hash: string) {
   await page.goto("/#" + hash);
-  await expect(page.locator(".main h1")).toBeVisible();
+  await expect(page.locator("h1:visible")).toBeVisible();
 }
 const top = (page: Page) => page.locator("dialog[open]").last();
 const errors = new WeakMap<Page, string[]>();
@@ -57,7 +57,7 @@ test.beforeEach(async ({ page }) => {
   page.on("pageerror", (error) => errors.get(page)!.push(error.message));
   await page.context().addCookies(ownerCookies);
   await page.goto("/");
-  await expect(page.locator(".main h1")).toBeVisible();
+  await expect(page.locator("h1:visible")).toBeVisible();
 });
 test.afterEach(async ({ page }, info) => {
   await page.screenshot({
@@ -88,7 +88,7 @@ test("queue count, posting hierarchy and query-safe selection", async ({
   // The navigation read its count before these changes.
   await page.reload();
   const queue = await call(page, "/jobs?triage=new");
-  await expect(page.locator(".navcount").first()).toHaveText(
+  await expect(page.locator(".ui-needs:visible").first()).toHaveText(
     String(queue.total),
   );
   const rows = page.locator(".job-list > li");
@@ -171,7 +171,7 @@ test("import protection and nested dialogs restore scroll after browser Back", a
   page,
 }) => {
   await go(page, "jobs");
-  await go(page, "career?section=knowledge");
+  await go(page, "profile?section=knowledge");
   await page.getByRole("button", { name: "Import", exact: true }).click();
   await top(page)
     .getByRole("textbox", { name: "Text or JSON", exact: true })
@@ -202,34 +202,38 @@ test("import protection and nested dialogs restore scroll after browser Back", a
     .click();
   await expect(page.locator("dialog[open]")).toHaveCount(1);
   await page.goBack();
-  await expect(page.locator(".main h1")).toHaveText("Jobs");
+  await expect(page.locator("h1:visible")).toHaveText("Jobs");
   await expect(page.locator("dialog[open]")).toHaveCount(0);
   await expect
     .poll(() => page.evaluate(() => document.body.style.overflow))
     .not.toBe("hidden");
 });
 
-test("mobile navigation contains focus and releases the background on close and resize", async ({
+test("keyboard only: the phone's More menu opens, moves, closes and gives focus back", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const button = page.getByRole("button", { name: "More", exact: true });
-  await button.click();
-  await expect(page.locator("main")).toHaveAttribute("inert", "");
-  for (let index = 0; index < 15; index++) {
-    await page.keyboard.press("Tab");
-    expect(
-      await page.evaluate(
-        () => !!document.activeElement?.closest(".more-sheet"),
-      ),
-    ).toBe(true);
-  }
+  await button.focus();
+  await page.keyboard.press("Enter");
+  const menu = page.getByRole("menu", { name: "More" });
+  await expect(
+    menu.getByRole("menuitem", { name: "Preferences" }),
+  ).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await expect(menu.getByRole("menuitem", { name: "Templates" })).toBeFocused();
   await page.keyboard.press("Escape");
+  await expect(menu).toBeHidden();
   await expect(button).toBeFocused();
-  await expect(page.locator("main")).not.toHaveAttribute("inert", "");
+  // Wide again: the sidebar replaces the bars.
   await button.click();
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await expect(page.locator("main")).not.toHaveAttribute("inert", "");
+  await expect(button).toBeHidden();
+  await expect(
+    page.getByRole("navigation", { name: "Main" }).getByRole("link", {
+      name: "Preferences",
+    }),
+  ).toBeVisible();
 });
 
 test("mobile applications, templates and stats stay usable inside the viewport", async ({
@@ -292,12 +296,13 @@ test("the career entry editor recovers its own concurrent version", async ({
     kind: "project",
     title: "Concurrent career entry",
   });
-  await go(page, "career?section=knowledge&q=Concurrent");
+  await go(page, "profile?section=knowledge&q=Concurrent");
   // The entry is edited in the panel beside the record, not in a dialog.
   const shown = page
     .getByRole("group", { name: "Shown pane" })
     .getByRole("button", { name: "Selected entry", exact: true });
-  if (await shown.isVisible()) await shown.click();
+  // On a narrow screen one pane shows at a time: switch to the entry.
+  if ((page.viewportSize()?.width ?? 1440) <= 860) await shown.click();
   const editor = page.locator("section.detail");
   await expect(editor.locator("[name=title]")).toHaveValue(
     "Concurrent career entry",

@@ -37,7 +37,7 @@
 .pipeline strong,
 .stat strong {
   display: block;
-  font: 400 var(--t-xl) / 1.2 var(--serif);
+  font: 600 var(--fs-xl) / 1.2 var(--font);
 }
 .pipeline .is-ready strong {
   color: var(--ready);

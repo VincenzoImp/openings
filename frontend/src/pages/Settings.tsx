@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import { ErrorBanner, Tabs } from "../design";
 import { PageHead } from "../library/common";
 import { useFresh } from "../library/useFresh";
+import { useShell } from "../shell/context";
 import { useUrlState } from "../state";
 import { Backup } from "./settings/Backup";
 import { Connect } from "./settings/Connect";
@@ -24,7 +25,8 @@ const tabOf = (value: string) =>
  * is kept. Parts that need owner authority are marked Owner only: an agent
  * token is refused there over REST and MCP alike.
  */
-export default function SettingsPage({ onLogout }: { onLogout: () => void }) {
+export default function SettingsPage() {
+  const { signOut: onLogout } = useShell();
   const [raw] = useUrlState("section", "agents");
   const section = tabOf(raw);
   const info = useFresh<WorkspaceInfo>("/workspace", {}, ["backup"]);

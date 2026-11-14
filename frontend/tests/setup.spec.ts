@@ -107,24 +107,24 @@ test("a new workspace opens on the setup guide, which is skipped, continued and 
   await expect(page).toHaveURL(/#setup$/);
   // Skipping goes to Today, and the guide no longer opens by itself.
   await page.getByRole("button", { name: "Skip for now" }).click();
-  await expect(page.locator(".main h1")).toHaveText("Today");
+  await expect(page.locator("h1:visible")).toHaveText("Today");
   await expect(banner).toHaveCount(0);
   await page.goto("/");
-  await expect(page.locator(".main h1")).toHaveText("Today");
+  await expect(page.locator("h1:visible")).toHaveText("Today");
   // Settings, Workspace opens it again.
   await go(page, "settings?section=workspace");
   await card(page, "Setup guide")
     .getByRole("link", { name: "Open the setup guide" })
     .click();
   await expect(page).toHaveURL(/#setup$/);
-  await expect(page.locator(".main h1")).toHaveText("Set up your workspace");
+  await expect(page.locator("h1:visible")).toHaveText("Set up your workspace");
   // A browser that saw a populated workspace first never opens it. (WebKit
   // reports a read cut short by leaving the page as an error: let it finish.)
   await page.waitForLoadState("networkidle");
   await page.unrouteAll({ behavior: "wait" });
   await page.evaluate(() => localStorage.removeItem("openings-setup"));
   await page.goto("/");
-  await expect(page.locator(".main h1")).toHaveText("Today");
+  await expect(page.locator("h1:visible")).toHaveText("Today");
   expect(
     await page.evaluate(() => localStorage.getItem("openings-setup")),
   ).toBe(null);

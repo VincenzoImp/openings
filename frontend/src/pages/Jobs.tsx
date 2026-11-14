@@ -4,8 +4,8 @@ import { Button, Card, EmptyState, Split, Tabs } from "../design";
 import { PageHead } from "../library/common";
 import { useFresh } from "../library/useFresh";
 import { useDebounce, useUrlFilters } from "../state";
-import type { Links } from "../library/records";
-import { AddJob } from "./jobs/AddJob";
+import { useShell } from "../shell/context";
+import { href, navigate } from "../shell/router";
 import { Detail } from "./jobs/Detail";
 import {
   DEFAULTS,
@@ -27,11 +27,13 @@ const NONE: JobList = { items: [], total: 0 };
  * Shortlist, the dismissed jobs and all of them, each beside the selected
  * job. `#jobs?section=…&job=…` opens a tab and a job.
  */
-export default function JobsPage({ onOpenApplication }: Links) {
+export default function JobsPage() {
+  const { addJob } = useShell();
+  const onOpenApplication = (id: string) =>
+    navigate(href("application", { id }));
   const [values, setValues] = useUrlFilters(DEFAULTS);
   const filters = values as Filters;
   const section = sectionOf(filters.section);
-  const [adding, setAdding] = useState(false);
   // On a phone one pane is shown: the selected job, or the list.
   const [pane, setPane] = useState<0 | 1>(filters.job ? 1 : 0);
   useEffect(() => {
@@ -76,7 +78,7 @@ export default function JobsPage({ onOpenApplication }: Links) {
       <PageHead
         title="Jobs"
         actions={
-          <Button icon="plus" onClick={() => setAdding(true)}>
+          <Button icon="plus" onClick={addJob}>
             Add a job
           </Button>
         }
@@ -121,7 +123,7 @@ export default function JobsPage({ onOpenApplication }: Links) {
                 rows.current = ids;
               }}
               leaving={leaving}
-              onAdd={() => setAdding(true)}
+              onAdd={addJob}
             />
             {filters.job ? (
               <Detail
@@ -146,16 +148,6 @@ export default function JobsPage({ onOpenApplication }: Links) {
           </Split>
         </div>
       </Tabs>
-      {adding && (
-        <AddJob
-          onClose={() => setAdding(false)}
-          onOpenJob={(job) => {
-            setAdding(false);
-            setValues({ section: "new", job, offset: "0" });
-            setPane(1);
-          }}
-        />
-      )}
     </>
   );
 }

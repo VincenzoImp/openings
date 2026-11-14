@@ -1,6 +1,7 @@
 // Small pieces the Library screens (Career, Preferences, Templates) share.
 import type { ReactNode } from "react";
 import { Button, Dialog, ErrorBanner, Loading } from "../design";
+import { useTitle } from "../shell/context";
 import { useWorkspace } from "../state";
 import type { Fresh } from "./useFresh";
 
@@ -38,6 +39,8 @@ export function PageHead({
   children: ReactNode;
   actions?: ReactNode;
 }) {
+  // On a phone the shell's top bar shows this title instead of the h1.
+  useTitle(title);
   return (
     <header className="page-head spread">
       <div className="grow">

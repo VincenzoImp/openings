@@ -35,7 +35,7 @@
   display: flex;
   align-items: center;
   gap: var(--s4);
-  min-height: var(--row);
+  min-height: var(--row-min);
   padding: var(--s3) var(--s4);
   border-top: 1px solid var(--line);
 }
@@ -48,7 +48,7 @@
 }
 .list .meta {
   color: var(--ink-2);
-  font-size: var(--t-sm);
+  font-size: var(--fs-sm);
   overflow-wrap: anywhere;
 }
 .list a.title,

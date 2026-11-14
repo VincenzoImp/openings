@@ -4,8 +4,6 @@ import assert from "node:assert/strict";
 const { nextTabIndex, trappedIndex } = await import("../src/design/keys.ts");
 const { buttonClass, tagClass, cx } = await import("../src/design/classes.ts");
 const { actorPhrase } = await import("../src/design/actor.ts");
-const routes = await import("../src/shell/routes.ts");
-const preferences = await import("../src/shell/preferences.ts");
 
 test("arrow keys move through tabs and wrap; Home and End jump", () => {
   assert.equal(nextTabIndex("ArrowRight", 0, 3), 1);
@@ -49,87 +47,6 @@ test("who made a change reads as one plain phrase; an unknown actor says nothing
   assert.equal(actorPhrase(undefined), "");
   assert.equal(actorPhrase(""), "");
   assert.equal(actorPhrase("agent:"), "by an agent");
-});
-
-test("every screen has one hash route; an unknown route opens Today", () => {
-  for (const route of [
-    "today",
-    "jobs",
-    "applications",
-    "collection",
-    "career",
-    "preferences",
-    "templates",
-    "settings",
-  ])
-    assert.equal(routes.routeOf("#" + route), route);
-  assert.equal(routes.routeOf(""), "today");
-  assert.equal(routes.routeOf("#no-such-page"), "today");
-  // Names of earlier versions are not kept, nor the removed Activity page:
-  // they open Today.
-  for (const old of [
-    "overview",
-    "inbox",
-    "shortlist",
-    "skills",
-    "onboarding",
-    "activity",
-  ])
-    assert.equal(routes.routeOf("#" + old), "today");
-  assert.equal(routes.routeOf("#activity?section=runs"), "today");
-  assert.equal(routes.canonicalHash, undefined);
-  assert.equal(routes.ALIASES, undefined);
-  // The review page belongs to Applications.
-  assert.equal(routes.routeOf("#review?application=x1"), "review");
-  assert.equal(routes.destinationOf("review").item.label, "Applications");
-});
-
-test("navigation has three groups", () => {
-  assert.deepEqual(
-    routes.NAV.map((group) => [
-      group.group,
-      group.items.map((item) => item.label),
-    ]),
-    [
-      ["Work", ["Today", "Applications", "Jobs"]],
-      ["Library", ["Career", "Preferences", "Templates"]],
-      ["System", ["Collection", "Settings"]],
-    ],
-  );
-  assert.equal(routes.destinationOf("jobs").group, "Work");
-  assert.equal(routes.destinationOf("settings").group, "System");
-  // The bottom bar on narrow screens: the work destinations and Career.
-  assert.deepEqual(routes.TAB_BAR, ["today", "applications", "jobs", "career"]);
-  // Every screen is reachable from the navigation, except the setup guide:
-  // a new workspace opens on it, and Settings, Workspace links to it.
-  for (const route of Object.keys(routes.SCREENS))
-    if (route !== "setup") assert.ok(routes.destinationOf(route), route);
-  assert.equal(routes.destinationOf("setup"), null);
-});
-
-test("the stored theme wins; otherwise the system theme", () => {
-  const store = (values) => ({
-    getItem: (key) => values[key] ?? null,
-    setItem() {},
-  });
-  assert.equal(preferences.initialTheme(store({}), true), "dark");
-  assert.equal(preferences.initialTheme(store({}), false), "light");
-  assert.equal(
-    preferences.initialTheme(store({ "openings-theme": "light" }), true),
-    "light",
-  );
-  assert.equal(
-    preferences.initialTheme(store({ "openings-theme": "sepia" }), false),
-    "light",
-  );
-  const broken = {
-    getItem() {
-      throw Error("blocked");
-    },
-    setItem() {},
-  };
-  assert.equal(preferences.initialTheme(broken, true), "dark");
-  assert.equal(preferences.initialDensity, undefined);
 });
 
 test("free-form values become typed rows and come back unchanged", async () => {

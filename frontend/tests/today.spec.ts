@@ -94,7 +94,7 @@ test("Today says what is ready, where applications stand and what waits for a re
   await expect(readyCard.locator(".btn.primary")).toHaveCount(1);
   await expect(rows.first().locator(".btn.primary")).toHaveAttribute(
     "href",
-    `#review?application=${ready.items[0].id}`,
+    `#applications/${ready.items[0].id}`,
   );
   await expect(
     rows.filter({ hasText: "Python Engineer" }).locator(".tag").first(),
@@ -191,7 +191,7 @@ test("Today says what is ready, where applications stand and what waits for a re
     .getByRole("link", { name: /Interview$/ })
     .click();
   await expect(page).toHaveURL(/#applications\?stage=interview/);
-  await expect(page.locator(".main h1")).toHaveText("Applications");
+  await expect(page.locator("h1:visible")).toHaveText("Applications");
   await expect(
     page.getByRole("group", { name: "Stage" }).getByRole("button", {
       name: /^Interview/,
@@ -268,7 +268,10 @@ test("every card of Today has its empty, loading and error state", async ({
       .getByRole("button", { name: "Try again" })
       .first()
       .click();
-  await expect(page.getByRole("alert")).toHaveCount(0);
+  // The shell's live region for error toasts stays, empty.
+  await expect(page.getByRole("alert").filter({ hasText: /\S/ })).toHaveCount(
+    0,
+  );
 });
 
 test("on a phone the bottom bar never covers the end of Today", async ({
@@ -277,7 +280,10 @@ test("on a phone the bottom bar never covers the end of Today", async ({
   test.skip(!isNarrow(page), "The bottom bar exists on narrow screens.");
   await go(page, "today");
   await settled(page);
-  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  // The content scrolls inside the shell, between its bars.
+  await page.evaluate(() =>
+    document.getElementById("content")!.scrollTo(0, 1e6),
+  );
   const bar = await page
     .getByRole("navigation", { name: "Main" })
     .boundingBox();

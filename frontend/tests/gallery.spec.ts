@@ -94,6 +94,82 @@ test("a list moves with j/k, dismisses with d and undoes with ⌘Z", async ({
   await expect(list.getByText("Python Engineer")).toHaveCount(1);
 });
 
+test("x and shift-click select rows; the bulk bar acts on them; Esc clears", async ({
+  page,
+}) => {
+  await open(page);
+  const list = page.getByRole("region", { name: "Jobs to review" });
+  const current = list.locator("[aria-current=true]");
+  await current.focus();
+  await page.keyboard.press("x");
+  const bar = page.getByRole("toolbar", { name: "1 selected" });
+  await expect(bar).toBeVisible();
+  await expect(current).toHaveAccessibleName(/, selected$/);
+  // Shift-click: from the row picked last to this one.
+  await list
+    .getByRole("button", { name: /^Site Reliability Engineer/ })
+    .click({ modifiers: ["Shift"] });
+  await expect(
+    page.getByRole("toolbar", { name: /selected$/ }),
+  ).toHaveAccessibleName("6 selected");
+  await expect(list.locator(".ui-row[data-checked]")).toHaveCount(6);
+  await page.keyboard.press("Escape");
+  await expect(list.locator(".ui-row[data-checked]")).toHaveCount(0);
+  await expect(page.getByRole("toolbar", { name: /selected$/ })).toHaveCount(0);
+  // Picked again, then dismissed together and brought back with ⌘Z.
+  await current.focus();
+  await page.keyboard.press("x");
+  await page.keyboard.press("j");
+  await page.keyboard.press("x");
+  await page
+    .getByRole("toolbar", { name: "2 selected" })
+    .getByRole("button", { name: "Dismiss" })
+    .click();
+  await expect(page.locator(".ui-toast-region [role=status]")).toContainText(
+    "Dismissed 2 jobs",
+  );
+  await expect(list.locator(".ui-row")).toHaveCount(9);
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(list.locator(".ui-row")).toHaveCount(11);
+});
+
+test("on touch a row swipes right to shortlist and left to dismiss", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await open(page);
+  const list = page.getByRole("region", { name: "Jobs to review" });
+  const swipe = (title: string, dx: number) =>
+    list.locator(".ui-row", { hasText: title }).evaluate((row, dx) => {
+      const box = row.getBoundingClientRect();
+      const at = (x: number) => ({
+        pointerType: "touch",
+        pointerId: 7,
+        bubbles: true,
+        clientX: x,
+        clientY: box.top + box.height / 2,
+      });
+      const start = box.left + box.width / 2;
+      row.dispatchEvent(new PointerEvent("pointerdown", at(start)));
+      row.dispatchEvent(new PointerEvent("pointermove", at(start + dx / 2)));
+      row.dispatchEvent(new PointerEvent("pointermove", at(start + dx)));
+      row.dispatchEvent(new PointerEvent("pointerup", at(start + dx)));
+    }, dx);
+  const toast = page.locator(".ui-toast-region [role=status]");
+  await swipe("Backend Engineer", 180);
+  await expect(toast).toContainText("Shortlisted “Backend Engineer”");
+  await swipe("Backend Engineer", -180);
+  await expect(toast).toContainText("Dismissed “Backend Engineer”");
+  await expect(list.getByText("Backend Engineer", { exact: true })).toHaveCount(
+    0,
+  );
+  // A short drag is not a swipe.
+  await swipe("Python Engineer", 40);
+  await expect(list.getByText("Python Engineer", { exact: true })).toHaveCount(
+    1,
+  );
+});
+
 test("a menu opens from the keyboard, moves with arrows and closes with Esc", async ({
   page,
 }) => {
