@@ -13,6 +13,7 @@ import { useAddJob } from "../../query/shell";
 import { href } from "../../shell/router";
 import { Button } from "../../ui/Button";
 import { Field, Input, Textarea } from "../../ui/Field";
+import { plural } from "../../ui/format";
 import { Icon, type LucideIcon } from "../../ui/Icon";
 import {
   useExampleTemplate,
@@ -24,14 +25,13 @@ import {
   type ImportPreview,
   type Search,
 } from "./data";
+import { CountrySelect } from "../sources/CountrySelect";
+import { countryIn } from "../sources/model";
 import { StepFrame } from "./Frame";
 import { LANGUAGES, aboutFrom, type About } from "./model";
 
 type Profile = Schema<"Profile">;
 type Preferences = Schema<"Preferences">;
-
-const plural = (count: number, one: string, many = `${one}s`) =>
-  `${count} ${count === 1 ? one : many}`;
 
 /** A line saying what a step already did. */
 function Done({ children }: { children: string }) {
@@ -166,7 +166,13 @@ export function AboutStep({
 
 type Found = { title?: unknown; company?: unknown; location?: unknown };
 
-/** Step 2: a saved search, tested first, or one job by its link. */
+const isLink = (value: string) => /^https?:\/\/\S+\.\S+/.test(value.trim());
+
+/**
+ * Step 2: a search that runs on its own (Test shows what it finds first),
+ * and one job by its link. "Save and continue" saves whatever is filled in;
+ * with nothing filled in, Continue moves on.
+ */
 export function JobsStep({
   preferences,
   onNext,
@@ -180,7 +186,7 @@ export function JobsStep({
   const [search, setSearch] = useState<Search>({
     query: start.roles,
     location: start.where,
-    country: "",
+    country: countryIn(start.where),
   });
   const [link, setLink] = useState("");
   const [saved, setSaved] = useState<string | null>(null);
@@ -198,125 +204,144 @@ export function JobsStep({
     .map((item) => String(item.message ?? item.error ?? ""))
     .filter(Boolean);
 
-  async function saveSearch(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const source = await save.mutateAsync(search).catch(() => null);
-    if (source) setSaved(source.name);
-  }
-  async function addJob(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const job = await add
-      .mutateAsync({
-        url: link.trim(),
-        posting: "",
-        title: "",
-        company: "",
-        location: "",
-      })
-      .catch(() => null);
-    if (job) {
-      setAdded(job.title || job.url || "the job");
-      setLink("");
+  const toSave = !saved && search.query.trim() !== "";
+  const toAdd = link.trim() !== "";
+  const busy = save.isPending || add.isPending;
+  async function saveAndContinue(event?: FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
+    if (toAdd && !isLink(link)) return;
+    let ok = true;
+    if (toSave) {
+      const source = await save.mutateAsync(search).catch(() => null);
+      if (source) setSaved(source.name);
+      else ok = false;
     }
+    if (toAdd) {
+      const job = await add
+        .mutateAsync({
+          url: link.trim(),
+          posting: "",
+          title: "",
+          company: "",
+          location: "",
+        })
+        .catch(() => null);
+      if (job) {
+        setAdded(job.title || job.url || "the job");
+        setLink("");
+      } else ok = false;
+    }
+    if (ok) onNext();
   }
-  const did = Boolean(saved || added);
+  const pending = toSave || toAdd;
   return (
     <StepFrame
       title="Find jobs"
       lead="Save a search that runs on its own, or add one job you found."
-      primary={{ label: "Continue", onClick: onNext }}
+      primary={{
+        label: pending ? "Save and continue" : "Continue",
+        form: "setup-jobs",
+      }}
+      busy={busy}
       onBack={onBack}
-      onSkip={did ? undefined : onNext}
+      onSkip={pending ? onNext : undefined}
     >
-      <section className="setup-block" aria-labelledby="setup-search">
-        <h2 id="setup-search">Add a search</h2>
-        {saved ? (
-          <Done>{`Saved the search “${saved}”.`}</Done>
-        ) : (
-          <form className="setup-form" data-unguarded="" onSubmit={saveSearch}>
-            <Field label="Keywords">
-              <Input
-                value={search.query}
-                required
-                maxLength={300}
-                onChange={(event) => set({ query: event.target.value })}
-              />
-            </Field>
-            <div className="setup-pair">
-              <Field label="Location" optional>
+      <form
+        id="setup-jobs"
+        className="setup-jobs"
+        data-unguarded=""
+        noValidate
+        onSubmit={saveAndContinue}
+      >
+        <section className="setup-block" aria-labelledby="setup-search">
+          <h2 id="setup-search">A search</h2>
+          {saved ? (
+            <Done>{`Saved the search “${saved}”.`}</Done>
+          ) : (
+            <div className="setup-form">
+              <Field label="Keywords">
                 <Input
-                  value={search.location}
+                  value={search.query}
                   maxLength={300}
-                  onChange={(event) => set({ location: event.target.value })}
+                  onChange={(event) => set({ query: event.target.value })}
                 />
               </Field>
-              <Field
-                label="Country"
-                optional
-                hint="The job site's market: switzerland, uk, usa."
-              >
-                <Input
-                  value={search.country}
-                  maxLength={100}
-                  onChange={(event) => set({ country: event.target.value })}
-                />
-              </Field>
-            </div>
-            {preview && (
-              <div className="setup-preview" role="status">
-                <p>
-                  {found.length
-                    ? `First results: ${plural(preview.total, "job")}`
-                    : "No job found with these words yet."}
-                </p>
-                {found.length > 0 && (
-                  <ul>
-                    {found.slice(0, 3).map((job, index) => (
-                      <li key={index}>
-                        <span>{String(job.title || "Untitled role")}</span>
-                        {job.company ? (
-                          <span className="setup-muted">
-                            {String(job.company)}
-                          </span>
-                        ) : null}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {problems.slice(0, 2).map((problem) => (
-                  <p key={problem} className="setup-muted">
-                    {problem}
-                  </p>
-                ))}
+              <div className="setup-pair">
+                <Field label="Location" optional>
+                  <Input
+                    value={search.location}
+                    maxLength={300}
+                    onChange={(event) => set({ location: event.target.value })}
+                  />
+                </Field>
+                <Field
+                  label="Country"
+                  optional
+                  hint="With a country, Indeed and Glassdoor are searched too."
+                >
+                  <CountrySelect
+                    value={search.country}
+                    onChange={(country) => set({ country })}
+                  />
+                </Field>
               </div>
-            )}
-            {(test.error || save.error) && (
-              <p className="setup-error" role="alert">
-                {(test.error || save.error)!.message}
-              </p>
-            )}
-            <div className="setup-actions">
-              <Button
-                disabled={!search.query.trim() || test.isPending}
-                onClick={() => test.mutate(search)}
-              >
-                {test.isPending ? "Testing…" : "Test"}
-              </Button>
-              <Button
-                type="submit"
-                disabled={!search.query.trim() || save.isPending}
-              >
-                Save search
-              </Button>
+              {preview && (
+                <div className="setup-preview" role="status">
+                  <p>
+                    {found.length
+                      ? `First results: ${plural(preview.total, "job")}`
+                      : "No job found with these words yet."}
+                  </p>
+                  {found.length > 0 && (
+                    <ul>
+                      {found.slice(0, 3).map((job, index) => (
+                        <li key={index}>
+                          <span>{String(job.title || "Untitled role")}</span>
+                          {job.company ? (
+                            <span className="setup-muted">
+                              {String(job.company)}
+                            </span>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {problems.slice(0, 2).map((problem) => (
+                    <p key={problem} className="setup-muted">
+                      {problem}
+                    </p>
+                  ))}
+                </div>
+              )}
+              {(test.error || save.error) && (
+                <p className="setup-error" role="alert">
+                  {(test.error || save.error)!.message}
+                </p>
+              )}
+              <div className="setup-actions">
+                <Button
+                  disabled={!search.query.trim() || test.isPending}
+                  onClick={() => test.mutate(search)}
+                >
+                  {test.isPending ? "Testing…" : "Test"}
+                </Button>
+              </div>
             </div>
-          </form>
-        )}
-      </section>
-      <section className="setup-block" aria-labelledby="setup-link">
-        <h2 id="setup-link">Or add one job by its link</h2>
-        {added && <Done>{`Added “${added}”.`}</Done>}
-        <form className="setup-inline" data-unguarded="" onSubmit={addJob}>
-          <Field label="Posting address" error={add.error?.message}>
+          )}
+        </section>
+        <section className="setup-block" aria-labelledby="setup-link">
+          <h2 id="setup-link">Or one job you found</h2>
+          {added && <Done>{`Added “${added}”.`}</Done>}
+          <Field
+            label="Link"
+            optional
+            error={
+              add.error?.message ??
+              (toAdd && !isLink(link)
+                ? "Paste the job's link, starting with https://."
+                : undefined)
+            }
+          >
             <Input
               type="url"
               inputMode="url"
@@ -325,16 +350,8 @@ export function JobsStep({
               onChange={(event) => setLink(event.target.value)}
             />
           </Field>
-          <Button
-            type="submit"
-            disabled={
-              !/^https?:\/\/\S+\.\S+/.test(link.trim()) || add.isPending
-            }
-          >
-            Add job
-          </Button>
-        </form>
-      </section>
+        </section>
+      </form>
     </StepFrame>
   );
 }

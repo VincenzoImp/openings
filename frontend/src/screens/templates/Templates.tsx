@@ -1,12 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  CircleAlert,
-  FilePlus2,
-  Files,
-  Mail,
-  Plus,
-  Upload,
-} from "lucide-react";
+import { FilePlus2, Files, Mail, Plus, Upload } from "lucide-react";
 import {
   Button,
   IconButton,
@@ -14,7 +7,6 @@ import {
   List,
   ListGroup,
   ListRow,
-  Callout,
   EmptyState,
   PageHeader,
   SkeletonRows,
@@ -45,6 +37,7 @@ import {
 } from "./model";
 import { EXAMPLE_CV, EXAMPLE_LETTER } from "./starters";
 import "./templates.css";
+import { LoadError } from "../../ui/LoadError";
 
 const byDefaultThenName = (a: Template, b: Template) =>
   Number(b.is_default) - Number(a.is_default) ||
@@ -219,20 +212,12 @@ export default function TemplatesScreen() {
           />
         </TopBarActions>
       )}
-      <p className="tpl-note">
-        Writing rules live in <a href="#preferences">Preferences</a>.
-      </p>
       {list.isError && !list.data ? (
         <div className="tpl-state">
-          <Callout
-            icon={CircleAlert}
-            tone="danger"
-            title="Templates could not be loaded"
-            actions={
-              <Button size="sm" onClick={() => void list.refetch()}>
-                Try again
-              </Button>
-            }
+          <LoadError
+            what="your templates"
+            error={list.error}
+            retry={() => void list.refetch()}
           />
         </div>
       ) : list.isPending ? (

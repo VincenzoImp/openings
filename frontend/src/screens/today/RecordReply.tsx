@@ -56,7 +56,7 @@ export function RecordReply({
     if (!done) return;
     const { title, company } = roleOf(application);
     toast.show({
-      message: `Recorded the reply ${company ? `from ${company}` : `to “${title}”`}`,
+      message: `Recorded the reply to “${title}”`,
       tone: "success",
     });
     onClose();

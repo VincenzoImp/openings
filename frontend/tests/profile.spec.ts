@@ -1,6 +1,13 @@
 import AxeBuilder from "@axe-core/playwright";
 import { test, expect, type Page } from "./fixtures";
-import { call, go, isPhone, ownerSession, upload } from "./session";
+import {
+  blockButton,
+  call,
+  go,
+  isPhone,
+  ownerSession,
+  upload,
+} from "./session";
 
 // Profile (#profile): the career record read as a CV, one block edited at a
 // time. Each test starts from the seeded workspace (fixtures.ts); the same
@@ -38,7 +45,9 @@ test("the profile reads as a CV: no fields, one primary button, no internals", a
 }) => {
   await go(page, "profile");
   const main = page.locator("#content");
-  await expect(main.getByText("Alex Morgan", { exact: true })).toBeVisible();
+  await expect(
+    main.getByText("Alex Morgan", { exact: true }).first(),
+  ).toBeVisible();
   await expect(
     main.getByRole("heading", { name: SENIOR, exact: true }),
   ).toBeVisible();
@@ -66,7 +75,7 @@ test("the header is edited and cancelled; leaving with changes asks first", asyn
   page,
 }) => {
   await go(page, "profile");
-  await page.getByRole("button", { name: "Edit header" }).click();
+  await blockButton(page, "Edit header");
   const header = form(page, "Edit header");
   await header.getByLabel("Headline").fill("Changed headline");
   if (!isPhone(page))
@@ -77,6 +86,19 @@ test("the header is edited and cancelled; leaving with changes asks first", asyn
     const ask = page.getByRole("dialog", { name: "Discard unsaved changes?" });
     await ask.getByRole("button", { name: "Keep editing" }).click();
     await expect(header.getByLabel("Headline")).toHaveValue("Changed headline");
+    // Leaving the screen asks in the page's own dialog, never the browser's.
+    let native = false;
+    page.on("dialog", (dialog) => {
+      native = true;
+      void dialog.dismiss();
+    });
+    await page.getByRole("link", { name: /^Jobs/ }).first().click();
+    const leave = page.getByRole("dialog", {
+      name: "Discard unsaved changes?",
+    });
+    await leave.getByRole("button", { name: "Keep editing" }).click();
+    await expect(page).toHaveURL(/#profile/);
+    expect(native).toBe(false);
   }
   await header.getByLabel("Headline").press("Escape");
   await page
@@ -88,7 +110,7 @@ test("the header is edited and cancelled; leaving with changes asks first", asyn
   expect((await call(page, "/career/profile")).headline).toBe(SENIOR);
   // Saving keeps the metadata the API holds.
   const before = await call(page, "/career/profile");
-  await page.getByRole("button", { name: "Edit header" }).click();
+  await blockButton(page, "Edit header");
   await form(page, "Edit header").getByLabel("Phone").fill("+41 00 000 00 00");
   await save(page);
   await toast(page, "Saved the header");
@@ -104,9 +126,7 @@ test("an entry is edited and saved, with its place and dates", async ({
   page,
 }) => {
   await go(page, "profile");
-  await page
-    .getByRole("button", { name: `Edit ${SENIOR}`, exact: true })
-    .click();
+  await blockButton(page, `Edit ${SENIOR}`);
   const entry = form(page, `Edit ${SENIOR}`);
   await entry.getByLabel("Organization").fill("Example Energy");
   await entry.getByLabel("Location").fill("Basel");
@@ -133,9 +153,7 @@ test("highlights are added, approved, starred and reordered inside their entry",
 }) => {
   await go(page, "profile");
   const id = (await entryByTitle(page, SENIOR)).id;
-  await page
-    .getByRole("button", { name: `Edit ${SENIOR}`, exact: true })
-    .click();
+  await blockButton(page, `Edit ${SENIOR}`);
   const entry = form(page, `Edit ${SENIOR}`);
   await entry.getByRole("button", { name: "Approve highlight 4" }).click();
   await entry.getByRole("button", { name: "Add highlight" }).click();
@@ -228,9 +246,7 @@ test("an entry is deleted permanently after the dialog lists what goes", async (
   );
   await page.reload();
   await expect(page.getByText("reference.txt")).toBeVisible();
-  await page
-    .getByRole("button", { name: "More actions for Synthetic project 03" })
-    .click();
+  await blockButton(page, "More actions for Synthetic project 03");
   await page.getByRole("menuitem", { name: "Delete permanently…" }).click();
   const ask = page.getByRole("dialog", {
     name: "Delete “Synthetic project 03” permanently?",
@@ -288,7 +304,7 @@ test("a block changed elsewhere keeps the draft: Keep editing, then save", async
   page,
 }) => {
   await go(page, "profile");
-  await page.getByRole("button", { name: "Edit header" }).click();
+  await blockButton(page, "Edit header");
   const header = form(page, "Edit header");
   await header.getByLabel("Headline").fill("My unsaved headline");
   const current = await call(page, "/career/profile");
@@ -314,9 +330,7 @@ test("editing is a sheet on a phone and in place on a wide screen; both pass axe
   page,
 }) => {
   await go(page, "profile");
-  await page
-    .getByRole("button", { name: `Edit ${SENIOR}`, exact: true })
-    .click();
+  await blockButton(page, `Edit ${SENIOR}`);
   const sheet = page.locator("dialog.pf-sheet[open]");
   if (isPhone(page)) {
     await expect(sheet).toBeVisible();

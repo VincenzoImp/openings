@@ -14,13 +14,6 @@
     /* The panes scroll; the closed drawer's offset never widens the page. */
     overflow: hidden;
   }
-  .tpl-note {
-    margin: var(--s-1) 0 var(--s-4);
-    padding: 0 var(--pane-pad);
-    color: var(--text-3);
-    font: var(--t-sm);
-    letter-spacing: 0;
-  }
   .tpl-state {
     padding: var(--s-6) var(--pane-pad);
   }
@@ -191,10 +184,6 @@
   }
 
   @container app (max-width: 719px) {
-    .tpl-note {
-      margin: var(--s-3) 0 var(--s-3);
-      padding: 0 var(--s-4);
-    }
     .tpl-state {
       padding: var(--s-4);
     }

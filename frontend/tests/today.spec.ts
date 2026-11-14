@@ -68,10 +68,10 @@ test("Today says what to do now, with one filled button, and Start applying open
     await expect(readyRows.nth(index)).toContainText(application.job.title);
   await expect(
     readyRows.filter({ hasText: "Python Engineer" }).locator(".ui-tone"),
-  ).toHaveText("Closes tomorrow");
+  ).toHaveText("Due tomorrow");
   await expect(
     readyRows.filter({ hasText: "Python Engineer" }).getByRole("img", {
-      name: "Priority 1",
+      name: "High priority",
     }),
   ).toBeVisible();
   await expect(

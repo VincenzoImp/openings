@@ -193,7 +193,7 @@ export function useDocumentUpload(
     upload.mutateAsync({ applicationId, kind, pdf, source, previous }).then(
       () =>
         toast.show({
-          message: `${KIND_LABEL[kind]} uploaded`,
+          message: `Uploaded the ${KIND_LABEL[kind]}`,
           tone: "success",
         }),
       (error) => toast.show({ message: errorText(error), tone: "error" }),
@@ -221,7 +221,7 @@ export function useDocumentUpload(
   };
 }
 
-/** A drop target around its children. */
+/** A drop target around its children; outlined only while a file is over it. */
 function DropZone({
   onFiles,
   className,
@@ -257,9 +257,11 @@ function DropZone({
 }
 
 /**
- * The slot of a required CV or letter. Empty: Upload PDF, with an optional
- * .tex alongside, by button or drop. Filled: its preview and `…` (Replace,
- * Download, Earlier versions, Show changes, Remove).
+ * The row of a required CV or letter, the same height empty or filled, so
+ * an upload never moves the page. Empty: what is missing, and Upload PDF
+ * (unless the page's primary already is that upload), by button or drop.
+ * Filled: its version, Preview and `…` (Replace, Download, Earlier versions,
+ * Show changes, Remove).
  */
 export function DocumentSlot({
   kind,
@@ -267,18 +269,21 @@ export function DocumentSlot({
   revisions,
   loading,
   uploader,
+  primary = false,
 }: {
   kind: Kind;
   revision: Revision | null;
   revisions: Revision[];
   loading: boolean;
   uploader: ReturnType<typeof useDocumentUpload>;
+  /** The page's primary action uploads this one: no second button here. */
+  primary?: boolean;
 }) {
   const name = KIND_LABEL[kind];
   const pdf = pdfOf(revision);
   const source = revision?.files?.find(isTex);
   const [dialog, setDialog] = useState<
-    "versions" | "changes" | "remove" | null
+    "preview" | "versions" | "changes" | "remove" | null
   >(null);
   const remove = useDeleteRevision();
   const toast = useToast();
@@ -322,22 +327,83 @@ export function DocumentSlot({
         },
       ]
     : [];
+  const missing = !loading && (!revision || !pdf);
   return (
-    <section
-      className="ap-slot"
-      aria-label={name}
-      data-empty={!revision || undefined}
+    <DropZone
+      className={cx(
+        "ap-slot",
+        missing && "ap-drop",
+        uploader.busy && "is-busy",
+      )}
+      onFiles={uploader.send}
     >
-      <header className="ap-slot-head">
-        <h3>{name}</h3>
-        {revision && (
-          <span className="ap-slot-meta">
-            {pdf ? "" : "PDF missing · "}
-            {`Version ${revision.revision_number || 1} · ${shortDay(revision.created_at)}`}
-            {source ? ` · with ${source.name}` : ""}
-          </span>
+      <section
+        className="ap-slot-row"
+        aria-label={name}
+        data-empty={missing || undefined}
+      >
+        <Icon icon={missing ? Upload : FileText} className="ap-slot-icon" />
+        <div className="ap-slot-text">
+          <h3>{name}</h3>
+          {loading ? (
+            <Skeleton width={160} height={10} />
+          ) : missing ? (
+            <p className="ap-slot-meta">
+              {revision ? "No PDF yet. " : "Not uploaded yet. "}
+              <span className="ap-hint-drop">
+                Drop the PDF here, with its .tex source if you have one.
+              </span>
+              <span className="ap-hint-touch">
+                Choose a PDF, with its .tex source if you have one.
+              </span>
+            </p>
+          ) : (
+            <p className="ap-slot-meta">
+              {`Version ${revision!.revision_number || 1} · ${shortDay(revision!.created_at)}`}
+              {source ? ` · with ${source.name}` : ""}
+            </p>
+          )}
+        </div>
+        {missing && !primary && (
+          <Button
+            size="sm"
+            icon={Upload}
+            disabled={uploader.busy}
+            onClick={uploader.open}
+          >
+            {uploader.busy ? "Uploading…" : "Upload PDF"}
+            <span className="ui-sr"> of the {name}</span>
+          </Button>
         )}
-        {revision && (
+        {missing && primary && uploader.busy && (
+          <span className="ap-slot-meta">Uploading…</span>
+        )}
+        {!missing && revision && (
+          <>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setDialog("preview")}
+            >
+              Preview
+              <span className="ui-sr"> the {name}</span>
+            </Button>
+            <Menu
+              label={`${name} actions`}
+              placement="bottom-end"
+              items={menu}
+              trigger={(props) => (
+                <IconButton
+                  {...props}
+                  icon={MoreHorizontal}
+                  label={`${name} actions`}
+                  size="sm"
+                />
+              )}
+            />
+          </>
+        )}
+        {revision && missing && (
           <Menu
             label={`${name} actions`}
             placement="bottom-end"
@@ -352,39 +418,21 @@ export function DocumentSlot({
             )}
           />
         )}
-      </header>
+      </section>
       {uploader.picker}
-      {loading ? (
-        <div className="ap-well ap-well-loading">
-          <Skeleton width="60%" height={12} />
-          <Skeleton width="40%" height={12} />
-        </div>
-      ) : !revision || !pdf ? (
-        <DropZone
-          className={cx("ap-drop", uploader.busy && "is-busy")}
-          onFiles={uploader.send}
-        >
-          <Icon icon={Upload} size="lg" />
-          <p>
-            {revision
-              ? `This ${name.toLowerCase()} has no PDF yet.`
-              : `Drop the ${name === "CV" ? "CV" : "letter"} PDF here, with its .tex source if you have one.`}
-          </p>
-          <Button
-            size="sm"
-            icon={Upload}
-            disabled={uploader.busy}
-            onClick={uploader.open}
-          >
-            {uploader.busy ? "Uploading…" : "Upload PDF"}
-            <span className="ui-sr"> of the {name}</span>
+      <Dialog
+        open={dialog === "preview" && !!revision}
+        onClose={() => setDialog(null)}
+        title={name}
+        className="ap-preview-dialog"
+        footer={
+          <Button variant="ghost" onClick={() => setDialog(null)}>
+            Close
           </Button>
-        </DropZone>
-      ) : (
-        <DropZone className="ap-slot-body" onFiles={uploader.send}>
-          <RevisionView revision={revision} kind={kind} />
-        </DropZone>
-      )}
+        }
+      >
+        {revision && <RevisionView revision={revision} kind={kind} />}
+      </Dialog>
       <VersionsDialog
         open={dialog === "versions"}
         onClose={() => setDialog(null)}
@@ -409,7 +457,7 @@ export function DocumentSlot({
             {
               onSuccess: () =>
                 toast.show({
-                  message: `${name} version removed`,
+                  message: `Removed ${name} version ${revision.revision_number || 1}`,
                   tone: "success",
                 }),
               onError: (error) =>
@@ -420,7 +468,7 @@ export function DocumentSlot({
       >
         {`Version ${revision?.revision_number || 1} and its files are deleted; earlier versions stay. This cannot be undone.`}
       </ConfirmDialog>
-    </section>
+    </DropZone>
   );
 }
 

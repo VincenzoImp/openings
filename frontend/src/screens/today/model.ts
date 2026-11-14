@@ -32,39 +32,6 @@ export function daysUntil(day: string, now = new Date()) {
   return Math.round((target - today.getTime()) / DAY);
 }
 
-const MONTHS = "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split(" ");
-const WEEKDAYS = "Sun Mon Tue Wed Thu Fri Sat".split(" ");
-function shortDay(day: string, now: Date) {
-  const [year, month, date] = day.slice(0, 10).split("-").map(Number);
-  const text = `${date} ${MONTHS[month - 1]}`;
-  return year === now.getFullYear() ? text : `${text} ${year}`;
-}
-
-export type Tone = "warning" | "danger";
-
-/**
- * A deadline as a row says it: overdue in danger, within a week in warning,
- * later in plain text.
- */
-export function deadlineText(
-  deadline: string | null | undefined,
-  now = new Date(),
-): { text: string; tone?: Tone } | null {
-  if (!deadline) return null;
-  const days = daysUntil(deadline, now);
-  if (days < 0)
-    return { text: `Closed ${shortDay(deadline, now)}`, tone: "danger" };
-  if (days === 0) return { text: "Closes today", tone: "warning" };
-  if (days === 1) return { text: "Closes tomorrow", tone: "warning" };
-  if (days <= 7) {
-    const [year, month, date] = deadline.slice(0, 10).split("-").map(Number);
-    const weekday = WEEKDAYS[new Date(year, month - 1, date).getDay()];
-    const when = days < 7 ? weekday : shortDay(deadline, now);
-    return { text: `Closes ${when}`, tone: "warning" };
-  }
-  return { text: `Closes ${shortDay(deadline, now)}` };
-}
-
 /** Whether a deadline falls in the next seven days (today included). */
 export const dueThisWeek = (
   deadline: string | null | undefined,

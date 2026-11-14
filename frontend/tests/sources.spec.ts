@@ -87,9 +87,11 @@ test("add a search: Test shows the first ten results, then Save adds it", async 
   // Indeed needs a country; the form says so on Test, before asking.
   await form.getByLabel("Keywords").fill("synthetic engineer");
   await form.getByRole("button", { name: "Test" }).click();
-  await expect(form.getByText("Indeed and Glassdoor search one")).toBeVisible();
+  await expect(
+    form.getByText("Indeed and Glassdoor need a country."),
+  ).toBeVisible();
   expect(asked).toEqual([]);
-  await form.getByLabel("Country").fill("switzerland");
+  await form.getByLabel("Country").selectOption("switzerland");
   await form.getByLabel(/^Location/).fill("Zurich");
   await form.getByLabel(/^Title must include/).fill("engineer, developer");
   await form.getByLabel(/^Name/).fill(name);
@@ -429,7 +431,7 @@ test("Sources with its menu and editor open has no serious accessibility finding
     await page.keyboard.press("Escape");
     await page.getByRole("button", { name: "Add source" }).first().click();
     await editor(page).getByLabel("Keywords").fill("synthetic");
-    await editor(page).getByLabel("Country").fill("switzerland");
+    await editor(page).getByLabel("Country").selectOption("switzerland");
     await editor(page).getByRole("button", { name: "Test" }).click();
     await expect(editor(page).getByText("12 jobs found")).toBeVisible();
     await check();

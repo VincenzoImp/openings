@@ -562,16 +562,22 @@
     }
   }
 
-  /* Touch: Edit and … are always there */
+  /* Touch: the CV reads as text; tapping a block shows its Edit and …
+     (the block takes the focus), and the dates stay. */
   @media (hover: none) {
-    .pf-block-actions,
+    .pf-block:not(:focus-within)
+      > .pf-block-actions:not(:has([aria-expanded="true"])) {
+      visibility: hidden;
+    }
     .pf-block .pf-entry-dates {
       opacity: 1 !important;
     }
-    .pf-entry-head {
-      display: block;
-      padding-right: 104px;
+    .pf-block:focus-within .pf-entry-dates {
+      visibility: hidden;
     }
+  }
+  .pf-block:focus {
+    outline: none;
   }
 
   @container app (max-width: 719px) {
@@ -579,9 +585,18 @@
     .pf > .ui-page-header {
       display: none;
     }
-    .pf-block-actions,
+    .pf-block:not(:focus-within)
+      > .pf-block-actions:not(:has([aria-expanded="true"])) {
+      visibility: hidden;
+    }
+    .pf-block:focus-within > .pf-block-actions {
+      opacity: 1;
+    }
     .pf-block .pf-entry-dates {
       opacity: 1 !important;
+    }
+    .pf-block:focus-within .pf-entry-dates {
+      visibility: hidden;
     }
     .pf-body {
       padding: var(--s-3) var(--s-4) var(--s-12);
@@ -596,10 +611,6 @@
     .pf-name {
       font-size: 24px;
       line-height: 30px;
-    }
-    .pf-entry-head {
-      display: block;
-      padding-right: 104px;
     }
     .pf-fields {
       grid-template-columns: minmax(0, 1fr);

@@ -116,9 +116,6 @@ test("source, files, limits, default, rename, duplicate and delete", async ({
   await expect(
     pane.getByRole("heading", { name: "Synthetic CV 05", exact: true }),
   ).toBeVisible();
-  await expect(
-    page.getByRole("link", { name: "Preferences", exact: true }).first(),
-  ).toHaveAttribute("href", "#preferences");
 
   // Source: read first; Edit source → Cancel asks, Save saves.
   await pane.getByRole("tab", { name: "Source" }).click();

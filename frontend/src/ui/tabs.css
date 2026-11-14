@@ -208,6 +208,17 @@
       border-radius: var(--r-full);
       box-shadow: var(--focus-ring);
     }
+    /* 44 px touch targets around the 26 px chips and segments */
+    .ui-chip,
+    .ui-segment {
+      position: relative;
+    }
+    .ui-chip::before,
+    .ui-segment::before {
+      content: "";
+      position: absolute;
+      inset: -9px 0;
+    }
     .ui-chips {
       flex-wrap: nowrap;
       overflow-x: auto;

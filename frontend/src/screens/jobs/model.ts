@@ -4,6 +4,7 @@
 // React and no requests: tested directly (tests/jobs.test.mjs).
 import type { Schema } from "../../api/client";
 import type { operations } from "../../api/schema";
+import { formatDay } from "../../ui/format.ts";
 
 export type JobSummary = Schema<"JobSummary">;
 export type Job = Schema<"Job">;
@@ -251,9 +252,7 @@ function foundSince(value: string, now: Date) {
   const choice = foundChoices(now).find((item) => item.value === value);
   if (choice) return choice.label;
   const date = new Date(value + "T00:00:00");
-  return Number.isNaN(date.getTime())
-    ? value
-    : `Since ${date.getDate()} ${date.toLocaleString("en-GB", { month: "short" })}`;
+  return Number.isNaN(date.getTime()) ? value : `Since ${formatDay(date, now)}`;
 }
 
 /**

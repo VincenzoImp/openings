@@ -24,8 +24,8 @@ export interface RouteDef {
   title: string;
   /** A second-level page: its parent, for the breadcrumb and the back chevron. */
   parent?: RouteId;
-  /** The navigation item shown as current. */
-  nav: RouteId;
+  /** The navigation item shown as current; none during the first-run setup. */
+  nav: RouteId | null;
 }
 
 export const ROUTES: Record<RouteId, RouteDef> = {
@@ -69,7 +69,7 @@ export const ROUTES: Record<RouteId, RouteDef> = {
     path: "setup",
     title: "Set up",
     parent: "today",
-    nav: "today",
+    nav: null,
   },
 };
 

@@ -8,7 +8,7 @@ import { Field, Input, Select } from "../../ui/Field";
 import type { ThemeMode } from "../../ui/theme";
 import { useToast } from "../../ui/Toast";
 import { useChangePassword, useIsOwner } from "./queries";
-import { OwnerOnly, SettingRow, SettingsSection } from "./Rows";
+import { SettingRow, SettingsSection } from "./Rows";
 
 /** Password, theme, the setup guide and signing out. */
 export function Account() {
@@ -21,7 +21,6 @@ export function Account() {
       {owner && (
         <SettingRow
           title="Password"
-          note={<OwnerOnly />}
           control={
             <Button onClick={() => setPassword(true)}>Change password</Button>
           }
@@ -59,7 +58,7 @@ export function Account() {
       <SettingRow
         title="Sign out"
         control={
-          <Button variant="ghost" icon={LogOut} onClick={signOut}>
+          <Button icon={LogOut} onClick={signOut}>
             Sign out
           </Button>
         }

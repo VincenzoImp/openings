@@ -1,20 +1,20 @@
 // Size budgets of the built dashboard. Reads the Vite manifest of
 // `npm run build`, prints a table and exits with 1 when a budget is exceeded.
 //
-//   first screen   JavaScript needed to show the home screen        85 kB
+//   first screen   JavaScript needed to show the home screen       110 kB
 //                  (React, Query and the shell included)
 //   lazy chunk     JavaScript a screen or an overlay adds           30 kB
-//   all JS         every script the dashboard can load             160 kB
-//   stylesheet     every stylesheet of the dashboard together       20 kB
+//   all JS         every script the dashboard can load             222 kB
+//   stylesheet     every stylesheet of the dashboard together       21 kB
 //
-// Interim: the first screen still carries the old data layer and component
-// helpers (src/state.tsx, src/api.ts, src/design) that Today and the other
-// old screens need, and the old screens weigh on all JS. Until they are
-// rebuilt (#222–#227) the budgets are 120 kB and 225 kB, and the stylesheets
-// 38 kB: a rebuilt screen brings its design-system modules and their
-// stylesheets, split per screen chunk, while the old screens' code and
-// stylesheet stay loaded for the others; #228 deletes the old
-// code and sets them back to 85 kB and 160 kB.
+// The plan (#228) aimed at 85 kB, 160 kB and 20 kB once the old screens were
+// gone. They are gone; what is left is the product itself. React DOM, React,
+// TanStack Query and openapi-fetch alone weigh about 76 kB, which leaves 9 kB
+// for the shell, its sidebar and menus and the Today screen; and the nine
+// rebuilt screens together weigh about 110 kB. Reaching 85 and 160 would mean
+// replacing React or removing features, so the budgets are the measured sizes
+// with about 2% of room. Every stylesheet ships as one file (vite.config.ts),
+// about two thirds of the size of the per-screen files it replaced.
 //
 // Sizes are gzip (level 9) in kB of 1000 bytes, as Vite reports them. The
 // design system gallery (ui.html) is not part of the dashboard: its size is
@@ -24,10 +24,10 @@ import { gzipSync } from "node:zlib";
 
 const KB = 1000;
 const BUDGET = {
-  first: 120 * KB, // 85 kB once #228 deletes the old screens' code
+  first: 110 * KB,
   later: 30 * KB,
-  all: 225 * KB, // 160 kB once #228 deletes the old screens' code
-  css: 38 * KB, // interim (20 kB): lowered again in #228
+  all: 222 * KB,
+  css: 21 * KB,
 };
 const HOME = "src/screens/today/Today.tsx";
 
@@ -96,9 +96,7 @@ const screens = [...dashboard]
 for (const key of screens) {
   const own = scripts(closure(key)).filter((file) => !firstFiles.has(file));
   add(
-    key.startsWith("src/pages/")
-      ? `Screen ${key.replace(/^src\/pages\//, "").replace(/\.tsx$/, "")}`
-      : `Chunk ${key.replace(/^src\//, "").replace(/\.tsx?$/, "")}`,
+    `Chunk ${key.replace(/^src\//, "").replace(/\.tsx?$/, "")}`,
     total(own),
     BUDGET.later,
   );

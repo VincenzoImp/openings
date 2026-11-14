@@ -14,6 +14,7 @@ export * from "./format";
 export * from "./Icon";
 export * from "./keys";
 export * from "./List";
+export * from "./LoadError";
 export * from "./Menu";
 export * from "./Page";
 export * from "./ReadEdit";

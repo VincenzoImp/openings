@@ -54,9 +54,8 @@ export class ApiError extends Error {
 const READS = new Set(["GET", "HEAD", "OPTIONS"]);
 const SIGN_IN = /\/auth\/(session|login|setup)$/;
 
-function signal(name: string, detail?: string) {
-  if (typeof window !== "undefined")
-    window.dispatchEvent(new CustomEvent(name, { detail }));
+function signal(name: string) {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(name));
 }
 
 const session: Middleware = {
@@ -69,10 +68,6 @@ const session: Middleware = {
     const path = new URL(request.url, "http://localhost").pathname;
     if (response.status === 401 && !SIGN_IN.test(path))
       signal("openings:unauthorized");
-    // The screens not yet on Query read again what a write changed (#228
-    // removes this): the path is given as the old client names it, "/jobs/…".
-    else if (response.ok && !READS.has(request.method))
-      signal("openings:changed", path.replace(/^\/api\/v1/, ""));
     return response;
   },
 };

@@ -2,8 +2,8 @@
 
 User docs are at most 10,000 words, the README at most 1,000, CONTRIBUTING at most 80
 lines and the architecture guide at most 150. Every relative link and image resolves,
-the MCP endpoint is spelled `/mcp/`, and no removed tool name or earlier vocabulary
-appears outside the changelog.
+every image in docs/images is embedded, the MCP endpoint is spelled `/mcp/`, and no
+removed tool name or earlier vocabulary appears outside the changelog.
 """
 
 import re
@@ -53,6 +53,21 @@ def test_every_relative_link_and_image_resolves():
             if not path.exists():
                 missing.append(f"{page.relative_to(ROOT)} -> {target}")
     assert not missing, missing
+
+
+def test_every_image_in_docs_images_is_embedded():
+    embedded = {
+        (page.parent / target).resolve()
+        for page in PAGES
+        for target in LINK.findall(page.read_text())
+        if not re.match(r"[a-z]+:|#", target)
+    }
+    unused = [
+        path.name
+        for path in sorted((ROOT / "docs" / "images").iterdir())
+        if path.resolve() not in embedded
+    ]
+    assert not unused, unused
 
 
 def test_every_anchor_names_a_heading():

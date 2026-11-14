@@ -115,7 +115,8 @@ export function Line({
         </button>
       </span>
       <p className="pref-text">{item.text}</p>
-      {writing && (
+      {/* A rule for both documents carries no tag; CV or Letter does. */}
+      {writing && item.scope && item.scope !== "all" && (
         <span className="pref-scope">
           <Tag>{scopeLabels[(item.scope as Scope) || "all"]}</Tag>
         </span>

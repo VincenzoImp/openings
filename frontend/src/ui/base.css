@@ -1,7 +1,6 @@
 /* The layer order of the design system, then the element reset. Screens add
-   their own rules in the `screens` layer; components live in `ui`. The old
-   stylesheet of the screens not yet rebuilt sits in `legacy` until they are. */
-@layer reset, tokens, legacy, ui, screens;
+   their own rules in the `screens` layer; components live in `ui`. */
+@layer reset, tokens, ui, screens;
 
 @import "@fontsource-variable/inter/opsz.css";
 @import "./tokens.css";

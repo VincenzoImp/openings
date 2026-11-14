@@ -5,6 +5,7 @@ import { SkeletonRows } from "../../ui/Page";
 import { useToast } from "../../ui/Toast";
 import { checkLine, failedTasks, isActive, type CheckView } from "./model";
 import { useRecentChecks, useRetryCheck, useStopCheck } from "./queries";
+import { LoadError } from "../../ui/LoadError";
 
 /**
  * The last twenty checks, collapsed at the bottom of the screen: when, which
@@ -28,9 +29,11 @@ function Checks() {
   if (checks.isPending) return <SkeletonRows rows={3} />;
   if (checks.isError)
     return (
-      <p className="src-checks-empty src-danger" role="alert">
-        Recent checks could not be read. {checks.error.message}
-      </p>
+      <LoadError
+        what="the recent checks"
+        error={checks.error}
+        retry={() => void checks.refetch()}
+      />
     );
   if (!checks.data.length)
     return (

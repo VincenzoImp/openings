@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   CalendarDays,
+  ChevronLeft,
   ExternalLink,
   MapPin,
   MoreHorizontal,
   SearchX,
   Send,
 } from "lucide-react";
+import { ApiError } from "../../api/client";
 import { TopBarActions, useTitle } from "../../shell/context";
 import { href, navigate, useRoute } from "../../shell/router";
 import { ToneText } from "../../ui/Badge";
@@ -15,6 +17,7 @@ import { Menu, type MenuEntry } from "../../ui/Menu";
 import { Icon } from "../../ui/Icon";
 import { isTyping } from "../../ui/keys";
 import { ActionBar } from "../../ui/Split";
+import { LoadError } from "../../ui/LoadError";
 import { EmptyState, PageHeader, Skeleton } from "../../ui/Page";
 import { useToast } from "../../ui/Toast";
 import {
@@ -50,6 +53,19 @@ import "./application.css";
 /** Set before the send loop opens the next application: it slides in. */
 let arriving = false;
 
+/** A job title in a toast: “Data Engineer”. */
+const quoted = (title: string) => `“${title || "Untitled role"}”`;
+
+/** Back to the list the page was opened from; the h1 below names the job. */
+function BackLink() {
+  return (
+    <a className="apg-back" href={listHref()}>
+      <Icon icon={ChevronLeft} size="sm" />
+      Applications
+    </a>
+  );
+}
+
 export interface PageContext {
   app: Application;
   noReplyDays: number;
@@ -75,7 +91,6 @@ function Header({
 }) {
   const job = jobOf(app);
   const deadline = deadlinePhrase(app.deadline);
-  const crumb = [job.title, job.company].filter(Boolean).join(" · ");
   const more = (tooltip: "below" | "none") => (
     <Menu
       label="Application actions"
@@ -105,13 +120,12 @@ function Header({
   ) : null;
   return (
     <div className="apg-head">
-      <PageHeader
-        title={job.title}
-        breadcrumb={[
-          { label: "Applications", href: listHref() },
-          { label: crumb },
-        ]}
-      />
+      <BackLink />
+      <PageHeader title={job.title} />
+      {/* On a phone the top bar shortens the title; the page shows it whole. */}
+      <p className="apg-phone-title" aria-hidden="true">
+        {job.title}
+      </p>
       <ul className="apg-meta" aria-label="About this application">
         {job.company && <li className="apg-company">{job.company}</li>}
         {job.location && (
@@ -179,7 +193,7 @@ function menuOf(
       onSelect: () =>
         move(
           { status: "closed", outcome: "no_response" },
-          "Closed as no reply",
+          `Closed ${quoted(jobOf(app).title)} as no reply`,
           back,
         ),
     });
@@ -187,7 +201,11 @@ function menuOf(
       id: "withdraw",
       label: "Withdraw",
       onSelect: () =>
-        move({ status: "closed", outcome: "not_pursued" }, "Withdrawn", back),
+        move(
+          { status: "closed", outcome: "not_pursued" },
+          `Withdrew ${quoted(jobOf(app).title)}`,
+          back,
+        ),
     });
     if (app.status === "offer")
       staged.push({
@@ -196,7 +214,7 @@ function menuOf(
         onSelect: () =>
           move(
             { status: "closed", outcome: "accepted" },
-            "Offer accepted",
+            `Accepted the offer for ${quoted(jobOf(app).title)}`,
             back,
           ),
       });
@@ -225,10 +243,14 @@ function menuOf(
           id: "reopen",
           label: "Reopen",
           onSelect: () =>
-            move({ status: reopenStage(app) }, "Reopened", {
-              status: "closed",
-              outcome: app.outcome as Patch["outcome"],
-            }),
+            move(
+              { status: reopenStage(app) },
+              `Reopened ${quoted(jobOf(app).title)}`,
+              {
+                status: "closed",
+                outcome: app.outcome as Patch["outcome"],
+              },
+            ),
         }
       : { id: "close", label: "Close…", onSelect: () => open("close") },
     "separator",
@@ -244,9 +266,12 @@ function menuOf(
 function Loading() {
   return (
     <div className="apg" role="status" aria-label="Loading the application">
-      <PageHeader title="Application" />
-      <div className="apg-head apg-skeleton">
-        <Skeleton width={260} height={12} />
+      <div className="apg-head">
+        <BackLink />
+        <PageHeader title="Application" />
+        <div className="apg-skeleton">
+          <Skeleton width={260} height={12} />
+        </div>
       </div>
       <div className="apg-panes-skeleton">
         {[0, 1, 2].map((index) => (
@@ -334,24 +359,31 @@ export default function ApplicationPage() {
   if (record.isError && !app)
     return (
       <div className="apg">
-        <PageHeader
-          title="Application"
-          breadcrumb={[
-            { label: "Applications", href: listHref() },
-            { label: "Not found" },
-          ]}
-        />
-        <EmptyState
-          icon={SearchX}
-          title="This application could not be opened"
-          actions={
-            <a className="ui-btn" data-variant="secondary" href={listHref()}>
-              <span className="ui-btn-label">Back to Applications</span>
-            </a>
-          }
-        >
-          {errorText(record.error)}
-        </EmptyState>
+        <div className="apg-head">
+          <BackLink />
+          <PageHeader title="Application" />
+        </div>
+        {record.error instanceof ApiError && record.error.status === 404 ? (
+          <EmptyState
+            icon={SearchX}
+            title="This application no longer exists"
+            actions={
+              <a className="ui-btn" data-variant="secondary" href={listHref()}>
+                <span className="ui-btn-label">Back to Applications</span>
+              </a>
+            }
+          >
+            It may have been deleted.
+          </EmptyState>
+        ) : (
+          <div className="apg-error">
+            <LoadError
+              what="this application"
+              error={record.error}
+              retry={() => void record.refetch()}
+            />
+          </div>
+        )}
       </div>
     );
   if (!app || !job) return <Loading />;
@@ -421,7 +453,7 @@ export default function ApplicationPage() {
       {
         onSuccess: (changed) => {
           toast.show({
-            message: `Marked applied · ${title}`,
+            message: `Marked applied ${quoted(title)}`,
             action: {
               label: "Undo",
               undo: true,
@@ -476,7 +508,7 @@ export default function ApplicationPage() {
               onSelect: () =>
                 move(
                   { status: "closed", outcome: "not_pursued" },
-                  `Not pursuing · ${job.title}`,
+                  `Closed ${quoted(job.title)} · not pursuing`,
                   { status: "shortlisted" },
                 ),
             },

@@ -1,8 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { CircleAlert } from "lucide-react";
 import {
-  Button,
-  Callout,
   PageHeader,
   SkeletonRows,
   LeaveDialog,
@@ -28,6 +25,7 @@ import { PreferenceSection, type SectionActions } from "./Section";
 import { FollowingUp, Languages } from "./Settings";
 import { useStatements } from "./useStatements";
 import "./preferences.css";
+import { LoadError } from "../../ui/LoadError";
 
 /**
  * Preferences: in the owner's words, what they want, rule out and are, how
@@ -130,23 +128,13 @@ export default function PreferencesScreen() {
   return (
     <div className="prefs">
       <PageHeader title="Preferences" />
-      <p className="prefs-lede">
-        Your agent reads this page as your instructions.
-      </p>
       {query.isError && !query.data ? (
         <div className="prefs-state">
-          <Callout
-            icon={CircleAlert}
-            tone="danger"
-            title="Preferences could not be loaded"
-            actions={
-              <Button size="sm" onClick={() => void query.refetch()}>
-                Try again
-              </Button>
-            }
-          >
-            {query.error instanceof Error ? query.error.message : null}
-          </Callout>
+          <LoadError
+            what="your preferences"
+            error={query.error}
+            retry={() => void query.refetch()}
+          />
         </div>
       ) : !query.data || !settings ? (
         <div className="prefs-state">

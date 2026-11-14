@@ -82,6 +82,68 @@
   .jobs-hint .ui-kbd {
     margin: 0 1px;
   }
+  /* A toast sits where the hint is: the hint steps aside while it shows. */
+  body:has(.ui-toast) .jobs-hint {
+    visibility: hidden;
+  }
+  /* Without room for one line, the hint is left out (? lists the keys). */
+  @container app (max-width: 1100px) {
+    .jobs-hint {
+      display: none;
+    }
+  }
+  /* Beside the detail on a narrower screen, a row keeps company and place. */
+  @container app (min-width: 1024px) and (max-width: 1279px) {
+    .jobs-row-source {
+      display: none;
+    }
+  }
+
+  /* While jobs are picked, the bulk bar decides: no row actions beside it. */
+  .jobs-list:has(.ui-row[data-checked]) .ui-row-actions {
+    display: none;
+  }
+
+  /* The pane beside a selection */
+  .jobs-picked {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-3);
+    padding: var(--s-6) var(--pane-pad);
+  }
+  .jobs-picked h2 {
+    font: var(--t-lg);
+    font-weight: var(--w-semibold);
+  }
+  .jobs-picked ul {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .jobs-picked li {
+    display: flex;
+    gap: var(--s-2);
+    min-width: 0;
+    font: var(--t-sm);
+  }
+  .jobs-picked-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .jobs-picked-company,
+  .jobs-picked-more,
+  .jobs-picked-hint {
+    color: var(--text-3);
+    font: var(--t-sm);
+    white-space: nowrap;
+  }
+  .jobs-picked-hint {
+    white-space: normal;
+  }
 
   /* The detail */
   .jobs-title {
@@ -225,11 +287,6 @@
     font: var(--t-sm);
     letter-spacing: 0;
     white-space: pre-line;
-  }
-  .jobs-pin {
-    flex: none;
-    margin-top: 2px;
-    color: var(--text-3);
   }
   .jobs-timeline-meta {
     color: var(--text-3);

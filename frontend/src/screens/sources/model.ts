@@ -61,6 +61,45 @@ export const SITES: [string, string][] = [
 /** Sites that search one country's site, and so need a country. */
 export const NATIONAL_SITES = ["indeed", "glassdoor"];
 
+// The markets Indeed and Glassdoor have a site for: the stored value (the
+// collector's name for it) and the name a person reads.
+const MARKETS = [
+  "argentina", "australia", "austria", "bahrain", "belgium", "brazil",
+  "canada", "chile", "china", "colombia", "costa rica", "czech republic",
+  "denmark", "ecuador", "egypt", "finland", "france", "germany", "greece",
+  "hong kong", "hungary", "india", "indonesia", "ireland", "israel", "italy",
+  "japan", "kuwait", "luxembourg", "malaysia", "mexico", "morocco",
+  "netherlands", "new zealand", "nigeria", "norway", "oman", "pakistan",
+  "panama", "peru", "philippines", "poland", "portugal", "qatar", "romania",
+  "saudi arabia", "singapore", "south africa", "south korea", "spain",
+  "sweden", "switzerland", "taiwan", "thailand", "türkiye", "ukraine",
+  "united arab emirates", "uk", "usa", "uruguay", "venezuela", "vietnam",
+]; // prettier-ignore
+const MARKET_NAMES: Record<string, string> = {
+  uk: "United Kingdom",
+  usa: "United States",
+};
+const marketName = (value: string) =>
+  MARKET_NAMES[value] ??
+  value.replace(/(^|\s)\p{L}/gu, (letter) => letter.toUpperCase());
+/** The countries a search can name, by the name a person reads. */
+export const COUNTRIES: [value: string, label: string][] = MARKETS.map(
+  (value): [string, string] => [value, marketName(value)],
+).sort((a, b) => a[1].localeCompare(b[1], "en"));
+
+/** The country a free-text location names ("Zurich, Switzerland"), if any. */
+export function countryIn(location: string) {
+  const words = location.toLowerCase();
+  return (
+    COUNTRIES.find(([value, label]) =>
+      new RegExp(
+        `(^|[\\s,(])(${value}|${label.toLowerCase()})($|[\\s,)])`,
+        "u",
+      ).test(words),
+    )?.[0] ?? ""
+  );
+}
+
 const siteName = (id: string) =>
   SITES.find(([key]) => key === id)?.[1] ?? capitalize(id);
 
@@ -93,7 +132,8 @@ export function sitesLine(source: SourceView) {
 
 /**
  * What a source searches, in one line, without empty parts:
- * "Data engineer · Zurich · LinkedIn, Indeed" or "Greenhouse · northstar".
+ * "Data engineer · Zurich · LinkedIn, Indeed", "Greenhouse" or "RSS feed · example.test".
+ * A board's internal slug is not shown; the source's name says which board.
  */
 export function describeSource(
   source: SourceView,
@@ -103,7 +143,7 @@ export function describeSource(
   if (kind === "search")
     return [
       text(source.config.query),
-      text(source.config.location) || capitalize(text(source.config.country)),
+      text(source.config.location) || marketName(text(source.config.country)),
       sitesLine(source),
     ]
       .filter(Boolean)
@@ -112,7 +152,7 @@ export function describeSource(
     ? shortUrl(source.url)
     : text(source.config.url)
       ? shortUrl(text(source.config.url))
-      : text(source.config.board);
+      : "";
   const label =
     kind === "feed"
       ? "RSS feed"

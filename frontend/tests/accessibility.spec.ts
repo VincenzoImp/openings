@@ -114,7 +114,7 @@ async function useTheme(page: Page, theme: string) {
 }
 async function settled(page: Page) {
   await page.waitForLoadState("networkidle");
-  await expect(page.locator(".loading")).toHaveCount(0);
+  await expect(page.locator(".ui-skeleton-rows")).toHaveCount(0);
 }
 
 for (const theme of ["light", "dark"]) {
