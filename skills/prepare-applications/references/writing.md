@@ -5,7 +5,7 @@ default method under them.
 
 ## The strongest true case
 
-- Write only what the Career record or the owner supports. Reasonable
+- Write only what the career entries or the owner support. Reasonable
   synthesis is fine ("built and ran the data pipeline" from an entry that
   describes both); a new fact is not: no invented metric, tool, scale, team
   size, production use or sole ownership.
