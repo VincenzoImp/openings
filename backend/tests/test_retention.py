@@ -175,13 +175,16 @@ def collected(tmp_path):
     return workspace, source["id"]
 
 
+SQL_APPLICATION_EVENTS = "SELECT count(*) n FROM events WHERE application_id=?"
+
+
 def test_old_finished_runs_go_and_the_recent_ones_of_each_source_stay(collected):
     workspace, source = collected
     job = workspace.ingest_job({"title": "Engineer", "company": "Example", "posting": "Build."})
     application = workspace.create_application({"job_id": job["id"]})
     workspace.db.execute("UPDATE events SET created_at=?", (stamp(400),))
     timeline = workspace.db.one("SELECT count(*) n FROM events WHERE job_id IS NOT NULL")["n"]
-    history = workspace.application_events(application["id"])["total"]
+    history = workspace.db.one(SQL_APPLICATION_EVENTS, (application["id"],))["n"]
     old = [add_run(workspace, source, 200 + number) for number in range(KEPT_RUNS_PER_SOURCE + 4)]
     queued = add_run(workspace, source, 500, state="queued")
     running = add_run(workspace, source, 499, state="running")
@@ -212,7 +215,7 @@ def test_old_finished_runs_go_and_the_recent_ones_of_each_source_stay(collected)
     assert (
         workspace.db.one("SELECT count(*) n FROM events WHERE job_id IS NOT NULL")["n"] == timeline
     )
-    assert workspace.application_events(application["id"])["total"] == history
+    assert workspace.db.one(SQL_APPLICATION_EVENTS, (application["id"],))["n"] == history
     orphans = workspace.db.one(
         "SELECT count(*) n FROM events e WHERE subject_type='collection_run' AND NOT EXISTS("
         "SELECT 1 FROM collection_runs r WHERE r.id=e.subject_id)"

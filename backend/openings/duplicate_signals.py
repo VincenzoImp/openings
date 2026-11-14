@@ -192,14 +192,6 @@ def normalize_location(value):
     return " ".join(words(value))
 
 
-def posting_fingerprint(posting):
-    """Hash of the posting's words, ignoring case, punctuation and whitespace."""
-    tokens = words((posting or "")[:_POSTING_CHARS])
-    if len(tokens) < MIN_POSTING_WORDS:
-        return None
-    return hashlib.sha256(" ".join(tokens).encode()).hexdigest()[:16]
-
-
 def _shingles(posting):
     tokens = words((posting or "")[:_POSTING_CHARS])[:_SHINGLE_WORDS]
     if len(tokens) < MIN_POSTING_WORDS:

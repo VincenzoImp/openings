@@ -130,10 +130,5 @@ def ulid():
     return "".join(_CROCKFORD[(value >> shift) & 31] for shift in range(125, -1, -5))
 
 
-def label_of(kind=None, name=None, token_kind=None):
-    """The actor label of stored actor columns; None for rows written before 0.17."""
-    return Actor(kind, None, name, token_kind).label if kind else None
-
-
 def from_columns(kind=None, actor_id=None, name=None, token_kind=None) -> Actor:
     return Actor(kind, actor_id, name, token_kind) if kind else SYSTEM

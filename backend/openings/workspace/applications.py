@@ -1,8 +1,7 @@
 """Application reads: computed Ready, preparation summaries, lists and history."""
 
-from ..db import decode_record
+from ..common import decode_record
 from ..errors import DomainError, missing
-from ..events import event_record
 from ..models import OUTCOMES
 from ..outcomes import last_replies, no_reply_cutoff, no_reply_period, replies_of
 from .readiness import MISSING_DOCUMENTS_SQL, READY_SQL, readiness
@@ -200,14 +199,3 @@ class ApplicationReads:
             "stage_counts": counts,
             "no_reply": no_reply,
         }
-
-    def application_events(self, application_id):
-        self.get_application(application_id)
-        rows = [
-            event_record(r)
-            for r in self.db.all(
-                "SELECT * FROM events WHERE application_id=? ORDER BY created_at DESC",
-                (application_id,),
-            )
-        ]
-        return {"items": rows, "total": len(rows)}
