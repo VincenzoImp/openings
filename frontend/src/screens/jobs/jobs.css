@@ -134,6 +134,10 @@
     padding-top: var(--s-6);
     border-top: 1px solid var(--border);
   }
+  .jobs-props:has(.ui-prop) + .jobs-posting {
+    padding-top: 0;
+    border-top: 0;
+  }
   .jobs-posting .ui-prose p {
     white-space: pre-line;
   }
@@ -229,6 +233,10 @@
     color: var(--text-3);
     font: var(--t-xs);
     letter-spacing: 0;
+  }
+  .jobs-timeline-reason {
+    display: block;
+    color: var(--text-2);
   }
   .jobs-timeline-event {
     color: var(--text-2);
@@ -391,10 +399,27 @@
     }
   }
   @container app (max-width: 719px) {
+    /* The phone's top bar carries the title. */
+    .jobs > .ui-page-header {
+      display: none;
+    }
     /* The pushed job takes the whole screen: its own bar on top, its
        decision at the bottom; the shell's bars step aside. */
     .ui-app:has(.jobs[data-pushed]) .ui-topbar,
-    .ui-app:has(.jobs[data-pushed]) .ui-app-bottom {
+    .ui-app:has(.jobs[data-pushed]) .ui-app-bottom,
+    .jobs[data-pushed] > :not(.jobs-panel, dialog) {
+      display: none;
+    }
+    /* The bulk bar stays on one line. */
+    .jobs .ui-bulkbar {
+      gap: var(--s-1);
+      padding: 0 var(--s-1) 0 var(--s-4);
+    }
+    .jobs .ui-bulkbar-count {
+      margin-right: var(--s-1);
+      white-space: nowrap;
+    }
+    .jobs .ui-bulkbar .ui-kbd {
       display: none;
     }
     .jobs[data-pushed] .ui-detail-bar {

@@ -333,6 +333,14 @@ function History({ job }: { job: Job }) {
                       {eventTitle(item.event ?? {})}
                     </span>
                     {by ? ` ${by}` : ""} · {when}
+                    {typeof item.event?.payload === "object" &&
+                    (item.event.payload as { reason?: unknown })?.reason ? (
+                      <span className="jobs-timeline-reason">
+                        {String(
+                          (item.event.payload as { reason: unknown }).reason,
+                        )}
+                      </span>
+                    ) : null}
                   </p>
                 )}
               </li>
@@ -359,6 +367,7 @@ export function JobDetail({
   onNext,
   onBack,
   on,
+  pushed = false,
 }: {
   id: string;
   row?: JobSummary;
@@ -368,9 +377,12 @@ export function JobDetail({
   onNext: () => void;
   onBack: () => void;
   on: DetailHandlers;
+  /** Shown as its own page (a phone): the title is the page's heading. */
+  pushed?: boolean;
 }) {
   const query = useJob(id, row);
   const job = query.data;
+  const Heading = pushed ? "h1" : "h2";
   if (!job)
     return (
       <>
@@ -517,9 +529,9 @@ export function JobDetail({
         />
       </DetailBar>
       <DetailBody className="jobs-detail">
-        <h2 id="job-title" className="jobs-title" tabIndex={-1}>
+        <Heading id="job-title" className="jobs-title" tabIndex={-1}>
           {job.title || "Untitled role"}
-        </h2>
+        </Heading>
         <MetaLine
           items={[
             ...(job.company

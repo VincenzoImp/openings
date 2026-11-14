@@ -53,11 +53,11 @@ export function useJob(id: string, row?: JobSummary) {
 }
 
 /** A job in full, from the cache when it is fresh. */
-export const fetchJob = (id: string) =>
+export const fetchJob = (id: string, staleTime = 10_000) =>
   queryClient.fetchQuery({
     queryKey: jobKeys.one(id),
     queryFn: ({ signal }) => readJob(id, signal),
-    staleTime: 10_000,
+    staleTime,
   });
 
 /** Read a job before it is shown (the next row of the queue). */

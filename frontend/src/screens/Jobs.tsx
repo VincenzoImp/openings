@@ -11,6 +11,7 @@ import {
   ArrowUpDown,
   Bookmark,
   Ellipsis,
+  EyeOff,
   Inbox,
   ListFilter,
   Plus,
@@ -68,7 +69,7 @@ import {
 import { useSeen } from "./jobs/seen";
 import "./jobs/jobs.css";
 
-const PAGE = 100;
+const PAGE = 200;
 
 function useMedia(query: string) {
   const [matches, setMatches] = useState(() => matchMedia(query).matches);
@@ -300,6 +301,9 @@ export default function Jobs() {
     undos.current = [...undos.current.slice(-19), entry];
     return entry;
   }
+  const forgetUndo = (entry: Undo) => {
+    undos.current = undos.current.filter((item) => item !== entry);
+  };
   /** Undo one decision: the latest, or the one a toast names. */
   function undo(id?: number) {
     const entry =
@@ -327,7 +331,7 @@ export default function Jobs() {
       })),
       reason,
     });
-    for (const item of results) record(item.id, item.version);
+    for (const item of results) if (item.id) record(item.id, item.version);
     return results;
   }
 
@@ -361,36 +365,22 @@ export default function Jobs() {
     }
     const one = moving.length === 1 ? moving[0] : null;
     const what = one ? title(one) : plural(moving.length, "job");
-    let results;
-    try {
-      results = await run(to, moving);
-    } catch (error) {
-      if (leaving) unhide(movingIds);
-      toast.show({
-        tone: "error",
-        message: `Nothing was changed: ${reasonOf(error)}`,
-      });
-      return;
-    }
-    const failed = results.filter((item) => !item.ok);
-    const done = moving.filter((job) =>
-      results.some((item) => item.ok && item.id === job.id),
-    );
-    if (failed.length) {
-      unhide(failed.map((item) => item.id));
-      const first = failed[0].error as { message?: string } | null;
-      toast.show({
-        tone: "error",
-        message: `${one ? what : `${failed.length} of ${what}`} not changed: ${first?.message || "it changed elsewhere."}`,
-      });
-    }
-    if (!done.length) return;
-    if (to === "forget") {
-      if (!failed.length)
-        toast.show({ tone: "success", message: `Forgot ${what}` });
-      return;
-    }
+    const pending = run(to, moving);
+    const doneOf = (results: Awaited<typeof pending>) =>
+      moving.filter((job) =>
+        results.some((item) => item.ok && item.id === job.id),
+      );
+    // Undo is ready at once: `z` pressed while the request is on its way
+    // waits for it, then turns it back.
+    let undone = false;
     const entry = remember(async () => {
+      undone = true;
+      let done: JobSummary[];
+      try {
+        done = doneOf(await pending);
+      } catch {
+        return;
+      }
       const groups = new Map<string, JobSummary[]>();
       for (const job of done) {
         const key = `${job.triage}\n${job.dismissal?.reason ?? ""}`;
@@ -414,8 +404,36 @@ export default function Jobs() {
         });
       }
     });
+    let results;
+    try {
+      results = await pending;
+    } catch (error) {
+      forgetUndo(entry);
+      if (leaving) unhide(movingIds);
+      toast.show({
+        tone: "error",
+        message: `Nothing was changed: ${reasonOf(error)}`,
+      });
+      return;
+    }
+    const failed = results.filter((item) => !item.ok);
+    const done = doneOf(results);
+    if (failed.length) {
+      unhide(failed.map((item) => item.id ?? ""));
+      const first = failed[0].error as { message?: string } | null;
+      toast.show({
+        tone: "error",
+        message: `${one ? what : `${failed.length} of ${what}`} not changed: ${first?.message || "it changed elsewhere."}`,
+      });
+    }
+    if (to === "forget" || !done.length) {
+      forgetUndo(entry);
+      if (to === "forget" && done.length && !failed.length)
+        toast.show({ tone: "success", message: `Forgot ${what}` });
+      return;
+    }
+    if (undone) return;
     if (failed.length) return;
-    const application = (results[0].result as JobSummary | null)?.application;
     toast.show({
       message:
         to === "shortlisted"
@@ -424,7 +442,11 @@ export default function Jobs() {
             : `Shortlisted ${what} — applications started`
           : `${to === "dismissed" ? "Dismissed" : "Restored"} ${what}`,
       icon:
-        to === "dismissed" ? X : to === "shortlisted" ? Bookmark : RotateCcw,
+        to === "dismissed"
+          ? EyeOff
+          : to === "shortlisted"
+            ? Bookmark
+            : RotateCcw,
       action: { label: "Undo", undo: true, run: () => undo(entry.id) },
       extra:
         to === "dismissed" ? (
@@ -432,13 +454,18 @@ export default function Jobs() {
             key={entry.id}
             onSave={(reason) => void addReason(done, reason)}
           />
-        ) : one && application ? (
-          <a
+        ) : one && to === "shortlisted" ? (
+          <button
+            type="button"
             className="ui-toast-action"
-            href={href("application", { id: application.id })}
+            onClick={async () => {
+              toast.close();
+              const started = (await fetchJob(one.id, 0)).application;
+              if (started) navigate(href("application", { id: started.id }));
+            }}
           >
             Open
-          </a>
+          </button>
         ) : undefined,
     });
   }
@@ -967,6 +994,7 @@ export default function Jobs() {
                   onNext={() => move(1, false)}
                   onBack={close}
                   on={handlers}
+                  pushed={phone && open}
                 />
               ) : list.isPending ? (
                 <div className="jobs-pane-loading">
