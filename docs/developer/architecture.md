@@ -1,8 +1,7 @@
 # Architecture
 
 Openings is a FastAPI application, a React dashboard and one SQLite file. The core
-runs no model, browser or TeX: an external agent generates and compiles, and uploads
-the result.
+runs no model, browser or TeX: an external agent generates, compiles and uploads.
 
 ## Layers
 
@@ -44,7 +43,7 @@ erDiagram
   sources ||--o{ postings : found
   jobs ||--o{ postings : has
   jobs ||--o{ job_identities : known_by
-  jobs ||--|| job_signals : labelled_by
+  jobs ||--|| job_signals : labeled_by
   jobs ||--o{ applications : "at most one open"
   applications ||--o{ documents : revisions
   applications ||--o{ replies : receives
@@ -91,7 +90,8 @@ Parity runs one way: every dashboard action is a REST operation, and every
 operation that is not owner-only is an MCP tool or names one. REST is the superset.
 `openapi.py` completes the document (tags, `bearerAuth`, the `Error` model,
 examples); the dashboard's types are generated from it (`npm --prefix frontend run
-api:gen`; CI fails on a stale `schema.d.ts`). The agent's interface is 44 tools. The server sends `instructions` on initialize
+api:gen`; CI fails on a stale `schema.d.ts`). `test_mcp_budget.py` caps the
+agent's tool list. On initialize the server sends `instructions`
 (`mcp_server.INSTRUCTIONS`): start with `workspace_context`, load the skill for the
 task, and the hard limits. `workspace_context` returns the workspace, counts,
 settings, profile, Preferences, a career summary, templates, skills and `feedback`:
@@ -115,7 +115,7 @@ the owner's corrections of agent work since the token's last read.
   With a source, the PDF names its SHA-256 and a mismatch is refused. Readable text
   comes from the source (`documents/text.py`) or the PDF (pypdf), never a TeX runtime.
 - **Preferences:** five free-text sections, replaced whole under a version; only
-  `no_reply_days` and `spoken_languages` are typed. Signals label and filter; nothing
+  `no_reply_days` and `spoken_languages` are typed. Labels describe and filter; nothing
   dismisses a job automatically.
 - **Attribution and concurrency:** each write records an actor label (`owner`,
   `agent:<token name>`, `system`) and the batch, never content. Typed inputs,
@@ -125,21 +125,21 @@ the owner's corrections of agent work since the token's last read.
 
 Every provider request goes through the persisted gate (`discovery/service.py`,
 `collectors/pinning.py`): previews, URL imports, runs, redirects and detail fetches.
-It stores spacing and cooldowns, honours 429 and `Retry-After` and pins resolved
+It stores spacing and cooldowns, honors 429 and `Retry-After` and pins resolved
 addresses against DNS rebinding. Never use an unguarded HTTP client. Incomplete
 automatic candidates stay in the run's checkpoint until usable text exists.
 
 ## Upgrades
 
-`schema.sql` is the whole layout and runs once, on a new file. A workspace of the
-previous schema is upgraded by the one migration in `migrations/` (`MIGRATIONS` has
-one key, `SCHEMA_VERSION - 1`); older ones are refused with the release to open
-first. The migration is frozen with its release, imports only the standard library
-and builds a new file from `schema.sql`, copying data in one transaction. It writes
-removed records to a JSON archive beside the database, verifies the result, then
-keeps the original as the pre-upgrade copy. `test_upgrade.py` upgrades a real fixture
-(`backend/tests/fixtures/workspace-<schema>.sql.gz`) and compares it to a new file.
-Until its release ships, edit the migration instead of adding one.
+`schema.sql` is the whole layout and runs once, on a new file. The one migration in
+`migrations/` (`MIGRATIONS` has one key, `SCHEMA_VERSION - 1`) upgrades a workspace of
+the previous schema; older ones are refused with the release to open first. It is
+frozen with its release, imports only the standard library and builds a new file from
+`schema.sql`, copying data in one transaction, writes removed records to a JSON archive
+beside the database, verifies the result and keeps the original. `test_upgrade.py`
+upgrades a real fixture (`backend/tests/fixtures/workspace-<schema>.sql.gz`, written by
+`scripts/release_fixture.py`) and compares it to a new file. Until its release ships,
+edit the migration instead of adding one.
 
 ## Backups and tests
 
