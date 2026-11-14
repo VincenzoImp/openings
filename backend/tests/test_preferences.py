@@ -89,7 +89,7 @@ def test_a_stale_version_is_a_conflict_with_the_current_version(services):
     with pytest.raises(DomainError) as stale:
         preferences.update_preferences("facts", {"expected_version": 0, "items": []})
     assert (stale.value.status, stale.value.code) == (409, "conflict")
-    assert stale.value.details == {"current_version": 1, "section": "facts"}
+    assert stale.value.details == {"current_version": 1, "id": "facts", "section": "facts"}
     with pytest.raises(DomainError) as unknown:
         preferences.update_preferences("decision", {"expected_version": 0, "items": []})
     assert unknown.value.status == 404
@@ -145,7 +145,8 @@ def test_settings_change_with_their_version(services):
     assert kept["version"] == 1 and kept["spoken_languages"] == ["en", "it"]
     with pytest.raises(DomainError) as stale:
         preferences.update_settings({"expected_version": 0, "no_reply_days": 10})
-    assert stale.value.status == 409 and stale.value.details == {"current_version": 1}
+    assert stale.value.status == 409
+    assert stale.value.details == {"current_version": 1, "id": "settings"}
     for wrong in (
         {"no_reply_days": 0},
         {"no_reply_days": 366},
@@ -288,7 +289,7 @@ def test_an_agent_replaces_sections_with_version_checks(app, agent_token, mcp):
     assert client.get("/api/v1/policy", headers=headers).status_code == 410
     assert client.get("/api/v1/instructions", headers=headers).status_code == 410
     _, removed = mcp.call("policy_get")
-    assert removed["code"] == "tool_removed" and "preferences_get" in removed["message"]
+    assert removed["code"] == "renamed" and removed["details"]["use"] == "workspace_context"
 
 
 def test_templates_hold_no_rule_statements(workspace):

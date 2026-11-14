@@ -59,12 +59,10 @@ _CODE = re.compile(r"^[a-z]{2}$")
 
 
 class PreferenceItem(Input):
-    text: NonBlank = Field(
-        min_length=1, max_length=MAX_TEXT, description="The statement in the owner's words."
-    )
+    text: NonBlank = Field(min_length=1, max_length=MAX_TEXT, description="In the owner's words.")
     scope: Scope | None = Field(
         default=None,
-        description="Writing rules only: all (the default), cv or letter. Other sections take none.",
+        description="writing only: all, cv or letter; all when omitted.",
     )
 
 
@@ -74,7 +72,7 @@ class PreferencesUpdate(Input):
     expected_version: int = Field(ge=0, strict=True, description="The section's current version.")
     items: list[PreferenceItem] = Field(
         max_length=MAX_ITEMS,
-        description=f"Every statement of the section, in order (at most {MAX_ITEMS}, each at most {MAX_TEXT} characters): {{text, scope}}.",
+        description=f"The whole section, in order (each at most {MAX_TEXT} characters).",
     )
 
 
@@ -82,19 +80,19 @@ class SettingsUpdate(Input):
     """Omitted settings stay as they are."""
 
     expected_version: int = Field(
-        ge=0, strict=True, description="The settings' current version (0 before the first save)."
+        ge=0, strict=True, description="The settings' version (0 before the first save)."
     )
     no_reply_days: int | None = Field(
         default=None,
         ge=1,
         le=365,
         strict=True,
-        description="Days after which an application without an employer answer counts as no reply.",
+        description="Days without an answer after which an application is overdue.",
     )
     spoken_languages: list[str] | None = Field(
         default=None,
         max_length=50,
-        description="Languages the owner speaks, as ISO 639-1 codes such as en or de (English names are accepted).",
+        description="ISO 639-1 codes such as en or de.",
     )
 
     @field_validator("spoken_languages")
@@ -223,7 +221,7 @@ class PreferencesService:
         with self.db.transaction() as conn:
             row = _section_row(conn, section)
             if row[2] != value.expected_version:
-                conflict(details={"current_version": row[2], "section": section})
+                conflict(details={"current_version": row[2], "id": section, "section": section})
             if json.loads(row[1]) == items:
                 return section_record(row)
             version = row[2] + 1
@@ -247,7 +245,7 @@ class PreferencesService:
         with self.db.transaction() as conn:
             current = settings_record(conn)
             if current["version"] != value.expected_version:
-                conflict(details={"current_version": current["version"]})
+                conflict(details={"current_version": current["version"], "id": "settings"})
             data = {key: current[key] for key in SETTINGS_DEFAULTS}
             merged = {**data, **changes}
             if merged == data:

@@ -285,8 +285,12 @@ def test_signal_filter_dismissal_reason_and_distinct_over_the_interfaces(tmp_pat
             dismissed["dismissal"]["reason"] == "Seen."
             and dismissed["dismissal"]["category"] == "agent"
         )
-        distinct = tool(client, "jobs_distinct", {"job_id": copy["id"], "other_id": first["id"]})
-        assert distinct["signals"]["duplicate"] is None
+        distinct = tool(
+            client,
+            "jobs_link",
+            {"job_id": copy["id"], "other_id": first["id"], "decision": "different"},
+        )
+        assert "duplicate" not in distinct["signals"]
         over_rest = client.post(
             f"/api/v1/jobs/{copy['id']}/distinct", json={"other_id": first["id"]}, headers=headers
         )

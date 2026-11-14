@@ -8,7 +8,9 @@ CREATE TABLE settings (
 CREATE TABLE api_tokens (
  id TEXT PRIMARY KEY, name TEXT NOT NULL, token_hash TEXT NOT NULL UNIQUE,
  created_at TEXT NOT NULL, last_used_at TEXT,
- kind TEXT NOT NULL DEFAULT 'owner' CHECK(kind IN ('owner','agent'))
+ kind TEXT NOT NULL DEFAULT 'owner' CHECK(kind IN ('owner','agent')),
+ -- The token's previous workspace_context read: owner corrections after it are feedback.
+ context_read_at TEXT
 );
 CREATE TABLE jobs (
  id TEXT PRIMARY KEY, title TEXT NOT NULL, company TEXT NOT NULL, location TEXT NOT NULL DEFAULT '',

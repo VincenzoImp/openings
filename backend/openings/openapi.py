@@ -67,65 +67,79 @@ def errors(op, path):
 
 
 TAGS = [
-    ("workspace", "Identity, sessions, the change log, skills, backup and export."),
+    ("workspace", "The start read, identity, sessions, the change log, skills and backup."),
     ("jobs", "Archived postings, triage, duplicates and the timeline."),
     ("notes", "Notes on jobs and applications."),
     ("applications", "Applications, replies, readiness and Stats."),
     ("documents", "CV, letter and form-answer revisions."),
     ("files", "File metadata and byte transfers."),
     ("career", "Profile and career entries, and their import."),
-    ("highlights", "Reusable wording (claims) tied to career entries."),
+    ("highlights", "Reusable wording tied to career entries."),
     ("templates", "CV and letter templates."),
     ("preferences", "The owner's Preferences and settings."),
     ("sources", "Saved searches and company feeds."),
     ("collection", "The collection switch, providers, runs and tasks."),
-    ("owner", "Owner-only operations: never available to an agent token or over MCP."),
+    (
+        "owner",
+        "Owner-only operations: never available to an agent token or over MCP (password, tokens, restore, export, career import, kept backups).",
+    ),
 ]
-
-
-def _items(*pairs):
-    return [{"id": identifier, "expected_version": version} for identifier, version in pairs]
 
 
 # Request examples by operationId: the batch operations and the upload sequence.
 EXAMPLES = {
-    "jobs_bulk": {
+    "jobs_triage": {
         "dismiss": {
-            "summary": "Dismiss two jobs with a reason",
+            "summary": "Dismiss two jobs with a reason and shortlist a third",
             "value": {
-                "action": "dismissed",
-                "reason": "Junior roles; I look for senior roles.",
-                "items": _items(("j_01", 2), ("j_02", 1)),
+                "items": [
+                    {
+                        "job_id": "j_01",
+                        "to": "dismissed",
+                        "reason": "Junior role; I look for senior roles.",
+                    },
+                    {"job_id": "j_02", "to": "dismissed", "reason": "Requires German."},
+                    {"job_id": "j_03", "to": "shortlisted"},
+                ]
             },
         },
         "restore": {
             "summary": "Restore them to review",
-            "value": {"action": "new", "items": _items(("j_01", 3), ("j_02", 2))},
+            "value": {"items": [{"job_id": "j_01", "to": "new"}, {"job_id": "j_02", "to": "new"}]},
         },
     },
-    "applications_bulk": {
-        "close": {
-            "summary": "Close overdue applications as no_response",
+    "applications_update": {
+        "reply": {
+            "summary": "Record an interview invitation and close an overdue application",
             "value": {
-                "action": "close",
-                "outcome": "no_response",
-                "items": _items(("a_01", 4), ("a_02", 6)),
+                "items": [
+                    {
+                        "application_id": "a_01",
+                        "reply": {"kind": "interview", "note": "Call on Monday."},
+                    },
+                    {"application_id": "a_02", "stage": "closed", "outcome": "no_response"},
+                ]
             },
         }
     },
-    "sources_bulk": {
-        "pause": {
-            "summary": "Pause two sources",
-            "value": {"action": "pause", "items": _items(("s_01", 3), ("s_02", 1))},
+    "sources_save": {
+        "add": {
+            "summary": "Add a company board, paused, and pause an existing source",
+            "value": {
+                "items": [
+                    {"name": "Example GmbH", "url": "https://boards.greenhouse.io/example"},
+                    {"source_id": "s_01", "expected_version": 3, "enabled": False},
+                ]
+            },
         }
     },
-    "files_reserve_upload": {
+    "files_upload": {
         "upload": {
             "summary": "Step 1 of 2: reserve; then PUT the bytes to the returned url",
             "description": "PUT the exact bytes to the returned url with the returned headers "
             "(X-Transfer-Token); the PUT returns the stored file.",
             "value": {
-                "owner_type": "knowledge",
+                "owner_type": "career",
                 "owner_id": "k_01",
                 "name": "certificate.pdf",
                 "size": 48213,
@@ -135,13 +149,14 @@ EXAMPLES = {
     },
     "documents_create": {
         "cv": {
-            "summary": "A CV revision; PUT its source, then its PDF, to the returned uploads",
+            "summary": "A CV revision with its TeX source inline; PUT its PDF to uploads.pdf",
             "value": {
                 "application_id": "a_01",
                 "kind": "cv",
                 "title": "CV for Example GmbH",
                 "pdf": {"name": "cv.pdf", "size": 48213},
-                "source_file": {"name": "cv.tex", "size": 5120},
+                "source": "\\documentclass{article}\\begin{document}Alex Example\\end{document}",
+                "highlight_ids": ["h_01"],
             },
         }
     },

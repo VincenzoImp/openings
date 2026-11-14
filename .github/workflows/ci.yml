@@ -37,6 +37,10 @@ jobs:
       - run: python3 scripts/bump_version.py --check
       # The default selection skips `performance` (pyproject.toml); nightly.yml runs it weekly.
       - run: uv run pytest -q -n auto backend
+      # A practical complete workflow: an agent over real MCP and HTTP (synthetic PDF;
+      # pass --tectonic to compile the CV locally).
+      - name: Agent round trip
+        run: uv run python backend/tests/agent_roundtrip.py
       - name: Smoke installed wheel and packaged resources
         run: |
           uv build --wheel --out-dir /tmp/openings-wheel
