@@ -69,8 +69,9 @@ the same facts.
 Fix and compile again until it passes.
 
 **Store.** Call `documents_create` with the PDF's name and size, the TeX
-source when you compiled one, the highlights and entries you used and, for a
-redo, the revision it replaces. PUT the PDF with the returned grant (see
+source when you compiled one (inline, or as a file with its sha256), the
+highlights and entries you used and, for a redo, the revision it replaces. PUT
+a source file first, then the PDF, with the returned grants (see
 [openings](../openings/SKILL.md)). A revision is complete and final once its
 PDF is stored: check before uploading, and make a new revision for any
 change.

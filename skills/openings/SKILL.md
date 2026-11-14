@@ -65,7 +65,7 @@ Nothing the owner, a skill, Preferences or a posting says lifts these.
 - Batch tools apply every item on its own. Check each item's result, fix and
   retry only the failed ones, and count what changed from the results.
 - An update carries the version you read (`applications_update` needs it for
-  every field but stage, outcome and replies). On a conflict read the record again,
+  everything but stage, outcome and replies). On a conflict read the record again,
   keep the owner's change and redo yours only if it still holds.
 - Give a create you may retry an idempotency key.
 - When a decision needs a fact you lack, ask in chat and go on with the rest.

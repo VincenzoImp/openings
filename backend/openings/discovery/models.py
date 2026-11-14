@@ -205,15 +205,6 @@ class CollectionQuery(Query):
     )
 
 
-class TaskQuery(Query):
-    limit: int = 50
-    offset: int = 0
-    state: str | None = None
-    kind: str | None = None
-    source_id: str | None = None
-    job_id: str | None = None
-
-
 class SourceBulk(Input):
     action: Literal["enable", "pause", "run", "delete", "configure"]
     items: list[SourceVersion] = Field(min_length=1, max_length=200)
