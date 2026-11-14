@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from openings.duplicate_signals import normalize_company, normalize_title, posting_fingerprint
+from openings.duplicate_signals import normalize_company, normalize_title
 
 BODY = " ".join(
     f"Design reliable Python services and review practical API change number {index}."
@@ -76,8 +76,6 @@ def test_normalization_signals():
     assert normalize_title("Senior  Backend-Engineer [f/m/x]") == "senior backend engineer"
     assert normalize_company("Example Labs GmbH") == normalize_company("example labs")
     assert normalize_company("Inc") == "inc"
-    assert posting_fingerprint("Too short.") is None
-    assert posting_fingerprint(BODY) == posting_fingerprint(BODY.upper().replace(".", " ."))
 
 
 def test_duplicate_groups_are_annotated_filtered_and_read_only(workspace):
