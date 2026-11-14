@@ -3,6 +3,7 @@ import { api as legacy, setCsrf as setLegacyCsrf, type Session } from "./api";
 import { api, call, setCsrf } from "./api/client";
 import { queryClient } from "./query/query";
 import { ErrorBanner, Loading } from "./design";
+import { href, navigate } from "./shell/router";
 import { Shell } from "./shell/Shell";
 
 // Signing in is needed once per session: its code loads only then.
@@ -74,6 +75,8 @@ export default function App() {
         <Auth
           configured={session.configured}
           onSuccess={(value) => {
+            // A new installation starts with the first-run guide.
+            if (!session.configured) navigate(href("setup"), { replace: true });
             shareToken(value.csrf_token || "");
             setSession(value);
           }}

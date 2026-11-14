@@ -19,23 +19,48 @@ Open **http://127.0.0.1:8080** and choose an owner password of at least 10
 characters (or set `OPENINGS_PASSWORD` in `.env` before the first start). To reach
 Openings from other devices, see [Operations](operations.md#reach-it-from-other-devices).
 
-A new workspace may open on a short setup guide that connects an agent. If you
-work by hand, choose **Skip for now**.
+## Set up your workspace
 
-![The setup guide: the record the agent builds, with the Profile and Preferences basics](../images/setup.png)
+Open `http://127.0.0.1:8080` and choose an owner password of at least 10
+characters (or set `OPENINGS_PASSWORD` in `.env` before the first start). A new
+installation then opens the **setup guide**, four short steps about you:
+
+1. **About you.** Your name, the roles you are after and where (saved as
+   statements under Preferences, *What I'm looking for*), and the languages you
+   speak. Only the name is required.
+2. **Find jobs.** A saved search, prefilled from step 1, that you can **Test**
+   before you save it; or one job added by its link.
+3. **Your CV.** Paste your CV text and add the career entries read from it, or
+   start from the example CV template.
+4. **Done.** How every day works, and connecting an AI agent, which is
+   optional: Openings has no AI of its own.
+
+Find jobs and Your CV can be skipped. Until the workspace has a name and what
+you look for, a job or a source, and a career entry or template, Today shows a
+three-item **setup checklist** and the sidebar a **Finish setup** link. Both
+are read from the workspace, so every browser shows the same state.
+
+![The setup guide: About you, the first of four steps](../images/setup.png)
 
 ## Find your way
 
 The navigation has three parts:
 
-- **Today**, **Jobs** and **Applications**: your daily work.
-- **You**: **Profile**, **Preferences** and **Templates**.
-- **Workspace**: **Sources** and **Settings**.
+**Today** is the first screen: a greeting with one line of counts, then
 
-**Today** shows the applications that are **Ready to apply**, the pipeline and the
-applications **waiting for a reply**. The numbers beside Jobs and Applications
-count new jobs and Ready applications. Press `?` for the keyboard shortcuts, and
-`n` adds a job from anywhere.
+- **Ready to apply:** the Ready applications, closest deadline first, with the
+  priority as a glyph and the deadline in colour when it is near.
+  **Start applying** opens the first one.
+- **Needs attention:** Shortlisted applications due within a week that are not
+  Ready, and Ready ones with an open requirement, each naming what is missing.
+- **Waiting for a reply:** applications sent longer ago than the no-reply period
+  (Preferences, 30 days unless you change it). On a row, **Record reply** (`r`)
+  or **Close as no reply** (`c`); **Close all as no reply** closes them
+  together. Closing is undone from the toast. Nothing closes by itself.
+- **New jobs:** how many, the newest three and **Go through them**.
+- The count of applications in each stage, each a link to its list.
+
+When nothing needs you, Today says so.
 
 ## Add your first job
 
