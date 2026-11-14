@@ -5,6 +5,7 @@ import { Button } from "../../ui/Button";
 import { Choice } from "../../ui/Choice";
 import { Dialog } from "../../ui/Dialog";
 import { Field } from "../../ui/Field";
+import { plural } from "../../ui/format";
 import { BulkBar } from "../../ui/List";
 import { useToast } from "../../ui/Toast";
 import {
@@ -88,7 +89,7 @@ export function BulkActions({
       const versions = versionsOf(result);
       report(
         result,
-        `Closed ${result.succeeded} as ${OUTCOMES[value].toLowerCase()}`,
+        `Closed ${plural(result.succeeded, "application")} as ${OUTCOMES[value].toLowerCase()}`,
         () =>
           reopen(
             items
@@ -123,7 +124,10 @@ export function BulkActions({
       onClear();
       const succeeded = results.reduce((sum, item) => sum + item.succeeded, 0);
       if (undoing) {
-        toast.show({ message: `Reopened ${succeeded}`, tone: "success" });
+        toast.show({
+          message: `Reopened ${plural(succeeded, "application")}`,
+          tone: "success",
+        });
         return;
       }
       const versions = new Map(
@@ -133,13 +137,17 @@ export function BulkActions({
         items.filter((app) => versions.has(app.id)),
         (app) => app.outcome || "not_pursued",
       );
-      report(results[0], `Reopened ${succeeded}`, async () => {
-        for (const [value, group] of back)
-          await close(
-            value,
-            group.map((app) => ({ ...app, version: versions.get(app.id)! })),
-          );
-      });
+      report(
+        results[0],
+        `Reopened ${plural(succeeded, "application")}`,
+        async () => {
+          for (const [value, group] of back)
+            await close(
+              value,
+              group.map((app) => ({ ...app, version: versions.get(app.id)! })),
+            );
+        },
+      );
     } catch (error) {
       toast.show({ message: errorText(error), tone: "error" });
     }
@@ -261,7 +269,7 @@ export function BulkActions({
                     setDialog(null);
                     onClear();
                     toast.show({
-                      message: `Priority set on ${selected.length}`,
+                      message: `Set the priority of ${plural(selected.length, "application")}`,
                       tone: "success",
                     });
                   },
