@@ -225,7 +225,9 @@ function Editor({
     if (draft.kind === "feed")
       return { kind: "rss" as const, url, config: { url }, filters };
     return {
-      kind: (sameAddress ? source.kind : "auto") as Schema<"SourceCreate">["kind"],
+      kind: (sameAddress
+        ? source.kind
+        : "auto") as Schema<"SourceCreate">["kind"],
       url,
       config: sameAddress ? kept : {},
       filters,

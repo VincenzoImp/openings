@@ -25,12 +25,7 @@ import {
   useWorkspaceInfo,
   type KeptBackup,
 } from "./queries";
-import {
-  OwnerOnly,
-  SettingRow,
-  SettingsGroup,
-  SettingsSection,
-} from "./Rows";
+import { OwnerOnly, SettingRow, SettingsGroup, SettingsSection } from "./Rows";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -79,8 +74,8 @@ export function Data() {
           </Button>
         }
       >
-        One file with everything: jobs, applications, documents and their
-        files, your profile and settings
+        One file with everything: jobs, applications, documents and their files,
+        your profile and settings
         {storage ? `, about ${bytes(storage.database_bytes)}` : ""}. Keep it
         somewhere other than this machine.
       </SettingRow>
@@ -126,8 +121,8 @@ export function Data() {
         control={
           storage && (
             <span className="set-value">
-              {bytes(storage.database_bytes)} used ·{" "}
-              {bytes(storage.free_bytes)} free
+              {bytes(storage.database_bytes)} used · {bytes(storage.free_bytes)}{" "}
+              free
             </span>
           )
         }
@@ -231,9 +226,7 @@ function KeptCopies({
                   >
                     {formatFull(item.created_at)}
                   </span>
-                  <span className="set-item-sub">
-                    {bytes(item.size_bytes)}
-                  </span>
+                  <span className="set-item-sub">{bytes(item.size_bytes)}</span>
                 </span>
                 {downloadButton(item)}
               </li>
@@ -258,9 +251,7 @@ function KeptCopies({
                   >
                     {formatDay(item.created_at)}
                   </span>
-                  <span className="set-item-sub">
-                    {bytes(item.size_bytes)}
-                  </span>
+                  <span className="set-item-sub">{bytes(item.size_bytes)}</span>
                 </span>
                 {downloadButton(item)}
                 <Menu
@@ -393,15 +384,13 @@ function RestoreDialog({
             <dt>Replaced</dt>
             <dd>
               Everything in this workspace now: jobs, applications, documents
-              and their files, your profile, preferences, templates, sources
-              and settings.
+              and their files, your profile, preferences, templates, sources and
+              settings.
             </dd>
           </div>
           <div>
             <dt>Kept</dt>
-            <dd>
-              Your password, your API tokens and this browser's sign-in.
-            </dd>
+            <dd>Your password, your API tokens and this browser's sign-in.</dd>
           </div>
         </dl>
         <p className="set-row-desc">

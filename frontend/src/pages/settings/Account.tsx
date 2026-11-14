@@ -132,12 +132,7 @@ function PasswordDialog({
         </>
       }
     >
-      <form
-        id="password-form"
-        className="set-form"
-        noValidate
-        onSubmit={save}
-      >
+      <form id="password-form" className="set-form" noValidate onSubmit={save}>
         <Field
           label="New password"
           hint="At least 10 characters."

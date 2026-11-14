@@ -16,6 +16,19 @@
   .set-danger {
     color: var(--danger);
   }
+  /* Actions sit at the end of their line: their tooltips open toward the
+     start, so none reaches past the right edge. */
+  .set-screen .ui-icon-btn[data-tip]::after {
+    left: auto;
+    right: 0;
+    transform: translate(0, -2px);
+  }
+  .set-screen .ui-icon-btn[data-tip="above"]::after {
+    transform: translate(0, 2px);
+  }
+  .set-screen .ui-icon-btn[data-tip]:is(:hover, :focus-visible)::after {
+    transform: none;
+  }
 
   /* Sub-navigation */
   .set-nav ul {
@@ -265,6 +278,8 @@
     overflow-wrap: anywhere;
   }
   .set-nowrap {
+    display: inline-flex;
+    align-items: center;
     white-space: nowrap;
   }
   .set-external {

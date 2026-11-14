@@ -10,6 +10,19 @@
   .src-danger {
     color: var(--danger);
   }
+  /* Actions sit at the end of their line: their tooltips open toward the
+     start, so none reaches past the right edge. */
+  .src-screen .ui-icon-btn[data-tip]::after {
+    left: auto;
+    right: 0;
+    transform: translate(0, -2px);
+  }
+  .src-screen .ui-icon-btn[data-tip="above"]::after {
+    transform: translate(0, 2px);
+  }
+  .src-screen .ui-icon-btn[data-tip]:is(:hover, :focus-visible)::after {
+    transform: none;
+  }
 
   /* "Checked every [6 h] · next check 14:00 · Check all now" */
   .src-topline {
@@ -367,6 +380,9 @@
     .src-row-more {
       width: var(--touch);
       height: var(--touch);
+      border-color: transparent;
+      background: none;
+      box-shadow: none;
     }
     .src-checks {
       margin-left: var(--s-4);

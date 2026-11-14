@@ -74,7 +74,8 @@ export function gateOf(
     typeof value === "string" && new Date(value).getTime() > now;
   if (provider.capability.supported === false)
     return { tone: "neutral", text: "Not supported" };
-  if (provider.policy.enabled === false) return { tone: "neutral", text: "Off" };
+  if (provider.policy.enabled === false)
+    return { tone: "neutral", text: "Off" };
   if (future(provider.runtime.cooldown_until))
     return { tone: "warning", text: "Asked to wait" };
   return { tone: "success", text: "Ready" };

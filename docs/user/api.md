@@ -359,7 +359,7 @@ restore accepts now), `restore_limit_configured_bytes` (the optional
 `GET /skills` lists the shipped skills: `name`, `title`, `summary`, `example`,
 `description`, `files` and `file_details` (`path`, `bytes` and the first
 heading as `title` for each file). `title`, `summary` and `example` come from
-the `SKILL.md` frontmatter and feed **Settings › Skills** ("What you can ask
+the `SKILL.md` frontmatter and feed **Settings › API & agents** ("What you can ask
 your agent"). `GET /skills/{name}` returns `name`, `path` and the shipped
 `content` of `SKILL.md`; `GET /skills/{name}/files/{path}` a reference file.
 Skills ship with the server and are never edited by a workspace. Standing

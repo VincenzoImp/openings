@@ -7,8 +7,8 @@ client configuration and environment-variable syntax differ.
 
 ## Token kinds
 
-Every API token has a kind, chosen when it is created and shown in **Settings →
-Agent access**:
+Every API token has a kind, chosen when it is created and shown in **Settings ›
+API & agents** (Agent or Full access):
 
 | Kind | Access |
 |---|---|
@@ -49,7 +49,7 @@ serves them to connected agents: `skills_list`, `skills_get(name, path)` and one
 prompt per skill, also at `GET /api/v1/skills`. Start with
 [`setup-openings`](../../skills/setup-openings/SKILL.md) for a new workspace or
 [`openings-workspace`](../../skills/openings-workspace/SKILL.md) for the basics.
-**Settings → Agent access** shows client configuration snippets; **Settings →
+**Settings › API & agents** shows client configuration snippets; **Settings →
 Skills** shows what you can ask your agent: for each skill a title, one sentence
 and an example phrase (the `title`, `summary` and `example` fields of its
 `SKILL.md` frontmatter).
@@ -60,7 +60,7 @@ belong in **Preferences › Working with me**, which the agent reads with
 `preferences_get` and updates with `preferences_update` (section
 `working_with_me`) only when you state or confirm an instruction.
 
-![Settings → Agent access with the API tokens, the token form and a Claude Code configuration snippet](../images/agent-access.png)
+![Settings › API & agents with the API tokens, the token form and a Claude Code configuration snippet](../images/agent-access.png)
 
 To let an agent run the whole search for you, see
 [Agent-operated job search](agent-operated.md). MCP remains usable without the

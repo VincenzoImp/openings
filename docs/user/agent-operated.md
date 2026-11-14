@@ -46,7 +46,7 @@ password and create the API token yourself.
    [Agent Skills](https://agentskills.io/specification) can also load the
    repository's `skills/` directory.
 3. Connect the agent to MCP at `<origin>/mcp` with `Authorization: Bearer <token>`.
-   **Settings → Agent access** shows ready-to-copy configuration for Claude Code,
+   **Settings › API & agents** shows ready-to-copy configuration for Claude Code,
    Codex and JSON-based clients (see [Agents and MCP](agents.md)). Set `OPENINGS_URL` and `OPENINGS_TOKEN` in
    the agent's environment for REST and file transfers; set `OPENINGS_CA_FILE`
    when the server uses a private certificate authority.
@@ -83,7 +83,7 @@ change.
 
 Talk to the agent in its own chat and ask for anything in plain language: "what
 should I apply to today?", "add these companies", "I got an interview at X",
-"make the CV stronger for data roles". **Settings › Skills** lists what you can
+"make the CV stronger for data roles". **Settings › API & agents** lists what you can
 ask your agent, with an example phrase for each skill. Between conversations, a
 scheduled or recurring agent session can review new jobs and prepare
 applications. The agent reports in the chat what changed, what is left and which

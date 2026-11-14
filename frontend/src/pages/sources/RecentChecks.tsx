@@ -78,7 +78,7 @@ function Checks() {
               >
                 Stop
               </Button>
-            ) : failed && tasks.length ? (
+            ) : failed && tasks.length && check.source_id ? (
               <Button
                 size="sm"
                 variant="ghost"

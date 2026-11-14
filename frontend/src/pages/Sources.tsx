@@ -64,7 +64,9 @@ export default function SourcesScreen() {
   const sources = useSources();
   const labels = useKindLabels();
   const toast = useToast();
+  // The last opened form stays drawn while the drawer closes.
   const [editing, setEditing] = useState<Editing | null>(null);
+  const [editorOpen, setEditorOpen] = useState(false);
   const [opened, setOpened] = useState(0);
   const [removing, setRemoving] = useState<SourceView | null>(null);
   const [details, setDetails] = useState<SourceView | null>(null);
@@ -81,6 +83,7 @@ export default function SourcesScreen() {
   const open = (next: Omit<Editing, "key">) => {
     setOpened((count) => count + 1);
     setEditing({ ...next, key: opened + 1 });
+    setEditorOpen(true);
   };
   const failed = (error: Error) =>
     toast.show({ message: error.message, tone: "error" });
@@ -141,8 +144,7 @@ export default function SourcesScreen() {
     const source = byId(id);
     if (source) action(source);
   };
-  const tabStop =
-    activeId && byId(activeId) ? activeId : (list[0]?.id ?? null);
+  const tabStop = activeId && byId(activeId) ? activeId : (list[0]?.id ?? null);
 
   return (
     <div className="src-screen">
@@ -248,8 +250,8 @@ export default function SourcesScreen() {
       )}
       <SourceEditor
         key={editing?.key ?? 0}
-        open={!!editing}
-        onClose={() => setEditing(null)}
+        open={editorOpen}
+        onClose={() => setEditorOpen(false)}
         source={editing?.source}
         template={editing?.template}
         initialKind={editing?.kind}
@@ -308,7 +310,10 @@ function ScheduleLine({
   const on = collection.data?.enabled ?? true;
   const next = collection.data?.next_run_at;
   const versions = (items: SourceView[]) =>
-    items.map((source) => ({ id: source.id, expected_version: source.version }));
+    items.map((source) => ({
+      id: source.id,
+      expected_version: source.version,
+    }));
   const failed = (error: Error) =>
     toast.show({ message: error.message, tone: "error" });
   const checkable = sources.filter((source) => source.automatic_collection);
@@ -491,8 +496,8 @@ function CheckDetails({
             ]}
           />
           <p className="src-details-note">
-            A site that blocks or limits requests usually works again later.
-            If it keeps failing, edit the source or check the address.
+            A site that blocks or limits requests usually works again later. If
+            it keeps failing, edit the source or check the address.
           </p>
         </>
       )}

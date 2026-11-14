@@ -1,7 +1,6 @@
 import { test, expect, type Page } from "./fixtures";
 import {
   call,
-  card,
   fitsViewport,
   go,
   isNarrow,
@@ -77,8 +76,12 @@ test("a new workspace opens on the setup guide, which is skipped, continued and 
   await expect(
     steps(page).getByRole("tab", { name: /Connect your agent/ }),
   ).toHaveAttribute("aria-selected", "true");
-  await expect(card(page, "Create a token")).toBeVisible();
-  await expect(card(page, "Connect an agent")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Create an agent token" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "MCP configuration" }),
+  ).toBeVisible();
   // The steps move with the arrow keys.
   await steps(page)
     .getByRole("tab", { name: /Connect your agent/ })
@@ -111,11 +114,9 @@ test("a new workspace opens on the setup guide, which is skipped, continued and 
   await expect(banner).toHaveCount(0);
   await page.goto("/");
   await expect(page.locator("h1:visible")).toHaveText("Today");
-  // Settings, Workspace opens it again.
-  await go(page, "settings?section=workspace");
-  await card(page, "Setup guide")
-    .getByRole("link", { name: "Open the setup guide" })
-    .click();
+  // Settings, Account opens it again.
+  await go(page, "settings?section=account");
+  await page.getByRole("link", { name: "Open setup guide" }).click();
   await expect(page).toHaveURL(/#setup$/);
   await expect(page.locator("h1:visible")).toHaveText("Set up your workspace");
   // A browser that saw a populated workspace first never opens it. (WebKit
@@ -203,20 +204,18 @@ test("the setup guide reads the workspace and fills in the basics", async ({
   await part(page, "First searches")
     .getByRole("button", { name: "Add a search" })
     .click();
-  const editor = page.locator("section", {
-    has: page.getByRole("heading", { name: "New search" }),
-  });
+  const editor = page.getByRole("dialog", { name: "Add a source" });
   await editor.getByLabel("Name", { exact: true }).fill(name);
   await editor.getByLabel("Keywords").fill("synthetic engineer");
   await editor.getByLabel("Location", { exact: true }).fill("Zurich");
   await editor.getByLabel("Country").fill("switzerland");
-  await editor.getByRole("button", { name: "Save the search" }).click();
-  await toast(page, "Search saved.");
-  await expect(editor).toHaveCount(0);
+  await editor.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.locator(".ui-toast")).toContainText(`Added “${name}”`);
+  await expect(editor).toBeHidden();
   const source = (
     await call(page, "/sources?summary=false&limit=200")
   ).items.find((item: { name: string }) => item.name === name);
-  expect(source.enabled).toBe(false);
+  expect(source.config).toMatchObject({ query: "synthetic engineer" });
   await call(
     page,
     `/sources/${source.id}?expected_version=${source.version}`,
@@ -235,15 +234,19 @@ test("the setup guide reads the workspace and fills in the basics", async ({
       hasText: used ? "Connected." : "Waiting for your agent's first call",
     }),
   ).toBeVisible();
-  const create = card(page, "Create a token");
   const tokenName = unique("Setup agent");
-  await create.getByLabel("Token name").fill(tokenName);
-  await create.getByRole("button", { name: "Create", exact: true }).click();
-  await expect(create.locator("pre.secret")).toHaveText(/^op_/);
+  await page.getByRole("button", { name: "Create an agent token" }).click();
+  const create = page.getByRole("dialog", { name: "New token" });
+  await create.getByLabel("Name", { exact: true }).fill(tokenName);
+  await create.getByRole("button", { name: "Create token" }).click();
   await expect(
-    card(page, "Connect an agent").getByLabel("MCP configuration", {
-      exact: true,
-    }),
+    page
+      .getByRole("dialog", { name: "Copy your token" })
+      .getByRole("region", { name: "Token" }),
+  ).toHaveText(/^op_/);
+  await page.getByRole("button", { name: "Done" }).click();
+  await expect(
+    page.getByRole("region", { name: "MCP configuration" }),
   ).toContainText("/mcp");
   const token = (await call(page, "/tokens")).items.find(
     (item: { name: string }) => item.name === tokenName,

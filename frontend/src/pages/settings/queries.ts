@@ -70,8 +70,13 @@ export function useSkills() {
   return useQuery({
     queryKey: settingsKeys.skills,
     staleTime: Infinity,
-    queryFn: async ({ signal }) =>
-      (await call(api.GET("/api/v1/skills", { signal }))).items,
+    queryFn: async ({ signal }) => {
+      // Without a name, the read is the list of skills.
+      const list = (await call(
+        api.GET("/api/v1/skills", { signal }),
+      )) as Schema<"SkillList">;
+      return list.items;
+    },
   });
 }
 
@@ -138,10 +143,7 @@ export function useProviders(enabled = true) {
 export function useUpdateProvider() {
   return useApiMutation({
     touches: ["providers"],
-    mutationFn: ({
-      id,
-      ...body
-    }: Schema<"ProviderPatch"> & { id: string }) =>
+    mutationFn: ({ id, ...body }: Schema<"ProviderPatch"> & { id: string }) =>
       call(
         api.PATCH("/api/v1/providers/{provider_id}", {
           params: { path: { provider_id: id } },
