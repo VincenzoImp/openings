@@ -10,11 +10,8 @@
 // Interim: the first screen still carries the old data layer and component
 // helpers (src/state.tsx, src/api.ts, src/design) that Today and the other
 // old screens need, and the old screens weigh on all JS. Until they are
-// rebuilt (#222–#227) the budgets are 120 kB and 214 kB; #228 deletes the old
-// code and sets them back to 85 kB and 160 kB. A rebuilt screen loads the
-// design system's primitives as chunks of their own while the old modules
-// stay, and their stylesheets split per chunk: the stylesheet budget is 24 kB
-// until #228 too.
+// rebuilt (#222–#227) the budgets are 120 kB and 222 kB; #228 deletes the old
+// code and sets them back to 85 kB and 160 kB.
 //
 // Sizes are gzip (level 9) in kB of 1000 bytes, as Vite reports them. The
 // design system gallery (ui.html) is not part of the dashboard: its size is
@@ -26,8 +23,13 @@ const KB = 1000;
 const BUDGET = {
   first: 120 * KB, // 85 kB once #228 deletes the old screens' code
   later: 30 * KB,
-  all: 214 * KB, // 160 kB once #228 deletes the old screens' code
-  css: 24 * KB, // lowered again in #228
+  // A rebuilt screen brings its own design-system modules while the old
+  // library it no longer uses stays loaded for the others (Profile #225,
+  // Jobs #223).
+  all: 222 * KB, // 160 kB once #228 deletes the old screens' code
+  // The shared ui stylesheets are split per screen chunk while the old
+  // stylesheet stays loaded: 20 kB, lowered again in #228.
+  css: 27 * KB,
 };
 const HOME = "src/screens/today/Today.tsx";
 
