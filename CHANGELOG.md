@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.24.1 — 2026-11-14
+
+Smoother document uploads for agents and cleaner document text. No schema change.
 
 - Upload and download grants carry an absolute `url` on the public origin (`OPENINGS_PUBLIC_URL`, else the origin the request reached), so an agent uploads with the returned URL alone.
 - Text read from a TeX source leaves out the lengths and glue of spacing commands (such as `0pt plus .4pt`), and text from a TeX source or a PDF writes ligatures (ﬁ, ﬂ, ﬀ) as plain letters. Revisions stored earlier keep their text.
