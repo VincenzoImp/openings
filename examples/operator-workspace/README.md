@@ -4,7 +4,7 @@ A small directory from which your AI agent runs your Openings job search. Copy
 it, point it at your server, start your agent here, and let it work: it reads
 the skills from your Openings server, onboards your career and keeps the search
 going. You answer its questions in the chat, apply to the applications it makes Ready, and mark them
-Applied or close them. See [Agent-operated job search](../../docs/user/agent-operated.md).
+Applied or close them. See [Work with an agent](../../docs/user/agents.md). This template is optional.
 
 ## Set up
 
