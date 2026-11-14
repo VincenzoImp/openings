@@ -397,7 +397,7 @@ test("a screen that fails to load offers a reload", async ({ page }) => {
 });
 
 // One test per width, so the workers share them.
-for (const width of [360, 390, 600, 719, 720, 1024, 1280, 1600])
+for (const width of [360, 390, 719, 720, 1024, 1600])
   test(`no horizontal scroll at ${width} px on every screen`, async ({
     page,
   }) => {

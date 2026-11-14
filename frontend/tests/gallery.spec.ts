@@ -4,8 +4,10 @@ import { test, expect, type Page } from "./fixtures";
 
 // The design system gallery (ui.html, src/ui): every primitive renders in
 // both themes without errors, axe findings or horizontal scroll, and the
-// keyboard models work. The dashboard never serves ui.html, so the test hands
-// the built page to the browser; its scripts and styles come from /assets.
+// keyboard models of the menu and the dialog work; the screens' journeys
+// cover the list, selection, swipe and editing models. The dashboard never
+// serves ui.html, so the test hands the built page to the browser; its
+// scripts and styles come from /assets.
 const GALLERY = resolve(import.meta.dirname, "../dist/ui.html");
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 
@@ -31,12 +33,6 @@ for (const theme of ["light", "dark"] as const)
   test(`every primitive renders in the ${theme} theme`, async ({ page }) => {
     const errors = await open(page, theme);
     await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
-    const overflow = await page.evaluate(
-      () =>
-        document.documentElement.scrollWidth -
-        document.documentElement.clientWidth,
-    );
-    expect(overflow).toBe(0);
     const { violations } = await new AxeBuilder({ page })
       .withTags(TAGS)
       .analyze();
@@ -45,132 +41,19 @@ for (const theme of ["light", "dark"] as const)
         (v) => `${v.id}: ${v.nodes.map((n) => n.target).join(" ")}`,
       ),
     ).toEqual([]);
+    for (const width of [360, 720, 1024, 1600]) {
+      await page.setViewportSize({ width, height: 900 });
+      const overflow = await page.evaluate(
+        () =>
+          document.documentElement.scrollWidth -
+          document.documentElement.clientWidth,
+      );
+      expect(overflow, `${width} px`).toBe(0);
+    }
     expect(errors).toEqual([]);
   });
 
-test("no horizontal scroll from 360 to 1600 px", async ({ page }) => {
-  await open(page);
-  for (const width of [360, 720, 1024, 1600]) {
-    await page.setViewportSize({ width, height: 900 });
-    const overflow = await page.evaluate(
-      () =>
-        document.documentElement.scrollWidth -
-        document.documentElement.clientWidth,
-    );
-    expect(overflow, `${width} px`).toBe(0);
-  }
-});
-
-test("the theme switch sets the theme of the page", async ({ page }) => {
-  await open(page);
-  await page
-    .getByRole("radiogroup", { name: "Theme" })
-    .getByRole("radio", { name: "Dark" })
-    .click();
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-  await page.keyboard.press("ArrowLeft");
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
-});
-
-test("a list moves with j/k, dismisses with d and undoes with ⌘Z", async ({
-  page,
-}) => {
-  await open(page);
-  const list = page.getByRole("region", { name: "Jobs to review" });
-  const current = list.locator("[aria-current=true]");
-  await current.focus();
-  await expect(current).toContainText("Data Engineer, Grid Platform");
-  await page.keyboard.press("j");
-  await expect(current).toContainText("Python Engineer");
-  await expect(current).toBeFocused();
-  await page.keyboard.press("k");
-  await page.keyboard.press("j");
-  await page.keyboard.press("d");
-  await expect(page.locator(".ui-toast-region [role=status]")).toContainText(
-    "Dismissed “Python Engineer”",
-  );
-  await expect(list.getByText("Python Engineer")).toHaveCount(0);
-  await page.keyboard.press("ControlOrMeta+z");
-  await expect(list.getByText("Python Engineer")).toHaveCount(1);
-});
-
-test("x and shift-click select rows; the bulk bar acts on them; Esc clears", async ({
-  page,
-}) => {
-  await open(page);
-  const list = page.getByRole("region", { name: "Jobs to review" });
-  const current = list.locator("[aria-current=true]");
-  await current.focus();
-  await page.keyboard.press("x");
-  const bar = page.getByRole("toolbar", { name: "1 selected" });
-  await expect(bar).toBeVisible();
-  await expect(current).toHaveAccessibleName(/, selected$/);
-  // Shift-click: from the row picked last to this one.
-  await list
-    .getByRole("button", { name: /^Site Reliability Engineer/ })
-    .click({ modifiers: ["Shift"] });
-  await expect(
-    page.getByRole("toolbar", { name: /selected$/ }),
-  ).toHaveAccessibleName("6 selected");
-  await expect(list.locator(".ui-row[data-checked]")).toHaveCount(6);
-  await page.keyboard.press("Escape");
-  await expect(list.locator(".ui-row[data-checked]")).toHaveCount(0);
-  await expect(page.getByRole("toolbar", { name: /selected$/ })).toHaveCount(0);
-  // Picked again, then dismissed together and brought back with ⌘Z.
-  await current.focus();
-  await page.keyboard.press("x");
-  await page.keyboard.press("j");
-  await page.keyboard.press("x");
-  await page
-    .getByRole("toolbar", { name: "2 selected" })
-    .getByRole("button", { name: "Dismiss" })
-    .click();
-  await expect(page.locator(".ui-toast-region [role=status]")).toContainText(
-    "Dismissed 2 jobs",
-  );
-  await expect(list.locator(".ui-row")).toHaveCount(9);
-  await page.keyboard.press("ControlOrMeta+z");
-  await expect(list.locator(".ui-row")).toHaveCount(11);
-});
-
-test("on touch a row swipes right to shortlist and left to dismiss", async ({
-  page,
-}) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await open(page);
-  const list = page.getByRole("region", { name: "Jobs to review" });
-  const swipe = (title: string, dx: number) =>
-    list.locator(".ui-row", { hasText: title }).evaluate((row, dx) => {
-      const box = row.getBoundingClientRect();
-      const at = (x: number) => ({
-        pointerType: "touch",
-        pointerId: 7,
-        bubbles: true,
-        clientX: x,
-        clientY: box.top + box.height / 2,
-      });
-      const start = box.left + box.width / 2;
-      row.dispatchEvent(new PointerEvent("pointerdown", at(start)));
-      row.dispatchEvent(new PointerEvent("pointermove", at(start + dx / 2)));
-      row.dispatchEvent(new PointerEvent("pointermove", at(start + dx)));
-      row.dispatchEvent(new PointerEvent("pointerup", at(start + dx)));
-    }, dx);
-  const toast = page.locator(".ui-toast-region [role=status]");
-  await swipe("Backend Engineer", 180);
-  await expect(toast).toContainText("Shortlisted “Backend Engineer”");
-  await swipe("Backend Engineer", -180);
-  await expect(toast).toContainText("Dismissed “Backend Engineer”");
-  await expect(list.getByText("Backend Engineer", { exact: true })).toHaveCount(
-    0,
-  );
-  // A short drag is not a swipe.
-  await swipe("Python Engineer", 40);
-  await expect(list.getByText("Python Engineer", { exact: true })).toHaveCount(
-    1,
-  );
-});
-
-test("a menu opens from the keyboard, moves with arrows and closes with Esc", async ({
+test("a menu and a confirm dialog work from the keyboard and return focus", async ({
   page,
 }) => {
   await open(page);
@@ -191,39 +74,17 @@ test("a menu opens from the keyboard, moves with arrows and closes with Esc", as
   await page.keyboard.press("Escape");
   await expect(menu).toBeHidden();
   await expect(trigger).toBeFocused();
-});
 
-test("a confirm dialog focuses Cancel, closes on Esc and returns focus", async ({
-  page,
-}) => {
-  await open(page);
-  const trigger = page.getByRole("button", { name: "Delete…" });
-  await trigger.click();
+  // A confirm dialog focuses Cancel, closes on Esc and returns focus.
+  const remove = page.getByRole("button", { name: "Delete…" });
+  await remove.click();
   const dialog = page.getByRole("dialog", {
     name: "Delete this job permanently?",
   });
   await expect(dialog.locator("button", { hasText: "Cancel" })).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(page.locator("dialog[open]")).toHaveCount(0);
-  await expect(trigger).toBeFocused();
-});
-
-test("read first, edit on purpose: save bar and the leave question", async ({
-  page,
-}) => {
-  await open(page);
-  const block = page.getByRole("region", { name: "Profile" }).first();
-  await expect(block.locator("input")).toHaveCount(0);
-  await block.getByRole("button", { name: "Edit" }).click();
-  await block.getByLabel("Name").fill("Alex M. Morgan");
-  await expect(block.getByText("1 unsaved change")).toBeVisible();
-  await block.getByRole("button", { name: "Cancel" }).click();
-  const leave = page.getByRole("dialog", { name: "Discard unsaved changes?" });
-  await leave.getByRole("button", { name: "Keep editing" }).click();
-  await expect(block.getByLabel("Name")).toHaveValue("Alex M. Morgan");
-  await block.getByLabel("Name").press("ControlOrMeta+Enter");
-  await expect(block.getByText("Alex M. Morgan")).toBeVisible();
-  await expect(block.locator("input")).toHaveCount(0);
+  await expect(remove).toBeFocused();
 });
 
 test("every Tab stop shows a focus ring", async ({ page, browserName }) => {

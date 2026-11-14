@@ -40,7 +40,7 @@ async function entryByTitle(page: Page, title: string) {
 const highlightsOf = async (page: Page, id: string) =>
   (await call(page, `/career/claims?summary=false&career_id=${id}`)).items;
 
-test("the profile reads as a CV: no fields, one primary button, no internals", async ({
+test("the profile reads as a CV and approves a highlight in place", async ({
   page,
 }) => {
   await go(page, "profile");
@@ -69,6 +69,18 @@ test("the profile reads as a CV: no fields, one primary button, no internals", a
   await expect(
     main.locator("#pf-skills").getByText("Python", { exact: true }),
   ).toHaveCount(1);
+  // A highlight is approved from the read view.
+  const id = (await entryByTitle(page, SENIOR)).id;
+  await page
+    .getByRole("button", {
+      name: "Approve: Led the migration of 14 pipelines to a new scheduler.",
+    })
+    .first()
+    .click();
+  await toast(page, "Approved the highlight");
+  expect(
+    (await highlightsOf(page, id)).every((item: any) => item.approved),
+  ).toBe(true);
 });
 
 test("the header is edited and cancelled; leaving with changes asks first", async ({
@@ -182,21 +194,6 @@ test("highlights are added, approved, starred and reordered inside their entry",
   const added = items.find((item: any) => item.text.startsWith("Mentored"));
   expect(added).toMatchObject({ approved: true, always_include: true });
   expect(items.every((item: any) => item.approved)).toBe(true);
-});
-
-test("a highlight is approved from the read view", async ({ page }) => {
-  await go(page, "profile");
-  const id = (await entryByTitle(page, SENIOR)).id;
-  await page
-    .getByRole("button", {
-      name: "Approve: Led the migration of 14 pipelines to a new scheduler.",
-    })
-    .first()
-    .click();
-  await toast(page, "Approved the highlight");
-  expect(
-    (await highlightsOf(page, id)).every((item: any) => item.approved),
-  ).toBe(true);
 });
 
 test("an entry is added where its dates put it", async ({ page }) => {
