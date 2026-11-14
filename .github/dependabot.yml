@@ -10,7 +10,7 @@ updates:
         update-types: [minor, patch]
 
   - package-ecosystem: npm
-    directories: [/frontend, /frontend/tools/openapi]
+    directory: /frontend
     schedule:
       interval: weekly
     ignore:
@@ -18,6 +18,18 @@ updates:
       # version (ci.yml, weekly.yml, screenshots.yml), which Dependabot does not
       # update. Bump both by hand together; ci.yml checks that they match.
       - dependency-name: "@playwright/test"
+    groups:
+      npm-minor-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /frontend/tools/openapi
+    schedule:
+      interval: weekly
+    ignore:
+      # openapi-typescript needs TypeScript 5; the dashboard itself builds with 7.
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
     groups:
       npm-minor-patch:
         update-types: [minor, patch]
