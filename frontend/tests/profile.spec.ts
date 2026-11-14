@@ -58,7 +58,9 @@ test("the profile reads as a CV: no fields, one primary button, no internals", a
 }) => {
   await go(page, "profile");
   const main = page.locator("#content");
-  await expect(main.getByText("Alex Morgan", { exact: true })).toBeVisible();
+  await expect(
+    main.getByText("Alex Morgan", { exact: true }).first(),
+  ).toBeVisible();
   await expect(
     main.getByRole("heading", { name: SENIOR, exact: true }),
   ).toBeVisible();
