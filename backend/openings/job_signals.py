@@ -25,7 +25,6 @@ import json
 import logging
 import threading
 
-from .actors import pop_actor
 from .collectors.catalog import COMPANY_KINDS
 from .common import encode, now
 from .duplicates import confidence_tier
@@ -46,25 +45,23 @@ UNLISTED_SQL = (
     "(SELECT max(p.unlisted_at) FROM postings p WHERE p.job_id={alias}.id "
     "AND p.unlisted_at IS NOT NULL)"
 )
-DISMISSAL_COLUMNS = (
-    "dismissed_at",
-    "dismissed_by_kind",
-    "dismissed_by_id",
-    "dismissed_by_name",
-    "dismissed_by_token_kind",
-    "dismissed_reason",
-)
-# Who dismissed a job, as the Dismissed tab groups it.
+DISMISSAL_COLUMNS = ("dismissed_at", "dismissed_by", "dismissed_reason")
+# Who dismissed a job (its actor label), as the Dismissed tab groups it. A job
+# dismissed without a record (before 0.21) counts as system.
 DISMISSED_BY = {
-    "agent": "j.dismissed_by_kind='token' AND j.dismissed_by_token_kind='agent'",
-    "owner": "(j.dismissed_by_kind='owner' OR "
-    "(j.dismissed_by_kind='token' AND coalesce(j.dismissed_by_token_kind,'owner')='owner'))",
+    "agent": "j.dismissed_by LIKE 'agent:%'",
+    "owner": "j.dismissed_by='owner'",
+    "system": "coalesce(j.dismissed_by,'system')='system'",
 }
-# Without a record (dismissed before 0.21 without an event) the conditions above
-# are NULL, not false: coalesce so that those jobs count as other.
-DISMISSED_BY["other"] = (
-    "NOT (" + " OR ".join(f"coalesce(({sql}),0)" for sql in DISMISSED_BY.values()) + ")"
-)
+
+
+def dismissed_by_category(label):
+    """owner, agent or system for an actor label (None counts as system)."""
+    if label and label.startswith("agent:"):
+        return "agent"
+    return "owner" if label == "owner" else "system"
+
+
 SIGNAL_FILTERS = {
     "likely_duplicate": "EXISTS(SELECT 1 FROM job_signals s WHERE s.job_id=j.id "
     "AND s.duplicate_of IS NOT NULL)",
@@ -116,24 +113,10 @@ def dismissal_record(row):
     values = {name: row.pop(name, None) for name in DISMISSAL_COLUMNS}
     if row.get("triage") != "dismissed":
         return None
-    by = pop_actor(
-        {
-            f"dismissed_by_{suffix}": values[f"dismissed_by_{suffix}"]
-            for suffix in ("kind", "id", "name", "token_kind")
-        },
-        "dismissed_by",
-    )
-    category = (
-        "agent"
-        if by["kind"] == "token" and by["token_kind"] == "agent"
-        else "owner"
-        if by["kind"] == "owner" or (by["kind"] == "token")
-        else "other"
-    )
     return {
         "at": values["dismissed_at"],
-        "by": by,
-        "category": category,
+        "by": values["dismissed_by"],
+        "category": dismissed_by_category(values["dismissed_by"]),
         "reason": values["dismissed_reason"] or "",
     }
 

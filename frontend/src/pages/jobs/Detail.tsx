@@ -12,7 +12,7 @@ import {
 import { dayTime } from "../../library/time";
 import { useFresh } from "../../library/useFresh";
 import { useWorkspace } from "../../state";
-import type { Links } from "../activity/records";
+import type { Links } from "../../library/records";
 import { stageLabels, outcomeLabels } from "../applications/model";
 import { reviewHref } from "../applications/links";
 import { DismissDialog } from "./DismissDialog";
@@ -378,10 +378,7 @@ export function Detail({
       <div className="body stack">
         <Signals job={job} own={own} />
         {job.dismissal && (
-          <Banner
-            tone="neutral"
-            title={`Dismissed by ${dismissedBy(job).replace(/^You$/, "you")}`}
-          >
+          <Banner tone="neutral" title={dismissedBy(job)}>
             {[dayTime(job.dismissal.at), job.dismissal.reason]
               .filter(Boolean)
               .join(" · ") || "No reason was given."}

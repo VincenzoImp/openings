@@ -96,7 +96,6 @@ test("keyboard only: the sidebar reaches every destination in its group", async 
     /^Today/,
     /^Applications/,
     /^Jobs/,
-    /^Activity/,
     /^Career/,
     /^Preferences/,
     /^Templates/,
@@ -106,7 +105,7 @@ test("keyboard only: the sidebar reaches every destination in its group", async 
   // Tab walks the links in order, starting after the brand.
   await page.getByRole("link", { name: "Openings", exact: true }).focus();
   const order: string[] = [];
-  for (let index = 0; index < 9; index++) {
+  for (let index = 0; index < 8; index++) {
     await page.keyboard.press(tabKey(page));
     order.push((await focused(page)).split(":")[1]);
   }
@@ -114,7 +113,6 @@ test("keyboard only: the sidebar reaches every destination in its group", async 
     "Today",
     "Applications",
     "Jobs",
-    "Activity",
     "Career",
     "Preferences",
     "Templates",
@@ -135,7 +133,7 @@ test("keyboard only: More opens, keeps focus, closes with Escape and navigates",
     /^Today/,
     /^Applications/,
     /^Jobs/,
-    /^Activity/,
+    /^Career/,
   ]);
   const more = page.getByRole("button", { name: "More", exact: true });
   await more.focus();
@@ -144,20 +142,19 @@ test("keyboard only: More opens, keeps focus, closes with Escape and navigates",
   const sheet = page.getByRole("dialog", { name: "More destinations" });
   const links = sheet.getByRole("navigation", { name: "More" });
   await expect(links.getByRole("link")).toHaveText([
-    "Career",
     "Preferences",
     "Templates",
     "Collection",
     "Settings",
   ]);
-  await expect(sheet.getByRole("link", { name: "Career" })).toBeFocused();
+  await expect(sheet.getByRole("link", { name: "Preferences" })).toBeFocused();
   await expect(main(page)).toHaveAttribute("inert", "");
   // Focus stays in the sheet in both directions: back from the first link to
-  // the last one (the agent's status line while a run is open), then forward.
+  // the last one, then forward.
   await page.keyboard.press("Shift+Tab");
   await expect(sheet.getByRole("link").last()).toBeFocused();
   await page.keyboard.press("Tab");
-  await expect(sheet.getByRole("link", { name: "Career" })).toBeFocused();
+  await expect(sheet.getByRole("link", { name: "Preferences" })).toBeFocused();
   // Escape closes it and focus returns to More.
   await page.keyboard.press("Escape");
   await expect(sheet).toHaveCount(0);
@@ -167,7 +164,6 @@ test("keyboard only: More opens, keeps focus, closes with Escape and navigates",
   // Open again and go to Templates: the sheet closes, the screen takes focus
   // and More is the current tab.
   await page.keyboard.press("Enter");
-  await page.keyboard.press("Tab");
   await page.keyboard.press("Tab");
   await expect(sheet.getByRole("link", { name: "Templates" })).toBeFocused();
   await page.keyboard.press("Enter");
@@ -202,11 +198,17 @@ test("each screen has one address; an unknown or retired one opens Today", async
     await expect(page.locator(".main h1")).toHaveText("Today");
     await expect(page).toHaveURL(new RegExp(`#${route}$`));
   }
+  // The Activity page is gone: its address opens Today, and no link leads to it.
+  await go(page, "activity?section=runs");
+  await expect(page.locator(".main h1")).toHaveText("Today");
+  await expect(
+    page.getByRole("navigation", { name: "Main" }).getByRole("link", {
+      name: /^Activity/,
+    }),
+  ).toHaveCount(0);
 });
 
-test("navigation counts come from the workspace and the agent line shows an open run", async ({
-  page,
-}) => {
+test("navigation counts come from the workspace", async ({ page }) => {
   const api = (path: string) =>
     page.evaluate(
       (path) => fetch("/api/v1" + path).then((response) => response.json()),
@@ -222,10 +224,12 @@ test("navigation counts come from the workspace and the agent line shows an open
       new RegExp(`^Applications ?, ${ready} application`),
     );
   else await expect(applications.locator(".count")).toHaveCount(0);
-  // The status line shows exactly when a run is open (the synthetic agent has one).
-  const runs = await api("/runs?status=open&limit=1");
-  if (!isNarrow(page))
-    await expect(page.locator(".sidebar-foot")).toHaveCount(runs.total ? 1 : 0);
+  const fresh = (await api("/jobs?triage=new&limit=1")).total;
+  await expect(
+    page
+      .getByRole("navigation", { name: "Main" })
+      .getByRole("link", { name: /^Jobs/ }),
+  ).toHaveAccessibleName(new RegExp(`^Jobs ?, ${fresh} new jobs?$`));
 });
 
 test("a screen that fails to load offers a reload", async ({ page }) => {
@@ -278,10 +282,6 @@ for (const width of [360, 390, 600, 860, 861, 1024, 1280, 1600])
       [`jobs?job=${flagged.id}`, "Jobs"],
       ["jobs?section=dismissed", "Jobs"],
       ["jobs?section=all", "Jobs"],
-      ["activity", "Activity"],
-      ["activity?section=requests", "Activity"],
-      ["activity?section=runs", "Activity"],
-      ["activity?section=timeline", "Activity"],
       ["career?section=knowledge", "Career"],
       ["career?section=claims", "Career"],
       ["preferences", "Preferences"],
@@ -291,7 +291,7 @@ for (const width of [360, 390, 600, 860, 861, 1024, 1280, 1600])
       ["collection?section=runs", "Collection"],
       ["collection?section=providers", "Collection"],
       ["settings", "Settings"],
-      ["settings?section=skills&skill=prepare-shortlist", "Settings"],
+      ["settings?section=skills", "Settings"],
       ["settings?section=backup", "Settings"],
       ["settings?section=workspace", "Settings"],
     ]) {

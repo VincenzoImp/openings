@@ -9,11 +9,11 @@ from fastapi.testclient import TestClient
 
 from openings import operations, retention
 from openings._vendor.jobspy.model import JobPost
-from openings.activity import ActivityService
 from openings.app import create_app
 from openings.collectors.catalog import COMPANY_KINDS
 from openings.common import encode
 from openings.discovery import DiscoveryService, SourceCreate
+from openings.events import EventLog
 from openings.operations import (
     RESTORE_MARGIN,
     replace_room,
@@ -79,10 +79,10 @@ def test_a_refresh_is_an_event_only_when_a_visible_field_changes(tmp_path):
         {**posting, "title": "Senior Engineer", "location": "Milan", "metadata": {"x": 1}}
     )
     assert kinds(workspace, job_id=job["id"]) == ["job_added", "job_refreshed"]
-    activity = ActivityService(workspace)
-    event = activity.list_events({"kind": "job_refreshed"})["items"][0]
+    activity = EventLog(workspace)
+    event = activity.list_events({"kind": "job_refreshed", "include_system": True})["items"][0]
     assert event["payload"] == {"fields": ["title", "location"]}
-    assert event["subject"]["id"] == job["id"] and event["actor"]["kind"] == "system"
+    assert event["subject"]["id"] == job["id"] and event["actor"] == "system"
     assert activity.list_events({"kind": "posting_updated"})["total"] == 0
 
 
@@ -159,7 +159,7 @@ def add_run(workspace, source_id, days, state="succeeded", name="Synthetic"):
         )
         for kind, subject in (("collection_queued", run_id), ("task_cancelled", task_id)):
             conn.execute(
-                "INSERT INTO events(id,kind,created_at,subject_type,subject_id,actor_kind) "
+                "INSERT INTO events(id,kind,created_at,subject_type,subject_id,actor) "
                 "VALUES(?,?,?,?,?,?)",
                 (
                     uuid4().hex,
@@ -236,19 +236,15 @@ def test_old_finished_runs_go_and_the_recent_ones_of_each_source_stay(collected)
     }
 
 
-def test_pruning_is_bounded_and_keeps_records_of_agent_runs(collected, monkeypatch):
+def test_pruning_is_bounded_and_keeps_records_of_agent_changes(collected, monkeypatch):
     workspace, source = collected
     for number in range(KEPT_RUNS_PER_SOURCE):
         add_run(workspace, source, 1 + number)
     old = [add_run(workspace, source, 100 + number) for number in range(5)]
-    token = uuid4().hex
+    # A change an agent token made stays when its collection run goes.
     workspace.db.execute(
-        "INSERT INTO runs(id,token_id,token_name,workflow,status,started_at,last_activity_at,"
-        "updated_at) VALUES('agent-run',?,?,?,?,?,?,?)",
-        (token, "Agent", "manage-sources", "finished", *[stamp(100)] * 3),
-    )
-    workspace.db.execute(
-        "UPDATE events SET run_id='agent-run' WHERE subject_id=? AND kind='collection_queued'",
+        "UPDATE events SET actor='agent:Agent',batch_id='b_agent' WHERE subject_id=? "
+        "AND kind='collection_queued'",
         (old[0],),
     )
     first = prune(workspace.db, days=90, batch=2)
@@ -258,7 +254,7 @@ def test_pruning_is_bounded_and_keeps_records_of_agent_runs(collected, monkeypat
         passes += 1
     assert passes >= 2
     assert workspace.db.one("SELECT count(*) n FROM collection_runs")["n"] == KEPT_RUNS_PER_SOURCE
-    kept = workspace.db.all("SELECT subject_id FROM events WHERE run_id='agent-run'")
+    kept = workspace.db.all("SELECT subject_id FROM events WHERE batch_id='b_agent'")
     assert kept == [{"subject_id": old[0]}]
     # The setting: a number of days, 0 keeps everything.
     add_run(workspace, None, 400)

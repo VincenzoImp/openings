@@ -5,6 +5,7 @@ in the update's transaction, and the change leaves one event: the reply's, with 
 stage it moved from and to. A correction or a removal never moves the stage.
 """
 
+from .. import events
 from ..actors import current_actor
 from ..common import now
 from ..errors import DomainError, missing
@@ -54,8 +55,13 @@ class ReplyChanges:
             duplicate_reply(conn, row["id"], reply.kind, day)
             reply_id = insert_reply(conn, row["id"], reply.kind, day, reply.note or "")
             payload = {"kind": reply.kind, "date": day, **(moved or {})}
-            self.event(
-                "reply_added", row["job_id"], row["id"], payload, conn, subject=("reply", reply_id)
+            events.record(
+                conn,
+                "reply_added",
+                subject=("reply", reply_id),
+                payload=payload,
+                job_id=row["job_id"],
+                application_id=row["id"],
             )
             return
         current = conn.execute(
@@ -65,13 +71,13 @@ class ReplyChanges:
             missing("Reply")
         if reply.remove:
             conn.execute("DELETE FROM replies WHERE id=?", (reply.id,))
-            self.event(
-                "reply_removed",
-                row["job_id"],
-                row["id"],
-                {"kind": current["kind"], "date": current["date"]},
+            events.record(
                 conn,
+                "reply_removed",
                 subject=("reply", reply.id),
+                payload={"kind": current["kind"], "date": current["date"]},
+                job_id=row["job_id"],
+                application_id=row["id"],
             )
             return
         given = reply.model_dump(include={"kind", "date", "note"}, exclude_unset=True)
@@ -88,17 +94,16 @@ class ReplyChanges:
         conn.execute(
             "UPDATE replies SET "
             + "".join(key + "=?," for key in actual)
-            + "updated_by_kind=?,updated_by_id=?,updated_by_name=?,updated_by_token_kind=?,"
-            "version=version+1,updated_at=? WHERE id=?",
-            (*actual.values(), *current_actor().columns(), now(), reply.id),
+            + "updated_by=?,version=version+1,updated_at=? WHERE id=?",
+            (*actual.values(), current_actor().label, now(), reply.id),
         )
-        self.event(
-            "reply_edited",
-            row["job_id"],
-            row["id"],
-            {"fields": sorted(actual), "version": current["version"] + 1},
+        events.record(
             conn,
+            "reply_edited",
             subject=("reply", reply.id),
+            payload={"fields": sorted(actual), "version": current["version"] + 1},
+            job_id=row["job_id"],
+            application_id=row["id"],
         )
 
     def get_reply(self, reply_id):

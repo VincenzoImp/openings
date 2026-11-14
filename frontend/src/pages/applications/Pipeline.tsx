@@ -4,7 +4,6 @@ import {
   type Application,
   type BulkResult,
   type ListResult,
-  type OwnerQuestion,
 } from "../../api";
 import {
   Banner,
@@ -68,15 +67,6 @@ export function Pipeline({
     `/applications?${counted}`,
     NONE,
     SCOPES,
-  );
-  const questions = useFresh<ListResult<OwnerQuestion>>(
-    "/questions?state=open&subject_type=application&limit=200",
-    NONE,
-    ["questions"],
-  );
-  const asked = useMemo(
-    () => new Set(questions.data.items.map((item) => item.subject?.id || "")),
-    [questions.data],
   );
   const [selection, setSelection] = useState<Record<string, number>>({});
   const [failures, setFailures] = useState<string[]>([]);
@@ -351,7 +341,6 @@ export function Pipeline({
                     )
                   }
                   primary={application === firstReady}
-                  asked={asked.has(application.id)}
                   open={open === application.id}
                   onRespond={(show) => setOpen(show ? application.id : null)}
                   reload={list.reload}

@@ -135,7 +135,7 @@ def test_replies_are_corrected_and_removed_through_the_same_update(workspace):
     with acting_as(agent):
         recorded = reply(workspace, sent, kind="interview", date=days_ago(3), note="Call.")
     first = recorded["replies"][0]
-    assert first["created_by"]["token_kind"] == "agent" and first["version"] == 1
+    assert first["created_by"] == "agent:Synthetic agent" and first["version"] == 1
     before = last_rowid(workspace)
     corrected = reply(workspace, sent, id=first["id"], date=days_ago(4), note="Second round.")
     assert corrected["status"] == "interview"

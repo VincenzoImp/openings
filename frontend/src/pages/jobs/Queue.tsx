@@ -1,12 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import {
-  api,
-  type BulkResult,
-  type JobCounts,
-  type JobList,
-  type ListResult,
-  type OwnerQuestion,
-} from "../../api";
+import { useEffect, useState } from "react";
+import { api, type BulkResult, type JobCounts, type JobList } from "../../api";
 import {
   Banner,
   Button,
@@ -81,15 +74,6 @@ export function Queue({
   const query = listQuery({ ...filters, q }, LIMIT);
   if (section === "all") query.set("include_facets", "true");
   const list = useFresh<JobList>(`/jobs?${query}`, NONE, JOB_SCOPES);
-  const questions = useFresh<ListResult<OwnerQuestion>>(
-    "/questions?state=open&subject_type=job&limit=200",
-    { items: [], total: 0 },
-    ["questions"],
-  );
-  const asked = useMemo(
-    () => new Set(questions.data.items.map((item) => item.subject?.id || "")),
-    [questions.data],
-  );
   const [selection, setSelection] = useState<Record<string, number>>({});
   const [failures, setFailures] = useState<string[]>([]);
   const offset = Number(filters.offset) || 0;
@@ -385,7 +369,6 @@ export function Queue({
               selected={selection[job.id] !== undefined}
               current={job.id === selected}
               disabled={count >= 200}
-              asked={asked.has(job.id)}
               own={own}
               busy={pending}
               onSelect={onSelect}

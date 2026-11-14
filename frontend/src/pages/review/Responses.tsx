@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { api, localToday, type Application, type Reply } from "../../api";
 import {
-  ActorChip,
+  actorPhrase,
   Button,
   Field,
   Statement,
@@ -132,7 +132,11 @@ export function Responses({
               movable={false}
               editing={editing === reply.id}
               label={`${replyLabels[reply.kind]} · ${day(reply.date)}`}
-              caption={<ActorChip actor={reply.created_by} />}
+              caption={
+                actorPhrase(reply.created_by)
+                  ? `Recorded ${actorPhrase(reply.created_by)}`
+                  : undefined
+              }
               actions={
                 <>
                   <Button

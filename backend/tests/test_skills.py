@@ -18,6 +18,9 @@ def test_library_lists_every_shipped_skill_with_references():
     items = {item["name"]: item for item in SkillLibrary(ROOT).list()}
     assert set(items) == SHIPPED and "setup-openings" in items
     assert all(item["description"] for item in items.values())
+    # What the owner can ask, for the dashboard's "What you can ask your agent".
+    for item in items.values():
+        assert item["title"] and item["summary"] and item["example"], item["name"]
     assert "references/operating-mandate.md" in items["openings-workspace"]["files"]
 
 
@@ -56,10 +59,16 @@ def test_skills_over_rest_and_mcp(tmp_path, monkeypatch):
         assert {item["name"] for item in listed} == SHIPPED
         skill = client.get("/api/v1/skills/review-inbox", headers=rest).json()
         assert skill["content"].startswith("---\nname: review-inbox")
+        assert "local_notes" not in skill and "local_notes" not in listed[0]
+        assert {"title", "summary", "example"} <= set(listed[0])
         reference = client.get(
-            "/api/v1/skills/openings-workspace/files/references/run-report.md", headers=rest
+            "/api/v1/skills/openings-workspace/files/references/operating-mandate.md",
+            headers=rest,
         )
-        assert reference.status_code == 200 and "# Run report" in reference.json()["content"]
+        assert reference.status_code == 200
+        removed = "/api/v1/skills/openings-workspace/files/references/run-report.md"
+        assert client.get(removed, headers=rest).status_code == 404
+        assert client.get("/api/v1/skills/review-inbox/notes", headers=rest).status_code == 404
         assert client.get("/api/v1/skills/nope", headers=rest).status_code == 404
 
         result = rpc(

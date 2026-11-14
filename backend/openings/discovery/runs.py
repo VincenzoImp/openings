@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 
+from .. import events
 from ..collectors import jobspy as jobspy_collector
 from ..collectors.policy import ProviderPatch
 from ..common import check_version, decode_record, encode, missing, new_id, now
@@ -63,13 +64,11 @@ class RunOperations:
                 "INSERT INTO settings(key,data,version,updated_at) VALUES('collection',?,1,?) ON CONFLICT(key) DO UPDATE SET data=excluded.data,version=settings.version+1,updated_at=excluded.updated_at",
                 (encode({"enabled": value.enabled}), stamp),
             )
-            self._record(
+            events.record(
                 connection,
                 "collection_updated",
-                "collection",
-                "collection",
-                enabled=value.enabled,
-                version=current + 1,
+                ("collection", "collection"),
+                {"enabled": value.enabled, "version": current + 1},
             )
         return self.get_collection()
 
@@ -78,14 +77,18 @@ class RunOperations:
 
     def update_provider(self, provider_id, value: ProviderPatch):
         result = self.providers.update(provider_id, value)
-        self._record(
-            None,
-            "provider_updated",
-            "provider",
-            provider_id,
-            fields=sorted(value.model_dump(exclude_unset=True, exclude={"expected_version"})),
-            version=result["version"],
-        )
+        with self.db.transaction() as connection:
+            events.record(
+                connection,
+                "provider_updated",
+                ("provider", provider_id),
+                {
+                    "fields": sorted(
+                        value.model_dump(exclude_unset=True, exclude={"expected_version"})
+                    ),
+                    "version": result["version"],
+                },
+            )
         if result["policy"]["enabled"]:
             # Policy changes may make a previously deferred queued request eligible.
             self.db.execute(
@@ -251,12 +254,11 @@ class RunOperations:
                 (now(), run_id),
             ).rowcount
             if changed:
-                self._record(
+                events.record(
                     connection,
                     "collection_run_cancelled",
-                    "collection_run",
-                    run_id,
-                    source_id=run.get("source_id"),
+                    ("collection_run", run_id),
+                    {"source_id": run.get("source_id")},
                 )
         return self.get_run(run_id)
 
@@ -385,13 +387,11 @@ class RunOperations:
                 )
             else:
                 # Scheduled runs are routine; only a requested run is a recorded change.
-                self._record(
+                events.record(
                     connection,
                     "collection_queued",
-                    "collection_run",
-                    run_id,
-                    source_id=source_id,
-                    overrides=sorted(options),
+                    ("collection_run", run_id),
+                    {"source_id": source_id, "overrides": sorted(options)},
                 )
         task_ids.sort()
         return {**self.get_task(task_ids[0]), "task_ids": task_ids, "run_id": run_id}

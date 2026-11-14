@@ -18,7 +18,7 @@ default. Nothing closes an application automatically.
 
 from datetime import UTC, datetime, timedelta
 
-from .actors import current_actor, pop_actor
+from .actors import current_actor
 from .common import new_id, now
 from .errors import DomainError
 from .preferences import no_reply_days
@@ -50,11 +50,8 @@ def stage_after_reply(status, outcome, kind):
 
 
 def reply_record(row):
-    """A reply as returned by reads."""
-    row = dict(row)
-    row["created_by"] = pop_actor(row, "created_by")
-    row["updated_by"] = pop_actor(row, "updated_by")
-    return row
+    """A reply as returned by reads; created_by and updated_by are actor labels."""
+    return dict(row)
 
 
 def replies_of(conn, application_ids):
@@ -133,20 +130,18 @@ def duplicate_reply(conn, application_id, kind, day, excluding=None):
 
 def insert_reply(conn, application_id, kind, day, note=""):
     """Insert one reply in the caller's transaction; the caller records the event."""
-    reply_id, stamp, actor = new_id(), now(), current_actor()
+    reply_id, stamp, by = new_id(), now(), current_actor().label
     conn.execute(
-        "INSERT INTO replies(id,application_id,kind,date,note,"
-        "created_by_kind,created_by_id,created_by_name,created_by_token_kind,"
-        "updated_by_kind,updated_by_id,updated_by_name,updated_by_token_kind,"
-        "created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO replies(id,application_id,kind,date,note,created_by,updated_by,"
+        "created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
         (
             reply_id,
             application_id,
             kind,
             day,
             note,
-            *actor.columns(),
-            *actor.columns(),
+            by,
+            by,
             stamp,
             stamp,
         ),

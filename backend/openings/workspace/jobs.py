@@ -138,6 +138,8 @@ class JobReads:
         requires=None,
         dismissed_by=None,
         unspoken=None,
+        batch_id=None,
+        since=None,
     ):
         conditions, args = [], []
         if signal:
@@ -160,9 +162,22 @@ class JobReads:
             )
             args.append(normalize_languages([requires])[0])
         if dismissed_by:
-            if dismissed_by not in DISMISSED_BY:
-                raise DomainError(422, "dismissed_by", "Choose agent, owner or other.")
-            conditions.append("j.triage='dismissed' AND " + DISMISSED_BY[dismissed_by])
+            if dismissed_by in DISMISSED_BY:
+                conditions.append("j.triage='dismissed' AND " + DISMISSED_BY[dismissed_by])
+            elif dismissed_by.startswith("agent:") and len(dismissed_by) > len("agent:"):
+                conditions.append("j.triage='dismissed' AND j.dismissed_by=?")
+                args.append(dismissed_by)
+            else:
+                raise DomainError(
+                    422, "dismissed_by", "Choose owner, agent, system or agent:<token name>."
+                )
+        if batch_id:
+            # Jobs changed by one REST request or MCP tool call.
+            conditions.append("EXISTS(SELECT 1 FROM events e WHERE e.job_id=j.id AND e.batch_id=?)")
+            args.append(batch_id)
+        if since:
+            conditions.append("j.triage='dismissed' AND j.dismissed_at>=?")
+            args.append(since)
         if unspoken:
             conditions.append("NOT " + unspoken_sql(unspoken))
             args.extend(unspoken)
@@ -225,6 +240,8 @@ class JobReads:
         dismissed_by=None,
         include_counts=False,
         hide_unspoken_required=None,
+        batch_id=None,
+        since=None,
     ):
         limit, offset = min(max(int(limit), 1), 200), max(int(offset), 0)
         signal_filters = {
@@ -249,6 +266,8 @@ class JobReads:
                 created_until,
                 complete,
                 dismissed_by=dismissed_by,
+                batch_id=batch_id,
+                since=since,
                 **signal_filters,
             )
             base = " FROM jobs j"
@@ -291,6 +310,8 @@ class JobReads:
                     created_until=created_until,
                     complete=complete,
                     dismissed_by=dismissed_by,
+                    batch_id=batch_id,
+                    since=since,
                     **{**signal_filters, "unspoken": None},
                 )
             if include_counts:

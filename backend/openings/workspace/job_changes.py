@@ -4,6 +4,7 @@ import hashlib
 import json
 from urllib.parse import urlsplit
 
+from .. import events
 from ..actors import current_actor
 from ..common import check_version, new_id, now
 from ..db import collect_unused, encode
@@ -83,8 +84,8 @@ class JobChanges:
                         stamp,
                     ),
                 )
-                self.event(
-                    "job_added", job_id, payload={"title": title, "company": company}, conn=c
+                events.record(
+                    c, "job_added", payload={"title": title, "company": company}, job_id=job_id
                 )
                 store_text_signals(c, job_id, title, value.posting, 1, stamp)
             else:
@@ -128,7 +129,7 @@ class JobChanges:
                     # A re-sighting is recorded on the observation (last_seen_at) only.
                     visible = [key for key in updates if key in REFRESH_FIELDS]
                     if visible:
-                        self.event(REFRESH_EVENT, job_id, payload={"fields": visible}, conn=c)
+                        events.record(c, REFRESH_EVENT, payload={"fields": visible}, job_id=job_id)
                     if "title" in updates or "posting" in updates:
                         self._refresh_text_signals(c, job_id)
             c.executemany(
@@ -227,7 +228,7 @@ class JobChanges:
                     )
                 if "title" in actual or "posting" in actual:
                     self._refresh_text_signals(c, job_id)
-                self.event("job_edited", job_id, payload={"fields": list(actual)}, conn=c)
+                events.record(c, "job_edited", payload={"fields": list(actual)}, job_id=job_id)
         return self.job_summary(job_id)
 
     def set_triage(self, job_id, triage, expected_version, reason=None):
@@ -254,7 +255,9 @@ class JobChanges:
                     "UPDATE jobs SET dismissed_reason=?,version=version+1,updated_at=? WHERE id=?",
                     (reason, now(), job_id),
                 )
-                self.event("job_edited", job_id, payload={"fields": ["dismissed_reason"]}, conn=c)
+                events.record(
+                    c, "job_edited", payload={"fields": ["dismissed_reason"]}, job_id=job_id
+                )
         return self.job_summary(job_id)
 
     def _triage(self, conn, row, triage, actor, reason=""):
@@ -262,13 +265,12 @@ class JobChanges:
         stamp = now()
         if triage == "dismissed":
             conn.execute(
-                "UPDATE jobs SET triage=?,dismissed_at=?,dismissed_by_kind=?,dismissed_by_id=?,"
-                "dismissed_by_name=?,dismissed_by_token_kind=?,"
+                "UPDATE jobs SET triage=?,dismissed_at=?,dismissed_by=?,"
                 "dismissed_reason=?,version=version+1,updated_at=? WHERE id=?",
                 (
                     triage,
                     stamp,
-                    *actor.columns(),
+                    actor.label,
                     reason,
                     stamp,
                     row["id"],
@@ -280,14 +282,12 @@ class JobChanges:
             )
         else:
             conn.execute(
-                "UPDATE jobs SET triage=?,dismissed_at=NULL,dismissed_by_kind=NULL,"
-                "dismissed_by_id=NULL,dismissed_by_name=NULL,dismissed_by_token_kind=NULL,"
-                "dismissed_reason='',"
+                "UPDATE jobs SET triage=?,dismissed_at=NULL,dismissed_by=NULL,dismissed_reason='',"
                 "version=version+1,updated_at=? WHERE id=?",
                 (triage, stamp, row["id"]),
             )
         payload = {"from": row["triage"], "to": triage}
-        self.event("triage_changed", row["id"], payload=payload, conn=conn, actor=actor)
+        events.record(conn, "triage_changed", payload=payload, job_id=row["id"], actor=actor)
 
     def forget_job(self, job_id, expected_version, collect=True):
         """Delete a job; bulk callers pass collect=False and collect blobs once."""
@@ -301,5 +301,5 @@ class JobChanges:
             if collect:
                 collect_unused(c)
             # The job's own history is deleted with it; this record keeps only its id.
-            self.event("job_forgotten", conn=c, subject=("job", job_id))
+            events.record(c, "job_forgotten", subject=("job", job_id))
         return {"deleted": True, "id": job_id}

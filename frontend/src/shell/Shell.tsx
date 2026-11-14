@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { ListResult, Run } from "../api";
+import type { ListResult } from "../api";
 import {
   confirmLeave,
   useFormProtection,
@@ -7,12 +7,10 @@ import {
   useWorkspace,
 } from "../state";
 import { lockPageScroll } from "../design";
-import { AgentStatus } from "./AgentStatus";
 import { MoreSheet, Sidebar, TabBar } from "./Navigation";
 import {
   ApplicationsPage,
   ReviewPage,
-  ActivityPage,
   CareerPage,
   CollectionPage,
   JobsPage,
@@ -84,15 +82,10 @@ export function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
       "/jobs?triage=new&limit=1",
       emptyList,
     ),
-    questions = useResource<ListResult<never>>(
-      "/questions?state=open&limit=1",
-      emptyList,
-    ),
     applications = useResource<ListResult<never>>(
       "/applications?limit=1",
       emptyList,
-    ),
-    runs = useResource<ListResult<Run>>("/runs?status=open&limit=1", emptyList);
+    );
 
   useEffect(() => {
     lastRoute.current = location.hash;
@@ -123,15 +116,12 @@ export function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
     document.title = `${SCREENS[route] || "Workspace"} · Openings`;
   }, [route]);
   // On a new screen, focus moves to its content, so a keyboard or screen
-  // reader continues there instead of at the top of the navigation. An agent
-  // works while the dashboard is open: recount questions and runs as well.
+  // reader continues there instead of at the top of the navigation.
   const visited = useRef(route);
   useEffect(() => {
     if (visited.current === route) return;
     visited.current = route;
     main.current?.focus({ preventScroll: true });
-    questions.reload();
-    runs.reload();
   }, [route]);
   // The More sheet: Escape closes it, the page behind it does not scroll, and
   // it closes by itself when the window becomes wide.
@@ -201,17 +191,10 @@ export function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
     route,
     counts: {
       ready: applications.data.stage_counts?.ready ?? 0,
-      questions: questions.data.total,
       new: inbox.data.total,
     },
     onNavigate: (id: string) => navigate(id),
   };
-  const status = (
-    <AgentStatus
-      runs={runs.data}
-      onOpen={() => navigate("activity?section=runs")}
-    />
-  );
   return (
     <>
       <a
@@ -227,7 +210,7 @@ export function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
         Skip to content
       </a>
       <div className="app">
-        {!narrow && <Sidebar {...nav} foot={status} />}
+        {!narrow && <Sidebar {...nav} />}
         <div className="main">
           <TopBar
             route={route}
@@ -247,19 +230,13 @@ export function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
             <div className="screen">
               <Screen route={route}>
                 {route === "today" ? (
-                  <TodayPage onOpenJob={openJob} onOpenApplication={openApp} />
-                ) : route === "activity" ? (
-                  <ActivityPage
-                    openQuestions={questions.data.total}
-                    onOpenJob={openJob}
-                    onOpenApplication={openApp}
-                  />
+                  <TodayPage />
                 ) : route === "jobs" ? (
                   <JobsPage onOpenJob={openJob} onOpenApplication={openApp} />
                 ) : route === "applications" ? (
                   <ApplicationsPage />
                 ) : route === "review" ? (
-                  <ReviewPage onOpenJob={openJob} onOpenApplication={openApp} />
+                  <ReviewPage />
                 ) : route === "collection" ? (
                   <CollectionPage />
                 ) : route === "career" ? (
@@ -297,7 +274,7 @@ export function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
           />
         )}
         {narrow && more && (
-          <MoreSheet {...nav} foot={status} onClose={() => setMore(false)} />
+          <MoreSheet {...nav} onClose={() => setMore(false)} />
         )}
       </div>
     </>

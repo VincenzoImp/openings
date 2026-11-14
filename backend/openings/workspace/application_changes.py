@@ -3,6 +3,7 @@
 import json
 import math
 
+from .. import events
 from ..actors import current_actor
 from ..common import check_version, new_id, now
 from ..db import collect_unused, encode
@@ -52,12 +53,12 @@ class ApplicationChanges:
         connection.execute("DELETE FROM applications WHERE id=?", (application_id,))
         if collect:
             collect_unused(connection)
-        self.event(
+        events.record(
+            connection,
             "application_deleted",
-            row["job_id"],
-            payload={"application_id": application_id},
-            conn=connection,
             subject=("application", application_id),
+            payload={"application_id": application_id},
+            job_id=row["job_id"],
         )
 
     def create_application(self, value):
@@ -126,7 +127,9 @@ class ApplicationChanges:
         payload = {"status": "shortlisted"}
         if from_shortlist:
             payload["by"] = "shortlist"
-        self.event("application_created", job_id, record_id, payload, conn)
+        events.record(
+            conn, "application_created", payload=payload, job_id=job_id, application_id=record_id
+        )
         return record_id
 
     @staticmethod
@@ -214,12 +217,12 @@ class ApplicationChanges:
             # A reply that moves the stage is one change: its own event names the stage.
             fields = [key for key in actual if not (moved and key in moved)]
             if fields:
-                self.event(
-                    "application_updated",
-                    row["job_id"],
-                    application_id,
-                    {"from": row["status"], "to": status, "fields": fields},
+                events.record(
                     c,
+                    "application_updated",
+                    payload={"from": row["status"], "to": status, "fields": fields},
+                    job_id=row["job_id"],
+                    application_id=application_id,
                 )
             if reply_changed:
                 self.write_reply(c, row, reply, moved and {"from": row["status"], "to": status})

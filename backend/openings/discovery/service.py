@@ -46,9 +46,3 @@ class DiscoveryService(SourceOperations, RunOperations, TaskOperations):
             method=method,
             body=body,
         )
-
-    def _record(self, connection, event, subject_type, subject_id, /, **payload):
-        """Leave an attributed record of a collection change: identifiers and field names only."""
-        self.workspace.event(
-            event, payload=payload, conn=connection, subject=(subject_type, subject_id)
-        )

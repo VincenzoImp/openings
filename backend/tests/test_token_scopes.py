@@ -45,11 +45,6 @@ def tool(client, token, name, arguments=None):
     return result.get("structuredContent") or json.loads(result["content"][0]["text"]), None
 
 
-def question(app, agent):
-    with acting_as(token_actor(agent["id"], agent["name"], "agent")):
-        return app.state.activity.ask_question({"question": "Which notice period applies?"})
-
-
 def refused_over_rest(response):
     assert response.status_code == 403, response.text
     error = response.json()["error"]
@@ -69,9 +64,7 @@ def test_an_agent_token_is_refused_owner_operations_on_rest_and_mcp(app, client)
     auth = app.state.auth
     agent = auth.create_token("Synthetic agent", "agent")
     other = auth.create_token("Second synthetic agent", "agent")
-    asked = question(app, agent)
     headers = bearer(agent)
-    answer = {"expected_version": asked["version"], "answer": "Three months."}
     pairs = [
         (
             client.post(
@@ -102,22 +95,17 @@ def test_an_agent_token_is_refused_owner_operations_on_rest_and_mcp(app, client)
             ),
             tool(client, agent, "workspace_restore"),
         ),
-        (
-            client.post(f"/api/v1/questions/{asked['id']}/answer", json=answer, headers=headers),
-            tool(client, agent, "questions_answer", {"question_id": asked["id"], "value": answer}),
-        ),
     ]
     for over_rest, over_mcp in pairs:
         rest_error, mcp_error = refused_over_rest(over_rest), refused_over_mcp(over_mcp)
         assert rest_error["message"] == mcp_error["message"]
-    # Nothing changed: the password, both tokens and the open question are as before.
+    # Nothing changed: the password and both tokens are as before.
     assert client.post("/api/v1/auth/login", json={"password": PASSWORD}).status_code == 200
     assert {item["name"] for item in auth.list_tokens()["items"]} == {
         "Synthetic agent",
         "Second synthetic agent",
     }
-    assert app.state.activity.get_question(asked["id"])["state"] == "open"
-    assert not app.state.activity.list_events({"kind": "owner_password_changed"})["total"]
+    assert not app.state.events.list_events({"kind": "owner_password_changed"})["total"]
 
 
 def test_an_agent_token_keeps_the_workflow_operations(app, client):
@@ -125,48 +113,22 @@ def test_an_agent_token_keeps_the_workflow_operations(app, client):
     headers = bearer(agent)
     info, error = tool(client, agent, "workspace_info")
     assert error is None
-    assert info["actor"] == {
-        "kind": "token",
-        "id": agent["id"],
-        "name": "Synthetic agent",
-        "token_kind": "agent",
-        "label": "Synthetic agent",
-    }
+    assert info["actor"] == "agent:Synthetic agent" and "open_requests" not in info
+    assert "run" not in info["workflow"].replace("Report", "")
     assert client.get("/api/v1/workspace", headers=headers).json()["actor"] == info["actor"]
     job = client.post(
         "/api/v1/jobs",
         json={"title": "Synthetic engineer", "company": "Example", "posting": "Build APIs."},
         headers=headers,
     ).json()
-    run, error = tool(client, agent, "runs_start", {"value": {"workflow": "review-inbox"}})
-    assert error is None and run["actor"]["token_kind"] == "agent"
-    asked, error = tool(
-        client,
-        agent,
-        "questions_ask",
-        {
-            "value": {
-                "question": "Is Bern acceptable?",
-                "subject_type": "job",
-                "subject_id": job["id"],
-            }
-        },
-    )
-    assert error is None and asked["asked_by"]["token_kind"] == "agent"
     note = client.post(
         f"/api/v1/jobs/{job['id']}/notes", json={"body": "Synthetic note"}, headers=headers
     ).json()
-    assert note["author"]["token_kind"] == "agent"
-    # An agent may withdraw its own question; only the answer belongs to the owner.
-    withdrawn, error = tool(
-        client,
-        agent,
-        "questions_withdraw",
-        {"question_id": asked["id"], "value": {"expected_version": asked["version"]}},
-    )
-    assert error is None and withdrawn["withdrawn_by"]["token_kind"] == "agent"
-    history = client.get(f"/api/v1/events?run_id={run['id']}", headers=headers).json()["items"]
-    assert {item["actor"]["token_kind"] for item in history} == {"agent"}
+    assert note["author"] == "agent:Synthetic agent"
+    history = client.get("/api/v1/events", params={"job_id": job["id"]}, headers=headers).json()[
+        "items"
+    ]
+    assert {item["actor"] for item in history} == {"agent:Synthetic agent"}
     # Export and permanent deletion stay available: they are workspace data operations.
     assert client.get("/api/v1/export", headers=headers).status_code == 200
     export, error = tool(client, agent, "workspace_export")
@@ -176,9 +138,10 @@ def test_an_agent_token_keeps_the_workflow_operations(app, client):
         client, agent, "jobs_delete", {"job_id": job["id"], "expected_version": current["version"]}
     )
     assert error is None and forgotten["deleted"] is True
-    # The recorded kind outlives the token.
+    # The recorded label outlives the token.
     app.state.auth.revoke_token(agent["id"])
-    assert app.state.activity.get_run(run["id"])["actor"]["token_kind"] == "agent"
+    labels = app.state.events.list_events({"kind": "job_forgotten"})["items"]
+    assert [item["actor"] for item in labels] == ["agent:Synthetic agent"]
 
 
 def test_an_agent_backup_carries_no_installation_credentials(app, client, tmp_path):
@@ -248,23 +211,15 @@ def test_an_owner_token_keeps_full_access_and_chooses_the_kind(app, client):
         "Agent on laptop": "agent",
     }
     assert "token_hash" not in listed["items"][0] and "token" not in listed["items"][0]
-    created = app.state.activity.list_events({"kind": "token_created"})["items"][0]
+    created = app.state.events.list_events({"kind": "token_created"})["items"][0]
     assert created["payload"] == {"name": "Script", "kind": "owner"}
-    assert created["actor"]["token_kind"] == "owner"
+    assert created["actor"] == "owner"
     for body in ({"name": "Invalid", "kind": "admin"}, {"name": "Invalid", "kind": None}):
         invalid = client.post("/api/v1/tokens", json=body, headers=headers)
         _, error = tool(client, owner, "tokens_create", {"value": body})
         assert invalid.status_code == 422
         assert invalid.json()["error"]["code"] == error["code"] == "validation"
-    # The owner can run everything from an external session: answer, revoke, change the password.
-    asked = question(app, default)
-    answered, error = tool(
-        client,
-        owner,
-        "questions_answer",
-        {"question_id": asked["id"], "value": {"expected_version": 1, "answer": "Three months."}},
-    )
-    assert error is None and answered["answered_by"]["token_kind"] == "owner"
+    # The owner can run everything from an external session: revoke, change the password.
     assert client.delete(f"/api/v1/tokens/{default['id']}", headers=headers).status_code == 200
     changed, error = tool(
         client, owner, "owner_password_update", {"value": {"password": "changed-password"}}

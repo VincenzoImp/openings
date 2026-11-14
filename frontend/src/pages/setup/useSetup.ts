@@ -39,9 +39,6 @@ export function useSetup() {
     "applications",
     "settings",
   ]);
-  const questions = useFresh("/questions?state=open&limit=1", NONE, [
-    "questions",
-  ]);
   const all = [
     profile,
     preferences,
@@ -51,7 +48,6 @@ export function useSetup() {
     claims,
     templates,
     applications,
-    questions,
   ];
   useEffect(() => {
     const timer = setInterval(() => {
@@ -75,7 +71,6 @@ export function useSetup() {
     facts,
     profile: profile.data,
     preferences: preferences.data,
-    questions: questions.data.total,
     loading: all.some((read) => read.loading),
     error: all.find((read) => read.error)?.error ?? null,
     reload: () => all.forEach((read) => read.reload()),

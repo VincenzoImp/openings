@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 // Node strips the types of the source files; these modules have no React.
 const { nextTabIndex, trappedIndex } = await import("../src/design/keys.ts");
 const { buttonClass, tagClass, cx } = await import("../src/design/classes.ts");
-const { actorChip } = await import("../src/design/actor.ts");
+const { actorPhrase } = await import("../src/design/actor.ts");
 const routes = await import("../src/shell/routes.ts");
 const preferences = await import("../src/shell/preferences.ts");
 
@@ -41,35 +41,19 @@ test("buttons and tags get the design system's classes", () => {
   assert.equal(cx("a", false, "b a", undefined), "a b");
 });
 
-test("an actor chip names the agent's token and keeps the agent colour for agents", () => {
-  const token = { kind: "token", name: "career-agent", label: "career-agent" };
-  assert.deepEqual(actorChip({ ...token, token_kind: "agent" }), {
-    tone: "agent",
-    text: "career-agent",
-  });
-  assert.deepEqual(actorChip({ ...token, token_kind: "owner" }), {
-    tone: "owner",
-    text: "career-agent (owner token)",
-  });
-  assert.deepEqual(actorChip({ kind: "owner", name: null, label: "Owner" }), {
-    tone: "owner",
-    text: "Owner",
-  });
-  assert.deepEqual(actorChip({ kind: "system", name: null, label: "System" }), {
-    tone: "system",
-    text: "System",
-  });
-  assert.deepEqual(actorChip(null), { tone: "unknown", text: "Unknown" });
-  assert.equal(
-    actorChip({ kind: "unknown", name: null, label: "Unknown" }).tone,
-    "unknown",
-  );
+test("who made a change reads as one plain phrase; an unknown actor says nothing", () => {
+  assert.equal(actorPhrase("owner"), "by you");
+  assert.equal(actorPhrase("agent:career-agent"), "by career-agent");
+  assert.equal(actorPhrase("system"), "by job sources");
+  assert.equal(actorPhrase(null), "");
+  assert.equal(actorPhrase(undefined), "");
+  assert.equal(actorPhrase(""), "");
+  assert.equal(actorPhrase("agent:"), "by an agent");
 });
 
 test("every screen has one hash route; an unknown route opens Today", () => {
   for (const route of [
     "today",
-    "activity",
     "jobs",
     "applications",
     "collection",
@@ -81,9 +65,18 @@ test("every screen has one hash route; an unknown route opens Today", () => {
     assert.equal(routes.routeOf("#" + route), route);
   assert.equal(routes.routeOf(""), "today");
   assert.equal(routes.routeOf("#no-such-page"), "today");
-  // Names of earlier versions are not kept: they open Today.
-  for (const old of ["overview", "inbox", "shortlist", "skills", "onboarding"])
+  // Names of earlier versions are not kept, nor the removed Activity page:
+  // they open Today.
+  for (const old of [
+    "overview",
+    "inbox",
+    "shortlist",
+    "skills",
+    "onboarding",
+    "activity",
+  ])
     assert.equal(routes.routeOf("#" + old), "today");
+  assert.equal(routes.routeOf("#activity?section=runs"), "today");
   assert.equal(routes.canonicalHash, undefined);
   assert.equal(routes.ALIASES, undefined);
   // The review page belongs to Applications.
@@ -98,14 +91,15 @@ test("navigation has three groups", () => {
       group.items.map((item) => item.label),
     ]),
     [
-      ["Work", ["Today", "Applications", "Jobs", "Activity"]],
+      ["Work", ["Today", "Applications", "Jobs"]],
       ["Library", ["Career", "Preferences", "Templates"]],
       ["System", ["Collection", "Settings"]],
     ],
   );
   assert.equal(routes.destinationOf("jobs").group, "Work");
   assert.equal(routes.destinationOf("settings").group, "System");
-  assert.equal(routes.TAB_BAR.length, 4);
+  // The bottom bar on narrow screens: the work destinations and Career.
+  assert.deepEqual(routes.TAB_BAR, ["today", "applications", "jobs", "career"]);
   // Every screen is reachable from the navigation, except the setup guide:
   // a new workspace opens on it, and Settings, Workspace links to it.
   for (const route of Object.keys(routes.SCREENS))

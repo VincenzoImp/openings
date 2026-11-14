@@ -124,44 +124,12 @@ mechanics, not personal selection or writing rules.
   `concluded_on`) is manual, single or with `applications_bulk`; nothing closes
   automatically. `stats_get` / `GET /stats` reads the rates.
 
-## Runs and questions
+## The change log
 
-- `runs_start(value)` / `POST /runs` takes `workflow`, `scope`, optional
-  `supersede` and `idempotency_key`, and needs an API token: a dashboard session
-  has no runs (`403 run_actor`). One open run per token: `409 run_open` carries
-  the open run in `details.run`.
-- `runs_update(run_id, value)` / `PATCH /runs/{id}` and
-  `runs_finish(run_id, value)` / `POST /runs/{id}/finish` take the run's
-  `expected_version` and work only for the token that opened the run
-  (`403 run_owner`) while it is open (`409 run_closed`).
-- `runs_get` / `GET /runs/{id}` and `runs_list` / `GET /runs` are open to every
-  caller. `change_counts` is derived from the recorded changes; a finished or
-  superseded run keeps the counts it had when it ended.
-- `questions_ask(value)` / `POST /questions`, `questions_list(value)` /
-  `GET /questions`, `questions_get` / `GET /questions/{id}`,
-  `questions_answer(question_id, value)` / `POST /questions/{id}/answer` and
-  `questions_withdraw(question_id, value)` / `POST /questions/{id}/withdraw`.
-  An answer needs text or one of the listed choices; answering again corrects
-  the answer and renews `answered_at`. Answering needs owner authority: an agent
-  token gets `403 forbidden`. Only an open question can be withdrawn.
-- `events_list(value)` / `GET /events` reads the attributed change log.
-
-## Requests for the agent
-
-- `requests_list(value)` / `GET /requests` and `requests_get` /
-  `GET /requests/{id}` are open to every caller. Read `state: "open"` at the
-  start of a run; `workspace_info` reports the count as `open_requests`.
-- `requests_take(request_id, value)` / `POST /requests/{id}/take`,
-  `requests_complete` / `POST /requests/{id}/complete` (`result`) and
-  `requests_decline` / `POST /requests/{id}/decline` (`reason`) take the
-  request's `expected_version` and need an API token (`403 request_actor`).
-  Taking needs an open request (`409 request_taken`, `409 request_closed`);
-  completing and declining work from open or taken. The token's open run is
-  recorded on the request; without an open run the request is still handled.
-- `requests_create(value)` / `POST /requests` and `requests_withdraw` /
-  `POST /requests/{id}/withdraw` are the owner's (`403 forbidden` for an agent
-  token).
-- A request never authorises what the operating mandate forbids.
+- `events_list(value)` / `GET /events` reads the attributed change log. Each
+  change carries an `actor` label and the `batch_id` of the REST request or MCP
+  tool call that wrote it.
+- Report what you did in the chat.
 
 ## Recover preparation from the database
 

@@ -12,7 +12,7 @@ Agent access**:
 
 | Kind | Access |
 |---|---|
-| **Agent** (recommended for an agent) | The whole job search: jobs, applications, documents, Career, collection, runs and questions. |
+| **Agent** (recommended for an agent) | The whole job search: jobs, applications, documents, Career, Preferences and collection. |
 | **Owner** | Everything, the same as your dashboard session. |
 
 ![Access tokens in Settings: the tokens with their kinds, marked Owner only, and the form that offers an agent token first](../images/access-tokens.png)
@@ -21,10 +21,7 @@ An agent token is refused, with `403 forbidden` on REST and MCP, when it tries t
 
 - change the owner password;
 - list, create or revoke API tokens;
-- restore a backup;
-- answer a question for the owner (it can ask and withdraw questions);
-- write or withdraw a request for the agent (it takes, completes and declines
-  the requests you write).
+- restore a backup.
 
 An agent token can still download a backup and a records export, because the
 operating mandate has the agent back up before broad changes. A backup taken
@@ -38,8 +35,8 @@ Tokens created before version 0.17 are owner tokens and keep full access. To
 scope an existing agent, create an agent token, give it to the agent and revoke
 the old one. `POST /tokens` and `tokens_create` default to `owner` when no `kind`
 is sent, so existing scripts keep working; the dashboard form offers `agent`
-first. `workspace_info` returns `actor.token_kind`, so an agent can see which
-kind it holds. Use an owner token only when you want to run owner actions
+first. `workspace_info` returns `actor` (`owner` or `agent:<token name>`), so an
+agent can see which kind it holds. Use an owner token only when you want to run owner actions
 yourself from an external MCP session.
 
 A typical local connection uses `http://127.0.0.1:8080/mcp/`. For another machine,
@@ -53,26 +50,15 @@ prompt per skill, also at `GET /api/v1/skills`. Start with
 [`setup-openings`](../../skills/setup-openings/SKILL.md) for a new workspace or
 [`openings-workspace`](../../skills/openings-workspace/SKILL.md) for the basics.
 **Settings → Agent access** shows client configuration snippets; **Settings →
-Skills** shows each skill's text and reference files.
+Skills** shows what you can ask your agent: for each skill a title, one sentence
+and an example phrase (the `title`, `summary` and `example` fields of its
+`SKILL.md` frontmatter).
 
-A workspace never edits a shipped skill. It keeps **local notes** for a skill
-instead: up to 2,000 characters, appended to the served `SKILL.md` (by
-`skills_get`, the skill's MCP prompt and `GET /api/v1/skills/{name}`) under
-"Local notes for this workspace", with the version, the day and who wrote them.
-`skills_get(name, value={"local_notes": false})` returns the shipped text alone; reference
-files never carry notes. Read the notes and their earlier versions with
-`skill_notes_get(name)` and replace them with `skill_notes_update(name, value)`
-(`expected_version`, 0 for the first notes, and the whole `text`; empty clears
-them). The owner edits them under **Settings → Skills**, where earlier versions
-can be read and used again; a run report's **Method** section offers what the
-run lacked as a note (**Add to the local notes of …**), and each skill lists
-the method sections of its recent runs as suggestions. An agent token may
-write notes too: record a lasting gap in how a workflow fits this workspace,
-for example a step it always needs here. Each save is an attributed version the
-owner can read and restore. Personal criteria (what to apply to, eligibility,
-writing rules) belong to [Preferences](preferences.md), never to skill notes.
-
-![Settings → Skills: a skill's local notes with who wrote them, a suggestion from a recent run, the read-only skill text and its reference files](../images/skills.png)
+A workspace never edits a shipped skill; skills are served as shipped. Your
+standing instructions for the agent (for example a step it always needs here)
+belong in **Preferences › Working with me**, which the agent reads with
+`preferences_get` and updates with `preferences_update` (section
+`working_with_me`) only when you state or confirm an instruction.
 
 ![Settings → Agent access with the API tokens, the token form and a Claude Code configuration snippet](../images/agent-access.png)
 
@@ -82,10 +68,6 @@ skills: discover the tools/resources and their typed input schemas.
 
 ## Working sequence
 
-0. Read the owner's open requests with `requests_list` (`state: "open"`;
-   `workspace_info` returns their number as `open_requests`). Take the ones you
-   will handle with `requests_take` and report with `requests_complete` or
-   `requests_decline`. See [Ask your agent](agent-operated.md#ask-your-agent).
 1. Call `workspace_info`, `profile_get`, `knowledge_list`, `claims_list`,
    `templates_list` and `preferences_get` as needed. Detailed narratives explain
    the facts; approved claims are reusable wording, not the only allowed wording.
@@ -175,34 +157,24 @@ A write wraps its body in `value`. For example:
 }
 ```
 
-## Runs, questions and attribution
+## Attribution
 
-Every change records its actor: the dashboard session, the API token (its id and
-its name at the time) or the system. Use one token per agent.
+Every change records an actor label: `owner` (the dashboard session or an owner
+token), `agent:<token name>` (an agent token) or `system` (collection, the
+worker, an upgrade). Changes made before version 0.17 have no actor. Every
+change written by one REST request or MCP tool call carries the same
+`batch_id`, so one `jobs_triage` call over 50 jobs is one batch. Use one token
+per agent.
 
-1. At the start, read the answers given since the previous run with
-   `questions_list({"value": {"answered_since": "2026-03-01T08:00:00Z"}})`, then
-   call `runs_start({"value": {"workflow": "review-inbox", "scope": "New jobs: 14"}})`.
-   Writes made with the same token are attached to the open run automatically.
-   A token has one open run: a second start returns `run_open` with the open run
-   in `details.run`; pass `supersede: true` to mark it interrupted and start anew.
-2. Ask the owner with `questions_ask`: `question`, `why`, optional
-   `subject_type` (`job`, `application`, `knowledge`) with `subject_id`, and
-   optional `choices`. The owner answers in the dashboard under **Activity**.
-3. Close with `runs_finish(run_id, value)`: `expected_version`, `summary`,
-   `changes`, `not_done`, `checks`, `limits` and `method` (what the workflow
-   lacked; the owner may turn it into the skill's local notes, and `runs_list`
-   returns it with each run). Openings adds the change counts by kind. `runs_update` stores a progress note meanwhile.
+`events_list` reads the change log for scripts, filtered by `actor` (`owner`,
+`agent`, `system`, `unknown` or `agent:<token name>`), `batch_id`, record and
+time (`since`, `until`); it leaves out system changes unless you ask for them.
+`applications_history`, `timeline_get` and notes carry the same `actor` label.
+`jobs_list` filters dismissed jobs by `dismissed_by`, `batch_id` and `since`;
+`jobs_bulk` with action `new` restores them.
 
-`runs_get` returns a run with its report, questions and a page of its changes;
-`runs_list` filters by status, workflow, token and start time; `events_list`
-reads the change log by run, record, actor or time. `applications_history` and
-notes carry the same `actor`; a note also names the run it was written in.
-`timeline_get` lists one job's or application's notes and changes together. An open run without a write for two hours is
-reported as `interrupted` but stays open; a later write with the same token
-attaches to it again. Changes made before version 0.17 show the actor
-`unknown (before 0.17)`. The skills' [run report reference](../../skills/openings-workspace/references/run-report.md)
-describes the full procedure.
+Ask the owner in the chat when a fact or decision is missing, and report what
+you did in the chat.
 
 ## Collection through an agent
 
@@ -250,7 +222,7 @@ sent the application. `status: "shortlisted"` undoes it while no reply exists.
   `source` (`settings` or `default`). Close them as `no_response` (one by one or
   with `applications_bulk`, `concluded_on` today by default) only when the
   owner asks or Working with me says to; otherwise propose the list and ask the
-  owner with `questions_ask`. Nothing closes automatically.
+  owner in the chat. Nothing closes automatically.
 - `stats_get` with `period` (`90d`, `12m` or `all`) returns the applications
   sent, replied and interview counts and rates, the median days from applied to
   the first reply, the funnel and `by_source` (replies per source, only when at

@@ -4,7 +4,6 @@ import {
   copyText,
   tokenKinds,
   type ListResult,
-  type Run,
   type TokenKind,
 } from "../../api";
 import {
@@ -25,16 +24,12 @@ import { tokenAccess, type Token } from "./model";
 import { OwnerOnly } from "./OwnerOnly";
 
 const NONE: ListResult<Token> = { items: [], total: 0 };
-const NO_RUNS: ListResult<Run> = { items: [], total: 0 };
 
 /** The installation's API tokens with their kinds: create, read and revoke. */
 export function Tokens() {
   const tokens = useFresh("/tokens", NONE, ["tokens"]);
-  const runs = useFresh("/runs?status=open&limit=50", NO_RUNS, ["runs"]);
   const [revoking, setRevoking] = useState<Token | null>(null);
   const { mutate } = useWorkspace();
-  const openRun = (token: Token) =>
-    runs.data.items.find((run) => run.actor?.id === token.id);
   return (
     <>
       <section className="card" aria-labelledby="tokens-title">
@@ -69,16 +64,11 @@ export function Tokens() {
               </thead>
               <tbody>
                 {tokens.data.items.map((token) => {
-                  const run = openRun(token);
                   return (
                     <tr key={token.id}>
                       <td className="primary">
                         <span className="title">{token.name}</span>
-                        <div className="meta">
-                          {run
-                            ? `Run in progress: ${run.workflow}`
-                            : tokenAccess[token.kind]}
-                        </div>
+                        <div className="meta">{tokenAccess[token.kind]}</div>
                       </td>
                       <td>
                         <Tag
@@ -134,8 +124,8 @@ export function Tokens() {
           }}
         >
           <p>
-            Anything that uses this token stops working at once. Its runs and
-            changes stay recorded with its name.
+            Anything that uses this token stops working at once. Its changes
+            stay recorded with its name.
           </p>
         </ConfirmDialog>
       )}
@@ -208,7 +198,7 @@ export function CreateToken() {
         <p className="caption token-kind">{tokenAccess[kind]}</p>
         <p className="caption">
           The name is shown next to every change the token makes. Use one token
-          per agent, so its runs and changes carry its name.
+          per agent, so its changes carry its name.
         </p>
         {created && (
           <Banner

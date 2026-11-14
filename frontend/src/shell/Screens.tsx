@@ -7,7 +7,6 @@ import { SCREENS } from "./routes";
 // stays within the budget checked by scripts/budget.mjs.
 const loaders = {
   today: () => import("../pages/Today"),
-  activity: () => import("../pages/Activity"),
   jobs: () => import("../pages/Jobs"),
   applications: () => import("../pages/Applications"),
   review: () => import("../pages/Review"),
@@ -28,7 +27,6 @@ export function preloadScreen(route: string) {
 }
 
 export const TodayPage = lazy(loaders.today);
-export const ActivityPage = lazy(loaders.activity);
 export const CollectionPage = lazy(loaders.collection);
 export const CareerPage = lazy(loaders.career);
 export const PreferencesPage = lazy(loaders.preferences);

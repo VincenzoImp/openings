@@ -134,7 +134,7 @@ keep everything. The 20 most recent finished runs of every source stay whatever
 their age, so each source keeps its last run and its run history. Queued and
 running work, including the progress stored with it, is never removed. The
 change-log entries of a removed run or task (queued, cancelled, retried) go with
-it unless an agent run recorded them. Job and application history is never
+it unless an agent made them. Job and application history is never
 pruned. The worker does this at start and every six hours, in small batches;
 Settings → Workspace, Retention shows the period in use; Collection → Runs and
 tasks lists what is kept.
@@ -151,7 +151,7 @@ stored.
 Settings supports named API tokens of two kinds, independent token revocation and
 owner password changes; the parts that need owner authority (tokens, restore,
 the password, the automatic backups) are marked **Owner only**. An **agent** token cannot change the password, manage
-tokens, restore a backup or answer a question for the owner; an **owner** token
+tokens or restore a backup; an **owner** token
 has full access ([token kinds](agents.md#token-kinds)). Tokens created before
 version 0.17 are owner tokens. A password change rotates browser sessions and
 retains existing API tokens; log in again after changing it in the dashboard.

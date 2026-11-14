@@ -27,6 +27,7 @@ FIXTURE = Path(__file__).with_name("fixtures") / f"workspace-{SCHEMA_VERSION - 1
 # Tables 0.24 removes (archived whole) and adds (filled by the upgrade's folds).
 REMOVED_TABLES = {"policy_sections", "policy_items"}  # #213
 ADDED_TABLES = {"preference_sections"}  # #213
+REMOVED_TABLES |= {"runs", "questions", "requests", "skill_notes"}  # #209
 # #215
 REMOVED_TABLES |= {
     "contexts",
@@ -115,6 +116,16 @@ def created_by_upgrade(pre_upgrade):
     marks = query(pre_upgrade, "SELECT count(*) FROM applications WHERE ready_at IS NOT NULL")[0][0]
     created["applications"] = created.get("applications", 0) + started
     created["events"] = created.get("events", 0) + started + marks
+    # #209: a note per answered question and per request about an existing job or
+    # application.
+    notes = query(
+        pre_upgrade,
+        "SELECT (SELECT count(*) FROM questions q WHERE state='answered' AND ("
+        "q.job_id IN (SELECT id FROM jobs) OR q.application_id IN (SELECT id FROM applications)))"
+        "+(SELECT count(*) FROM requests r WHERE r.job_id IN (SELECT id FROM jobs) "
+        "OR r.application_id IN (SELECT id FROM applications))",
+    )[0][0]
+    created["notes"] = created.get("notes", 0) + notes
     return created
 
 
@@ -187,7 +198,7 @@ def test_generic_changes_keep_every_value(upgraded):
     for table, columns in (
         ("jobs", "id,title,company,posting,version,created_at"),
         ("applications", "id,job_id,outcome,version,questions,answers,requirements"),
-        ("events", "id,job_id,application_id,kind,payload,actor_kind,actor_name,run_id"),
+        ("events", "id,job_id,application_id,kind,payload,subject_type,subject_id"),
         ("documents", "id,previous_id,text,claim_ids"),
         ("blobs", "sha256,content,size"),
     ):
@@ -278,7 +289,7 @@ def test_every_shortlisted_job_has_an_open_application_after_the_upgrade(upgrade
         row[1:]
         for row in query(
             path,
-            "SELECT a.id,a.job_id,a.status,a.from_shortlist,e.actor_kind,"
+            "SELECT a.id,a.job_id,a.status,a.from_shortlist,e.actor,"
             "json_extract(e.payload,'$.by') FROM applications a JOIN events e "
             "ON e.application_id=a.id AND e.kind='application_created'",
         )
@@ -307,10 +318,16 @@ def test_stored_ready_marks_are_archived_with_an_event_and_ready_is_computed(upg
     } == {row[0]: row[1:] for row in marks}
     events = query(
         path,
-        "SELECT application_id,created_at,actor_kind,actor_name FROM events "
+        "SELECT application_id,created_at,actor FROM events "
         "WHERE kind='application_ready_mark_archived'",
     )
-    assert sorted(events) == sorted(marks)
+    # #209: attributed with the actor label of who set the mark.
+    labelled = query(
+        pre_upgrade,
+        f"SELECT id,ready_at,{LABEL.format('ready_by')} FROM applications "
+        "WHERE ready_at IS NOT NULL",
+    )
+    assert sorted(events) == sorted(labelled)
     # Ready is computed: the upgraded workspace lists what the rehearsal's rule
     # computes on the original, and the rehearsal counts where the stored marks differ.
     verify = runpy.run_path(str(Path(__file__).parents[2] / "scripts" / "verify_m15.py"))
@@ -381,7 +398,8 @@ def test_policy_items_become_preferences_with_their_text(upgraded):
         '(proposed by system, not confirmed) Interview availability: {"days": ["Tue", "Thu"], '
         '"from": "16:00", "timezone": "Europe/Zurich"}'
     )
-    assert len(facts) == 8
+    # #209: the answered question without a subject follows.
+    assert len(facts) == 9 and facts[8].startswith("Question from agent:career-agent")
     settings = json.loads(query(path, "SELECT data FROM settings WHERE key='workspace'")[0][0])
     assert settings == {"no_reply_days": 45, "spoken_languages": ["en", "it"]}
     # Every label, statement and note is kept byte for byte, each item exactly once.
@@ -393,9 +411,10 @@ def test_policy_items_become_preferences_with_their_text(upgraded):
         named = label if label.casefold() not in statement.casefold() else ""
         holding = [text for text in every if statement in text and named in text and note in text]
         assert len(holding) == 1, label
-    assert sections["working_with_me"] == ([], 0, None)
+    # #209: Working with me holds the skill notes.
     assert {name: value[1:] for name, value in sections.items() if value[0]} == {
-        name: (1, "system") for name in ("looking_for", "ruled_out", "facts", "writing")
+        name: (1, "system")
+        for name in ("looking_for", "ruled_out", "facts", "writing", "working_with_me")
     }
 
 
@@ -433,13 +452,13 @@ def test_rule_dismissals_are_kept_with_the_rule_as_reason(upgraded):
     path, pre_upgrade = upgraded[:2]
     before = query(
         pre_upgrade,
-        "SELECT id,dismissed_rule_label,dismissed_reason,dismissed_by_kind FROM jobs "
-        "WHERE dismissed_rule_id IS NOT NULL ORDER BY id",
+        f"SELECT id,dismissed_rule_label,dismissed_reason,{LABEL.format('dismissed_by')} "
+        "FROM jobs WHERE dismissed_rule_id IS NOT NULL ORDER BY id",
     )
     assert before and all(reason == "" for _, _, reason, _ in before)
     after = query(
         path,
-        "SELECT id,dismissed_reason,dismissed_by_kind,triage FROM jobs WHERE id IN "
+        "SELECT id,dismissed_reason,dismissed_by,triage FROM jobs WHERE id IN "
         f"({','.join('?' for _ in before)}) ORDER BY id",
         [row[0] for row in before],
     )
@@ -482,9 +501,159 @@ def test_a_workspace_without_policy_items_keeps_the_default_writing_rule(tmp_pat
     )
     Database(path)
     sections = preferences(path)
-    assert [len(sections[name][0]) for name in ("looking_for", "facts", "writing")] == [0, 0, 1]
+    assert [len(sections[name][0]) for name in ("looking_for", "facts", "writing")] == [
+        0,
+        1,
+        1,
+    ]  # #209: the answered question
     assert sections["writing"][0][0]["text"].startswith("Use only the supplied career evidence.")
     assert query(path, "SELECT count(*) FROM settings WHERE key='workspace'") == [(0,)]
+
+
+# #209 Remove the agent-collaboration layer; minimal attribution.
+
+# The actor label of a schema-14 actor block, computed independently of the migration.
+LABEL = (
+    "CASE WHEN {0}_kind IS NULL THEN NULL "
+    "WHEN {0}_kind='token' AND {0}_token_kind='agent' THEN 'agent:'||{0}_name "
+    "WHEN {0}_kind='token' THEN 'owner' ELSE {0}_kind END"
+)
+
+
+def test_every_actor_block_becomes_its_label(upgraded):
+    path, pre_upgrade = upgraded[:2]
+    for table, new_table, new, old in (
+        ("events", "events", "actor", "actor"),
+        ("notes", "notes", "author", "author"),
+        ("jobs", "jobs", "dismissed_by", "dismissed_by"),
+        ("responses", "replies", "created_by", "created_by"),
+        ("responses", "replies", "updated_by", "updated_by"),
+    ):
+        before = query(pre_upgrade, f"SELECT id,{LABEL.format(old)} FROM {table} ORDER BY 1")
+        after = dict(query(path, f"SELECT id,{new} FROM {new_table}"))
+        assert {row[0]: after[row[0]] for row in before} == dict(before), (table, new)
+    labels = {row[0] for row in query(path, "SELECT DISTINCT actor FROM events")}
+    assert labels == {"owner", "system", "agent:career-agent", "agent:synthetic-agent-probe"}
+    # A token of the owner and a token from before 0.17 are the owner; no kind is no label.
+    changed = load_fixture(
+        upgraded[0].parent / "kinds.sqlite",
+        "UPDATE events SET actor_kind='token',actor_token_kind=NULL,actor_name='script' "
+        "WHERE rowid=(SELECT min(rowid) FROM events WHERE actor_kind='owner');"
+        "UPDATE events SET actor_kind=NULL WHERE rowid=(SELECT min(rowid) FROM events "
+        "WHERE actor_kind='system');",
+    )
+    Database(changed)
+    assert query(changed, "SELECT count(*) FROM events WHERE actor IS NULL") == [(1,)]
+    assert query(changed, "SELECT count(*) FROM events WHERE actor='owner'") == [(42,)]
+    # The token columns stay in the archive.
+    dropped = json.loads(m15.files(changed).archive.read_text())["dropped_columns"]
+    assert any(item["value"] == "script" for item in dropped["events.actor_name"])
+
+
+def test_the_changes_of_a_former_run_share_one_batch(upgraded):
+    path, pre_upgrade = upgraded[:2]
+    before = query(pre_upgrade, "SELECT id,run_id FROM events WHERE run_id IS NOT NULL ORDER BY id")
+    after = query(path, "SELECT id,batch_id FROM events WHERE batch_id IS NOT NULL ORDER BY id")
+    assert before and after == [(event, "run:" + run) for event, run in before]
+    assert query(path, "SELECT count(*) FROM pragma_table_info('events') WHERE name='run_id'") == [
+        (0,)
+    ]
+
+
+def test_runs_questions_requests_and_skill_notes_are_archived_whole(upgraded):
+    path, pre_upgrade, archive_path = upgraded[:3]
+    archive = json.loads(archive_path.read_text())
+    for table in ("runs", "questions", "requests", "skill_notes"):
+        with closing(sqlite3.connect(pre_upgrade)) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = [dict(row) for row in conn.execute(f"SELECT * FROM {table}")]
+        assert rows and archive["counts"][table] == len(rows) == len(archive[table])
+        key = ("skill", "version") if table == "skill_notes" else ("id",)
+        by_key = {tuple(item[k] for k in key): item for item in archive[table]}
+        for row in rows:
+            assert by_key[tuple(row[k] for k in key)] == row
+        assert query(path, f"SELECT count(*) FROM sqlite_master WHERE name='{table}'") == [(0,)]
+    # Run reports and change counts are kept as stored.
+    finished = [run for run in archive["runs"] if run["status"] == "finished"]
+    assert finished and all(json.loads(run["report"])["summary"] for run in finished)
+    assert "dropped_tables" not in archive or not set(archive["dropped_tables"]) & {
+        "runs",
+        "questions",
+        "requests",
+        "skill_notes",
+    }
+
+
+def test_answers_requests_and_skill_notes_stay_where_the_owner_looks(upgraded):
+    path, pre_upgrade = upgraded[:2]
+    created = query(
+        path,
+        "SELECT job_id,application_id,body,author,created_at FROM notes WHERE id NOT IN "
+        f"({','.join(repr(row[0]) for row in query(pre_upgrade, 'SELECT id FROM notes'))})",
+    )
+    request = query(
+        pre_upgrade,
+        "SELECT r.application_id,a.job_id,r.text,r.result,r.created_at FROM requests r "
+        "JOIN applications a ON a.id=r.application_id",
+    )[0]
+    assert created == [
+        (
+            request[1],
+            request[0],
+            f"Request to the agent ({request[4][:10]}, done): {request[2]} — Result: {request[3]}",
+            "system",
+            request[4],
+        )
+    ]
+    # The answered question without a subject is a fact; open and withdrawn ones are not.
+    question, answer, asked, answered = query(
+        pre_upgrade,
+        "SELECT question,answer,created_at,resolved_at FROM questions WHERE state='answered'",
+    )[0]
+    facts = texts(path, "facts")
+    assert facts[-1] == (
+        f"Question from agent:career-agent ({asked[:10]}): {question} — "
+        f"Answer ({answered[:10]}): {answer}"
+    )
+    for (text,) in query(pre_upgrade, "SELECT question FROM questions WHERE state<>'answered'"):
+        assert not any(text in item for item in facts)
+    # The current version of each skill's notes is one Working with me item.
+    current = query(
+        pre_upgrade, "SELECT skill,text FROM skill_notes ORDER BY version DESC LIMIT 1"
+    )[0]
+    assert texts(path, "working_with_me") == [f"For {current[0]}: {current[1]}"]
+
+
+def test_answers_about_jobs_and_applications_become_notes_on_them(tmp_path):
+    path = load_fixture(
+        tmp_path / "openings.sqlite",
+        "UPDATE questions SET state='answered',answer='Yes.',answer_choice=NULL,"
+        "resolved_at='2026-11-13T10:00:00+00:00' WHERE subject_type IN ('job','application');"
+        "INSERT INTO idempotency_keys(scope,key,fingerprint,record_id,created_at) "
+        "VALUES('runs','k1','f','r','2026-11-13T10:00:00+00:00'),"
+        "('notes','k2','f','n','2026-11-13T10:00:00+00:00');",
+    )
+    with closing(sqlite3.connect(path)) as conn:
+        asked = conn.execute(
+            "SELECT q.question,coalesce(q.job_id,a.job_id),q.application_id FROM questions q "
+            "LEFT JOIN applications a ON a.id=q.application_id "
+            "WHERE q.subject_type IN ('job','application') ORDER BY q.subject_type"
+        ).fetchall()
+    Database(path)
+    notes = query(
+        path,
+        "SELECT job_id,application_id,body FROM notes WHERE author='system' AND body LIKE "
+        "'Question from %' ORDER BY application_id IS NULL",
+    )
+    assert [(job, application) for job, application, _ in notes] == [
+        (row[1], row[2]) for row in asked
+    ]
+    for (_, _, body), row in zip(notes, asked, strict=True):
+        assert row[0] in body and body.endswith("Answer (2026-11-13): Yes.")
+    # The idempotency keys of removed records go to the archive with them.
+    assert query(path, "SELECT scope FROM idempotency_keys") == [("notes",)]
+    archive = json.loads(m15.files(path).archive.read_text())
+    assert [row["key"] for row in archive["idempotency_keys_of_removed"]] == ["k1"]
 
 
 # #215 Frozen contexts, snapshots and staleness.

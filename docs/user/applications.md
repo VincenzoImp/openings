@@ -25,7 +25,9 @@ layout. Your external agent fills it using the selected facts and your writing r
 Review new jobs in **Jobs**, which opens on the **New** tab (the tabs are
 **New**, **Shortlisted**, **Dismissed** and **All**). Select a job to read it
 beside the list, then choose **Shortlist** or **Dismiss…** to reject it
-reversibly with an optional reason.
+reversibly with an optional reason. **Dismissed** shows each job's reason and
+who dismissed it; the **By agent** filter lists the jobs your agent dismissed,
+and **Restore** moves a selection back to New in one action.
 
 ![Shortlist of selected jobs awaiting application preparation](../images/shortlist.png)
 
@@ -54,8 +56,8 @@ a blocking requirement for an application being prepared; the day it was sent
 otherwise), the state of the CV and letter ("Missing: letter" names what Ready
 still lacks), what the employer answered (or how long the wait is, highlighted
 once it is longer than the no-reply period) and the next action: **Review** a
-Ready application, **Decide** on a blocking requirement, **Answer** your agent's
-question, or **Record reply** for one that was sent.
+Ready application, **Decide** on a blocking requirement, or **Record reply** for
+one that was sent.
 
 Select rows (or every row shown) to act on them together: **Close as no reply**,
 **Close…** with an outcome, **Reopen…** to a stage or **Delete…**. Each
@@ -102,7 +104,7 @@ Below, five tabs hold the rest:
 | **Requirements** | The employer's conditions, each blocking or not and resolved or not, with your note. |
 | **Timeline** | The employer's replies, then one list of the notes and changes of the application and of its job, the pinned notes first, with filters. |
 | **Documents** | Every document revision: open, revise, add files to an incomplete one, delete. |
-| **Details** | Stage and outcome, priority, deadline, the time sent, the required documents and whether it is Ready, the pinned note, requests for your agent, the job and deletion. |
+| **Details** | Stage and outcome, priority, deadline, the time sent, the required documents and whether it is Ready, the pinned note, the job and deletion. |
 
 ## Write, compile and upload
 
@@ -154,7 +156,7 @@ documents** sets which documents count (CV and letter by default; untick one
 when the employer asks only for the other). Details says whether the
 application is Ready, and otherwise what is missing.
 
-![Details of a Ready application, with its plan, its pinned note, the request that led to it and the job](../images/application-ready.png)
+![Details of a Ready application, with its plan, its pinned note and the job](../images/application-ready.png)
 
 Because Ready is computed, it always follows the records: a new revision that
 is not complete yet, or a blocking requirement added or reopened, makes the
@@ -249,9 +251,9 @@ the job with its notes, files and maintenance actions.
 
 Closing an application keeps it in Applications, including its history and
 files. The **Timeline** lists the notes and recorded changes of the application
-and of its job in one list, newest first, each with who made it: you in the
-dashboard, a named API token (with the workflow of its run) or the system.
-Entries from before version 0.17 show "unknown (before 0.17)". The job's own
+and of its job in one list, newest first, each with one plain phrase for who
+made it: "by you", "by <token name>" for an agent token, or "by job sources".
+Entries from before version 0.17 name nobody. The job's own
 entries carry a **Job** tag. Filter by kind (notes, changes, employer
 replies), by who, by scope (this application or the job) and by period. Add a
 note on the application at the top; each note can be pinned, edited or deleted.

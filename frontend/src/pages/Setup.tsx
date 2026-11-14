@@ -76,7 +76,6 @@ export default function SetupPage() {
               facts={setup.facts}
               profile={setup.profile}
               preferences={setup.preferences}
-              questions={setup.questions}
               onNext={() => choose("next")}
             />
           ) : (

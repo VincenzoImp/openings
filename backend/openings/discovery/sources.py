@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from .. import events
 from ..collectors import company as company_collectors, jobspy as jobspy_collector
 from ..collectors.catalog import COMPANY_ADAPTERS
 from ..collectors.policy import ProviderDeferred
@@ -340,8 +341,8 @@ class SourceOperations:
                         stamp,
                     ),
                 )
-                self._record(
-                    connection, "source_created", "source", record_id, kind=resolved["kind"]
+                events.record(
+                    connection, "source_created", ("source", record_id), {"kind": resolved["kind"]}
                 )
                 remember(connection, "sources", value.idempotency_key, digest, record_id)
         return self._source(replayed or record_id)
@@ -393,13 +394,14 @@ class SourceOperations:
                     source_id,
                 ),
             )
-            self._record(
+            events.record(
                 connection,
                 "source_updated",
-                "source",
-                source_id,
-                fields=sorted(key for key in updates if key != "expected_version"),
-                version=row["version"] + 1,
+                ("source", source_id),
+                {
+                    "fields": sorted(key for key in updates if key != "expected_version"),
+                    "version": row["version"] + 1,
+                },
             )
         return self._source(source_id)
 
@@ -414,5 +416,5 @@ class SourceOperations:
                 (now(), source_id),
             )
             connection.execute("DELETE FROM sources WHERE id=?", (source_id,))
-            self._record(connection, "source_deleted", "source", source_id)
+            events.record(connection, "source_deleted", ("source", source_id))
         return {"deleted": True, "id": source_id}

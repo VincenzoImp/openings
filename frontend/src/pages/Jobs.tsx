@@ -4,9 +4,8 @@ import { Button, Card, EmptyState, Split, Tabs } from "../design";
 import { PageHead } from "../library/common";
 import { useFresh } from "../library/useFresh";
 import { useDebounce, useUrlFilters } from "../state";
-import type { Links } from "./activity/records";
+import type { Links } from "../library/records";
 import { AddJob } from "./jobs/AddJob";
-import { AgentBanner } from "./jobs/AgentBanner";
 import { Detail } from "./jobs/Detail";
 import {
   DEFAULTS,
@@ -104,7 +103,6 @@ export default function JobsPage({ onOpenApplication }: Links) {
         }))}
       >
         <div className="stack jobs-panel">
-          {section === "new" && <AgentBanner />}
           <Split
             columns="minmax(0, 1.15fr) minmax(0, 1fr)"
             labels={filters.job ? ["List", "Selected job"] : undefined}

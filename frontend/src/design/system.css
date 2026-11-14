@@ -43,12 +43,13 @@
   width: 210px;
   margin-left: auto;
 }
-/* A skill's description in the list: two lines; the panel shows it all */
-.skills .meta {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
+/* What the owner can ask the agent: a title, one sentence and an example. */
+.skills h3.title {
+  margin: 0;
+  font-size: inherit;
+}
+.skills p {
+  margin: var(--s1) 0 0;
 }
 .time {
   gap: var(--s1);
@@ -75,23 +76,6 @@
 .code-block.inline .code {
   padding-top: var(--s2);
   padding-bottom: var(--s2);
-}
-.skill-text {
-  max-height: 420px;
-}
-.dialog .skill-text {
-  max-height: none;
-}
-.local-notes {
-  background: var(--accent-soft);
-}
-.local-notes .caption,
-.local-notes .hint,
-.local-notes .meta {
-  color: var(--ink-2);
-}
-.local-notes .list > li {
-  border-color: var(--line-strong);
 }
 /* A provider of the request gate: its state, on/off, spacing and Save */
 .provider {

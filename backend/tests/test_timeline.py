@@ -7,8 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
-from openings.activity import ActivityService
-from openings.actors import OWNER, SYSTEM, acting_as, token_actor
+from openings.actors import OWNER, SYSTEM, acting_as, batch, token_actor
 from openings.app import create_app
 from openings.errors import DomainError
 from openings.workspace import Workspace
@@ -36,8 +35,7 @@ def seeded(workspace):
         on_older = workspace.add_note(
             first_job["id"], {"body": "Not this time.", "application_id": older["id"]}
         )
-    with acting_as(AGENT):
-        ActivityService(workspace).start_run({"workflow": "track-applications"})
+    with acting_as(AGENT), batch():
         on_current = workspace.add_note(
             first_job["id"], {"body": "Agent observation.", "application_id": current["id"]}
         )
@@ -81,8 +79,12 @@ def test_an_application_timeline_holds_its_entries_and_its_jobs_only(tmp_path):
     assert by_id[ids["on_job"]["id"]]["scope"] == {"type": "job", "id": ids["job"]["id"]}
     agent_note = by_id[ids["on_current"]["id"]]
     assert agent_note["scope"] == {"type": "application", "id": current["id"]}
-    assert agent_note["actor"]["token_kind"] == "agent"
-    assert agent_note["run"]["workflow"] == "track-applications"
+    assert agent_note["actor"] == "agent:Synthetic agent" and agent_note["batch_id"] is None
+    assert "run" not in agent_note
+    # The agent's changes of one call share one batch.
+    batches = {item["batch_id"] for item in items if item["actor"] == "agent:Synthetic agent"}
+    batches.discard(None)
+    assert len(batches) == 1 and batches.pop().startswith("b_")
     # Writing a note is represented by the note, not by an event too.
     kinds = [item["event"]["kind"] for item in items if item["type"] == "event"]
     assert "note_added" not in kinds and "job_added" in kinds
@@ -132,13 +134,13 @@ def test_filters_counts_and_paging(tmp_path):
     events = read(kinds=["event", "reply"])
     assert events["total"] == full["total"] - 3
     by_agent = read(who=["agent"])
-    assert by_agent["items"] and {item["actor"]["token_kind"] for item in by_agent["items"]} == {
-        "agent"
+    assert by_agent["items"] and {item["actor"] for item in by_agent["items"]} == {
+        "agent:Synthetic agent"
     }
     owner = read(who=["owner"])
-    assert {item["actor"]["kind"] for item in owner["items"]} == {"owner"}
+    assert {item["actor"] for item in owner["items"]} == {"owner"}
     system = read(who=["system"])
-    assert {item["actor"]["kind"] for item in system["items"]} == {"system"}
+    assert {item["actor"] for item in system["items"]} == {"system"}
     assert by_agent["total"] + owner["total"] + system["total"] == full["total"]
     job_only = read(scope="job")
     assert {item["scope"]["type"] for item in job_only["items"]} == {"job"}
@@ -160,24 +162,21 @@ def test_filters_counts_and_paging(tmp_path):
         workspace.timeline(job_id="unknown")
 
 
-def test_notes_record_their_author_and_run(tmp_path):
+def test_notes_record_their_author(tmp_path):
     workspace = Workspace(tmp_path / "timeline.sqlite")
     target = job(workspace)
     with acting_as(OWNER):
         owner = workspace.add_note(target["id"], {"body": "By the owner."})
     with acting_as(AGENT):
-        before_run = workspace.add_note(target["id"], {"body": "Before a run."})
-        run = ActivityService(workspace).start_run({"workflow": "review-inbox"})
-        in_run = workspace.add_note(target["id"], {"body": "In a run."})
+        agent = workspace.add_note(target["id"], {"body": "By the agent."})
     with acting_as(SYSTEM):
         system = workspace.add_note(target["id"], {"body": "By the system."})
-    assert (owner["author"]["kind"], owner["run"]) == ("owner", None)
-    assert before_run["author"]["name"] == "Synthetic agent" and before_run["run"] is None
-    assert in_run["run"] == {"id": run["id"], "workflow": "review-inbox"}
-    assert system["author"]["kind"] == "system"
-    assert (owner["scope"], owner["pinned"]) == ("job", False)
-    # The run report counts the note it wrote.
-    assert ActivityService(workspace).get_run(run["id"])["change_counts"] == {"note_added": 1}
+    assert [note["author"] for note in (owner, agent, system)] == [
+        "owner",
+        "agent:Synthetic agent",
+        "system",
+    ]
+    assert "run" not in owner and (owner["scope"], owner["pinned"]) == ("job", False)
 
 
 def test_one_pinned_note_per_scope_and_pinning_is_recorded(tmp_path):

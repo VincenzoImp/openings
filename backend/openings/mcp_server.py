@@ -12,6 +12,7 @@ from mcp.server.mcpserver.exceptions import (
 )
 from pydantic import ValidationError
 
+from .actors import batch
 from .errors import DomainError
 
 
@@ -72,6 +73,42 @@ REMOVED_TOOLS |= {
     "staleness_list": "Removed in 0.24: documents are no longer compared with changed inputs. List applications with applications_list and their revisions with documents_list.",
 }
 
+# #209: the agent-collaboration layer.
+_RUNS = "Removed in 0.24 with agent runs: report what you did in the chat. Your changes carry your token's actor label and one batch_id per tool call (events_list)."
+_QUESTIONS = "Removed in 0.24 with questions for the owner: ask the owner in the chat. Keep a lasting answer as a note on the job or application (notes_create) or in Preferences (preferences_update, section facts)."
+_REQUESTS = "Removed in 0.24 with requests for the agent: the owner asks in the chat. Keep what was agreed as a note on the job or application (notes_create)."
+_SKILL_NOTES = "Removed in 0.24 with skill local notes: skills are served as shipped. The owner's standing instructions are Preferences, section working_with_me (preferences_get, preferences_update)."
+REMOVED_TOOLS.update(
+    {
+        **dict.fromkeys(
+            ("runs_list", "runs_start", "runs_get", "runs_update", "runs_finish"), _RUNS
+        ),
+        **dict.fromkeys(
+            (
+                "questions_list",
+                "questions_ask",
+                "questions_get",
+                "questions_answer",
+                "questions_withdraw",
+            ),
+            _QUESTIONS,
+        ),
+        **dict.fromkeys(
+            (
+                "requests_list",
+                "requests_create",
+                "requests_get",
+                "requests_take",
+                "requests_complete",
+                "requests_decline",
+                "requests_withdraw",
+            ),
+            _REQUESTS,
+        ),
+        **dict.fromkeys(("skill_notes_get", "skill_notes_update"), _SKILL_NOTES),
+    }
+)
+
 
 class OpeningsMCP(MCPServer):
     """Return REST-shaped error bodies; the SDK runs sync tools in worker threads."""
@@ -81,7 +118,9 @@ class OpeningsMCP(MCPServer):
             if name in REMOVED_TOOLS and self._tool_manager.get_tool(name) is None:
                 raise DomainError(404, "tool_removed", REMOVED_TOOLS[name], {"tool": name})
             self._refuse_unknown_arguments(name, arguments)
-            return await super().call_tool(name, arguments, context)
+            # Every change of one tool call shares one batch id.
+            with batch():
+                return await super().call_tool(name, arguments, context)
         except DomainError as error:
             raise ToolError(error_text(error)) from error
         except ToolError as error:

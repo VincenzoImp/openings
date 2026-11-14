@@ -386,7 +386,7 @@ test("Settings creates an agent token that is refused owner operations", async (
     "true",
   );
   await expect(create).toContainText(
-    "Cannot change your password, manage tokens, restore a backup",
+    "Cannot change your password, manage tokens or restore a backup",
   );
   await create.getByLabel("Token name").fill(name);
   await create.getByLabel("Token name").press("Enter");
@@ -430,21 +430,19 @@ test("Settings creates an agent token that is refused owner operations", async (
   expect(
     await attempt("/auth/password", "POST", { password: "changed-password" }),
   ).toEqual([403, "forbidden"]);
-  // An agent may write the local notes of a skill: it is attributed.
-  const notes = await call(page, "/skills/manage-sources/notes");
-  expect(
-    await attempt("/skills/manage-sources/notes", "PUT", {
-      expected_version: notes.version,
-      text: `Noted by ${name}.`,
-    }),
-  ).toEqual([200, null]);
-  await go(page, "activity?section=timeline");
+  // An agent may write a note on a job: its history names the token.
+  const job = (await call(page, "/jobs?limit=1")).items[0];
+  const [status, code] = await attempt(`/jobs/${job.id}/notes`, "POST", {
+    body: `Noted by ${name}.`,
+  });
+  expect([status < 300, code]).toEqual([true, null]);
+  await go(page, `jobs?section=all&job=${job.id}`);
   await expect(
     page
-      .locator("main li", { hasText: "Skill notes updated" })
-      .first()
-      .locator(".actor"),
-  ).toHaveText(name);
+      .getByRole("list", { name: "Timeline of this job" })
+      .getByRole("listitem")
+      .filter({ hasText: `Noted by ${name}.` }),
+  ).toContainText(`by ${name}`);
 
   // Revoke both tokens with the keyboard; each asks first.
   await go(page, "settings?section=agents");
@@ -483,7 +481,6 @@ test("backup, records export and a guarded restore", async ({ page }) => {
   expect(
     records.knowledge.some((entry: { dates: unknown }) => entry.dates === null),
   ).toBe(true);
-  expect(records.skill_notes.length).toBeGreaterThan(0);
   // The workspace tab names the version and schema of this workspace.
   await go(page, "settings?section=workspace");
   const about = card(page, "This workspace");
