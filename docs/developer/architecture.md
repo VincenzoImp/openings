@@ -21,9 +21,9 @@ flowchart LR
 |---|---|
 | `backend/openings/workspace/` | Job identities, triage, notes, application attempts and reporting |
 | `backend/openings/duplicates.py`, `duplicate_signals.py` | Read-only duplicate candidates: per-job signals, pair confidence and groups |
-| `backend/openings/language_signals.py` | Deterministic text signals: the posting's language and the languages it requires or welcomes |
+| `backend/openings/language_signals.py` | Deterministic text signals: the posting's language and the languages it requires |
 | `backend/openings/job_signals.py` | Ingest signals of each job (stored, backfilled), listing observations and the dismissal record; labels and filters, never a dismissal |
-| `backend/openings/source_yield.py` | Yield of each collection source and search, from collected jobs to employer answers |
+| `backend/openings/stats.py` | Stats of sent applications in a period: replies, interviews, the median days to a reply, the funnel and replies by source |
 | `backend/openings/career/` | Profile, detailed evidence, claims and templates |
 | `backend/openings/preferences.py` | The owner's Preferences: five free-text sections with their versions, and the settings `no_reply_days` and `spoken_languages` |
 | `backend/openings/documents/` | Frozen contexts, document revisions and scoped file transfers |
@@ -67,15 +67,15 @@ belongs to the module of its concern.
 
 | Package | Modules |
 |---|---|
-| `workspace/` | `service.py` settings and the attributed change log; `jobs.py` job reads, filters and search; `job_changes.py` ingest, corrections, triage and Forget; `identity.py` URL lookup, duplicate candidates, distinct marks and Merge; `notes.py` notes, their author, run and pin; `timeline.py` the timeline of a job or an application; `applications.py` derived readiness, preparation summaries, lists and history; `application_changes.py` one open attempt per job, stages, responses, Ready and deletion; `bulk.py` per-item bulk results; `overview.py` the funnel |
+| `workspace/` | `service.py` settings and the attributed change log; `jobs.py` job reads, filters and search; `job_changes.py` ingest, corrections, triage and Forget; `identity.py` URL lookup, duplicate candidates, distinct marks and Merge; `notes.py` notes, their author, run and pin; `timeline.py` the timeline of a job or an application; `applications.py` derived readiness, preparation summaries, lists and history; `application_changes.py` one open attempt per job, stages, responses, Ready and deletion; `bulk.py` per-item bulk results |
 | `discovery/` | `service.py` the provider gate (`http_budget`, `fetch_bytes`); `models.py` typed inputs; `network.py` the public-address policy and the bounded fetch; `resolution.py` board detection and source configuration; `feeds.py` posting readers (Lever, Ashby, RSS) and adapter dispatch; `sources.py` source schemas, preview and writes; `runs.py` the global switch, provider policies, queueing, scheduling and run records; `tasks.py` leases, retry and running one collection |
 | `documents/` | `contexts.py` frozen contexts and their staleness reports; `revisions.py` creation, cited evidence, review, comparison and deletion; `sources.py` the source and PDF of a CV or letter and its derived text; `text.py` readable text of a TeX source; `latex.py` what CV and letter class commands print; `files.py` owned files and scoped transfer grants; `models.py` inputs |
 | `career/` | `profile.py` the Profile; `entries.py` Career entries; `claims.py`; `templates.py`; `imports.py`; `models.py` inputs and defaults; `records.py` row helpers shared with documents |
-| `interfaces/` | One module per area declaring its operations and binding them to its service: `core.py` (workspace, jobs, notes, applications, overview), `career.py`, `documents.py`, `discovery.py`, `activity.py`, `agent_requests.py`, `preferences.py`, `outcomes.py`, `insights.py`, `source_yield.py`, `skills.py` and `system.py` (sign-in, tokens, capabilities, backup, restore, examples, export); `registry.py` the declaration and its binding |
+| `interfaces/` | One module per area declaring its operations and binding them to its service: `core.py` (workspace, jobs, notes, applications), `career.py`, `documents.py`, `discovery.py`, `activity.py`, `agent_requests.py`, `preferences.py`, `outcomes.py`, `stats.py`, `skills.py` and `system.py` (sign-in, tokens, capabilities, backup, restore, examples, export); `registry.py` the declaration and its binding |
 
 Services never import FastAPI routing or MCP registration; `interfaces/` binds
 them, and `app.py` calls each area in a fixed order. Smaller concerns stay single
-modules (`activity.py`, `outcomes.py`, `insights.py`, `staleness.py`,
+modules (`activity.py`, `outcomes.py`, `stats.py`, `staleness.py`,
 `job_signals.py` and the others in the code map). When a module approaches the
 limit, split it the same way rather than growing it.
 
@@ -226,8 +226,8 @@ route, tool or surface is not registered.
   `no_reply_days` and `spoken_languages`. Preparing a context freezes the
   sections (`payload.preferences`), each as its own content-addressed part.
 - **Signals:** `job_signals` holds one row per job: the posting's language and
-  confidence, required language groups (one language of a group suffices) and
-  welcome languages from `language_signals` (weighted function words and phrase
+  confidence and the required language groups (one language of a group suffices;
+  a language stated only as an advantage is not required) from `language_signals` (weighted function words and phrase
   cues in English, German, French and Italian; no model), computed in the
   ingest transaction and again when the title or posting changes
   (`content_version`, `format`). The likely duplicate (`duplicate_of`,
@@ -241,12 +241,15 @@ route, tool or surface is not registered.
   `jobs.dismissed_*` records every dismissal (who, when, why) and is cleared on
   restore. Duplicates are never merged. `jobs_list` with
   `hide_unspoken_required` leaves out jobs with a required language group none
-  of whose languages is in `spoken_languages`, and reports how many. `source_yield` attributes each job to the source of its earliest
-  observation and counts its outcome once.
+  of whose languages is in `spoken_languages`, and reports how many. `sources_list` counts, per source, the jobs it found
+  (each once) and how many were shortlisted, applied to and got a reply, in one
+  grouped query on `postings_source(source_id,job_id)`.
 - **Truth:** approved claims and narrative evidence guide an external agent;
   reference/length validation does not establish factual accuracy. Review outputs.
 - **Career:** entries have structured organizations, nullable partial dates, skill
   tags and ordering. Descriptions are optional; claims contain free reusable text.
+  A claim's one typed selection field is `always_include` (★ in the dashboard);
+  any other hint an agent keeps (such as a role or group) goes in its `metadata`.
   Reserved structured fields are stored once, outside arbitrary metadata.
 - **Attribution:** authentication sets the actor (owner session, named API token
   with its kind, or system) in a context variable (`actors.py`) that reaches the
@@ -361,8 +364,7 @@ is free after large deletions, `compaction.py` rewrites the file at start: a
 compact copy beside the database is copied back in one transaction, so an
 interruption leaves the previous file valid and the next start tries again.
 `outcomes.no_reply_period` is the only definition of the no-reply period (the
-setting `no_reply_days`, else 30); `insights.py` maps titles to role family and seniority with fixed
-keyword tables and no model.
+setting `no_reply_days`, else 30).
 
 Retention is one environment setting, `OPENINGS_RETENTION_DAYS` (default 90, 0
 off). The scheduler thread calls `retention.prune` at start and every six hours;

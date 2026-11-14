@@ -126,7 +126,7 @@ mechanics, not personal selection or writing rules.
   application that never got an answer.
 - `applications_list(value: {no_reply_due: true})` /
   `GET /applications?no_reply_due=true` lists the Applied applications past the
-  no-reply period; `insights_get` / `GET /insights` reads the rates.
+  no-reply period; `stats_get` / `GET /stats` reads the rates.
 
 ## Runs and questions
 

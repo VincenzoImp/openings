@@ -103,15 +103,12 @@ Description retrieval is automatic. Candidates awaiting text stay in the run
 checkpoint; only usable automatic postings enter the archive. Inspect pending,
 unavailable and failed results before calling a collection complete.
 
-`sources_yield({since?, until?, min_sample?})` reports, per source and per
-search, what the jobs it first collected became: collected, to review,
-shortlisted, applied, employer responses, dismissed (by agent, owner or
-other), likely duplicates and postings no longer listed, with
-searches split by job board. Use it to tune sources (manage-sources).
+`sources_list` gives each source `counts`: the jobs it found (each once) and
+how many were shortlisted, applied to and got a reply. Use them to tune sources
+(manage-sources).
 
 Every job has `signals` computed at collection without a model: `language`,
-the languages it states as `required` (groups, one of a group suffices) or
-`welcome`, a likely `duplicate` of an earlier job with its confidence, and
+the languages it states as `required` (groups, one of a group suffices), a likely `duplicate` of an earlier job with its confidence, and
 `no_longer_listed` (a company board stopped listing it; `unlisted_at` on the
 observation). Signals are labels and filters; nothing dismisses a job
 automatically. `jobs_list` filters by `signal`, `posting_language`,
@@ -171,7 +168,7 @@ the application `version`: read it again before the next update.
 `ready: false` with `status: "draft"` lists Preparing applications not marked
 ready.
 
-## Employer responses, no reply and insights
+## Employer responses, no reply and stats
 
 `responses_list(application_id)`, `responses_create(application_id, value)`,
 `responses_update(response_id, value)` and `responses_delete(response_id,
@@ -196,13 +193,12 @@ lists Applied applications sent before the no-reply cutoff; every list result
 has `no_reply` with `days`, `source` (`settings` or `default`) and `due`. The
 period comes from the setting `no_reply_days`, else 30.
 
-`insights_get(value)` / `GET /insights` takes `min_sample` (1-100, default 5),
-`applied_since` and `applied_until`. It returns `overall` (sent, responded,
-interviews, offers, rejections, no reply, waiting, the three rates,
-`median_days_to_response`, `timed`, `undated`), `time_to_response` buckets,
-`groups` (`role_family`, `seniority`, `location`, `source_kind`, `source`,
-`month`) and `excluded` (`preparing`, `closed_unsent`). A rate or median below
-the sample is `null` with `withheld`.
+`stats_get(value)` / `GET /stats` takes `period` (`90d`, `12m` or `all`). It
+returns `applied`, `replied`, `reply_rate`, `interviews`, `interview_rate`,
+`median_days_to_reply`, the `funnel` (applied, replied, interview, offer) and
+`by_source` (replies per source, `null` unless two sources have five sent
+applications each). `insights_get`, `overview_get` and `sources_yield` were
+removed in 0.24 and answer `tool_removed`.
 
 ## Requests for the agent
 

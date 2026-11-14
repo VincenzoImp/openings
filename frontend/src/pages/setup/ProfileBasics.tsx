@@ -5,7 +5,7 @@ import { useWorkspace } from "../../state";
 
 /**
  * The first fields of the Profile. Career, Profile has the rest: phone,
- * summary, links and other details.
+ * summary and links.
  */
 export function ProfileBasics({
   profile,

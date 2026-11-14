@@ -27,14 +27,13 @@ and submit. Jobs, documents and file bytes live in one portable SQLite database.
   when you confirm) and a company-board posting no longer listed. Signals label
   and filter jobs, for example hiding jobs that require languages you don't
   speak; nothing is dismissed automatically. Bulk actions work on up to 200 jobs.
-- **Measure sources:** **Yield** counts, per source and search, the jobs it found
-  first and how many were shortlisted, applied to, answered by an employer or
-  dismissed, and by whom.
+- **Measure sources:** each source shows how many jobs it found and how many of
+  them you shortlisted, applied to and got a reply for.
 - **Decide once:** **Preferences** hold, in your own words, what you are looking
   for, what you rule out, the facts employers ask about, your writing rules and
   how the agent should work with you. Your agent reads and applies them.
-- **Prepare:** store your Profile, Career entries, approved claims with typed
-  selection fields, LaTeX templates with guidance and typed limits. Each application freezes the exact context its CV,
+- **Prepare:** store your Profile, Career entries, approved claims (★ always
+  include in your CV), LaTeX templates with guidance and typed limits. Each application freezes the exact context its CV,
   cover letter and form answers were written from. A CV or letter revision is its
   `.tex` source and the PDF built from it; Openings reads its text from the source
   for review, search and comparison between revisions, without running TeX.
@@ -51,12 +50,13 @@ and submit. Jobs, documents and file bytes live in one portable SQLite database.
   writing rules in Preferences, templates, Career), naming the part, and a PDF built from another
   source than its revision's is refused.
 - **Track:** follow applications through Preparing, Ready, Applied, Interview,
-  Offer and Closed as a list or a board. Record the employer's rejection,
+  Offer and Closed. Record the employer's rejection,
   interview or offer with its date, and close the ones that never answered as
   **No reply** after a period you set in Preferences.
-- **Learn:** **Insights** shows which applications get answers: response, interview
-  and offer rates and the time to an answer by role family, seniority, source,
-  location and month, withheld for samples too small to read.
+- **Learn:** **Stats** shows, for the last 90 days, 12 months or all time, how many
+  applications you sent, the share that got a reply or led to an interview, the
+  median days to a reply, the funnel and, once two sources have enough
+  applications, replies by source.
 - **See what the agent did:** every change records who made it. An agent works in
   runs with a stored report, and asks you questions that you answer under **Activity**.
 - **Tell the agent what to do next:** write a request under **Activity**, or

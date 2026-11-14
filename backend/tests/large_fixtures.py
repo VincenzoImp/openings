@@ -72,7 +72,6 @@ def seed_signals(workspace):
                     signals["language"],
                     signals["language_confidence"],
                     json.dumps(signals["required"]),
-                    json.dumps(signals["welcome"]),
                     duplicate,
                     0.9 if duplicate else None,
                     stamp(datetime.now(UTC)),
@@ -81,8 +80,8 @@ def seed_signals(workspace):
             previous = job_id
         conn.executemany(
             "INSERT INTO job_signals(job_id,format,content_version,language,language_confidence,"
-            "required,welcome,duplicate_checked,duplicate_of,duplicate_confidence,computed_at) "
-            "VALUES(?,?,?,?,?,?,?,1,?,?,?)",
+            "required,duplicate_checked,duplicate_of,duplicate_confidence,computed_at) "
+            "VALUES(?,?,?,?,?,?,1,?,?,?)",
             rows,
         )
 
@@ -91,7 +90,7 @@ def seed_large(workspace, jobs, applications, sources=0):
     """Write ``jobs`` jobs and ``applications`` applications (on the first jobs).
 
     With ``sources``, that many company sources are created and four jobs in five
-    are first observed by one of them, so source yield has something to count.
+    are first observed by one of them, so the per-source counts have something to count.
     """
     now = datetime.now(UTC)
     sha = hashlib.sha256(PDF).hexdigest()
@@ -232,8 +231,8 @@ def seed_large(workspace, jobs, applications, sources=0):
             kind = {"interview": "interview", "offer": "offer", "closed": "rejection"}.get(status)
             if kind and applied and outcome != "no_response":
                 conn.execute(
-                    "INSERT INTO responses(id,application_id,kind,date,origin,created_by_kind,"
-                    "updated_by_kind,created_at,updated_at) VALUES(?,?,?,?,'stage','owner','owner',?,?)",
+                    "INSERT INTO responses(id,application_id,kind,date,created_by_kind,"
+                    "updated_by_kind,created_at,updated_at) VALUES(?,?,?,?,'owner','owner',?,?)",
                     (
                         new_id(),
                         app_id,

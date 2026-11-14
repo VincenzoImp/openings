@@ -15,22 +15,18 @@ import {
   ErrorBanner,
   GridTable,
   Loading,
-  SegmentedControl,
 } from "../../design";
 import { Pager, plural } from "../../library/common";
 import { useFresh } from "../../library/useFresh";
 import { selectRecords, useDebounce } from "../../state";
-import { BoardView } from "./BoardView";
 import { BulkBar } from "./BulkBar";
 import {
-  DEFAULTS,
   STAGES,
   bulkActions,
   listQuery,
   outcomeLabels,
   stageCounts,
   type Filters,
-  type StageKey,
 } from "./model";
 import { COLUMNS, HEAD, Row } from "./Row";
 
@@ -51,7 +47,7 @@ const SORTS: Record<string, string> = {
 
 /**
  * The pipeline: stage chips with their counts, search and filters, and the
- * applications as a list (with selection and bulk actions) or as a board.
+ * applications as a list with selection and bulk actions.
  */
 export function Pipeline({
   filters,
@@ -63,9 +59,8 @@ export function Pipeline({
   const q = useDebounce(filters.q);
   const current = { ...filters, q };
   const offset = Number(filters.offset) || 0;
-  const board = filters.view === "board";
   const list = useFresh<ListResult<Application>>(
-    board ? null : `/applications?${listQuery(current, LIMIT, offset)}`,
+    `/applications?${listQuery(current, LIMIT, offset)}`,
     NONE,
     SCOPES,
   );
@@ -88,7 +83,6 @@ export function Pipeline({
   const [selection, setSelection] = useState<Record<string, number>>({});
   const [failures, setFailures] = useState<string[]>([]);
   const [open, setOpen] = useState<string | null>(null);
-  const [showClosed, setShowClosed] = useState(false);
   const days = counts.data.no_reply?.days ?? 30;
   const chips = stageCounts(counts.data);
   // A new list keeps the selection with the versions it now has.
@@ -189,15 +183,6 @@ export function Pipeline({
               }
             />
           </label>
-          <SegmentedControl
-            label="Layout"
-            value={board ? "board" : "list"}
-            onChange={(view) => setFilters({ view })}
-            options={[
-              { id: "list", label: "List" },
-              { id: "board", label: "Board" },
-            ]}
-          />
         </div>
       </div>
       <div className="filterbar" role="group" aria-label="Filters">
@@ -237,25 +222,23 @@ export function Pipeline({
             ))}
           </select>
         </label>
-        {!board && (
-          <label className="toggle">
-            <span className="muted">Sort</span>
-            <select
-              aria-label="Sort"
-              className="input"
-              value={filters.sort}
-              onChange={(event) =>
-                setFilters({ sort: event.target.value, offset: "0" })
-              }
-            >
-              {Object.entries(SORTS).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
+        <label className="toggle">
+          <span className="muted">Sort</span>
+          <select
+            aria-label="Sort"
+            className="input"
+            value={filters.sort}
+            onChange={(event) =>
+              setFilters({ sort: event.target.value, offset: "0" })
+            }
+          >
+            {Object.entries(SORTS).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </label>
         {filters.waiting && (
           <Button
             size="sm"
@@ -306,22 +289,8 @@ export function Pipeline({
           </ul>
         </Banner>
       )}
-      <section
-        className="card"
-        aria-label={`Applications as a ${board ? "board" : "list"}`}
-      >
-        {board ? (
-          <BoardView
-            filters={current}
-            days={days}
-            closedCount={chips.closed}
-            showClosed={showClosed}
-            onShowClosed={setShowClosed}
-            onStage={(stage: StageKey) =>
-              setFilters({ stage, view: DEFAULTS.view, offset: "0" })
-            }
-          />
-        ) : list.error ? (
+      <section className="card" aria-label="Applications as a list">
+        {list.error ? (
           <div className="body">
             <ErrorBanner message={list.error} retry={list.reload} />
           </div>

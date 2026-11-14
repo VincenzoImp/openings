@@ -507,19 +507,3 @@ class ApplicationQuery(Input):
     @classmethod
     def valid_date(cls, value, info):
         return normalized_date(value, end=info.field_name.endswith("_until"))
-
-
-class PeriodQuery(Input):
-    since: str | None = None
-    until: str | None = None
-
-    @field_validator("since", "until")
-    @classmethod
-    def valid_date(cls, value, info):
-        return normalized_date(value, end=info.field_name == "until")
-
-    @model_validator(mode="after")
-    def valid_range(self):
-        if self.since and self.until and self.since > self.until:
-            raise ValueError("The start date must not follow the end date.")
-        return self

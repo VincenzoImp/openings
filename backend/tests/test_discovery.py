@@ -53,7 +53,7 @@ def test_user_completed_posting_survives_source_preview_refresh(case):
     assert refreshed["posting"] == "Build SQL services."
     assert refreshed["metadata"]["description_complete"] is False
     assert workspace.list_jobs(complete=True)["total"] == 1
-    assert workspace.overview()["incomplete"] == 0
+    assert workspace.list_jobs(complete=False)["total"] == 0
     # The observation is refreshed in place and stores no provider response.
     seen = workspace.db.all("SELECT payload FROM postings WHERE job_id=?", (preview["id"],))
     assert [row["payload"] for row in seen] == ["{}"]

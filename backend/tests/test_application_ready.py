@@ -311,8 +311,6 @@ def test_the_ready_queue_lists_filters_sorts_and_counts(app):
     assert "ready_by_kind" not in item
     other = next(item for item in listed["items"] if item["id"] == reviewed["id"])
     assert (other["readiness"], other["ready_at"], other["ready_by"]) == ("reviewed", None, None)
-    overview = workspace.overview()
-    assert (overview["drafts"], overview["ready"]) == (4, 2)
 
     result = workspace.bulk_applications(
         {

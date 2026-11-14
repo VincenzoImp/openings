@@ -11,9 +11,8 @@ import {
   type Cookies,
 } from "./session";
 
-// Applications (stage 3 of #135): the pipeline as a list and a board, the
-// employer's responses, bulk actions, Insights and the review page with its
-// tabs. Each test starts from the seeded workspace (fixtures.ts).
+// Applications (stage 3 of #135): the pipeline, the employer's responses,
+// bulk actions, Stats and the review page with its tabs. Each test starts from the seeded workspace (fixtures.ts).
 const cookies: Cookies = ownerSession();
 const errors = new WeakMap<Page, string[]>();
 test.beforeEach(async ({ page }) => {
@@ -598,9 +597,7 @@ test("selected applications are closed as no reply, reopened and deleted togethe
   expect(draft.id).toBeTruthy();
 });
 
-test("the pipeline counts each stage, filters and shows a board", async ({
-  page,
-}) => {
+test("the pipeline counts each stage and filters", async ({ page }) => {
   await go(page, "applications");
   await settled(page);
   const counts = await call(page, "/applications?limit=1");
@@ -641,55 +638,54 @@ test("the pipeline counts each stage, filters and shows a board", async ({
     row(page, "Platform Engineer").getByRole("link", { name: /^Decide/ }),
   ).toHaveAttribute("href", /tab=requirements$/);
   await page.getByRole("searchbox", { name: "Search applications" }).fill("");
-
-  // The board: one column per open stage, the rest of a stage in the list.
-  await page.getByRole("button", { name: "Board", exact: true }).click();
-  await expect(page).toHaveURL(/view=board/);
-  const board = page.getByRole("region", { name: "Applications as a board" });
-  await expect(board.locator("section h3")).toHaveText([
-    /^Preparing/,
-    /^Ready/,
-    /^Applied/,
-    /^Interview/,
-    /^Offer/,
-  ]);
-  await board.getByRole("button", { name: "Show closed" }).click();
-  await expect(board.locator("section h3")).toHaveCount(6);
-  await board.getByRole("button", { name: /more in Applied$/ }).click();
-  await expect(page).toHaveURL(/stage=applied/);
+  // One layout: a list, without a board.
+  await expect(page.getByRole("button", { name: "Board" })).toHaveCount(0);
   await expect(page.getByRole("table", { name: "Applications" })).toBeVisible();
   await fitsViewport(page);
 });
 
-test("Insights shows the rates of sent applications and withholds small groups", async ({
+test("Stats counts the applications sent in a period and how employers replied", async ({
   page,
 }) => {
-  await go(page, "applications?section=insights");
+  await go(page, "applications");
+  await page.getByRole("tab", { name: "Stats" }).click();
+  await expect(page).toHaveURL(/section=stats/);
   await settled(page);
-  const report = await call(page, "/insights");
+  const report = await call(page, "/stats?period=90d");
   const stats = page.locator(".tiles .stat");
-  await expect(stats.filter({ hasText: "Applications sent" })).toContainText(
-    String(report.overall.sent),
+  await expect(stats.filter({ hasText: "Applied" })).toContainText(
+    String(report.applied),
   );
-  await expect(stats.filter({ hasText: "Got an answer" })).toContainText(
-    `${report.overall.responded} of ${report.overall.sent}`,
+  await expect(stats.filter({ hasText: "Reply rate" })).toContainText(
+    `${report.replied} of ${report.applied}`,
   );
-  await expect(page.getByText("Not counted:")).toContainText(
-    `${report.excluded.closed_unsent} application`,
+  await expect(stats.filter({ hasText: "Interview rate" })).toContainText(
+    `${report.interviews} of ${report.applied}`,
   );
-  const families = page
-    .locator("section.card")
-    .filter({ has: page.getByRole("heading", { name: "By role family" }) });
-  for (const group of report.groups.role_family) {
-    const line = families.getByRole("row").filter({ hasText: group.label });
-    await expect(line).toContainText(String(group.sent));
-    if (group.withheld)
-      await expect(line).toContainText("Too few to show a rate");
-  }
-  await page.getByRole("button", { name: "Last 90 days" }).click();
-  await expect(page).toHaveURL(/period=90/);
+  await expect(
+    stats.filter({ hasText: "Median days to a reply" }),
+  ).toBeVisible();
+  const funnel = page.getByRole("table", { name: "Funnel" });
+  await expect(funnel.getByRole("row")).toHaveCount(report.funnel.length + 1);
+  await expect(
+    page.getByRole("table", { name: "Replies by source" }),
+  ).toHaveCount(report.by_source ? 1 : 0);
+  // One period control; the other periods are read the same way.
+  await page.getByRole("button", { name: "All time" }).click();
+  await expect(page).toHaveURL(/period=all/);
   await settled(page);
-  await expect(page.getByRole("heading", { name: "Progress" })).toBeVisible();
+  const all = await call(page, "/stats?period=all");
+  await expect(stats.filter({ hasText: "Applied" })).toContainText(
+    String(all.applied),
+  );
+  await page.getByRole("button", { name: "Last 12 months" }).click();
+  await expect(page).toHaveURL(/period=12m/);
+  await settled(page);
+  // No Progress table and no breakdowns by role or month.
+  await expect(page.getByRole("heading", { name: "Progress" })).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "By role family" }),
+  ).toHaveCount(0);
   await fitsViewport(page);
 });
 
@@ -768,11 +764,7 @@ test("requirements, the plan and a concurrent change in the details", async ({
       },
     ],
   });
-  // The old drawer's address opens the review page on the same tab.
-  await go(
-    page,
-    `applications?application=${application.id}&detail=requirements`,
-  );
+  await go(page, `review?application=${application.id}&tab=requirements`);
   await expect(page).toHaveURL(/#review\?application=.*&tab=requirements$/);
   await settled(page);
   const list = page.getByRole("form", { name: "Requirements" });

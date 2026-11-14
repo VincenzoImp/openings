@@ -121,8 +121,7 @@ test("version conflict reviews latest values and reloads the editor with a usabl
     company: "Original",
     posting: "Build services.",
   });
-  // The old drawer's address opens the job in Jobs.
-  await go(page, `inbox?job=${job.id}`);
+  await go(page, `jobs?job=${job.id}`);
   await expect(page).toHaveURL(new RegExp(`#jobs\\?job=${job.id}$`));
   const editor = page.getByRole("form", { name: "Correct this job" });
   await page.getByText("Correct the job", { exact: true }).click();
@@ -179,11 +178,15 @@ test("import protection and nested dialogs restore scroll after browser Back", a
   await top(page)
     .getByRole("button", { name: "Close dialog", exact: true })
     .click();
-  // A claim of the selected entry opens in a dialog.
+  // A claim of the selected entry opens in a dialog, from its menu.
   const detail = page
     .getByRole("group", { name: "Shown pane" })
     .getByRole("button", { name: "Selected entry", exact: true });
   if (await detail.isVisible()) await detail.click();
+  await page
+    .getByRole("button", { name: /^More actions for claim: /, exact: false })
+    .first()
+    .click();
   await page
     .getByRole("button", { name: /^Edit claim: /, exact: false })
     .first()
@@ -220,7 +223,7 @@ test("mobile navigation contains focus and releases the background on close and 
   await expect(page.locator("main")).not.toHaveAttribute("inert", "");
 });
 
-test("mobile applications, templates and progress stay usable inside the viewport", async ({
+test("mobile applications, templates and stats stay usable inside the viewport", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -252,13 +255,9 @@ test("mobile applications, templates and progress stay usable inside the viewpor
   await expect
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
     .toBeLessThanOrEqual(390);
-  // The progress of sent applications stacks its table in Insights.
-  await go(page, "applications?section=insights");
-  await expect(
-    page.getByRole("table", {
-      name: "Sent applications by the furthest stage they reached",
-    }),
-  ).toBeVisible();
+  // Stats fits the phone: its numbers and the funnel.
+  await go(page, "applications?section=stats");
+  await expect(page.getByRole("table", { name: "Funnel" })).toBeVisible();
   await expect
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
     .toBeLessThanOrEqual(390);

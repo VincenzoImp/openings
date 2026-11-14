@@ -73,12 +73,12 @@ while Today keeps being opened and ends after 30 minutes without it, so reloadin
 or looking at a run and coming back changes nothing. The browser remembers the
 visit; on the first visit, or when the browser keeps no site data, Today shows
 the last 7 days and says so. How your applications fare is under
-**Applications**, **Insights**.
+**Applications**, **Stats**.
 
 On a phone the bottom bar shows the four Work destinations and **More**, which
-opens Library and System. The top bar switches between the light and dark theme
-and between comfortable and compact rows; both choices are remembered in the
-browser, and the theme follows the system until you choose one.
+opens Library and System. The top bar switches between the light and dark theme;
+the choice is remembered in the browser, and the theme follows the system until
+you choose one.
 
 ## Your first job
 

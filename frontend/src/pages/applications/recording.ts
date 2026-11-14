@@ -56,7 +56,7 @@ export function respondPlan(
       body: { status: "closed", outcome: "no_response", concluded_on: date },
       submit: "Close as no reply",
       caption:
-        "No reply closes the application. Insights counts it as sent without an answer.",
+        "No reply closes the application. Stats counts it as sent without a reply.",
       note: false,
     };
   if (choice === "interview")

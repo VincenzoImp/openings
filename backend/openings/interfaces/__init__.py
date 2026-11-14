@@ -13,11 +13,10 @@ from . import (
     core,
     discovery,
     documents,
-    insights,
     outcomes,
     preferences,
     skills,
-    source_yield,
+    stats,
     system,
 )
 
@@ -32,8 +31,7 @@ AREAS = (
     agent_requests,
     preferences,
     outcomes,
-    insights,
-    source_yield,
+    stats,
 )
 
 

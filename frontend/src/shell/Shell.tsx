@@ -25,16 +25,8 @@ import {
 } from "./Screens";
 import { markSetup, readNewWorkspace, setupMark } from "./setup";
 import { TopBar } from "./TopBar";
-import {
-  THEME_KEY,
-  applyDensity,
-  applyTheme,
-  initialDensity,
-  initialTheme,
-  type Density,
-  type Theme,
-} from "./preferences";
-import { HOME, SCREENS, canonicalHash, routeOf } from "./routes";
+import { THEME_KEY, applyTheme, initialTheme, type Theme } from "./preferences";
+import { HOME, SCREENS, routeOf } from "./routes";
 
 const NARROW = "(max-width: 860px)";
 const emptyList = { items: [], total: 0 };
@@ -50,10 +42,9 @@ function useNarrow() {
   return narrow;
 }
 
-/** Theme and density as the owner chose them; the theme follows the system until then. */
+/** The theme as the owner chose it; it follows the system until then. */
 function usePreferences() {
-  const [theme, setTheme] = useState<Theme>(initialTheme),
-    [density, setDensity] = useState<Density>(initialDensity);
+  const [theme, setTheme] = useState<Theme>(initialTheme);
   useEffect(() => {
     const media = matchMedia("(prefers-color-scheme: dark)");
     const follow = () => {
@@ -71,16 +62,10 @@ function usePreferences() {
   }, []);
   return {
     theme,
-    density,
     toggleTheme: () => {
       const next = theme === "light" ? "dark" : "light";
       applyTheme(next);
       setTheme(next);
-    },
-    toggleDensity: () => {
-      const next = density === "compact" ? "comfortable" : "compact";
-      applyDensity(next);
-      setDensity(next);
     },
   };
 }
@@ -93,7 +78,7 @@ export function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
   const [route, setRoute] = useState(() => routeOf(location.hash)),
     [more, setMore] = useState(false);
   const narrow = useNarrow();
-  const { theme, density, toggleTheme, toggleDensity } = usePreferences();
+  const { theme, toggleTheme } = usePreferences();
   const { pending, refresh, notify } = useWorkspace();
   const inbox = useResource<ListResult<never>>(
       "/jobs?queue=inbox&limit=1",
@@ -110,30 +95,17 @@ export function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
     runs = useResource<ListResult<Run>>("/runs?status=open&limit=1", emptyList);
 
   useEffect(() => {
-    // Another name of a screen (#overview, #jobs) is rewritten to the route that
-    // shows it, so links and the Back button see one address per screen.
-    const canonicalise = () => {
-      const canonical = canonicalHash(location.hash);
-      if (canonical) history.replaceState(null, "", canonical);
-      return Boolean(canonical);
-    };
-    // A screen that already read the old address reads the rewritten one.
-    const announce = () => window.dispatchEvent(new PopStateEvent("popstate"));
-    const rewritten = canonicalise();
     lastRoute.current = location.hash;
-    if (rewritten) announce();
     const listener = () => {
       if (location.hash === lastRoute.current) return;
       if (!confirmLeave()) {
         history.replaceState(null, "", lastRoute.current || `#${HOME}`);
         return;
       }
-      const changed = canonicalise();
       lastRoute.current = location.hash;
       setRoute(routeOf(location.hash));
       setMore(false);
       window.scrollTo(0, 0);
-      if (changed) announce();
     };
     const remember = () => {
       lastRoute.current = location.hash;
@@ -263,8 +235,6 @@ export function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
             onRefresh={refresh}
             theme={theme}
             onTheme={toggleTheme}
-            density={density}
-            onDensity={toggleDensity}
             inert={more}
           />
           <main

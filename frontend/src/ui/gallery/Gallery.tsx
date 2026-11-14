@@ -575,7 +575,10 @@ function JobDetail({
       <div className="gx-block-lg">
         <Properties
           items={[
-            { label: "Language", value: "Posting in English · German welcome" },
+            {
+              label: "Language",
+              value: "Posting in English · Requires German",
+            },
             { label: "Salary", value: "CHF 115–135k" },
             { label: "Deadline", value: "None given" },
             {
