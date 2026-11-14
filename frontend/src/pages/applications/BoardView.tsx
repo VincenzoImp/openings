@@ -8,13 +8,13 @@ import {
   STAGES,
   listQuery,
   planTags,
-  responseLine,
+  replyLine,
   type Filters,
   type StageKey,
 } from "./model";
 
 const NONE = { items: [], total: 0 };
-const SCOPES = ["applications", "jobs", "documents", "files", "responses"];
+const SCOPES = ["applications", "jobs", "documents", "files"];
 const TILES = 6;
 
 /** One stage of the board: its first applications as tiles, and a link to the rest. */
@@ -46,7 +46,7 @@ function Column({
       </h3>
       {list.error && <ErrorBanner message={list.error} retry={list.reload} />}
       {list.data.items.map((application) => {
-        const response = responseLine(application, days);
+        const response = replyLine(application, days);
         const tags = [
           ...planTags(application).filter((tag) => tag.tone),
           ...(response.text && stage !== "closed" ? [response] : []),
@@ -101,7 +101,7 @@ export function BoardView({
   onStage: (stage: StageKey) => void;
 }) {
   const stages: StageKey[] = [
-    "preparing",
+    "shortlisted",
     "ready",
     "applied",
     "interview",

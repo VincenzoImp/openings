@@ -1,30 +1,31 @@
-"""Document revisions: creation, evidence, review, comparison and deletion.
+"""Document revisions: creation, evidence, comparison and deletion.
 
-A CV or letter revision (``SOURCE_KINDS``) is its uploaded .tex source and PDF,
-the evidence it cites and an optional note; its text is derived from the source
-(``sources.py``). Form answers and other documents keep structured content.
-Content stored on a CV or letter before 0.22 is kept read-only as
-``legacy_content``.
+A CV or letter revision (``SOURCE_KINDS``) is its PDF and an optional TeX source,
+the evidence it cites and an optional note. Creating it returns one-shot upload
+grants; it is incomplete until its PDF is stored, then complete and immutable
+(``sources.py``). Its readable text comes from the source, else from the PDF. Form
+answers and other documents keep structured content. Content stored on a CV or
+letter before 0.22 is kept read-only as ``legacy_content``.
 """
 
 from __future__ import annotations
 
 import difflib
+import hashlib
 import json
-from typing import Literal
 
 from ..career.records import _get, _page
 from ..common import check_version, encode, new_id, now
-from ..errors import DomainError, conflict, missing
+from ..errors import DomainError, missing
 from ..idempotency import fingerprint, remember, replay
-from .models import SOURCE_KINDS, DocumentCreate, ReviewUpdate
-from .sources import approval_problem
+from .models import SOURCE_KINDS, DocumentCreate, UploadReservation
+from .pdf import pdf_text
+from .sources import PDF, refresh_text, source_hash, store_pdf_text
 from .text import is_tex_source
 
 # Columns of a revision summary; the full record adds content, text and evidence.
-SUMMARY_COLUMNS = (
-    "id,application_id,context_id,kind,title,previous_id,review_state,version,created_at"
-)
+SUMMARY_COLUMNS = "id,application_id,context_id,kind,title,previous_id,text_from,version,created_at"
+TEX = "application/x-tex"
 
 
 def readable_lines(row) -> list[str]:
@@ -191,14 +192,16 @@ class RevisionOperations:
             )
 
     def create_document(self, value: DocumentCreate) -> dict:
-        """Create a new immutable draft revision; previous_id links the revision it replaces. A CV or letter (resume, cover_letter) takes no content: then upload its .tex source and the PDF built from it (files_reserve_upload with source_sha256). Form answers and other kinds keep structured content. Never marks the application sent."""
+        """Create a new revision; previous_id links the revision it replaces. A CV or letter (cv, letter) takes no content: give pdf (name, size, optional sha256) and, optionally, its TeX source inline (source) or as a file (source_file). The result's uploads holds one-shot grants (pdf, and source for source_file): PUT the exact bytes to each url with its headers, the source first. The revision is incomplete until its PDF is stored, then complete and immutable; Ready counts only complete revisions. Text comes from the source, else from the PDF. Form answers and other kinds keep structured content. Never marks the application sent."""
+        if not isinstance(value, DocumentCreate):
+            value = DocumentCreate.model_validate(value)
         source_kind = value.kind in SOURCE_KINDS
         if source_kind and value.content is not None:
             raise DomainError(
                 422,
                 "content_not_accepted",
-                "A CV or letter revision is its .tex source and PDF: create the revision without "
-                "content, then upload the source and the PDF built from it.",
+                "A CV or letter revision is its PDF and optional TeX source: create the revision "
+                "without content and upload the files with the grants it returns.",
             )
         content = encode({} if source_kind else value.content or {})
         claim_ids, knowledge_ids = encode(value.claim_ids), encode(value.knowledge_ids)
@@ -237,13 +240,15 @@ class RevisionOperations:
                     self._validate_content(value.content or {}, context, value.kind)
                 self._validate_evidence(conn, context, value.claim_ids, value.knowledge_ids)
                 # A retry returns the revision it created: for a CV or letter, only while
-                # that revision is still an empty draft.
+                # that revision has no file yet.
                 old = conn.execute(
                     "SELECT id FROM documents d WHERE application_id=? AND context_id IS ? AND kind=? "
                     "AND title=? AND content=? AND previous_id IS ? AND note=? AND claim_ids=? "
                     "AND knowledge_ids=?"
                     + (
-                        " AND review_state='draft' AND NOT EXISTS(SELECT 1 FROM files f WHERE f.document_id=d.id)"
+                        " AND NOT EXISTS(SELECT 1 FROM files f WHERE f.document_id=d.id)"
+                        if source_kind and value.source is None
+                        else " AND 0"
                         if source_kind
                         else ""
                     )
@@ -281,6 +286,8 @@ class RevisionOperations:
                             now(),
                         ),
                     )
+                    if value.source is not None:
+                        self._store_inline_source(conn, document_id, value.kind, value.source)
                     self.workspace.event(
                         "document_created",
                         application["job_id"],
@@ -293,9 +300,64 @@ class RevisionOperations:
                         conn,
                         subject=("document", document_id),
                     )
-                    self.workspace.clear_ready(conn, value.application_id, "document_created")
                 remember(conn, "documents", value.idempotency_key, digest, document_id)
-        return self.get_document(document_id)
+            uploads = self._create_grants(conn, document_id, value) if source_kind else None
+        result = self.get_document(document_id)
+        if uploads is not None:
+            result["uploads"] = uploads
+        return result
+
+    @staticmethod
+    def _store_inline_source(conn, document_id, kind, source):
+        """Store an inline TeX source as the revision's source file and derive its text."""
+        data = source.encode("utf-8")
+        digest = hashlib.sha256(data).hexdigest()
+        conn.execute(
+            "INSERT OR IGNORE INTO blobs(sha256,content,size) VALUES(?,?,?)",
+            (digest, data, len(data)),
+        )
+        conn.execute(
+            "INSERT INTO files(id,sha256,name,media_type,size,document_id,created_at) "
+            "VALUES(?,?,?,?,?,?,?)",
+            (new_id(), digest, f"{kind}.tex", TEX, len(data), document_id, now()),
+        )
+        refresh_text(conn, document_id)
+
+    def _create_grants(self, conn, document_id, value):
+        """One-shot grants for the files the create declared and the revision still lacks."""
+        document = _get(conn, "documents", document_id, "Document revision")
+        names = {
+            row[0]
+            for row in conn.execute("SELECT name FROM files WHERE document_id=?", (document_id,))
+        }
+        uploads = {"pdf": None, "source": None}
+        if any(name.lower().endswith(".pdf") for name in names):
+            return uploads
+        if value.source_file is not None and value.source_file.name not in names:
+            uploads["source"] = self.upload_grant(
+                conn,
+                UploadReservation(
+                    owner_type="document",
+                    owner_id=document_id,
+                    media_type=TEX,
+                    **value.source_file.model_dump(),
+                ),
+            )
+        if value.pdf is not None:
+            pending = value.source_file.sha256 if uploads["source"] else None
+            source = source_hash(conn, document_id) or pending
+            uploads["pdf"] = self.upload_grant(
+                conn,
+                UploadReservation(
+                    owner_type="document",
+                    owner_id=document["id"],
+                    media_type=PDF,
+                    source_sha256=source,
+                    **value.pdf.model_dump(),
+                ),
+                pending_source=pending,
+            )
+        return uploads
 
     def _document_records(self, rows, *, summary=False):
         if not rows:
@@ -316,24 +378,31 @@ class RevisionOperations:
             )
         }
         files = {record_id: [] for record_id in ids}
+        complete = set()
         if summary:
-            counts = {
-                row["document_id"]: row["n"]
-                for row in self.db.all(
-                    f"SELECT document_id,COUNT(*) AS n FROM files WHERE document_id IN ({placeholders}) GROUP BY document_id",
-                    ids,
-                )
-            }
+            counts = {}
+            for row in self.db.all(
+                "SELECT document_id,COUNT(*) AS n,SUM(media_type=?) AS pdf FROM files "
+                f"WHERE document_id IN ({placeholders}) GROUP BY document_id",
+                (PDF, *ids),
+            ):
+                counts[row["document_id"]] = row["n"]
+                if row["pdf"]:
+                    complete.add(row["document_id"])
         else:
             for row in self.db.all(
                 f"SELECT * FROM files WHERE document_id IN ({placeholders}) ORDER BY created_at,name,id",
                 ids,
             ):
                 files[row["document_id"]].append(self._file_record(row))
+                if row["media_type"] == PDF:
+                    complete.add(row["document_id"])
         items = []
         for row in rows:
             result = dict(row)
             result["revision_number"] = revisions[result["id"]]
+            # A CV or letter is complete once its PDF is stored; other kinds always are.
+            result["complete"] = result["kind"] not in SOURCE_KINDS or result["id"] in complete
             if summary:
                 result["file_count"] = counts.get(result["id"], 0)
                 items.append(result)
@@ -353,11 +422,40 @@ class RevisionOperations:
         return items
 
     def get_document(self, document_id: str) -> dict:
-        """Read a revision: for a CV or letter its text derived from the .tex source, the evidence it cites, its note, review state and files (the PDF names its source_sha256); for other kinds its structured content."""
+        """Read a revision: for a CV or letter whether it is complete (its PDF stored), its readable text and where it came from (text_from: tex or pdf), the evidence it cites, its note and files (a PDF built from a source names its source_sha256); for other kinds its structured content."""
         row = self.db.one("SELECT * FROM documents WHERE id=?", (document_id,))
         if not row:
             missing("Document revision")
+        if self._read_pdf_text(row):
+            row = self.db.one("SELECT * FROM documents WHERE id=?", (document_id,))
         return self._document_records([row])[0]
+
+    def _read_pdf_text(self, row) -> bool:
+        """Read the text of a PDF-only revision stored without one (first read after an upgrade).
+
+        A PDF without readable text is tried once per process. Returns whether text was stored.
+        """
+        if row["kind"] not in SOURCE_KINDS or row["text"] is not None:
+            return False
+        if row["id"] in self._unreadable:
+            return False
+        with self.db.connect() as conn:
+            if source_hash(conn, row["id"]) is not None:
+                return False
+            blob = conn.execute(
+                "SELECT b.content FROM files f JOIN blobs b ON b.sha256=f.sha256 "
+                "WHERE f.document_id=? AND f.media_type=? ORDER BY f.created_at LIMIT 1",
+                (row["id"], PDF),
+            ).fetchone()
+        if blob is None:
+            return False
+        text = pdf_text(bytes(blob[0]))
+        if text is None:
+            self._unreadable.add(row["id"])
+            return False
+        with self.db.transaction() as conn:
+            store_pdf_text(conn, row["id"], text)
+        return True
 
     def list_documents(
         self,
@@ -367,9 +465,8 @@ class RevisionOperations:
         offset: int = 0,
         summary: bool = True,
         q: str = "",
-        review_state: Literal["draft", "approved"] | None = None,
     ) -> dict:
-        """List revisions by application/kind/review state; q searches titles, notes and the text derived from sources. summary=true (default) omits text, content and file entries; summary=false includes them."""
+        """List revisions by application and kind (cv, letter, answers, other), each with complete (a CV or letter whose PDF is stored); q searches titles, notes and readable text. summary=true (default) omits text, content and file entries; summary=false includes them."""
         _page(limit, offset)
         where, params = [], []
         if application_id:
@@ -378,11 +475,6 @@ class RevisionOperations:
         if kind:
             where.append("kind=?")
             params.append(kind)
-        if review_state is not None:
-            if review_state not in {"draft", "approved"}:
-                raise DomainError(422, "review_state", "Use draft or approved review state.")
-            where.append("review_state=?")
-            params.append(review_state)
         if q:
             where.append("(title LIKE ? OR note LIKE ? OR text LIKE ?)")
             params.extend([f"%{q}%"] * 3)
@@ -400,7 +492,7 @@ class RevisionOperations:
         }
 
     def compare_documents(self, document_id: str, other_id: str = "") -> dict:
-        """Compare a revision's text with another revision's (by default the one it replaces), line by line. CV and letter revisions compare the text derived from their sources; form answers compare their content as text."""
+        """Compare a revision's text with another revision's (by default the one it replaces), line by line. CV and letter revisions compare their readable text (from the source, else the PDF); form answers compare their content as text."""
         with self.db.connect() as conn:
             row = conn.execute("SELECT * FROM documents WHERE id=?", (document_id,)).fetchone()
             if not row:
@@ -444,39 +536,6 @@ class RevisionOperations:
             "lines": lines,
         }
 
-    def review_document(self, document_id: str, value: ReviewUpdate) -> dict:
-        """Approve the exact revision and its files; future changes require a new revision. A CV or letter needs its .tex source and the PDF built from it (409 source_required, pdf_required)."""
-        with self.db.transaction() as conn:
-            row = _get(conn, "documents", document_id, "Document revision")
-            if row["version"] != value.expected_version:
-                conflict(
-                    "The document or its files changed. Reload it before approving.",
-                    details={"current_version": row["version"]},
-                )
-            if row["review_state"] != "approved":
-                problem = approval_problem(conn, row)
-                if problem:
-                    raise problem
-                conn.execute(
-                    "UPDATE documents SET review_state='approved',version=version+1 WHERE id=?",
-                    (document_id,),
-                )
-                application = _get(conn, "applications", row["application_id"], "Application")
-                self.workspace.event(
-                    "document_reviewed",
-                    application["job_id"],
-                    row["application_id"],
-                    {
-                        "document_id": document_id,
-                        "kind": row["kind"],
-                        "review_state": "approved",
-                        "version": row["version"] + 1,
-                    },
-                    conn,
-                    subject=("document", document_id),
-                )
-        return self.get_document(document_id)
-
     def delete_document(self, document_id: str, expected_version: int) -> dict:
         """Permanently remove one document revision and its attached files, with its current expected_version; other revisions remain."""
         with self.db.transaction() as conn:
@@ -505,6 +564,5 @@ class RevisionOperations:
                     conn,
                     subject=("document", document_id),
                 )
-                self.workspace.clear_ready(conn, document["application_id"], "document_deleted")
         self.db.collect_blobs()
         return {"deleted": True, "id": document_id}

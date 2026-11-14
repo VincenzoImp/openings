@@ -12,15 +12,18 @@ export const runStatus: Record<
   interrupted: { label: "Interrupted", tone: "attention" },
 };
 
-// The names of application stages and of job queues a change moves between.
+// The names of application stages and of job triage a change moves between;
+// changes recorded before 0.24 name them in the words of then.
 const places: Record<string, string> = {
-  draft: "Preparing",
+  shortlisted: "Shortlisted",
+  draft: "Shortlisted",
   applied: "Applied",
   interview: "Interview",
   offer: "Offer",
   closed: "Closed",
-  inbox: "Inbox",
-  saved: "Shortlist",
+  new: "New",
+  inbox: "New",
+  saved: "Shortlisted",
   dismissed: "Dismissed",
 };
 

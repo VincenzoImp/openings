@@ -8,7 +8,7 @@ import {
   type Cookies,
 } from "./session";
 
-// Jobs (stage 4 of #135): the tabs To review, Shortlist, Dismissed and All
+// Jobs (stage 4 of #135): the tabs New, Shortlisted, Dismissed and All
 // beside the selected job, its signals, the duplicate decision inside the job,
 // hiding jobs that require a language the owner does not speak, and the yield
 // of each source in Collection. Each test starts from the seeded workspace (fixtures.ts).
@@ -111,7 +111,7 @@ test("keyboard only: a job is shortlisted, another dismissed with a reason and r
   await expect(toast(page)).toContainText("Shortlisted");
   await expect
     .poll(async () => (await call(page, `/jobs/${second.id}`)).triage)
-    .toBe("saved");
+    .toBe("shortlisted");
   // The first job: dismissed from its page with a reason.
   await go(page, `jobs?job=${first.id}`);
   await settled(page);
@@ -129,7 +129,7 @@ test("keyboard only: a job is shortlisted, another dismissed with a reason and r
   // The Dismissed tab, by keyboard from the selected tab.
   await go(page, "jobs");
   await settled(page);
-  await page.getByRole("tab", { name: /^To review/ }).focus();
+  await page.getByRole("tab", { name: /^New/ }).focus();
   await page.keyboard.press("ArrowRight");
   await page.keyboard.press("ArrowRight");
   await expect(page.getByRole("tab", { name: /^Dismissed/ })).toHaveAttribute(
@@ -144,7 +144,7 @@ test("keyboard only: a job is shortlisted, another dismissed with a reason and r
   await page.keyboard.press("Enter");
   await expect(toast(page)).toContainText("Restored");
   const restored = await call(page, `/jobs/${first.id}`);
-  expect(restored.triage).toBe("inbox");
+  expect(restored.triage).toBe("new");
   expect(restored.dismissal).toBeNull();
   await fitsViewport(page);
 });
@@ -155,7 +155,7 @@ test("jobs requiring a language I don't speak are hidden on request, never dismi
   const token = await agentToken(page);
   const title = unique("Bergwerk role");
   const url = `https://jobs.example.test/german/${Date.now()}`;
-  // An agent collects the job: it stays to review, with its requirement.
+  // An agent collects the job: it stays in New, with its requirement.
   const collected = await call(
     page,
     "/jobs",
@@ -163,7 +163,7 @@ test("jobs requiring a language I don't speak are hidden on request, never dismi
     { title, company: "Bergwerk AG", url, posting: GERMAN },
     token,
   );
-  expect(collected.triage).toBe("inbox");
+  expect(collected.triage).toBe("new");
   expect(collected.dismissal).toBeNull();
   await go(page, "jobs");
   await settled(page);
@@ -183,7 +183,7 @@ test("jobs requiring a language I don't speak are hidden on request, never dismi
   await expect(chips).toContainText("hides 1 of 1");
   await expect(page.getByText("No job matches")).toBeVisible();
   // Hiding changes nothing about the job.
-  expect((await call(page, `/jobs/${collected.id}`)).triage).toBe("inbox");
+  expect((await call(page, `/jobs/${collected.id}`)).triage).toBe("new");
   // The setting holds across the tabs, and turns off again.
   await page.getByRole("tab", { name: /^All/ }).click();
   await expect(toggle).toBeChecked();
@@ -306,7 +306,7 @@ test("bulk actions shortlist, return and forget selected jobs after asking", asy
   await bar.getByRole("button", { name: "Shortlist", exact: true }).click();
   await expect(toast(page)).toContainText("Jobs updated");
   await expect(page.locator(".job-list > li")).toHaveCount(0);
-  await page.getByRole("tab", { name: /^Shortlist/ }).click();
+  await page.getByRole("tab", { name: /^Shortlisted/ }).click();
   await page.getByRole("searchbox", { name: "Search jobs" }).fill(tag);
   await expect(page.locator(".job-list > li")).toHaveCount(3);
   await row(page, `${tag} one`).getByRole("checkbox").check();
@@ -318,10 +318,14 @@ test("bulk actions shortlist, return and forget selected jobs after asking", asy
   await expect(toast(page)).toContainText("Jobs forgotten");
   await expect(page.locator(".job-list > li")).toHaveCount(2);
   await page.getByRole("checkbox", { name: "Select every job shown" }).check();
-  await bar.getByRole("button", { name: "Return to review" }).click();
+  // Their applications are still empty, so the shortlists are undone with them.
+  await bar.getByRole("button", { name: "Back to New" }).click();
   await expect(page.locator(".job-list > li")).toHaveCount(0);
-  for (const item of jobs.slice(1))
-    expect((await call(page, `/jobs/${item.id}`)).triage).toBe("inbox");
+  for (const item of jobs.slice(1)) {
+    const back = await call(page, `/jobs/${item.id}`);
+    expect(back.triage).toBe("new");
+    expect(back.application).toBeNull();
+  }
 });
 
 test("signals filter the list and Collection shows what each source yielded", async ({
@@ -334,12 +338,12 @@ test("signals filter the list and Collection shows what each source yielded", as
     .selectOption("no_longer_listed");
   const rows = page.locator(".job-list > li");
   await expect(rows.first()).toContainText("No longer listed");
-  const listed = await call(page, "/jobs?queue=inbox&signal=no_longer_listed");
+  const listed = await call(page, "/jobs?triage=new&signal=no_longer_listed");
   await expect(rows).toHaveCount(listed.total);
   // The tabs keep their counts from the workspace.
   const counts = (await call(page, "/jobs?limit=1&include_counts=true")).counts;
-  await expect(page.getByRole("tab", { name: /^To review/ })).toContainText(
-    String(counts.inbox),
+  await expect(page.getByRole("tab", { name: /^New/ })).toContainText(
+    String(counts.new),
   );
   await go(page, "collection?section=yield");
   await settled(page);
@@ -403,15 +407,20 @@ test("a note is edited, an application started and a job forgotten from its page
     "Pinned note",
   );
   await expect(timeline).toContainText("Collected");
-  // Shortlisted, then started: the review page of the new application opens.
+  // In New the job offers Shortlist and Dismiss only.
+  await expect(actions(page).getByRole("button")).toHaveText([
+    "Shortlist",
+    "Dismiss…",
+  ]);
+  // Shortlisting starts the application: its review page opens from the job.
   await actions(page).getByRole("button", { name: "Shortlist" }).click();
   await expect(toast(page)).toContainText("Shortlisted");
-  // The job left To review; the Shortlist shows it.
+  // The job left New; Shortlisted shows it.
   await expect(page).not.toHaveURL(new RegExp(`job=${kept.id}`));
-  await go(page, `jobs?section=shortlist&job=${kept.id}`);
+  await go(page, `jobs?section=shortlisted&job=${kept.id}`);
   await settled(page);
   await actions(page)
-    .getByRole("button", { name: "Start application", exact: true })
+    .getByRole("link", { name: "Open the application", exact: true })
     .click();
   await expect(page).toHaveURL(/#review\?application=/);
   await expect(page.locator(".main h1")).toHaveText(kept.title);
@@ -434,7 +443,7 @@ test("after a triage the next job of the list is shown, or the previous one at t
 }) => {
   const tag = unique("Next after triage");
   for (const name of ["A", "B", "C"]) await job(page, `${tag} ${name}`);
-  await go(page, "jobs?section=review");
+  await go(page, "jobs?section=new");
   await settled(page);
   await page.getByRole("searchbox", { name: "Search jobs" }).fill(tag);
   const links = page.locator(".job-list > li .title");
@@ -486,7 +495,7 @@ test("on a phone the job's actions stay above the bottom bar and the toast", asy
   const tag = unique("Phone actions");
   await job(page, `${tag} A`);
   await job(page, `${tag} B`);
-  await go(page, "jobs?section=review");
+  await go(page, "jobs?section=new");
   await settled(page);
   await page.getByRole("searchbox", { name: "Search jobs" }).fill(tag);
   await expect(page.locator(".job-list > li")).toHaveCount(2);
@@ -515,7 +524,8 @@ test("on a phone the job's actions stay above the bottom bar and the toast", asy
   const box = await inReach();
   const message = (await toast(page).boundingBox())!;
   expect(message.y + message.height).toBeLessThanOrEqual(box.y + 1);
-  await expect(page.getByRole("button", { name: "Add a note" })).toBeVisible();
+  // A new job offers Shortlist and Dismiss only.
+  await expect(page.getByRole("button", { name: "Add a note" })).toHaveCount(0);
   await fitsViewport(page);
 });
 

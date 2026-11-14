@@ -2,7 +2,7 @@
 
 import hashlib
 
-from openings.documents import DocumentCreate, ReviewUpdate, UploadReservation
+from openings.documents import DocumentCreate, UploadReservation
 
 PDF = b"%PDF-1.4\nSynthetic test PDF"
 
@@ -56,16 +56,58 @@ def attach(documents, put, document_id, text="Synthetic content.", pdf=True, nam
 
 
 def source_revision(
-    documents, put, application_id, kind="resume", text="Synthetic content.", **options
+    documents, put, application_id, kind="cv", text="Synthetic content.", **options
 ):
-    """A CV or letter revision with its source, its PDF (unless pdf=False) and, if asked, approved."""
-    pdf, approve = options.pop("pdf", True), options.pop("approve", False)
+    """A CV or letter revision with its source and its PDF (unless pdf=False)."""
+    pdf = options.pop("pdf", True)
     document = documents.create_document(
         DocumentCreate(application_id=application_id, kind=kind, **options)
     )
-    document = attach(documents, put, document["id"], text, pdf)
-    if approve:
-        document = documents.review_document(
-            document["id"], ReviewUpdate(expected_version=document["version"])
+    return attach(documents, put, document["id"], text, pdf)
+
+
+def pdf_revision(documents, put, application_id, kind="cv", data=PDF, **options):
+    """A complete PDF-only CV or letter revision, uploaded with the grant its create returns."""
+    document = documents.create_document(
+        DocumentCreate(
+            application_id=application_id,
+            kind=kind,
+            pdf={"name": f"{kind}.pdf", "size": len(data)},
+            **options,
         )
-    return document
+    )
+    grant = document["uploads"]["pdf"]
+    response = put(grant["url"], headers=grant["headers"], content=data)
+    assert response.status_code == 200, response.text
+    return documents.get_document(document["id"])
+
+
+def text_pdf(*lines):
+    """A small valid PDF whose page shows ``lines`` in Helvetica, for text extraction."""
+    content = (
+        "BT /F1 12 Tf 72 720 Td 14 TL "
+        + " ".join(
+            "(" + line.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)") + ") '"
+            for line in lines
+        )
+        + " ET"
+    )
+    objects = [
+        "<< /Type /Catalog /Pages 2 0 R >>",
+        "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        (
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
+            "/Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>"
+        ),
+        "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+        f"<< /Length {len(content)} >>\nstream\n{content}\nendstream",
+    ]
+    out, offsets = "%PDF-1.4\n", []
+    for number, body in enumerate(objects, start=1):
+        offsets.append(len(out))
+        out += f"{number} 0 obj\n{body}\nendobj\n"
+    xref = len(out)
+    out += f"xref\n0 {len(objects) + 1}\n0000000000 65535 f \n"
+    out += "".join(f"{offset:010d} 00000 n \n" for offset in offsets)
+    out += f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n"
+    return out.encode("latin-1")

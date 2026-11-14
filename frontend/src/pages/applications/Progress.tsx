@@ -21,7 +21,7 @@ export function Progress() {
   const overview = useFresh<Overview | null>(
     `/overview?${new URLSearchParams(Object.entries(period).filter(([, value]) => value))}`,
     null,
-    ["applications", "jobs", "responses"],
+    ["applications", "jobs"],
   );
   const ranged = Boolean(period.since || period.until);
   return (

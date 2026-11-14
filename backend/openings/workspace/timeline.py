@@ -3,8 +3,9 @@
 A job's timeline holds everything recorded on the job and on each of its
 applications; an application's timeline holds its own entries and its job's
 (``scope`` says which), not those of the job's other applications. Each entry is
-a note or an event, of kind ``note``, ``event`` or ``response`` (an employer
-response recorded, corrected or removed), with who made it and the run. Pinned
+a note or an event, of kind ``note``, ``event`` or ``reply`` (an employer reply
+recorded, corrected or removed; ``response`` events from before 0.24 count), with who
+made it and the run. Pinned
 notes come first, then everything newest first. ``note_added`` and
 ``note_edited`` events are not entries: the note itself is, with its author and
 version. Event payloads hold identifiers, field names and versions, never text.
@@ -25,7 +26,7 @@ WHO = {
 
 # note_added and note_edited are represented by the note entry itself.
 _ENTRIES = (
-    "SELECT 'event' AS type,CASE WHEN e.subject_type='response' THEN 'response' ELSE 'event' END AS kind,"
+    "SELECT 'event' AS type,CASE WHEN e.subject_type IN ('reply','response') THEN 'reply' ELSE 'event' END AS kind,"
     "e.id,e.created_at,e.job_id,e.application_id,e.actor_kind,e.actor_id,e.actor_name,"
     "e.actor_token_kind,e.run_id,NULL AS pinned_at,e.kind AS event_kind,e.payload,"
     "e.subject_type,e.subject_id,NULL AS body,NULL AS version,NULL AS updated_at "
@@ -127,7 +128,7 @@ class Timeline:
             # Counts by kind follow every filter but the kind, for the filter chips.
             base = " FROM (" + entries + ") x"
             clause = " WHERE " + " AND ".join(where) if where else ""
-            counts = {"note": 0, "event": 0, "response": 0}
+            counts = {"note": 0, "event": 0, "reply": 0}
             for kind, count in conn.execute(
                 "SELECT x.kind,count(*)" + base + clause + " GROUP BY x.kind", (*args, *params)
             ):

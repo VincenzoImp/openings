@@ -8,7 +8,7 @@ const clearedReasons: Record<string, string> = {
   context_prepared: "A new context was prepared",
   file_uploaded: "A file was added to a current revision",
   blocking_requirement: "A blocking requirement is unresolved",
-  left_preparing: "The application left Preparing",
+  left_preparing: "The application was sent or closed",
 };
 export function readyReason(payload?: Json) {
   const reason = payload?.reason;

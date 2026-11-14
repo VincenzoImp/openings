@@ -305,7 +305,8 @@ class ActivityService:
             "source": "SELECT id,name,'' FROM sources WHERE id IN ({})",
             "question": "SELECT id,substr(question,1,120),'' FROM questions WHERE id IN ({})",
             "request": "SELECT id,substr(text,1,120),'' FROM requests WHERE id IN ({})",
-            "response": "SELECT r.id,j.title,j.company FROM responses r JOIN applications a ON a.id=r.application_id JOIN jobs j ON j.id=a.job_id WHERE r.id IN ({})",
+            "response": "SELECT r.id,j.title,j.company FROM replies r JOIN applications a ON a.id=r.application_id JOIN jobs j ON j.id=a.job_id WHERE r.id IN ({})",
+            "reply": "SELECT r.id,j.title,j.company FROM replies r JOIN applications a ON a.id=r.application_id JOIN jobs j ON j.id=a.job_id WHERE r.id IN ({})",
             "collection_run": "SELECT id,source_name,'' FROM collection_runs WHERE id IN ({})",
         }
         wanted = {}

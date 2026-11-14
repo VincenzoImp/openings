@@ -44,7 +44,7 @@ const COLUMNS =
 const HEAD = [
   "Source",
   "Collected",
-  "To review",
+  "New",
   "Shortlisted",
   "Kept",
   "Applied",
@@ -63,7 +63,7 @@ function Counts({
       <Cell label="Collected" className="num">
         {row.collected}
       </Cell>
-      <Cell label="To review" className="num">
+      <Cell label="New" className="num">
         {row.to_review}
       </Cell>
       <Cell label="Shortlisted" className="num">
@@ -123,7 +123,7 @@ export function SourceYieldView() {
   const result = useFresh<SourceYield | null>(
     `/collection/yield?${query}`,
     null,
-    ["jobs", "applications", "sources", "responses"],
+    ["jobs", "applications", "sources"],
   );
   const data = result.data;
   const noisy = data?.items

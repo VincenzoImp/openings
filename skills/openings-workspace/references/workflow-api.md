@@ -16,27 +16,33 @@ mechanics, not personal selection or writing rules.
   `idempotency_key`: a retry with the same key and request returns the record
   the first request created; the key with another request is `409 conflict`.
 
-## Queues and applications
+## Triage and applications
 
-- `GET /jobs?queue=inbox&limit=200&offset=0` and `jobs_list(value)` list a
+- `GET /jobs?triage=new&limit=200&offset=0` and `jobs_list(value)` list a
   compact preview. `jobs_get` / `GET /jobs/{id}` supplies the full posting.
   Filter value lists (`facets`) appear only with `include_facets: true`.
 - `jobs_triage(job_id, value)` / `POST /jobs/{id}/triage` takes `triage` and
   `expected_version`, and with `dismissed` an optional `reason` (at most 500
   characters) the owner reads beside the dismissal; `jobs_bulk` takes the same
-  `reason` for its `dismissed` action. Values are `inbox`, `saved` and
-  `dismissed`, not `draft`. Restoring a dismissed job clears its dismissal.
+  `reason` for its `dismissed` action. Values are `new`, `shortlisted` and
+  `dismissed`. Restoring a dismissed job clears its dismissal.
   It returns the compact job summary with the new `version`, not the posting.
   `jobs_update` and `applications_update` also return compact jobs.
 - A 409 version conflict carries `details.current_version`; read the record
   again before retrying so concurrent edits are preserved.
-- Actionable `queue=shortlist` means saved with no application attempt. Raw
-  `triage=saved` also includes jobs with open or closed attempts.
-- Snapshot the queue's IDs before mutating it, or repeatedly process offset zero.
-  Advancing offsets over a shrinking queue can skip jobs.
+- `triage: "shortlisted"` starts the job's application in stage Shortlisted
+  when it has no open one. Moving a shortlisted job back to `new` or `dismissed`
+  deletes that application only while it is empty (no documents, notes,
+  replies, requirements or answers); otherwise `409 application_has_work` with
+  `details.work` naming what exists. Closing an application never changes the
+  job's triage; deleting a job's last application returns it to `new`.
+- Snapshot the list's IDs before mutating it, or repeatedly process offset zero.
+  Advancing offsets over a shrinking list can skip jobs.
 - `applications_list` / `GET /applications?job_id={id}` resolves attempts.
-  `applications_create` / `POST /applications` creates Draft and retains saved
-  job interest. Application existence removes the job from actionable Shortlist.
+  `applications_create` / `POST /applications` starts an application in stage
+  Shortlisted and shortlists its job; `required_documents` (a subset of `cv`,
+  `letter`, both by default) names what Ready needs and stays editable with
+  `applications_update`.
 - Application creation supports an `idempotency_key`. A repeat key for the same
   job returns the existing attempt without changing its fields. A conflicting open attempt returns409 with its ID;
   a key reused for another job also conflicts. Resume the intended open attempt.
@@ -54,79 +60,75 @@ mechanics, not personal selection or writing rules.
 - A context is a fixed input snapshot. Compare versions and relevant content
   before reusing it. Prepare a new context when different inputs are needed.
 - `documents_create` / `POST /documents` takes application/context IDs,
-  `kind: resume | cover_letter | answers | other`, `title`, optional `note`,
-  `claim_ids`, `knowledge_ids` and `previous_id`. A CV or letter (`resume`,
-  `cover_letter`) takes no `content` (`422 content_not_accepted`): it is the
-  `.tex` source and PDF uploaded next. Form answers keep structured `content`.
-  A retry with the same fields, or the same `idempotency_key`, returns the same
-  revision (without a key, a CV or letter only while it is still an empty
-  draft). Changed output needs the proper parent.
-  Child revisions inherit neither files nor approval.
+  `kind: cv | letter | answers | other`, `title`, optional `note`,
+  `claim_ids`, `knowledge_ids` and `previous_id`. A CV or letter takes no
+  `content` (`422 content_not_accepted`): it is a required PDF
+  (`pdf: {name, size, sha256?}`) and an optional TeX source, inline as `source`
+  (UTF-8, at most 256 KB) or uploaded as `source_file`. The result's `uploads`
+  holds one-shot grants (`pdf`, and `source` for `source_file`). Form answers
+  keep structured `content`. A retry with the same fields, or the same
+  `idempotency_key`, returns the same revision. Changed output needs the proper
+  parent; child revisions inherit no files.
 - Cite the evidence a revision uses: `claim_ids` of reused approved claims,
   `knowledge_ids` of the Career entries behind new wording. Include them in the
   context. Unknown frozen evidence/claim IDs are rejected; entailment is not
   checked.
-- `documents_get` returns a CV or letter's `text`, derived from its source
-  without a TeX runtime, `source_sha256`, the cited ids, `note`, its files and,
+- `documents_get` returns a CV or letter's `complete`, its `text` and
+  `text_from` (`tex`: derived from the source without a TeX runtime; `pdf`:
+  extracted from the PDF when there is no source; no text when extraction
+  fails), `source_sha256`, the cited ids, `note`, its files and,
   for revisions saved before 0.22, the read-only `legacy_content`.
   `documents_compare(document_id, other_id?)` /
   `GET /documents/{id}/comparison` compares the text with the revision it
   replaces (or `other_id`) line by line: `lines` of `same`, `added`, `removed`.
 
-## Transfers and completed Drafts
+## Transfers and complete revisions
 
 - `files_reserve_upload` / `POST /files/uploads` takes owner type/ID, name,
   media type, size and optional SHA-256. Transfer bytes through the returned
   upload instruction, then verify the stored file. The server checks size,
   digest and a PDF header, not full PDF validity or layout.
-- A CV or letter revision has one `.tex` source (UTF-8) and one PDF. Upload the
-  source first; the PDF reservation names `source_sha256`, the source's
-  SHA-256. Without it: `422 source_required`; before the source:
+- PUT the exact bytes to each grant's `url` with its headers, the source
+  first. A CV or letter revision is incomplete until its PDF is stored, then
+  complete and immutable (`409 revision_complete`); a change is a new revision
+  with `previous_id`. With a source, the PDF must name `source_sha256`, the
+  source's SHA-256 (`422 source_sha256_required`); before the source:
   `409 source_required`; another source: `409 source_mismatch`; a second source
-  or PDF: `409 source_exists` / `pdf_exists`.
-- `documents_review` / `POST /documents/{id}/review` takes `expected_version`
-  and `review_state: approved`. A CV or letter needs its source
-  (`409 source_required`) and its PDF (`409 pdf_required`). Uploads change the
-  document version; read it again before review. Approval does not parse the PDF
-  or establish human approval.
+  or PDF: `409 source_exists` / `pdf_exists`. A PDF-only revision has no
+  source hash.
 - `documents_list` / `GET /documents` returns compact rows by default (file
-  counts, no text, content or files); `q` searches titles, notes and the text
-  derived from sources. Pass `value.summary: false`, or read `documents_get`, for
+  counts and `complete`, no text, content or files); `q` searches titles, notes
+  and readable text. Pass `value.summary: false`, or read `documents_get`, for
   text, content and file entries. `documents_delete(document_id,
-  expected_version)` removes a draft revision and its files for good.
-- Ready is a stored step of a Draft, set with `applications_ready(application_id,
-  value)` / `POST /applications/{id}/ready` (`expected_version`, `ready`). The
-  agent's assessment comes first: the intended current CV and CL leaf revisions,
-  valid final PDFs and sources, complete content/layout checks and approved
-  document review states. The server then checks files, review states and
-  blocking requirements and refuses with `409 application_not_ready` and
-  `details.check`. `readiness` is `ready` only for a marked Draft whose checks
-  still pass, and `reviewed` when they pass without the mark.
-- A new revision or context, a deleted revision, a file added to a current
-  revision, an unresolved blocking requirement or leaving Draft clears the mark
-  and changes the application version; mark it again after the rework is checked.
-- The UI projects current leaves as Needs PDF, PDF to review or Approved PDF.
-  A newer incomplete leaf is not covered by an approved parent. Resolve ambiguous
-  branches rather than selecting an arbitrary ancestor.
-- Keep application state Draft. The owner submits online and records Applied.
+  expected_version)` removes a revision and its files for good.
+- Ready is computed, never stored or marked: an application is `ready` when it
+  is Shortlisted, every kind in `required_documents` has a current complete
+  revision and no blocking requirement is unresolved. Reads and lists return
+  `ready` and `missing` (for example `["letter", "requirement:<id>"]`). Ready
+  checks files, not content: finish the agent's own content and PDF checks
+  before uploading the PDF. A newer incomplete leaf is not covered by a
+  complete parent. Resolve ambiguous branches rather than selecting an
+  arbitrary ancestor.
+- Keep the application Shortlisted. Mark applied (`status: "applied"`) is the
+  owner's act: the owner submits online and records it.
   Missing output or a failed check remains incomplete; do not delete the attempt
   or dismiss the job to conceal a preparation failure.
 
-## Employer responses
+## Employer replies
 
-- `responses_create(application_id, value)` / `POST /applications/{id}/responses`
-  records an owner-reported answer (`kind`, `date`, `note`,
-  `idempotency_key`) without moving the stage. `responses_update` /
-  `PATCH /responses/{id}` and `responses_delete` / `DELETE /responses/{id}` take
-  the response's `expected_version`; `responses_list` /
-  `GET /applications/{id}/responses` reads them.
-- `applications_update` moving a sent application to Interview or Offer, or
-  closing it as `rejected`, records the response itself (`response_date`,
-  `response_note`); `outcome: "no_response"` with `concluded_on` closes a sent
-  application that never got an answer.
-- `applications_list(value: {no_reply_due: true})` /
-  `GET /applications?no_reply_due=true` lists the Applied applications past the
-  no-reply period; `insights_get` / `GET /insights` reads the rates.
+- `applications_update` / `PATCH /applications/{id}` with
+  `reply: {kind, date?, note?}` records an owner-reported reply to a sent
+  application (kinds `interview`, `rejection`, `offer`, `other`; `date` defaults
+  to today) and moves the stage in the same change: `interview` to Interview,
+  `offer` to Offer, `rejection` closes as `rejected`, `other` leaves it. Do not
+  pass `status` with it. `reply: {id, kind?, date?, note?}` corrects one and
+  `reply: {id, remove: true}` removes one; corrections never move the stage.
+  `applications_get` lists `replies` and `last_reply`.
+- `applications_list(value: {needs: "reply_overdue"})` /
+  `GET /applications?needs=reply_overdue` lists the Applied applications without
+  a reply past the no-reply period. Closing one as `outcome: "no_response"` (with
+  `concluded_on`) is manual, single or with `applications_bulk`; nothing closes
+  automatically. `insights_get` / `GET /insights` reads the rates.
 
 ## Runs and questions
 
@@ -169,13 +171,14 @@ mechanics, not personal selection or writing rules.
 
 ## Recover preparation from the database
 
-Use `applications_list(value: {status: "draft", limit: 200, offset: 0})` or
-`GET /applications?status=draft&limit=200&offset=0`, then paginate the stable
-read-only result. The field is `status`, not `stage`. Add `readiness`
-(`none`, `missing_pdf`, `unreviewed`, `blocked`, `reviewed`, `ready`) to resume only
-incomplete or blocked Drafts, and `sort: "deadline"` to keep deadline order. Read each relevant
-application and its document revisions, contexts and files before resuming.
-A local checkpoint is optional. A compatible complete Draft needs no new work.
+Use `applications_list(value: {stage: "shortlisted", limit: 200, offset: 0})` or
+`GET /applications?stage=shortlisted&limit=200&offset=0`, then paginate the
+stable read-only result. `needs: "documents"` keeps the ones missing a required
+document, `stage: "ready"` the Ready ones, and `sort: "deadline"` keeps deadline
+order; each row's `missing` names what is left. Read each relevant application
+and its document revisions, contexts and files before resuming. A local
+checkpoint is optional. A Ready application whose documents pass the agent's
+checks needs no new work.
 
 Application idempotency matches the key and job, not the whole payload. A repeat
 key for the same job reuses the attempt without changing existing fields; inspect

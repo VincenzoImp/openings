@@ -70,15 +70,24 @@ test.afterEach(async ({ page }, info) => {
 test("queue count, posting hierarchy and query-safe selection", async ({
   page,
 }) => {
-  const active = (await call(page, "/applications?status=draft&limit=1"))
-    .items[0];
-  const job = await call(page, "/jobs/" + active.job_id);
-  await call(page, `/jobs/${job.id}/triage`, "POST", {
-    triage: "inbox",
+  // A shortlist undone while its application is still empty: back in New.
+  const job = await call(page, "/jobs", "POST", {
+    title: "Undone shortlist",
+    company: "Example Labs",
+    posting: "Build services.",
+  });
+  const shortlisted = await call(page, `/jobs/${job.id}/triage`, "POST", {
+    triage: "shortlisted",
     expected_version: job.version,
   });
+  await call(page, `/jobs/${job.id}/triage`, "POST", {
+    triage: "new",
+    expected_version: shortlisted.version,
+  });
   await go(page, "jobs");
-  const queue = await call(page, "/jobs?queue=inbox");
+  // The navigation read its count before these changes.
+  await page.reload();
+  const queue = await call(page, "/jobs?triage=new");
   await expect(page.locator(".navcount").first()).toHaveText(
     String(queue.total),
   );

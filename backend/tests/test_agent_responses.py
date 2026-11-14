@@ -52,7 +52,7 @@ def populated(tmp_path):
     application = ws.create_application({"job_id": jobs[0]["id"]})
     with ws.db.transaction() as connection:
         connection.execute(
-            "INSERT INTO documents(id,application_id,kind,title,content,review_state,version,created_at) VALUES('doc-1',?,'answers','Form',?,'draft',1,?)",
+            "INSERT INTO documents(id,application_id,kind,title,content,version,created_at) VALUES('doc-1',?,'answers','Form',?,1,?)",
             (application["id"], encode({"sections": ["Synthetic content"] * 50}), STAMP),
         )
         connection.execute(
@@ -146,13 +146,14 @@ def test_job_and_application_mutations_return_compact_jobs(tmp_path):
         triaged = client.post(
             f"/api/v1/jobs/{job['id']}/triage",
             headers=headers,
-            json={"triage": "saved", "expected_version": job["version"]},
+            json={"triage": "shortlisted", "expected_version": job["version"]},
         ).json()
-        assert triaged["triage"] == "saved" and triaged["version"] == job["version"] + 1
+        assert triaged["triage"] == "shortlisted" and triaged["version"] == job["version"] + 1
         assert "posting" not in triaged and "postings" not in triaged
         assert triaged["posting_preview"].startswith("Build reliable services.")
         assert (
-            triaged == client.get("/api/v1/jobs?triage=saved", headers=headers).json()["items"][0]
+            triaged
+            == client.get("/api/v1/jobs?triage=shortlisted", headers=headers).json()["items"][0]
         )
         job = jobs[2]
         via_mcp = structured(
@@ -199,7 +200,6 @@ def test_settings_conflicts_report_current_version(tmp_path):
             ("PATCH", "/api/v1/career/profile", {"name": "Synthetic"}, profile["version"]),
             ("PATCH", "/api/v1/settings", {"no_reply_days": 40}, settings["version"]),
             ("PATCH", "/api/v1/collection", {"enabled": False}, collection["version"]),
-            ("POST", "/api/v1/documents/doc-1/review", {"review_state": "approved"}, 1),
         ]:
             response = client.request(
                 method, path, headers=headers, json={**body, "expected_version": current + 5}
@@ -224,7 +224,7 @@ def test_settings_conflicts_report_current_version(tmp_path):
         stale = client.post(
             "/api/v1/jobs/bulk",
             headers=headers,
-            json={"action": "saved", "items": [{"id": jobs[1]["id"], "expected_version": 9}]},
+            json={"action": "shortlisted", "items": [{"id": jobs[1]["id"], "expected_version": 9}]},
         ).json()
         assert stale["items"][0]["error"]["details"] == {"current_version": jobs[1]["version"]}
 

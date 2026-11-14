@@ -18,7 +18,7 @@ GERMAN = (
 ENGLISH = "You will build services in Python with a small team. Fluent English is required."
 # (source, job board, posting, what happened). "applied" and later fates are sent.
 FIXTURE = [
-    ("search", "linkedin", ENGLISH, "inbox"),
+    ("search", "linkedin", ENGLISH, "new"),
     ("search", "linkedin", ENGLISH, "saved"),
     ("search", "linkedin", ENGLISH, "applied"),
     ("search", "linkedin", ENGLISH, "interview"),
@@ -27,18 +27,18 @@ FIXTURE = [
     ("search", "indeed", GERMAN, "dismissed_system"),
     ("search", "indeed", GERMAN, "dismissed_system"),
     ("search", "linkedin", ENGLISH, "dismissed_owner"),
-    ("search", "linkedin", ENGLISH, "draft"),
+    ("search", "linkedin", ENGLISH, "shortlisted"),
     ("search", "linkedin", ENGLISH, "not_pursued"),
     ("board", "greenhouse", ENGLISH, "offer"),
-    ("board", "greenhouse", ENGLISH, "inbox"),
+    ("board", "greenhouse", ENGLISH, "new"),
     ("board", "greenhouse", GERMAN, "dismissed_system"),
     ("board", "greenhouse", ENGLISH, "dismissed_agent"),
     (None, "manual", ENGLISH, "saved"),
-    (None, "manual", ENGLISH, "inbox"),
+    (None, "manual", ENGLISH, "new"),
 ]
 SENT = {"applied", "interview", "rejected", "offer"}
 ANSWERED = {"interview": "interview", "rejected": "rejection", "offer": "offer"}
-STARTED = SENT | {"draft", "not_pursued"}
+STARTED = SENT | {"shortlisted", "not_pursued"}
 
 
 def expected(rows):
@@ -51,7 +51,7 @@ def expected(rows):
     )
     return {
         "collected": len(fates),
-        "to_review": fates.count("inbox"),
+        "to_review": fates.count("new"),
         "shortlisted": sum(fate == "saved" or fate in STARTED for fate in fates),
         "applied": sum(fate in SENT for fate in fates),
         "responded": sum(fate in ANSWERED for fate in fates),
@@ -63,7 +63,7 @@ def expected(rows):
 
 
 def seed(app):
-    workspace, responses = app.state.workspace, app.state.responses
+    workspace = app.state.workspace
     sources = {"search": new_id(), "board": new_id()}
     with workspace.db.transaction() as conn:
         for key, name, kind, config in (
@@ -86,12 +86,13 @@ def seed(app):
             }
         )
         # Nothing is dismissed automatically.
-        assert job["triage"] == "inbox", (number, fate)
+        assert job["triage"] == "new", (number, fate)
         if fate == "dismissed_system":
             workspace.set_triage(job["id"], "dismissed", job["version"])
         elif fate in {"saved", "dismissed_owner"}:
             with acting_as(OWNER):
-                workspace.set_triage(job["id"], fate.split("_")[0], job["version"])
+                triage = "shortlisted" if fate == "saved" else "dismissed"
+                workspace.set_triage(job["id"], triage, job["version"])
         elif fate == "dismissed_agent":
             with acting_as(AGENT):
                 workspace.set_triage(job["id"], "dismissed", job["version"], "Not a match.")
@@ -112,8 +113,12 @@ def seed(app):
                     },
                 )
             if fate in ANSWERED:
-                responses.add_response(
-                    application["id"], {"kind": ANSWERED[fate], "date": now()[:10]}
+                workspace.update_application(
+                    application["id"],
+                    {
+                        "expected_version": application["version"],
+                        "reply": {"kind": ANSWERED[fate], "date": now()[:10]},
+                    },
                 )
     return sources
 
