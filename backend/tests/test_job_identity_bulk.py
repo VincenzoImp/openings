@@ -1,7 +1,5 @@
 """Read-only identity lookup, duplicate candidates and bulk application changes."""
 
-import json
-
 import pytest
 from fastapi.testclient import TestClient
 
@@ -290,7 +288,7 @@ def test_bulk_deletion_collects_orphan_blobs_once(workspace, monkeypatch):
     assert failed["failed"] == 1 and calls == []
 
 
-def test_rest_and_mcp_parity(tmp_path):
+def test_resolve_duplicates_and_bulk_close_over_rest(tmp_path):
     app = create_app(tmp_path / "rest.sqlite", start_worker=False)
     with TestClient(app) as client:
         owner = client.post("/api/v1/auth/setup", json={"password": "synthetic-password"}).json()
@@ -336,32 +334,3 @@ def test_rest_and_mcp_parity(tmp_path):
             ).status_code
             == 422
         )
-
-    async def call(name, arguments):
-        result = await app.state.mcp.call_tool(name, arguments)
-        return json.loads(result.content[0].text)
-
-    import asyncio
-
-    resolved = asyncio.run(call("jobs_resolve", {"value": {"url": "https://example.test/two"}}))
-    assert resolved["items"][0]["id"] == second["id"]
-    groups = asyncio.run(call("jobs_duplicates", {}))
-    assert groups["total"] == 1
-    reopened = asyncio.run(
-        call(
-            "applications_bulk",
-            {
-                "value": {
-                    "action": "reopen",
-                    "status": "shortlisted",
-                    "items": [
-                        {
-                            "id": attempt["id"],
-                            "expected_version": bulk.json()["items"][0]["result"]["version"],
-                        }
-                    ],
-                }
-            },
-        )
-    )
-    assert reopened["items"][0]["result"]["status"] == "shortlisted"

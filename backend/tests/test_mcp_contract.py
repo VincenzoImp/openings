@@ -48,12 +48,12 @@ def test_mcp_errors_keep_code_status_details_and_current_version(tmp_path):
                 client,
                 headers,
                 "jobs_update",
-                {"job_id": job["id"], "value": {"expected_version": 99, "title": "Changed"}},
+                {"job_id": job["id"], "expected_version": 99, "title": "Changed"},
                 2,
             )
         )
         assert stale["code"] == "conflict" and stale["status"] == 409
-        assert stale["details"] == {"current_version": job["version"]}
+        assert stale["details"] == {"current_version": job["version"], "id": job["id"]}
 
         invalid = error_body(call(client, headers, "jobs_get", {}, 3))
         assert invalid["code"] == "validation" and invalid["status"] == 422

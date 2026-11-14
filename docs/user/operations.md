@@ -167,9 +167,9 @@ sign-in; an attempt that would wait more than 30 s returns 429 with
 proxy's limit. To find it, check the client address of proxied requests in
 `docker compose logs openings`.
 
-Operational grants from `workspace_backup`, `workspace_export` and
-`workspace_restore` expire after 120 seconds and work once; request a new
-grant for each transfer or retry.
+Operational grants from `workspace_backup` and `workspace_export` (MCP, or
+`POST /api/v1/backup/grant` and `POST /api/v1/export/grant`) expire after 120
+seconds and work once; request a new grant for each transfer or retry.
 
 ## Troubleshooting
 

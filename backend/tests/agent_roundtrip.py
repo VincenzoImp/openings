@@ -1,8 +1,6 @@
 """Practical external-agent round trip against an isolated production workspace.
 
 Requires the development environment and an external Tectonic executable.
-The standalone-registration option supports module development before root integration;
-normal execution requires the production app to register all services itself.
 """
 
 import argparse
@@ -21,7 +19,6 @@ from urllib.parse import urljoin
 import httpx
 import httpx2
 import uvicorn
-from fastapi import APIRouter
 from mcp import Client
 from mcp.client.streamable_http import streamable_http_client
 
@@ -71,12 +68,10 @@ async def exercise(base, token, folder, tectonic):
                     await session.call_tool(
                         "profile_update",
                         {
-                            "value": {
-                                "expected_version": profile["version"],
-                                "name": "Alex Example",
-                                "headline": "Backend engineer",
-                                "summary": "Built Python APIs and reduced latency by 20%.",
-                            }
+                            "expected_version": profile["version"],
+                            "name": "Alex Example",
+                            "headline": "Backend engineer",
+                            "summary": "Built Python APIs and reduced latency by 20%.",
                         },
                     )
                 )
@@ -84,11 +79,9 @@ async def exercise(base, token, folder, tectonic):
                     await session.call_tool(
                         "knowledge_create",
                         {
-                            "value": {
-                                "kind": "project",
-                                "title": "Example API",
-                                "narrative": "Built Python APIs and reduced latency by 20%.",
-                            }
+                            "kind": "project",
+                            "title": "Example API",
+                            "narrative": "Built Python APIs and reduced latency by 20%.",
                         },
                     )
                 )
@@ -96,11 +89,9 @@ async def exercise(base, token, folder, tectonic):
                     await session.call_tool(
                         "claims_create",
                         {
-                            "value": {
-                                "knowledge_id": evidence["id"],
-                                "text": "Reduced latency by 20%.",
-                                "approved": True,
-                            }
+                            "knowledge_id": evidence["id"],
+                            "text": "Reduced latency by 20%.",
+                            "approved": True,
                         },
                     )
                 )
@@ -109,12 +100,10 @@ async def exercise(base, token, folder, tectonic):
                     await session.call_tool(
                         "templates_create",
                         {
-                            "value": {
-                                "name": "Synthetic CV",
-                                "tex": tex,
-                                "guidance": "Use concise evidence-backed bullets.",
-                                "rules": {"max_bullet_chars": 150},
-                            }
+                            "name": "Synthetic CV",
+                            "tex": tex,
+                            "guidance": "Use concise evidence-backed bullets.",
+                            "rules": {"max_bullet_chars": 150},
                         },
                     )
                 )
@@ -122,11 +111,9 @@ async def exercise(base, token, folder, tectonic):
                     await session.call_tool(
                         "jobs_create",
                         {
-                            "value": {
-                                "title": "Backend engineer",
-                                "company": "Example Co",
-                                "posting": "Build Python APIs.",
-                            }
+                            "title": "Backend engineer",
+                            "company": "Example Co",
+                            "posting": "Build Python APIs.",
                         },
                     )
                 )
@@ -135,20 +122,17 @@ async def exercise(base, token, folder, tectonic):
                         "jobs_triage",
                         {
                             "job_id": job["id"],
-                            "value": {"triage": "shortlisted", "expected_version": job["version"]},
+                            "triage": "shortlisted",
+                            "expected_version": job["version"],
                         },
                     )
                 )
                 checks["shortlist_starts_the_application"] = (
-                    unpack(
-                        await session.call_tool("jobs_list", {"value": {"triage": "shortlisted"}})
-                    )["total"]
+                    unpack(await session.call_tool("jobs_list", {"triage": "shortlisted"}))["total"]
                     == 1
                     and job["application"]["status"] == "shortlisted"
                 )
-                second_start = await session.call_tool(
-                    "applications_create", {"value": {"job_id": job["id"]}}
-                )
+                second_start = await session.call_tool("applications_create", {"job_id": job["id"]})
                 checks["one_open_application_per_job"] = second_start.is_error
                 application = unpack(
                     await session.call_tool(
@@ -166,11 +150,9 @@ async def exercise(base, token, folder, tectonic):
                         "notes_create",
                         {
                             "job_id": job["id"],
-                            "value": {
-                                "body": "Prefer technical detail.",
-                                "application_id": application["id"],
-                                "pinned": True,
-                            },
+                            "body": "Prefer technical detail.",
+                            "application_id": application["id"],
+                            "pinned": True,
                         },
                     )
                 )
@@ -178,10 +160,13 @@ async def exercise(base, token, folder, tectonic):
                     "applications_update",
                     {
                         "application_id": application["id"],
-                        "value": {"expected_version": application["version"], "note": "Gone"},
+                        "expected_version": application["version"],
+                        "note": "Gone",
                     },
                 )
+                # Arguments are flat: the 0.23 `value` wrapper is refused, not ignored.
                 flat = await session.call_tool("knowledge_list", {"q": "Example API"})
+                wrapped = await session.call_tool("knowledge_list", {"value": {"q": "Example"}})
                 unversioned = await session.call_tool("notes_delete", {"note_id": pinned["id"]})
                 gone = [
                     name
@@ -190,14 +175,15 @@ async def exercise(base, token, folder, tectonic):
                 ]
                 checks["removed_fields_and_tools_refused"] = (
                     removed.is_error
-                    and flat.is_error
+                    and not flat.is_error
+                    and wrapped.is_error
                     and unversioned.is_error
                     and "expected_version" in unversioned.content[0].text
                     and gone == []
                 )
                 # The agent reads the live records; frozen contexts are gone (0.24).
                 frozen = await session.call_tool(
-                    "contexts_create", {"value": {"application_id": application["id"]}}
+                    "contexts_create", {"application_id": application["id"]}
                 )
                 checks["contexts_removed_with_a_hint"] = (
                     frozen.is_error
@@ -234,11 +220,9 @@ async def exercise(base, token, folder, tectonic):
                 refused = await session.call_tool(
                     "documents_create",
                     {
-                        "value": {
-                            "application_id": application["id"],
-                            "kind": "cv",
-                            "content": {"text": "Free-form wording."},
-                        }
+                        "application_id": application["id"],
+                        "kind": "cv",
+                        "content": {"text": "Free-form wording."},
                     },
                 )
                 checks["cv_content_refused"] = refused.is_error and (
@@ -267,16 +251,14 @@ async def exercise(base, token, folder, tectonic):
                     await session.call_tool(
                         "documents_create",
                         {
-                            "value": {
-                                "application_id": application["id"],
-                                "kind": "cv",
-                                "title": "CV",
-                                "claim_ids": [claim["id"]],
-                                "knowledge_ids": [evidence["id"]],
-                                "note": "Built from the synthetic template.",
-                                "source_file": spec("application.tex", tex_bytes),
-                                "pdf": spec("application.pdf", pdf),
-                            }
+                            "application_id": application["id"],
+                            "kind": "cv",
+                            "title": "CV",
+                            "claim_ids": [claim["id"]],
+                            "knowledge_ids": [evidence["id"]],
+                            "note": "Built from the synthetic template.",
+                            "source_file": spec("application.tex", tex_bytes),
+                            "pdf": spec("application.pdf", pdf),
                         },
                     )
                 )
@@ -317,13 +299,11 @@ async def exercise(base, token, folder, tectonic):
                     await session.call_tool(
                         "files_reserve_upload",
                         {
-                            "value": {
-                                "owner_type": "document",
-                                "owner_id": document["id"],
-                                "name": "late.pdf",
-                                "media_type": "application/pdf",
-                                "size": len(pdf),
-                            }
+                            "owner_type": "document",
+                            "owner_id": document["id"],
+                            "name": "late.pdf",
+                            "media_type": "application/pdf",
+                            "size": len(pdf),
                         },
                     )
                 ).is_error
@@ -332,11 +312,9 @@ async def exercise(base, token, folder, tectonic):
                     await session.call_tool(
                         "documents_create",
                         {
-                            "value": {
-                                "application_id": application["id"],
-                                "kind": "letter",
-                                "pdf": spec("letter.pdf", pdf),
-                            }
+                            "application_id": application["id"],
+                            "kind": "letter",
+                            "pdf": spec("letter.pdf", pdf),
                         },
                     )
                 )
@@ -351,9 +329,7 @@ async def exercise(base, token, folder, tectonic):
                     and letter["text_from"] == "pdf"
                     and "Example" in (letter["text"] or "")
                 )
-                ready = unpack(
-                    await session.call_tool("applications_list", {"value": {"stage": "ready"}})
-                )
+                ready = unpack(await session.call_tool("applications_list", {"stage": "ready"}))
                 checks["ready_is_computed"] = [item["id"] for item in ready["items"]] == [
                     application["id"]
                 ] and ready["items"][0]["missing"] == []
@@ -361,16 +337,12 @@ async def exercise(base, token, folder, tectonic):
                     await session.call_tool(
                         "documents_create",
                         {
-                            "value": {
-                                "application_id": application["id"],
-                                "previous_id": document["id"],
-                                "kind": "cv",
-                                "note": "Edited source awaiting a newly compiled PDF.",
-                                "source": tex_bytes.decode().replace(
-                                    "Linux.", "Linux, Kubernetes."
-                                ),
-                                "pdf": spec("application.pdf", pdf),
-                            }
+                            "application_id": application["id"],
+                            "previous_id": document["id"],
+                            "kind": "cv",
+                            "note": "Edited source awaiting a newly compiled PDF.",
+                            "source": tex_bytes.decode().replace("Linux.", "Linux, Kubernetes."),
+                            "pdf": spec("application.pdf", pdf),
                         },
                     )
                 )
@@ -396,13 +368,7 @@ async def exercise(base, token, folder, tectonic):
                 summaries = unpack(
                     await session.call_tool(
                         "documents_list",
-                        {
-                            "value": {
-                                "application_id": application["id"],
-                                "summary": True,
-                                "limit": 1,
-                            }
-                        },
+                        {"application_id": application["id"], "summary": True, "limit": 1},
                     )
                 )
                 rest_summaries = (
@@ -426,7 +392,7 @@ async def exercise(base, token, folder, tectonic):
                     unpack(
                         await session.call_tool(
                             "knowledge_list",
-                            {"value": {"summary": True, "q": "Example API"}},
+                            {"summary": True, "q": "Example API"},
                         )
                     )["items"][0]["id"]
                     == evidence["id"]
@@ -455,7 +421,8 @@ async def exercise(base, token, folder, tectonic):
                             "applications_update",
                             {
                                 "application_id": application["id"],
-                                "value": {"expected_version": current["version"], **value},
+                                "expected_version": current["version"],
+                                **value,
                             },
                         )
                     )
@@ -467,22 +434,18 @@ async def exercise(base, token, folder, tectonic):
                         "applications_update",
                         {
                             "application_id": application["id"],
-                            "value": {
-                                "expected_version": current["version"],
-                                "reply": {"kind": "rejection"},
-                            },
+                            "expected_version": current["version"],
+                            "reply": {"kind": "rejection"},
                         },
                     )
                 )
                 checks["closing_keeps_the_shortlist"] = (
                     (current["status"], current["outcome"]) == ("closed", "rejected")
-                    and unpack(
-                        await session.call_tool("jobs_list", {"value": {"triage": "shortlisted"}})
-                    )["total"]
-                    == 1
-                    and unpack(await session.call_tool("jobs_list", {"value": {"triage": "new"}}))[
+                    and unpack(await session.call_tool("jobs_list", {"triage": "shortlisted"}))[
                         "total"
                     ]
+                    == 1
+                    and unpack(await session.call_tool("jobs_list", {"triage": "new"}))["total"]
                     == 0
                 )
                 response = await http.get(base + "/api/v1/backup")
@@ -518,31 +481,10 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--out", type=Path)
     parser.add_argument("--tectonic", default="tectonic")
-    parser.add_argument("--standalone-registration", action="store_true")
     args = parser.parse_args()
     with tempfile.TemporaryDirectory() as temporary:
         folder = Path(temporary)
         app = create_app(folder / "workspace.sqlite", start_worker=False)
-        if args.standalone_registration:
-            from openings import career, documents
-            from openings.interfaces import (
-                career as career_interface,
-                documents as documents_interface,
-            )
-
-            service = career.CareerService(app.state.workspace)
-            files = documents.DocumentService(app.state.workspace)
-            router = APIRouter(prefix="/api/v1")
-            career_interface.register_api(router, service)
-            documents_interface.register_api(router, files)
-            career_interface.register_mcp(app.state.mcp, service)
-            documents_interface.register_mcp(app.state.mcp, files)
-            catchalls = [
-                route for route in app.router.routes if getattr(route, "path", "") == "/{path:path}"
-            ]
-            app.router.routes = [route for route in app.router.routes if route not in catchalls]
-            app.include_router(router)
-            app.router.routes += catchalls
         if not app.state.auth.configured():
             app.state.auth.setup("synthetic-probe-password")
         token = app.state.auth.create_token("synthetic-agent-probe")["token"]
@@ -559,7 +501,6 @@ def main():
             if not server.started:
                 raise RuntimeError("Probe HTTP server did not start.")
             record = asyncio.run(exercise(f"http://127.0.0.1:{port}", token, folder, args.tectonic))
-            record["standalone_registration"] = args.standalone_registration
             if args.out:
                 args.out.write_text(json.dumps(record, indent=2) + "\n")
             print(json.dumps(record, indent=2))
