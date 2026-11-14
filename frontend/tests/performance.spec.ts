@@ -121,7 +121,12 @@ test("the jobs to review, 200 rows with their signals, are interactive in under 
   );
   expect(inbox.total).toBeGreaterThanOrEqual(200);
   expect(inbox.items[0].signals.computed).toBe(true);
-  const time = await median(page, "#jobs", ".job-list > li", "Jobs to review");
-  await expect(page.locator(".job-list input[type=checkbox]")).toHaveCount(200);
+  const time = await median(
+    page,
+    "#jobs",
+    ".jobs-list .ui-row",
+    "Jobs to review",
+  );
+  await expect(page.locator(".jobs-list .ui-row-main")).toHaveCount(200);
   expect(time).toBeLessThan(BUDGET_MS);
 });
