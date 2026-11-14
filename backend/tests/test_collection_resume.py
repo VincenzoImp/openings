@@ -185,6 +185,6 @@ def test_location_and_title_filters_match_whole_terms():
     assert not matches_filters({"title": "Senior Sales Engineer"}, filters)
     assert not matches_filters({"title": "SAP CRM Analyst"}, filters)
     assert matches_filters({"title": "Wholesales Data Engineer"}, filters)
-    assert matches_filters({"title": "Sapienza Research Engineer"}, filters)
+    assert matches_filters({"title": "Sapling Research Engineer"}, filters)
     assert not matches_filters({"title": "Sales Director"}, {"exclude_titles": ["sales"]})
     assert matches_filters({"title": "Backend Engineer"}, {"exclude_titles": []})

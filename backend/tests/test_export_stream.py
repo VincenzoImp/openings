@@ -11,7 +11,7 @@ from starlette.requests import ClientDisconnect
 
 from openings.interfaces.system import grant
 from openings.models import JobInput
-from openings.transfers import RecordsResponse
+from openings.snapshots import RecordsResponse
 
 
 @pytest.fixture

@@ -20,7 +20,7 @@ from ..errors import DomainError
 from ..operations import backup_file_for, restore_upload
 from ..removed import ROUTES
 from ..skills import SKILL_FILE, read_skill
-from ..transfers import RecordsResponse, export_records
+from ..snapshots import RecordsResponse, export_records
 from .operation import API_PREFIX, capability_entries
 from .system import PasswordInput
 

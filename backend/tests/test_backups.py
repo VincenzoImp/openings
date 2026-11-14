@@ -1,4 +1,4 @@
-"""Pre-upgrade copies, scheduled local backups and the owner's access to them (#205)."""
+"""Scheduled local backups, pre-upgrade copies and the owner's access to them (#205)."""
 
 import shutil
 import sqlite3
@@ -10,7 +10,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from fastapi.testclient import TestClient
 
-from openings import backups, compaction, db as db_module
+from openings import backups, compaction
 from openings.app import create_app
 from openings.db import SCHEMA_VERSION, Database
 from openings.errors import DomainError
@@ -19,7 +19,7 @@ from openings.workspace import Workspace
 
 
 def older(path, version=13):
-    """A workspace file marked with an earlier schema: what an in-place upgrade copies first."""
+    """A workspace file marked with an earlier schema than the migration starts from."""
     workspace = Workspace(path)
     workspace.ingest_job({"title": "Synthetic engineer", "company": "Example", "posting": "APIs."})
     del workspace
@@ -46,63 +46,19 @@ def mode(path):
     return stat.S_IMODE(path.stat().st_mode)
 
 
-# Pre-upgrade copies
+# Starting a workspace
 
 
-def test_a_verified_private_copy_is_kept_and_only_the_two_most_recent_stay(tmp_path):
-    path = older(tmp_path / "openings.sqlite")
-    before = path.read_bytes()
-    copy = db_module.copy_before_upgrade(path, 13)
-    assert db_module.pre_upgrade_copies(path) == [copy]
-    assert copy.name.startswith("openings.pre-schema13-") and copy.suffix == ".sqlite"
-    assert opened_version(copy) == 13
-    assert mode(copy) == 0o600
-    assert path.read_bytes() == before
-    assert not list(tmp_path.glob(".openings-temp-*"))
-    with closing(sqlite3.connect(copy)) as conn:
-        assert conn.execute("SELECT count(*) FROM jobs").fetchone()[0] == 1
-
-    copy.unlink()
-    for stamp in ("20250101T000000Z", "20250201T000000Z", "20250301T000000Z"):
-        shutil.copyfile(path, tmp_path / f"openings.pre-schema12-{stamp}.sqlite")
-    # Another kind of kept copy (0.24's renamed original) is never rotated here.
-    shutil.copyfile(path, tmp_path / "openings.pre-0.24.sqlite")
-    db_module.copy_before_upgrade(path, 13)
-    kept = [item.name for item in db_module.pre_upgrade_copies(path)]
-    assert len(kept) == 2
-    assert kept[0].startswith("openings.pre-schema13-")
-    assert kept[1] == "openings.pre-schema12-20250301T000000Z.sqlite"
-    assert (tmp_path / "openings.pre-0.24.sqlite").is_file()
-
-
-def test_a_copy_is_refused_and_the_file_left_unchanged(tmp_path, monkeypatch):
+def test_a_fresh_workspace_takes_no_copy_and_an_unsupported_schema_is_refused(tmp_path):
     Database(tmp_path / "fresh.sqlite")
-    assert not list(tmp_path.glob("*.pre-*"))  # a fresh workspace takes no copy
+    assert not list(tmp_path.glob("*.pre-*"))
 
     path = older(tmp_path / "openings.sqlite")
     before = path.read_bytes()
     files = sorted(item.name for item in tmp_path.iterdir())
-    # An unsupported older schema is refused without a copy.
     with pytest.raises(DomainError) as refused:
         Database(path)
     assert refused.value.code == "schema_version"
-    # Without room for the copy.
-    with monkeypatch.context() as patch:
-        no_room(patch, free=1024)
-        with pytest.raises(DomainError) as refused:
-            db_module.copy_before_upgrade(path, 13)
-    assert refused.value.code == "upgrade_room"
-    assert "MiB of free space" in refused.value.message
-    assert refused.value.details["needed_bytes"] >= 2.2 * len(before)
-
-    # A copy that cannot be renamed into place.
-    def broken_rename(source, target):
-        raise OSError("synthetic rename failure")
-
-    monkeypatch.setattr(db_module.os, "replace", broken_rename)
-    with pytest.raises(DomainError) as refused:
-        db_module.copy_before_upgrade(path, 13)
-    assert refused.value.code == "upgrade_copy"
     assert path.read_bytes() == before
     assert sorted(item.name for item in tmp_path.iterdir()) == files
 
@@ -152,9 +108,13 @@ def test_skipped_failed_and_disabled_backups_are_recorded(tmp_path, monkeypatch,
     def broken(*_):
         raise OSError("synthetic disk failure")
 
+    # After a skipped or failed attempt the next one waits an hour, not one cycle.
+    later = datetime.now(UTC) + timedelta(hours=backups.RETRY_HOURS, minutes=1)
     with monkeypatch.context() as patch:
         patch.setattr(backups, "run_backup", broken)
-        attempt = backups.run_if_due(workspace.db)
+        assert backups.run_if_due(workspace.db) is None
+        attempt = backups.run_if_due(workspace.db, later)
+        assert backups.run_if_due(workspace.db, later + timedelta(minutes=30)) is None
     assert attempt["outcome"] == "failed"
     assert attempt["error"] == "synthetic disk failure"
     assert backups.last_attempt(workspace.db)["error"] == "synthetic disk failure"

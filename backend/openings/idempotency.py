@@ -25,7 +25,6 @@ TABLES = frozenset(
         "jobs",
         "knowledge",
         "notes",
-        "responses",
         "sources",
         "templates",
     }
