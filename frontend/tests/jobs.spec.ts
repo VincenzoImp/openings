@@ -336,8 +336,8 @@ test("a note is added to a job and pinned to the top of its history", async ({
     "Synthetic pinned note.",
   );
   await expect(history.locator("li").first()).toContainText("Pinned note");
-  const notes = await call(page, `/jobs/${made.id}/notes`);
-  expect(notes.items[0].pinned).toBe(true);
+  const read = await call(page, `/jobs/batch?ids=${made.id}`);
+  expect(read.items[0].notes[0].pinned).toBe(true);
 });
 
 test("forgetting a job asks first and names what is lost", async ({ page }) => {

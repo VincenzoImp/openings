@@ -6,7 +6,7 @@ const applications = await import("../src/screens/applications/model.ts");
 
 const row = (id, fields = {}) => ({
   id,
-  status: "shortlisted",
+  stage: "shortlisted",
   ready: false,
   deadline: null,
   missing: [],

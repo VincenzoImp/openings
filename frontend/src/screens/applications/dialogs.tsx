@@ -35,7 +35,7 @@ import {
 export interface Target {
   id: string;
   version: number;
-  status: string;
+  stage: string;
   title: string;
   applied_at?: string | null;
   outcome?: string | null;
@@ -144,7 +144,7 @@ export function RecordReplyDialog({
   const [note, setNote] = useState("");
   useEffect(() => {
     if (!target) return;
-    setKind(likelyReply(target.status));
+    setKind(likelyReply(target.stage));
     setDate(isoDay());
     setNote("");
   }, [target]);
@@ -201,7 +201,7 @@ export function RecordReplyDialog({
       </Field>
       {target && (
         <p className="ap-caption">
-          {replyEffect(target.status, kind, target.outcome)}
+          {replyEffect(target.stage, kind, target.outcome)}
         </p>
       )}
     </FormDialog>
@@ -209,11 +209,9 @@ export function RecordReplyDialog({
 }
 
 /** The outcomes a Close can record for these applications. */
-export function closeOutcomes(
-  targets: Pick<Target, "status" | "applied_at">[],
-) {
+export function closeOutcomes(targets: Pick<Target, "stage" | "applied_at">[]) {
   const sent = targets.every((target) => !!target.applied_at);
-  const offer = targets.every((target) => target.status === "offer");
+  const offer = targets.every((target) => target.stage === "offer");
   return [
     { value: "rejected", label: "Rejected", hint: "The employer said no." },
     ...(sent
@@ -246,7 +244,7 @@ export function CloseDialog({
 }) {
   const [outcome, setOutcome] = useState("rejected");
   useEffect(() => {
-    if (target) setOutcome(isSent(target.status) ? "rejected" : "not_pursued");
+    if (target) setOutcome(isSent(target.stage) ? "rejected" : "not_pursued");
   }, [target]);
   const change = useChange(onClose);
   return (
@@ -260,7 +258,7 @@ export function CloseDialog({
         target &&
         change.run(
           target,
-          { status: "closed", outcome: outcome as Patch["outcome"] },
+          { stage: "closed", outcome: outcome as Patch["outcome"] },
           `Closed “${target.title}” as ${OUTCOMES[outcome].toLowerCase()}`,
         )
       }
@@ -295,7 +293,7 @@ export function StageDialog({
   const [outcome, setOutcome] = useState("rejected");
   useEffect(() => {
     if (!target) return;
-    setStage(target.status);
+    setStage(target.stage);
     setOutcome(target.outcome || "rejected");
   }, [target]);
   const change = useChange(onClose);
@@ -307,14 +305,14 @@ export function StageDialog({
       title="Change stage"
       submit="Change stage"
       busy={change.busy}
-      disabled={!target || (stage === target.status && stage !== "closed")}
+      disabled={!target || (stage === target.stage && stage !== "closed")}
       onSubmit={() =>
         target &&
         change.run(
           target,
           stage === "closed"
-            ? { status: "closed", outcome: outcome as Patch["outcome"] }
-            : { status: stage as Patch["status"] },
+            ? { stage: "closed", outcome: outcome as Patch["outcome"] }
+            : { stage: stage as Patch["stage"] },
           `Moved “${target.title}” to ${label}`,
         )
       }

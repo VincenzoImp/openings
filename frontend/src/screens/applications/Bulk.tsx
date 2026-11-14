@@ -18,7 +18,7 @@ import { PrioritySelect, closeOutcomes, errorText } from "./dialogs";
 import { OUTCOMES, bulkActions, reopenStage } from "./model";
 
 type Bulk = Schema<"ApplicationBulk">;
-type Item = Pick<ApplicationRow, "id" | "version" | "status" | "outcome">;
+type Item = Pick<ApplicationRow, "id" | "version" | "stage" | "outcome">;
 
 const groupBy = <T,>(items: T[], key: (item: T) => string) => {
   const groups = new Map<string, T[]>();
@@ -108,13 +108,13 @@ export function BulkActions({
     try {
       const groups = groupBy(items, (app) =>
         undoing
-          ? app.status
+          ? app.stage
           : reopenStage(app as Pick<ApplicationRow, "applied_at">),
       );
       const results = await run(
-        [...groups].map(([status, group]) => ({
+        [...groups].map(([stage, group]) => ({
           action: "reopen",
-          status: status as Bulk["status"],
+          stage: stage as Bulk["stage"],
           items: group.map((app) => ({
             id: app.id,
             expected_version: app.version,

@@ -23,7 +23,7 @@ import {
 export function FollowUp({ context }: { context: PageContext }) {
   const { app, noReplyDays } = context;
   const current = useCurrentDocuments(app.id);
-  const closed = app.status === "closed";
+  const closed = app.stage === "closed";
   const line = closed
     ? { text: closedSummary(app) }
     : followUpLine(app, noReplyDays);

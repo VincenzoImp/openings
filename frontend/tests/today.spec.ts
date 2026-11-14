@@ -130,11 +130,16 @@ test("a shortlisted application due this week names what it still needs", async 
     location: "Zurich",
     posting: `${title} at Example Labs.`,
   });
-  const application = await call(page, "/applications", "POST", {
-    job_id: job.id,
-    deadline: localDay(3),
-    required_documents: ["cv", "letter"],
+  const started = await call(page, "/applications/batch", "POST", {
+    items: [
+      {
+        job_id: job.id,
+        deadline: localDay(3),
+        required_documents: ["cv", "letter"],
+      },
+    ],
   });
+  const application = started.items[0].result;
   await page.reload();
   await settled(page);
   const row = rows(page, "Applications that need attention").filter({
@@ -188,7 +193,7 @@ test("waiting for a reply: close one with c, undo, record a reply with r, close 
   await expect(dialog).toBeHidden();
   await expect(toast(page)).toContainText("Recorded the reply");
   await expect
-    .poll(async () => (await call(page, `/applications/${first.id}`)).status)
+    .poll(async () => (await call(page, `/applications/${first.id}`)).stage)
     .toBe("interview");
   await expect.poll(overdue).toBe(waiting.total - 1);
 
