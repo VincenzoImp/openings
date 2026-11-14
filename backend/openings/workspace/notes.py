@@ -1,24 +1,25 @@
-"""Notes on a job or on one of its applications, with their author, run and pin.
+"""Notes on a job or on one of its applications, with their author and pin.
 
 A note's scope is its job, or one application of that job when
-``application_id`` is set. Each note records who wrote it and, for a token with
-an open run, that run. A job and an application each have at most one pinned
-note (partial unique indexes); pinning a note unpins the one pinned in its
-scope, and both changes are recorded. The application's pinned note is its
+``application_id`` is set. Each note records who wrote it (an actor label). A
+job and an application each have at most one pinned note (partial unique
+indexes); pinning a note unpins the one pinned in its scope, and both changes
+are recorded. The application's pinned note is its
 standing guidance, which a new frozen context includes.
 """
 
-from ..actors import current_actor, pop_actor
+from .. import events
+from ..actors import current_actor
 from ..common import check_version, new_id, now
 from ..errors import DomainError, missing
 from ..idempotency import fingerprint, remember, replay
 from ..models import NoteInput, NotePatch, NotePin
 
-NOTE_SELECT = "SELECT n.*,r.workflow AS run_workflow FROM notes n LEFT JOIN runs r ON r.id=n.run_id"
+NOTE_SELECT = "SELECT n.* FROM notes n"
 
 
 def note_record(row):
-    """A note as returned by reads: scope, author, run and pin."""
+    """A note as returned by reads: scope, author label and pin."""
     if row is None:
         missing("Note")
     row = dict(row)
@@ -31,10 +32,7 @@ def note_record(row):
         "version": row["version"],
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],
-        "author": pop_actor(row, "author"),
-        "run": {"id": row["run_id"], "workflow": row.get("run_workflow")}
-        if row["run_id"]
-        else None,
+        "author": row["author"],
         "pinned": row["pinned_at"] is not None,
         "pinned_at": row["pinned_at"],
     }
@@ -72,14 +70,13 @@ class Notes:
         return self.get_note(note_id)
 
     def insert_note(self, conn, job_id, application_id, body, pinned=False):
-        """Write a note by the current actor, in its open run, and record it."""
-        actor = current_actor()
+        """Write a note by the current actor and record it."""
         note_id, stamp = new_id(), now()
         if pinned:
             self._unpin_scope(conn, job_id, application_id, note_id)
         conn.execute(
-            "INSERT INTO notes(id,job_id,application_id,body,created_at,updated_at,author_kind,"
-            "author_id,author_name,author_token_kind,run_id,pinned_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO notes(id,job_id,application_id,body,created_at,updated_at,author,"
+            "pinned_at) VALUES(?,?,?,?,?,?,?,?)",
             (
                 note_id,
                 job_id,
@@ -87,18 +84,17 @@ class Notes:
                 body,
                 stamp,
                 stamp,
-                *actor.columns(),
-                self.open_run_id(conn, actor),
+                current_actor().label,
                 stamp if pinned else None,
             ),
         )
-        self.event(
-            "note_added",
-            job_id,
-            application_id,
-            {"pinned": True} if pinned else None,
+        events.record(
             conn,
+            "note_added",
             subject=("note", note_id),
+            payload={"pinned": True} if pinned else None,
+            job_id=job_id,
+            application_id=application_id,
         )
         return note_id
 
@@ -110,12 +106,12 @@ class Notes:
                 missing("Note")
             check_version(row, expected_version)
             c.execute("DELETE FROM notes WHERE id=?", (note_id,))
-            self.event(
+            events.record(
+                c,
                 "note_deleted",
-                row["job_id"],
-                row["application_id"],
-                conn=c,
                 subject=("note", note_id),
+                job_id=row["job_id"],
+                application_id=row["application_id"],
             )
         return {"deleted": True}
 
@@ -134,13 +130,13 @@ class Notes:
             "UPDATE notes SET body=?,version=version+1,updated_at=? WHERE id=?",
             (body, now(), row["id"]),
         )
-        self.event(
-            "note_edited",
-            row["job_id"],
-            row["application_id"],
-            {"version": row["version"] + 1},
+        events.record(
             conn,
+            "note_edited",
             subject=("note", row["id"]),
+            payload={"version": row["version"] + 1},
+            job_id=row["job_id"],
+            application_id=row["application_id"],
         )
 
     def pin_note(self, note_id, value):
@@ -161,13 +157,13 @@ class Notes:
             "UPDATE notes SET pinned_at=?,version=version+1,updated_at=? WHERE id=?",
             (stamp, now(), row["id"]),
         )
-        self.event(
-            kind,
-            row["job_id"],
-            row["application_id"],
-            {"version": row["version"] + 1, **(payload or {})},
+        events.record(
             conn,
+            kind,
             subject=("note", row["id"]),
+            payload={"version": row["version"] + 1, **(payload or {})},
+            job_id=row["job_id"],
+            application_id=row["application_id"],
         )
 
     def _unpin_scope(self, conn, job_id, application_id, replaced_by):

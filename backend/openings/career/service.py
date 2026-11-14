@@ -20,7 +20,3 @@ class CareerService(
         with self.db.transaction() as conn:
             if not _setting(conn, "profile", None)["version"]:
                 _write_setting(conn, "profile", DEFAULT_PROFILE, 1)
-
-    def _record(self, conn, event, subject_type, subject_id, /, **payload):
-        """Leave an attributed record of a change: identifiers, field names and versions only."""
-        self.workspace.event(event, payload=payload, conn=conn, subject=(subject_type, subject_id))

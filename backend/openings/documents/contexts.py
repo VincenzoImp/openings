@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 
+from .. import events
 from ..career.models import DEFAULT_PROFILE
 from ..career.records import _get, _page, _setting
 from ..common import decode_record, encode, new_id, now
@@ -175,13 +176,13 @@ class ContextOperations:
                     "UPDATE jobs SET triage='saved',version=version+1,updated_at=? WHERE id=?",
                     (timestamp, job["id"]),
                 )
-            self.workspace.event(
-                "context_prepared",
-                job["id"],
-                value.application_id,
-                {"context_id": context_id},
+            events.record(
                 conn,
+                "context_prepared",
                 subject=("context", context_id),
+                payload={"context_id": context_id},
+                job_id=job["id"],
+                application_id=value.application_id,
             )
             self.workspace.clear_ready(conn, value.application_id, "context_prepared")
         return self.get_context(context_id)

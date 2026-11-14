@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from .. import events
 from ..errors import conflict
 from .models import DEFAULT_PROFILE, ProfileUpdate
 from .records import _setting, _write_setting, values
@@ -23,13 +24,14 @@ class ProfileOperations:
         merged = {**previous, **data}
         if previous != merged:
             _write_setting(conn, "profile", merged, expected + 1)
-            self._record(
+            events.record(
                 conn,
                 "profile_updated",
-                "profile",
-                "profile",
-                fields=sorted(key for key in merged if previous.get(key) != merged[key]),
-                version=expected + 1,
+                ("profile", "profile"),
+                {
+                    "fields": sorted(key for key in merged if previous.get(key) != merged[key]),
+                    "version": expected + 1,
+                },
             )
 
     def update_profile(self, value: ProfileUpdate) -> dict:

@@ -13,7 +13,7 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 from starlette.background import BackgroundTask
 
-from .. import __version__, backups
+from .. import __version__, backups, events
 from ..actors import current_actor, require_owner
 from ..auth import COOKIE, MAX_AGE
 from ..db import SCHEMA_VERSION
@@ -426,7 +426,8 @@ def register_system(router, mcp, workspace, auth, public_url):
             workspace.maintenance = True
             try:
                 result = await asyncio.to_thread(restore_database, workspace, name)
-                workspace.event("workspace_restored", subject=("workspace", "backup"))
+                with workspace.db.transaction() as conn:
+                    events.record(conn, "workspace_restored", ("workspace", "backup"))
                 # Other jobs now: build the duplicate index and missing signals again.
                 workspace.reset_duplicates()
                 workspace.warm_duplicates()
@@ -506,8 +507,6 @@ def register_system(router, mcp, workspace, auth, public_url):
                 "postings": ["payload"],
                 "applications": ["questions", "answers", "requirements"],
                 "events": ["payload"],
-                "runs": ["report", "change_counts"],
-                "questions": ["choices"],
                 "knowledge": ["metadata", "dates", "skills"],
                 "claims": ["metadata"],
                 "preference_sections": ["items"],
@@ -524,14 +523,10 @@ def register_system(router, mcp, workspace, auth, public_url):
                 "responses",
                 "notes",
                 "events",
-                "runs",
-                "questions",
-                "requests",
                 "knowledge",
                 "claims",
                 "templates",
                 "preference_sections",
-                "skill_notes",
                 "contexts",
                 "documents",
                 "files",

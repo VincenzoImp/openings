@@ -356,48 +356,6 @@ def test_forgetting_a_job_collects_its_context_parts_in_the_same_transaction(tmp
     assert final["blobs"] == workspace.db.one("SELECT count(DISTINCT sha256) AS n FROM files")["n"]
 
 
-def test_questions_and_requests_do_not_keep_deleted_contexts_alive(tmp_path):
-    app = create_app(tmp_path / "subjects.sqlite", start_worker=False)
-    workspace, documents = app.state.workspace, app.state.documents
-    career = app.state.career
-    entry = career.create_knowledge(KnowledgeCreate(title="Backend engineer", narrative="Built."))
-    career.create_template(TemplateCreate(name="CV", kind="resume", tex="x", is_default=True))
-    add_asset(workspace, "knowledge_id", entry["id"], "proof.pdf", b"%PDF-1.4 proof")
-    applications = []
-    for index in range(2):
-        job = workspace.ingest_job({"title": f"Synthetic role {index}", "posting": "Build."})
-        application = workspace.create_application({"job_id": job["id"]})
-        context = documents.prepare_context(ContextCreate(application_id=application["id"]))
-        for subject in (("job", job["id"]), ("application", application["id"])):
-            app.state.activity.ask_question(
-                {"question": "Which team?", "subject_type": subject[0], "subject_id": subject[1]}
-            )
-            app.state.requests.create_request(
-                {"text": "Prepare this.", "subject_type": subject[0], "subject_id": subject[1]}
-            )
-        applications.append((job, application, context))
-    assert counts(workspace)["snapshot_parts"] > 0
-
-    job, application, context = applications[0]
-    workspace.delete_application(
-        application["id"], workspace.get_application(application["id"])["version"]
-    )
-    remaining = counts(workspace)
-    assert remaining["contexts"] == 1 and remaining["blobs"] == 1
-    assert documents.get_context(applications[1][2]["id"]) == applications[1][2]
-    job = applications[1][0]
-    workspace.forget_job(job["id"], workspace.get_job(job["id"])["version"])
-    final = counts(workspace)
-    assert final["contexts"] == final["context_parts"] == final["snapshot_parts"] == 0
-    assert final["snapshot_list_items"] == 0
-    # The live Career file still owns its bytes; questions and requests survive unlinked.
-    assert final["blobs"] == 1
-    assert workspace.db.one("SELECT count(*) AS n FROM questions")["n"] == 4
-    assert workspace.db.one("SELECT count(*) AS n FROM requests")["n"] == 4
-    with workspace.db.connect() as conn:
-        assert not conn.execute("PRAGMA foreign_key_check").fetchall()
-
-
 def prepared(path):
     """A workspace with one frozen context per application, prepared by the current code."""
     workspace, _, _, _, applications = seed(path)

@@ -26,7 +26,9 @@ Review new jobs in **Jobs**, which opens on the **To review** tab. Select a job
 to read it beside the list, then choose **Shortlist** to save it for later, or
 **Dismiss…** to reject it reversibly with an optional reason. To review and
 Shortlist contain only jobs without application attempts. Shortlist is your
-ready-to-prepare queue.
+ready-to-prepare queue. **Dismissed** shows each job's reason and who dismissed
+it; the **By agent** filter lists the jobs your agent dismissed, and **Restore**
+moves a selection back to To review in one action.
 
 ![Shortlist of selected jobs awaiting application preparation](../images/shortlist.png)
 
@@ -53,7 +55,7 @@ a blocking requirement for an application being prepared; the day it was sent
 otherwise), the state of the CV and letter, what the employer answered (or how
 long the wait is, highlighted once it is longer than the no-reply period) and
 the next action: **Review** a ready application, **Decide** on a blocking
-requirement, **Answer** your agent's question, or **Record response** for one
+requirement, or **Record response** for one
 that was sent. **Board** shows the open stages side by side; **Show closed**
 adds the closed ones and **N more** opens the rest of a stage in the list.
 
@@ -104,7 +106,7 @@ Below, six tabs hold the rest:
 | **Timeline** | The employer's responses, then one list of the notes and changes of the application and of its job, the pinned notes first, with filters. |
 | **Inputs** | The frozen copies of your record the documents were written from, their files, and what changed since. |
 | **Documents** | Every document revision: open, approve, revise, add files, delete. |
-| **Details** | Stage and outcome, priority, deadline, the time sent, the Ready step, the pinned note, requests for your agent, the job and deletion. |
+| **Details** | Stage and outcome, priority, deadline, the time sent, the Ready step, the pinned note, the job and deletion. |
 
 Old links to an application (`#applications?application=…&detail=…`) open this
 page on the matching tab.
@@ -184,7 +186,7 @@ every current revision has its PDF and is approved and no blocking requirement i
 unresolved; otherwise it names what is missing. It shows who marked the
 application and when, and **Not ready** removes the mark.
 
-![Details of an application marked ready by the agent, with its plan, its pinned note, the request that led to it and the job](../images/application-ready.png)
+![Details of an application marked ready by the agent, with its plan, its pinned note and the job](../images/application-ready.png)
 
 The mark describes exactly what was judged, so Openings clears it when that
 changes: a new document revision or frozen copy, a deleted revision, a file added
@@ -312,9 +314,9 @@ the job with its notes, files and maintenance actions.
 
 Closing an application keeps it in Applications, including its history and
 files. The **Timeline** lists the notes and recorded changes of the application
-and of its job in one list, newest first, each with who made it: you in the
-dashboard, a named API token (with the workflow of its run) or the system.
-Entries from before version 0.17 show "unknown (before 0.17)". The job's own
+and of its job in one list, newest first, each with one plain phrase for who
+made it: "by you", "by <token name>" for an agent token, or "by job sources".
+Entries from before version 0.17 name nobody. The job's own
 entries carry a **Job** tag. Filter by kind (notes, changes, employer
 responses), by who, by scope (this application or the job) and by period. Add a
 note on the application at the top; each note can be pinned, edited or deleted.

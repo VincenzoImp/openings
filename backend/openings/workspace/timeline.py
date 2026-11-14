@@ -4,35 +4,28 @@ A job's timeline holds everything recorded on the job and on each of its
 applications; an application's timeline holds its own entries and its job's
 (``scope`` says which), not those of the job's other applications. Each entry is
 a note or an event, of kind ``note``, ``event`` or ``response`` (an employer
-response recorded, corrected or removed), with who made it and the run. Pinned
+response recorded, corrected or removed), with who made it (an actor label)
+and, for an event, its batch. Pinned
 notes come first, then everything newest first. ``note_added`` and
 ``note_edited`` events are not entries: the note itself is, with its author and
 version. Event payloads hold identifiers, field names and versions, never text.
 """
 
-from ..actors import describe
 from ..db import decode_record
 from ..errors import DomainError, missing
+from ..events import WHO
 from ..models import TimelineQuery
-
-# The owner is the dashboard session or an owner token (tokens before 0.17 had no kind).
-WHO = {
-    "owner": "(x.actor_kind='owner' OR (x.actor_kind='token' AND coalesce(x.actor_token_kind,'owner')='owner'))",
-    "agent": "(x.actor_kind='token' AND x.actor_token_kind='agent')",
-    "system": "x.actor_kind='system'",
-    "unknown": "x.actor_kind IS NULL",
-}
 
 # note_added and note_edited are represented by the note entry itself.
 _ENTRIES = (
     "SELECT 'event' AS type,CASE WHEN e.subject_type='response' THEN 'response' ELSE 'event' END AS kind,"
-    "e.id,e.created_at,e.job_id,e.application_id,e.actor_kind,e.actor_id,e.actor_name,"
-    "e.actor_token_kind,e.run_id,NULL AS pinned_at,e.kind AS event_kind,e.payload,"
+    "e.id,e.created_at,e.job_id,e.application_id,e.actor,e.batch_id,"
+    "NULL AS pinned_at,e.kind AS event_kind,e.payload,"
     "e.subject_type,e.subject_id,NULL AS body,NULL AS version,NULL AS updated_at "
     "FROM events e WHERE {events} AND e.kind NOT IN ('note_added','note_edited') "
     "UNION ALL "
-    "SELECT 'note','note',n.id,n.created_at,n.job_id,n.application_id,n.author_kind,n.author_id,"
-    "n.author_name,n.author_token_kind,n.run_id,n.pinned_at,NULL,NULL,NULL,NULL,n.body,n.version,"
+    "SELECT 'note','note',n.id,n.created_at,n.job_id,n.application_id,n.author,NULL,"
+    "n.pinned_at,NULL,NULL,NULL,NULL,n.body,n.version,"
     "n.updated_at FROM notes n WHERE {notes}"
 )
 
@@ -51,10 +44,8 @@ def _entry(row):
         },
         "job_id": row["job_id"],
         "application_id": application_id,
-        "actor": describe(
-            row["actor_kind"], row["actor_id"], row["actor_name"], row["actor_token_kind"]
-        ),
-        "run": {"id": row["run_id"], "workflow": row["run_workflow"]} if row["run_id"] else None,
+        "actor": row["actor"],
+        "batch_id": row["batch_id"],
         "note": None,
         "event": None,
     }
@@ -113,7 +104,13 @@ class Timeline:
             args = [*scope_args, *scope_args]
             where, params = [], []
             if value.who:
-                where.append("(" + " OR ".join(WHO[who] for who in sorted(set(value.who))) + ")")
+                where.append(
+                    "("
+                    + " OR ".join(
+                        WHO[who].format(column="x.actor") for who in sorted(set(value.who))
+                    )
+                    + ")"
+                )
             if value.scope:
                 where.append(
                     "x.application_id IS NOT NULL"
@@ -139,9 +136,8 @@ class Timeline:
             clause = " WHERE " + " AND ".join(where) if where else ""
             total = conn.execute("SELECT count(*)" + base + clause, (*args, *params)).fetchone()[0]
             rows = conn.execute(
-                "SELECT x.*,r.workflow AS run_workflow"
+                "SELECT x.*"
                 + base
-                + " LEFT JOIN runs r ON r.id=x.run_id"
                 + clause
                 + " ORDER BY x.pinned_at IS NULL,x.created_at DESC,x.id DESC LIMIT ? OFFSET ?",
                 (*args, *params, value.limit, value.offset),

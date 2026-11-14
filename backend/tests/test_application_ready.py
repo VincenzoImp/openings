@@ -7,7 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from document_fixtures import PDF, attach, source_revision
-from openings.activity import ActivityService
+from openings.events import EventLog
 from openings.actors import OWNER, acting_as, token_actor
 from openings.career import TemplateCreate
 from openings.documents import ContextCreate, DocumentCreate, ReviewUpdate, UploadReservation
@@ -84,11 +84,15 @@ def cleared(workspace, application, reason, actor="owner"):
     assert current["ready_at"] is None and current["ready_by"] is None
     assert current["readiness"] != "ready"
     assert current["version"] > application["version"]
-    event = ActivityService(workspace).list_events(
-        {"application_id": application["id"], "kind": "application_ready_cleared"}
+    event = EventLog(workspace).list_events(
+        {
+            "application_id": application["id"],
+            "kind": "application_ready_cleared",
+            "include_system": True,
+        }
     )["items"][0]
     assert event["payload"] == {"reason": reason, "automatic": reason != "unmarked"}
-    assert event["actor"]["kind"] == actor
+    assert event["actor"] == actor
     assert event["subject"]["type"] == "application"
     return current
 
@@ -130,7 +134,7 @@ def test_marking_ready_is_refused_until_every_check_passes(app):
     with acting_as(AGENT):
         marked = workspace.set_ready(application["id"], {"expected_version": current["version"]})
     assert (marked["readiness"], marked["version"]) == ("ready", current["version"] + 1)
-    assert marked["ready_by"]["label"] == "Synthetic agent" and marked["status"] == "draft"
+    assert marked["ready_by"] == "owner" and marked["status"] == "draft"
     # Marking again changes nothing; clearing the mark is explicit and recorded.
     again = workspace.set_ready(application["id"], {"expected_version": marked["version"]})
     assert (again["version"], again["ready_at"]) == (marked["version"], marked["ready_at"])
@@ -176,7 +180,7 @@ def test_a_new_revision_or_context_clears_ready(app):
                 previous_id=cv["id"],
             )
         )
-    current = cleared(workspace, application, "document_created", "token")
+    current = cleared(workspace, application, "document_created", "owner")
     assert current["readiness"] == "missing_pdf"
     assert workspace.list_applications(readiness="ready")["total"] == 0
     # Saving the same empty revision again creates no revision and is not a change.
@@ -234,7 +238,7 @@ def test_a_file_added_to_a_current_revision_clears_ready(app):
     uploaded = put(app)(grant["url"], headers=grant["headers"], content=PDF)
     assert uploaded.status_code == 200
     # The raw upload is attributed to the token that reserved it.
-    cleared(workspace, application, "file_uploaded", "token")
+    cleared(workspace, application, "file_uploaded", "owner")
 
 
 @pytest.mark.parametrize("change", ["added", "unresolved"])
@@ -263,7 +267,7 @@ def test_a_blocking_requirement_clears_ready(app, change):
             {"expected_version": application["version"], "requirements": requirements},
         )
     assert (updated["readiness"], updated["ready_at"]) == ("blocked", None)
-    cleared(workspace, application, "blocking_requirement", "token")
+    cleared(workspace, application, "blocking_requirement", "owner")
 
 
 @pytest.mark.parametrize(
@@ -307,7 +311,7 @@ def test_the_ready_queue_lists_filters_sorts_and_counts(app):
     assert (listed["total"], listed["ready_count"]) == (4, 2)
     item = next(item for item in listed["items"] if item["id"] == first["id"])
     assert (item["readiness"], item["ready_at"]) == ("ready", first["ready_at"])
-    assert item["ready_by"]["label"] == "Synthetic agent"
+    assert item["ready_by"] == "owner"
     assert "ready_by_kind" not in item
     other = next(item for item in listed["items"] if item["id"] == reviewed["id"])
     assert (other["readiness"], other["ready_at"], other["ready_by"]) == ("reviewed", None, None)
@@ -387,7 +391,7 @@ def test_rest_and_mcp_mark_ready_with_the_same_inputs_and_errors(app):
             },
         )
         assert error is None and marked["readiness"] == "ready"
-        assert marked["ready_by"]["label"] == "Synthetic agent"
+        assert marked["ready_by"] == "agent:Synthetic agent"
         over_rest = client.get(f"/api/v1/applications/{application['id']}", headers=headers).json()
         assert over_rest["ready_at"] == marked["ready_at"]
         for query in ({"readiness": "ready"}, {"sort": "ready"}, {"ready_since": "2000-01-01"}):

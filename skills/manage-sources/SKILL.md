@@ -1,5 +1,8 @@
 ---
 name: manage-sources
+title: Tune job sources
+summary: Have your sources measured and searches, companies, filters and schedules added, tuned or retired.
+example: Check which job sources bring me useful jobs and retire the noisy ones.
 description: Review and tune Openings collection sources by measuring what each source contributes to kept jobs and applications, then add, tune or retire searches, monitored companies, filters and schedules as standing work under the operating mandate.
 compatibility: Requires access to the Openings MCP server or REST API, as described in the openings-workspace skill.
 ---
@@ -17,19 +20,10 @@ the owner's Preferences (`preferences_get`), above all What I'm looking for and
 What I rule out: they define what a useful job is. Keep no personal search
 criteria in this skill.
 
-## Run and questions
+## Questions and report
 
-Open a run before the first write: `runs_start` with `workflow: "manage-sources"` and the scope; writes made
-with this token then attach to the run. First read the owner's answers given
-since the previous run (`questions_list` with `answered_since`) and act on them.
-Then read the owner's open requests (`requests_list` with `state: "open"`): take
-the ones in this workflow's scope (`requests_take`), do the work, and report on
-each with `requests_complete` and a short result, or `requests_decline` and the
-reason. Leave requests for other workflows open. A request never authorises
-submitting an application, contacting an employer or recording Applied.
-Ask each new question as a record tied to its job, application or Career entry
-(`questions_ask`), not only in chat. Close the run with `runs_finish` and the
-stored [run report](../openings-workspace/references/run-report.md).
+Ask the owner in the chat when a missing fact matters, and never record an
+answer the owner did not give. Report what you did in the chat.
 
 ## Measure before changing
 
@@ -77,6 +71,6 @@ terms with no ambiguous technical use and leave borderline titles to triage.
 ## Report
 
 List each changed source with before/after configuration and the yield that
-justified it (period, collected, shortlisted, applied, responses). Use the shared
-[run report](../openings-workspace/references/run-report.md). Re-measure after
+justified it (period, collected, shortlisted, applied, responses), in the chat.
+Re-measure after
 the next collection cycles before tuning the same source again.

@@ -204,66 +204,21 @@ interviews, offers, rejections, no reply, waiting, the three rates,
 `month`) and `excluded` (`preparing`, `closed_unsent`). A rate or median below
 the sample is `null` with `withheld`.
 
-## Requests for the agent
+## Skills and the change log
 
-`requests_list` filters by `state` (`open`, `taken`, `done`, `declined`,
-`withdrawn`), `subject_type`/`subject_id`, `run_id` and `updated_since` (written
-or changed at or after a time, oldest first). Each request has `text`, an
-optional `subject` shaped like a question's, `created_by`, `taken_by`, `run_id`
-(the run that handled it), `result` and `resolved_by`. `requests_take` moves an
-open request to `taken` for the calling token and records its open run;
-`409 request_taken` names the run of another taker. `requests_complete` takes
-`result` and `requests_decline` takes `reason`; both work on an open or taken
-request, need its current `expected_version` and an API token
-(`403 request_actor` for a dashboard session). `requests_create` (`text`,
-optional subject, `idempotency_key`) and `requests_withdraw` need owner
-authority: an agent token gets `403 forbidden`. A finished or withdrawn request
-returns `409 request_closed`. A request outlives its subject like a question
-does, and `runs_get` lists the requests a run handled.
+`skills_get(name)` returns the shipped `SKILL.md`; reference files are served as
+shipped. The owner's standing instructions for the agent live in Preferences ›
+Working with me (`preferences_get`, section `working_with_me`).
 
-## Runs, questions and the change log
-
-`runs_start` opens a run for the calling token (`workflow`, `scope`, optional
-`idempotency_key`); the token's later writes attach to it without any extra
-argument. A second start returns `run_open` with the open run in
-`details.run`; `supersede: true` marks that run interrupted and starts a new
-one. `runs_update` stores a progress `note`; `runs_finish` closes the run with
-`summary`, `changes`, `not_done`, `checks`, `limits` and `method`, both with the
-run's current `expected_version`. `runs_get` returns the report, the questions
-asked and a page of the changes made (`value.changes_limit`,
-`value.changes_offset`);
-`runs_list` filters by `status` (`open`, `finished`, `interrupted`), `workflow`,
-`token_id`, start time and `active_since` (last activity at or after a time). An open run without a write or note for two hours is
-reported as `interrupted`; it stays open, and a later write revives it.
-Each listed run carries its report's `summary` and `method`.
-
-`skills_get(name)` returns `SKILL.md` with this workspace's local notes appended
-under `## Local notes for this workspace` (`value.local_notes: false` for the shipped
-text alone); reference files are served as shipped. `skill_notes_get(name)`
-returns `text`, `version` (0 when none), the author and up to 50 earlier
-versions. `skill_notes_update(name, {"expected_version": N, "text": "..."})`
-replaces the whole notes (at most 2,000 characters; empty clears them); a stale
-version returns `409 conflict` with `details.current_version`. An agent token may
-write notes; every version names its author and the owner can restore any.
-
-`questions_ask` takes `question`, `why`, optional `subject_type` (`job`,
-`application`, `knowledge`) with `subject_id`, optional `choices` and an
-`idempotency_key`. `questions_list` filters by `state` (`open`, `answered`,
-`withdrawn`), subject, `run_id` and `answered_since`, which returns answers
-given at or after a time, oldest first. `questions_answer` and
-`questions_withdraw` take the question's current `expected_version`;
-`questions_answer` needs owner authority and returns `403 forbidden` to an agent
-token. A question
-outlives its subject: after the job, application or entry is deleted,
-`subject.id` is null, `subject.deleted` is true and `subject.label` keeps the
-name.
-
-`events_list` reads the change log, newest first, by `run_id`, `job_id`,
-`application_id`, `subject_type`/`subject_id`, `actor` (`owner`, `token`,
-`system`, `unknown`), `kind` or time; `subject_types` takes several kinds of
-record at once. Every entry carries `actor` (for a token, with `token_kind`
-`owner` or `agent`), `run_id` with `run_workflow`, and `subject`; `applications_history` returns the same fields. Changes recorded
-before version 0.17 have the actor `unknown (before 0.17)`. Payloads hold
+`events_list` reads the change log, newest first, by `job_id`,
+`application_id`, `subject_type`/`subject_id`, `actor` (`owner`, `agent`,
+`system`, `unknown` or `agent:<token name>`), `batch_id`, `kind`, `since` and
+`until`; `subject_types` takes several kinds of record at once. System changes
+(collection, worker, upgrade) are left out unless `actor` is `system` or
+`include_system` is true. Every entry carries `actor`, a label (`owner`,
+`agent:<token name>` or `system`), `batch_id`, shared by every change of one REST
+request or MCP tool call, and `subject`; `applications_history` returns the same
+fields. Changes recorded before version 0.17 have a null actor. Payloads hold
 identifiers, changed field names and versions, never record content. Deleting an
 application or forgetting a job removes that record's own history and leaves one
 `application_deleted` or `job_forgotten` entry. For one job or application,
@@ -273,7 +228,7 @@ application or forgetting a job removes that record's own history and leaves one
 
 A note belongs to a job, or to one application of that job when written with
 `application_id`: `notes_create(job_id, {"body": "...", "application_id": ...})`.
-It records its author and the open run. `pinned: true` pins it; a job and an
+It records its author as an actor label. `pinned: true` pins it; a job and an
 application each have one pinned note, listed first, and pinning another unpins
 it (`notes_pin(note_id, {"expected_version": N, "pinned": true|false})`). The
 application's pinned note is the owner's standing guidance for that application:
@@ -285,7 +240,7 @@ expected_version)` removes a note for good and leaves a `note_deleted` event.
 with all of its applications, or `application_id` for one application with its
 job's entries. Each entry has `type` (`note` or `event`), `kind` (`note`,
 `event`, or `response` for an employer response recorded, corrected or
-removed), `scope` (`job` or `application`), `actor`, `run` and either `note`
+removed), `scope` (`job` or `application`), `actor`, `batch_id` and either `note`
 (`body`, `version`, `pinned`) or `event` (`kind`, a text-free
 `payload`, `subject`). Pinned notes come first, then newest first. Filter with
 `kinds`, `who` (`owner`, `agent`, `system`, `unknown`), `scope`, `since` and
@@ -312,7 +267,7 @@ values. Career dates also accept null to clear them.
 when requested. Restore replaces workspace data while retaining destination
 authentication, recent provider request history and later cooldowns.
 `workspace_restore`, `tokens_list`, `tokens_create`, `tokens_revoke`,
-`owner_password_update`, `requests_create` and `requests_withdraw` need owner authority: an agent token gets
+and `owner_password_update` need owner authority: an agent token gets
 `403 forbidden`. A backup downloaded with an agent token omits the owner
 password hash, the session secret and the API tokens, and still restores
 completely. Keep transfer

@@ -1,5 +1,8 @@
 ---
 name: career-claims
+title: Write career claims
+summary: Have CV bullets, letters and form answers written or checked against your real evidence.
+example: Rewrite my CV bullets for the data platform role so every claim matches my Career record.
 description: Write and review factual career claims, CV bullets, supporting contexts, letters and answers in clear international English, using the current evidence and document rules.
 ---
 

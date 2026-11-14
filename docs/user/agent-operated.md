@@ -2,7 +2,7 @@
 
 Openings is built to be run by your own AI agent. You install the workspace and
 connect an agent; the agent then runs the search and keeps improving it. Your
-part stays small: tell it facts and preferences, answer its focused questions,
+part stays small: tell it facts and preferences, answer its focused questions in its chat,
 apply to the Drafts it prepares, and mark each one Applied or close it.
 
 ## What the agent does
@@ -38,7 +38,7 @@ password and create the API token yourself.
 
 1. [Install Openings](getting-started.md) and create an **Agent** token in
    the setup guide a new workspace opens on, or in Settings. An agent token runs the whole search but cannot change your
-   password, manage tokens, restore a backup or answer its own questions
+   password, manage tokens or restore a backup
    (see [token kinds](agents.md#token-kinds)).
 2. Give your agent the skills. A connected agent gets them from the server
    itself: `skills_list` and `skills_get` tools, and one MCP prompt per skill,
@@ -63,74 +63,32 @@ password and create the API token yourself.
 
 ## See what the agent did
 
-Every change in Openings records who made it: you in the dashboard, a named API
-token, or the system (collection). An agent works in **runs**. It opens a run
-with the workflow name and scope, its changes are attached to that run, and it
-closes the run with a report: summary, changes, what was not done and why,
-checks, a statement of limits and what the workflow lacked. A run that was never
-closed is shown as interrupted, with the changes it made.
+Every change in Openings records who made it: **owner** (you in the dashboard or
+with an owner token), **agent:<token name>** (an agent token) or **system**
+(collection and other background work). All the changes of one REST request or
+MCP tool call share one batch id, so a bulk triage of 50 jobs is one batch.
 
-When the agent needs a fact or a decision, it asks a **question** tied to the
-job, application or Career entry concerned. **Today** shows the newest open
-questions under **Needs your decision**, where you answer them in place. Open
-**Activity** in the dashboard for everything:
+- The history of a job or an application says, for each change, "by you",
+  "by <token name>" or "by job sources".
+- **Jobs › Dismissed** shows each dismissed job with its reason and who
+  dismissed it. The **By agent** filter lists the agent's dismissals; select
+  them and choose **Restore** to move them back to New in one action.
+- Scripts can read the change log with `events_list` (`GET /events`), filtered
+  by actor, batch and time (see [the API](api.md#the-change-log)).
 
-- **Questions** lists the open questions, each with who asked it in which run,
-  what it is about and its answer controls: a choice answers at once, **Write
-  an answer** opens a text box (a comment and a choice are sent together), and
-  **Not now** only folds the box away. The navigation shows how many are open.
-  Beside them, **Answered** keeps each answer with who gave it and when, and you
-  can change it; **Withdrawn** keeps the questions nobody needs answered any
-  more. The agent reads your answers at the start of its next run.
-- **Requests** is where you tell the agent what to do next (see below).
-- **Runs** lists the runs with their workflow, agent, start, duration, status
-  and what they changed; filter by status. A run opens its report: summary, the
-  changes counted by kind with links to the records, what was not done and why,
-  checks, limits, method, the questions it asked and the requests it handled.
-  An interrupted run says why it has no report and keeps its changes.
-- **Timeline** lists every change, newest first and by day, with who made it.
-  Filter by who (you, API tokens or one token, the system), by kind of record,
-  by period and by run; a run's report links to its changes here.
-
-![Activity with two open questions from the agent, one with answer choices](../images/activity-questions.png)
-
-![A finished run beside the list of runs, with its report: scope, summary, changes by kind, not done and checks](../images/activity-run.png)
-
-![The timeline of every change by day, with who made it and the filters by who, kind and period](../images/activity-timeline.png)
-
-## Ask your agent
-
-You do not need a chat session to give the agent an instruction. Write a
-**request** under **Activity → Requests**, or choose **Ask your agent** on a job
-or an application to write one about that record: "prepare this one too",
-"rewrite the letter with more focus on data pipelines", "stop preparing
-consultancy roles".
-
-![Activity → Requests with the form, a request waiting for the agent and a completed one with its result](../images/activity-requests.png)
-
-Openings runs no agent itself, so a request waits until the agent's next run.
-Every workflow starts by reading the open requests. The agent takes the ones it
-can handle, does the work and writes a short result on the request, or declines
-it with the reason. You see the state of each request (waiting, taken, done,
-declined, withdrawn), who handled it and a link to the run. You can withdraw a
-request until the agent has finished it.
-
-A request directs the agent inside its mandate. It cannot make the agent submit
-an application, contact an employer or record Applied: the agent declines that
-part and says so. Only you, in the dashboard or with an owner token, write and
-withdraw requests; an agent token cannot write requests for itself.
-
-Give each agent, and each parallel worker that should report separately, its
-own agent token: a token has one open run at a time, and its name and kind are
-what you see next to each change.
+Give each agent its own agent token: its name is what you see next to each
+change.
 
 ## Working with the agent
 
-Ask for anything in plain language: "what should I apply to today?", "add these
-companies", "I got an interview at X", "make the CV stronger for data roles".
-Between requests, a scheduled or recurring agent session can review new jobs and
-prepare Drafts. Each run ends with a short report of what changed, what is left
-and which facts the agent needs from you.
+Talk to the agent in its own chat and ask for anything in plain language: "what
+should I apply to today?", "add these companies", "I got an interview at X",
+"make the CV stronger for data roles". **Settings › Skills** lists what you can
+ask your agent, with an example phrase for each skill. Between conversations, a
+scheduled or recurring agent session can review new jobs and prepare Drafts. The
+agent reports in the chat what changed, what is left and which facts it needs
+from you. Standing instructions for how it should work ("never prepare
+consultancy roles") belong in **Preferences › Working with me**.
 
 Changes stay reversible: records keep versions, contexts and document revisions
 are immutable, and the agent backs up before broad changes. You can narrow the

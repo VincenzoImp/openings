@@ -22,7 +22,8 @@ from typing import Literal
 
 from pydantic import Field, field_validator, model_validator
 
-from .actors import current_actor, pop_actor
+from . import events
+from .actors import current_actor
 from .common import new_id, now
 from .errors import DomainError, conflict, missing
 from .idempotency import fingerprint, remember, replay
@@ -78,11 +79,8 @@ class ResponsePatch(Versioned):
 
 
 def response_record(row):
-    """A response as returned by reads."""
-    row = dict(row)
-    row["created_by"] = pop_actor(row, "created_by")
-    row["updated_by"] = pop_actor(row, "updated_by")
-    return row
+    """A response as returned by reads; created_by and updated_by are actor labels."""
+    return dict(row)
 
 
 def responses_of(conn, application_ids):
@@ -155,31 +153,29 @@ def record_response(workspace, conn, application, kind, day, note=""):
         ).fetchone()
     ):
         return None
-    response_id, stamp, actor = new_id(), now(), current_actor()
+    response_id, stamp, by = new_id(), now(), current_actor().label
     conn.execute(
-        "INSERT INTO responses(id,application_id,kind,date,note,"
-        "created_by_kind,created_by_id,created_by_name,created_by_token_kind,"
-        "updated_by_kind,updated_by_id,updated_by_name,updated_by_token_kind,"
-        "created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO responses(id,application_id,kind,date,note,created_by,updated_by,"
+        "created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
         (
             response_id,
             application["id"],
             kind,
             day,
             note,
-            *actor.columns(),
-            *actor.columns(),
+            by,
+            by,
             stamp,
             stamp,
         ),
     )
-    workspace.event(
-        "response_added",
-        application["job_id"],
-        application["id"],
-        {"kind": kind, "date": day},
+    events.record(
         conn,
+        "response_added",
         subject=("response", response_id),
+        payload={"kind": kind, "date": day},
+        job_id=application["job_id"],
+        application_id=application["id"],
     )
     return response_id
 
@@ -276,17 +272,16 @@ class ResponseService:
             conn.execute(
                 "UPDATE responses SET "
                 + ",".join(key + "=?" for key in actual)
-                + ",updated_by_kind=?,updated_by_id=?,updated_by_name=?,updated_by_token_kind=?,"
-                "version=version+1,updated_at=? WHERE id=?",
-                (*actual.values(), *current_actor().columns(), now(), response_id),
+                + ",updated_by=?,version=version+1,updated_at=? WHERE id=?",
+                (*actual.values(), current_actor().label, now(), response_id),
             )
-            self.workspace.event(
-                "response_edited",
-                current["job_id"],
-                current["application_id"],
-                {"fields": fields, "version": current["version"] + 1},
+            events.record(
                 conn,
+                "response_edited",
                 subject=("response", response_id),
+                payload={"fields": fields, "version": current["version"] + 1},
+                job_id=current["job_id"],
+                application_id=current["application_id"],
             )
             return self._read(conn, response_id)
 
@@ -297,12 +292,12 @@ class ResponseService:
             if current["version"] != expected_version:
                 conflict(details={"current_version": current["version"]})
             conn.execute("DELETE FROM responses WHERE id=?", (response_id,))
-            self.workspace.event(
-                "response_removed",
-                current["job_id"],
-                current["application_id"],
-                {"kind": current["kind"], "date": current["date"]},
+            events.record(
                 conn,
+                "response_removed",
                 subject=("response", response_id),
+                payload={"kind": current["kind"], "date": current["date"]},
+                job_id=current["job_id"],
+                application_id=current["application_id"],
             )
         return {"deleted": True, "id": response_id}
