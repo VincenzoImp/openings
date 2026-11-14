@@ -46,7 +46,7 @@ export function ClaimRow({
       // The next control uses the new version at once, before the list is read again.
       onSaved({ ...claim, ...saved });
     }, message);
-  const entry = [claim.knowledge_title, claim.knowledge_organization]
+  const entry = [claim.career_title, claim.career_organization]
     .filter(Boolean)
     .join(" · ");
   return (
@@ -169,7 +169,7 @@ export const replaced = (saved: Claim) => (list: ListResult<Claim>) => ({
 /** The claims of one entry, inside its editor. */
 export function EntryClaims({ entry }: { entry: Knowledge }) {
   const { data, setData, loading, error, reload } = useFresh(
-    `/career/claims?knowledge_id=${entry.id}&limit=200&summary=false`,
+    `/career/claims?career_id=${entry.id}&limit=200&summary=false`,
     NONE,
     ["career"],
   );

@@ -1,7 +1,5 @@
 """Typed career headers preserve precision and optional content."""
 
-import json
-
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
@@ -72,13 +70,13 @@ def test_summary_claim_preview_is_ordered_bounded_and_independent_of_description
     app = create_app(tmp_path / "preview.sqlite", start_worker=False)
     career = app.state.career
     owner = career.create_knowledge(KnowledgeCreate(title="Languages", narrative="User context."))
-    assert career.list_knowledge(summary=True)["items"][0]["claim_preview"] is None
-    first = career.create_claim(ClaimCreate(knowledge_id=owner["id"], text="Python, SQL."))
-    later = career.create_claim(ClaimCreate(knowledge_id=owner["id"], text="Long wording " * 100))
-    assert career.list_knowledge(summary=True)["items"][0]["claim_preview"] == first["text"]
+    assert career.list_knowledge(summary=True)["items"][0]["highlight_preview"] is None
+    first = career.create_claim(ClaimCreate(career_id=owner["id"], text="Python, SQL."))
+    later = career.create_claim(ClaimCreate(career_id=owner["id"], text="Long wording " * 100))
+    assert career.list_knowledge(summary=True)["items"][0]["highlight_preview"] == first["text"]
     career.update_claim(first["id"], ClaimUpdate(expected_version=first["version"], position=2))
     row = career.list_knowledge(summary=True)["items"][0]
-    assert row["claim_preview"] == later["text"][:240]
+    assert row["highlight_preview"] == later["text"][:240]
     assert row["narrative_preview"] == "User context."
     assert career.get_knowledge(owner["id"])["narrative"] == "User context."
 
@@ -87,7 +85,7 @@ def test_a_claim_is_always_included_or_not_and_keeps_other_hints_in_metadata(wor
     career = CareerService(workspace)
     entry = career.create_knowledge(KnowledgeCreate(title="Synthetic entry", narrative="Built."))
     claim = career.create_claim(
-        ClaimCreate(knowledge_id=entry["id"], text="Built APIs.", metadata={"role": "core"})
+        ClaimCreate(career_id=entry["id"], text="Built APIs.", metadata={"role": "core"})
     )
     assert claim["always_include"] is False and claim["metadata"] == {"role": "core"}
     claim = career.update_claim(
@@ -99,46 +97,30 @@ def test_a_claim_is_always_included_or_not_and_keeps_other_hints_in_metadata(wor
     assert not {"role", "group", "default_in_cv"} & set(listed) & set(claim)
     for removed in ({"role": "core"}, {"group": "Scale"}, {"default_in_cv": True}):
         with pytest.raises(ValidationError):
-            ClaimCreate.model_validate({"knowledge_id": entry["id"], "text": "X.", **removed})
+            ClaimCreate.model_validate({"career_id": entry["id"], "text": "X.", **removed})
 
 
-@pytest.mark.parametrize("transport", ["rest", "mcp"])
-def test_complete_entry_workflow_headers_and_order(tmp_path, transport):
+def test_complete_entry_workflow_headers_and_order(tmp_path):
+    """The one-record career routes the dashboard uses, and the owner's import (REST only)."""
     app = create_app(tmp_path / "headers.sqlite", start_worker=False)
     app.state.auth.setup("synthetic-password")
-    token = app.state.auth.create_token("Synthetic Career client")["token"]
+    token = app.state.auth.create_token("Synthetic Career client", "owner")["token"]
     headers = {"Authorization": "Bearer " + token, "Accept": "application/json, text/event-stream"}
     with TestClient(app, base_url="http://localhost:8080", headers=headers) as client:
 
         def call(tool, method, path, arguments):
-            if transport == "rest":
-                # REST names the identifiers in the path and the rest in the body or query.
-                body = {
-                    k: v
-                    for k, v in arguments.items()
-                    if not (k.endswith("_id") and f"/{v}" in path)
-                }
-                response = client.request(
-                    method,
-                    "/api/v1" + path,
-                    params=body if method == "GET" else None,
-                    json=body if method != "GET" else None,
-                )
-                response.raise_for_status()
-                return response.json()
-            response = client.post(
-                "/mcp",
-                json={
-                    "jsonrpc": "2.0",
-                    "id": 1,
-                    "method": "tools/call",
-                    "params": {"name": tool, "arguments": arguments},
-                },
+            # REST names the identifiers in the path and the rest in the body or query.
+            body = {
+                k: v for k, v in arguments.items() if not (k.endswith("_id") and f"/{v}" in path)
+            }
+            response = client.request(
+                method,
+                "/api/v1" + path,
+                params=body if method == "GET" else None,
+                json=body if method != "GET" else None,
             )
             response.raise_for_status()
-            result = response.json()["result"]
-            assert not result.get("isError"), result
-            return result.get("structuredContent") or json.loads(result["content"][0]["text"])
+            return response.json()
 
         first = call(
             "knowledge_create",
@@ -170,33 +152,33 @@ def test_complete_entry_workflow_headers_and_order(tmp_path, transport):
             "claims_create",
             "POST",
             "/career/claims",
-            {"knowledge_id": first["id"], "text": "First wording.", "approved": True},
+            {"career_id": first["id"], "text": "First wording.", "approved": True},
         )
         c2 = call(
             "claims_create",
             "POST",
             "/career/claims",
-            {"knowledge_id": first["id"], "text": "Earlier wording.", "approved": True},
+            {"career_id": first["id"], "text": "Earlier wording.", "approved": True},
         )
         assert c2["position"] == c1["position"] + 1
         c1 = call(
             "claims_update",
             "PATCH",
             "/career/claims/" + c1["id"],
-            {"claim_id": c1["id"], "expected_version": c1["version"], "position": 5},
+            {"highlight_id": c1["id"], "expected_version": c1["version"], "position": 5},
         )
         rows = call("claims_list", "GET", "/career/claims", {"q": "Cloud", "summary": True})[
             "items"
         ]
         assert [row["id"] for row in rows] == [c2["id"], c1["id"]]
-        assert rows[0]["knowledge_organization"] == "Example Cloud"
+        assert rows[0]["career_organization"] == "Example Cloud"
 
         changed = call(
             "knowledge_update",
             "PATCH",
             "/career/knowledge/" + first["id"],
             {
-                "knowledge_id": first["id"],
+                "career_id": first["id"],
                 "expected_version": first["version"],
                 "dates": None,
                 "organization": "",
@@ -214,7 +196,7 @@ def test_complete_entry_workflow_headers_and_order(tmp_path, transport):
             "POST",
             "/career/import",
             {
-                "knowledge": [
+                "entries": [
                     {
                         "kind": "award",
                         "title": "Community award",

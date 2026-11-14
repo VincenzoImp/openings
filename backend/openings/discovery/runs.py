@@ -11,7 +11,7 @@ from ..collectors.policy import ProviderPatch
 from ..common import check_version, decode_record, encode, missing, new_id, now
 from ..errors import DomainError, conflict
 from ..scheduling import next_due
-from .models import CollectionWrite, RunOverrides
+from .models import RunOverrides
 from .resolution import require_automatic_collection
 
 
@@ -50,27 +50,29 @@ class RunOperations:
             "next_run_at": min(upcoming) if upcoming else None,
         }
 
-    def update_collection(self, value: CollectionWrite):
+    def set_collection_switch(self, expected_version, enabled):
+        """Check the collection's version and, when ``enabled`` is given, turn it on or off."""
         with self.db.transaction() as connection:
             row = connection.execute("SELECT * FROM settings WHERE key='collection'").fetchone()
             current = row["version"] if row else 0
-            if current != value.expected_version:
+            if current != expected_version:
                 conflict(
                     "Collection settings changed. Reload before saving.",
-                    details={"current_version": current},
+                    details={"current_version": current, "id": "collection"},
                 )
+            if enabled is None:
+                return
             stamp = now()
             connection.execute(
                 "INSERT INTO settings(key,data,version,updated_at) VALUES('collection',?,1,?) ON CONFLICT(key) DO UPDATE SET data=excluded.data,version=settings.version+1,updated_at=excluded.updated_at",
-                (encode({"enabled": value.enabled}), stamp),
+                (encode({"enabled": enabled}), stamp),
             )
             events.record(
                 connection,
                 "collection_updated",
                 ("collection", "collection"),
-                {"enabled": value.enabled, "version": current + 1},
+                {"enabled": enabled, "version": current + 1},
             )
-        return self.get_collection()
 
     def list_providers(self):
         return self.providers.list()

@@ -198,7 +198,7 @@ def test_generic_changes_keep_every_value(upgraded):
     for table, columns in (
         ("jobs", "id,title,company,posting,version,created_at"),
         ("applications", "id,job_id,outcome,version,questions,answers,requirements"),
-        ("events", "id,job_id,application_id,kind,payload,subject_type,subject_id"),
+        ("events", "id,job_id,application_id,payload,subject_id"),
         ("documents", "id,previous_id,text,claim_ids"),
         ("blobs", "sha256,content,size"),
     ):
@@ -206,6 +206,15 @@ def test_generic_changes_keep_every_value(upgraded):
         if table == "blobs":
             sql = f"SELECT {columns} FROM {table} ORDER BY sha256"
         assert query(path, sql)[: len(old := query(pre_upgrade, sql))] == old
+    # #218: career entries and highlights take the words of 0.24 in the change log.
+    renamed = {"knowledge": "career", "claim": "highlight"}
+    sql = "SELECT rowid,kind,subject_type FROM events ORDER BY rowid"
+    for (_, kind, subject), (_, new_kind, new_subject) in zip(
+        query(pre_upgrade, sql), query(path, sql), strict=False
+    ):
+        prefix = kind.split("_", 1)[0]
+        assert new_kind == (renamed[prefix] + kind[len(prefix) :] if prefix in renamed else kind)
+        assert new_subject == renamed.get(subject, subject)
     # An estimated response day becomes text on the response.
     old = query(pre_upgrade, "SELECT id,note FROM responses WHERE estimated=1")
     assert old

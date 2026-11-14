@@ -36,7 +36,7 @@ function ClaimForm({ record, entry, entries, onClose }: Props) {
     const form = new FormData(event.currentTarget);
     // Order and other details are kept as they are: they are not sent.
     const body = {
-      knowledge_id: form.get("knowledge_id"),
+      career_id: form.get("knowledge_id"),
       text: form.get("text"),
       approved: form.get("approved") === "on",
       always_include: form.get("always_include") === "on",
@@ -62,7 +62,7 @@ function ClaimForm({ record, entry, entries, onClose }: Props) {
             <select
               name="knowledge_id"
               required
-              defaultValue={record?.knowledge_id || entry?.id}
+              defaultValue={record?.career_id || entry?.id}
             >
               {entries.map((item) => (
                 <option key={item.id} value={item.id}>
