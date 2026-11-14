@@ -146,3 +146,21 @@ export function save(blob: Blob, filename: string) {
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+// A request cut off by leaving or reloading the page is not a failure: Safari
+// rejects it as a TypeError ("Load failed") that nothing is left to handle.
+// Those rejections, and every aborted request, are dropped quietly.
+let leaving = false;
+if (typeof window !== "undefined") {
+  window.addEventListener("pagehide", () => (leaving = true));
+  window.addEventListener("pageshow", () => (leaving = false));
+  window.addEventListener("beforeunload", () => (leaving = true));
+  window.addEventListener("unhandledrejection", (event) => {
+    const reason = event.reason as { name?: string } | null;
+    if (
+      reason?.name === "AbortError" ||
+      (leaving && reason instanceof TypeError)
+    )
+      event.preventDefault();
+  });
+}

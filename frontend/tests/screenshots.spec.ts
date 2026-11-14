@@ -96,6 +96,9 @@ const test = base.extend<
   ],
 });
 
+// Each screen signs in to its own workspace (capture), not the tests' one.
+test.use({ signedIn: false });
+
 /** The owner session as cookies for the browser. */
 const sessionCookies = (session: string) => {
   const [name, ...value] = session.split("=");
