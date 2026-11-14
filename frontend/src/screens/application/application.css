@@ -559,11 +559,6 @@
     flex-direction: column;
     gap: var(--s-4);
   }
-  .ap-note-add {
-    display: flex;
-    gap: var(--s-2);
-    max-width: 560px;
-  }
   .ap-events {
     position: relative;
     margin: 0;

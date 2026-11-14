@@ -1,5 +1,6 @@
 // Words and pure helpers of the Templates screen, kept free of React.
 import type { TemplateKind } from "../../query/templates";
+import { formatNumber } from "../../ui/format.ts";
 
 export const KINDS: { kind: TemplateKind; label: string }[] = [
   { kind: "cv", label: "CV" },
@@ -45,7 +46,7 @@ export function limitOf(
 /** "3 characters" / "No limit" */
 export function limitText(value: number | null, unit: string) {
   if (value === null) return null;
-  return `${value.toLocaleString("en")} ${value === 1 ? unit.replace(/s$/, "") : unit}`;
+  return `${formatNumber(value)} ${value === 1 ? unit.replace(/s$/, "") : unit}`;
 }
 
 /**

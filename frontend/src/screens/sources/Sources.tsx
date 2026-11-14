@@ -5,7 +5,7 @@ import { TopBarActions, useTitle } from "../../shell/context";
 import { Button, IconButton } from "../../ui/Button";
 import { ConfirmDialog, Dialog } from "../../ui/Dialog";
 import { Select } from "../../ui/Field";
-import { formatFull } from "../../ui/format";
+import { formatFull, plural } from "../../ui/format";
 import { listIndex, plainKey } from "../../ui/keys";
 import { Menu } from "../../ui/Menu";
 import {
@@ -447,13 +447,11 @@ function ScheduleLine({
 
 /** What Check all now did: how many it queued, and what it could not. */
 function checkAllMessage(result: Schema<"BatchResult">) {
-  const plural = (count: number) =>
-    `${count} ${count === 1 ? "source" : "sources"}`;
   if (!result.failed)
-    return { message: `Checking ${plural(result.succeeded)} now` };
+    return { message: `Checking ${plural(result.succeeded, "source")} now` };
   const reason = result.items.find((item) => !item.ok)?.error?.message;
   return {
-    message: `Checking ${plural(result.succeeded)} now; ${plural(result.failed)} could not be checked${reason ? `: ${reason}` : "."}`,
+    message: `Checking ${plural(result.succeeded, "source")} now; ${plural(result.failed, "source")} could not be checked${reason ? `: ${reason}` : "."}`,
     tone: "error" as const,
   };
 }

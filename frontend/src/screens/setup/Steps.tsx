@@ -13,6 +13,7 @@ import { useAddJob } from "../../query/shell";
 import { href } from "../../shell/router";
 import { Button } from "../../ui/Button";
 import { Field, Input, Textarea } from "../../ui/Field";
+import { plural } from "../../ui/format";
 import { Icon, type LucideIcon } from "../../ui/Icon";
 import {
   useExampleTemplate,
@@ -29,9 +30,6 @@ import { LANGUAGES, aboutFrom, type About } from "./model";
 
 type Profile = Schema<"Profile">;
 type Preferences = Schema<"Preferences">;
-
-const plural = (count: number, one: string, many = `${one}s`) =>
-  `${count} ${count === 1 ? one : many}`;
 
 /** A line saying what a step already did. */
 function Done({ children }: { children: string }) {

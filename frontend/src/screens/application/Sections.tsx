@@ -6,6 +6,7 @@ import { ConflictNotice } from "../../query/ConflictNotice";
 import { Button, IconButton } from "../../ui/Button";
 import { Checkbox, Input, Textarea, Field } from "../../ui/Field";
 import { formatDate, formatFull } from "../../ui/format";
+import { copyText } from "../../ui/CodeBlock";
 import { Icon } from "../../ui/Icon";
 import { Skeleton } from "../../ui/Page";
 import { ReadEdit } from "../../ui/ReadEdit";
@@ -73,12 +74,10 @@ export function Fold({
 /** Copy a text, saying so. */
 export function useCopy() {
   const toast = useToast();
-  return (text: string, what: string) =>
-    navigator.clipboard?.writeText(text).then(
-      () => toast.show({ message: `Copied ${what}`, tone: "success" }),
-      () =>
-        toast.show({ message: "Copying is not allowed here", tone: "error" }),
-    );
+  return async (text: string, what: string) =>
+    (await copyText(text))
+      ? toast.show({ message: `Copied ${what}`, tone: "success" })
+      : toast.show({ message: "Copying is not allowed here", tone: "error" });
 }
 
 /**

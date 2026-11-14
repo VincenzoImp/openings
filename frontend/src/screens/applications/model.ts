@@ -2,6 +2,7 @@
 // words: its stage, its one status phrase, the "Needs action" order, the bulk
 // actions valid for a selection, what is missing before Ready, the send queue
 // and the history. No React: tests/applications.test.mjs runs it directly.
+import { plural } from "../../ui/format.ts";
 
 export type StageKey =
   "shortlisted" | "ready" | "applied" | "interview" | "offer" | "closed";
@@ -106,9 +107,6 @@ export function shortDay(value: string | Date, now = new Date()) {
     ? text
     : `${text} ${day.getFullYear()}`;
 }
-
-const plural = (count: number, word: string) =>
-  `${count} ${count === 1 ? word : word + "s"}`;
 
 export type Tone = "warning" | "danger";
 export interface Phrase {

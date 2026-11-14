@@ -31,6 +31,8 @@ forget them at once; each job succeeds or fails on its own. On a phone a job
 opens full screen with **Dismiss** and **Shortlist** at the bottom; swipe a row
 right to shortlist it or left to dismiss it.
 
+![Jobs on a phone: the New, Dismissed and All tabs, the job rows and the bottom bar](../images/jobs-mobile.png)
+
 ## Add or correct a job
 
 **Add job** (or `n`) takes a URL, or a title, company and the full posting. A job
