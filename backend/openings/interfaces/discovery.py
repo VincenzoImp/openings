@@ -119,7 +119,7 @@ def sources_run(ws: WS, body: SourceRunInput) -> SourcePreviewResult | Task:
     """Fetch a saved source now, or preview (preview true) what a source would collect.
 
     Preview a saved source (source_id) or an unsaved one (url, kind, config); nothing is
-    stored. Through the provider gate.
+    stored.
     """
     return ws.discovery.run_source(body)
 
