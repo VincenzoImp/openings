@@ -17,7 +17,7 @@ import {
   Send,
   Sun,
 } from "lucide-react";
-import { usePaletteSearch } from "../data/shell";
+import { usePaletteSearch } from "../query/shell";
 import { Kbd } from "../ui/Button";
 import { Icon, type LucideIcon } from "../ui/Icon";
 import type { ThemeMode } from "../ui/theme";

@@ -421,7 +421,7 @@ The dashboard is a shell around one routed screen at a time:
 | `frontend/src/shell/router.ts` | `useRoute()` (id, `params`, `query`), `navigate()`, `href()` and `addLeaveGuard()`. Links are plain `<a href="#…">`. |
 | `frontend/src/shell/Screens.tsx` | `LOADERS`: the lazy module of each route, its error boundary and loading skeleton. |
 | `frontend/src/shell/Shell.tsx` | The design system's sidebar, phone top and bottom bars, the ⌘K palette, the Add job dialog, the shortcut sheet and the global keyboard (`g t`/`g j`/`g a`/`g p`, `n`, `/`, `?`, ⌘K). |
-| `frontend/src/data/` | TanStack Query over the generated client: `queryClient`, resource keys, `useApiMutation` and `useVersionedMutation` with `ConflictNotice`. |
+| `frontend/src/query/` | TanStack Query over the generated client: `queryClient`, resource keys, `useApiMutation` and `useVersionedMutation` with `ConflictNotice`. |
 
 **A screen module** is what each screen issue replaces, one at a time:
 

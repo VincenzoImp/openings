@@ -8,7 +8,7 @@ import {
   useState,
 } from "react";
 import { Plus, Search } from "lucide-react";
-import { useAccountName, useNeedsCounts } from "../data/shell";
+import { useAccountName, useNeedsCounts } from "../query/shell";
 import { confirmLeave, useFormProtection } from "../state";
 // The design system's modules, not its index: the first screen loads only
 // the primitives the shell draws (each module brings its own stylesheet).

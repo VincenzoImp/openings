@@ -1,7 +1,7 @@
 import { Suspense, lazy, useCallback, useEffect, useState } from "react";
 import { api as legacy, setCsrf as setLegacyCsrf, type Session } from "./api";
 import { api, call, setCsrf } from "./api/client";
-import { queryClient } from "./data/query";
+import { queryClient } from "./query/query";
 import { ErrorBanner, Loading } from "./design";
 import { Shell } from "./shell/Shell";
 
