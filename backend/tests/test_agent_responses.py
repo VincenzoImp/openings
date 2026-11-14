@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from openings.app import create_app
 from openings.db import encode
+from openings.interfaces.operation import without_empty
 from test_mcp_contract import call, error_body
 
 PASSWORD = "synthetic-password"
@@ -86,17 +87,21 @@ def test_lists_default_to_compact_records_with_full_opt_in(tmp_path):
     with TestClient(app, base_url="http://localhost:8080") as client:
         rest = client.get("/api/v1/jobs", headers=headers).json()
         mcp = structured(call(client, headers, "jobs_list", {}))
-        assert "facets" not in rest and mcp == rest and rest["total"] == 3
+        # MCP returns the same record without its empty fields.
+        assert "facets" not in rest and mcp == without_empty(rest) and rest["total"] == 3
         faceted = client.get("/api/v1/jobs?include_facets=true", headers=headers).json()
         assert faceted["facets"]["companies"] == ["Example 0", "Example 1"]
         assert faceted["items"] == rest["items"]
         mcp_faceted = structured(call(client, headers, "jobs_list", {"include_facets": True}, 2))
-        assert mcp_faceted == faceted
+        assert mcp_faceted == without_empty(faceted)
 
         documents = client.get("/api/v1/documents", headers=headers).json()
         assert documents["items"][0]["file_count"] == 0
         assert "content" not in documents["items"][0]
-        assert structured(call(client, headers, "documents_list", {}, 3)) == documents
+        read = structured(
+            call(client, headers, "applications_get", {"ids": [_application["id"]]}, 3)
+        )
+        assert read["items"][0]["documents"] == without_empty(documents["items"])
         full = client.get("/api/v1/documents?summary=false", headers=headers).json()
         assert full["items"][0]["content"]["sections"] and full["items"][0]["files"] == []
 
@@ -116,20 +121,20 @@ def test_lists_default_to_compact_records_with_full_opt_in(tmp_path):
                 "updated_at": STAMP,
             }
         ]
-        assert stable(structured(call(client, headers, "sources_list", {}, 4))) == stable(sources)
+        assert stable(structured(call(client, headers, "sources_list", {}, 4))) == stable(
+            without_empty(sources)
+        )
         full = client.get("/api/v1/sources?summary=false", headers=headers).json()["items"][0]
         assert len(full["last_diagnostics"]) == 3
         assert full["last_run"]["tasks"][0]["result"]["received"] == 4
-        assert stable(full) == stable(
-            client.get("/api/v1/sources/source-1", headers=headers).json()
-        )
+        detail = client.get("/api/v1/sources/source-1", headers=headers).json()
+        assert detail.pop("recent_runs") and stable(full) == stable(detail)
 
         runs = client.get("/api/v1/collection/runs", headers=headers).json()
         assert runs["items"][0]["tasks"] == source["last_run"]["tasks"]
         assert runs["items"][0]["counts"]["received"] == 4
-        assert stable(structured(call(client, headers, "collection_runs_list", {}, 5))) == stable(
-            runs
-        )
+        detail = structured(call(client, headers, "sources_get", {"source_id": "source-1"}, 5))
+        assert stable(detail["recent_runs"]) == stable(without_empty(runs["items"]))
         full = client.get("/api/v1/collection/runs?summary=false", headers=headers).json()
         assert stable(full["items"][0]) == stable(
             client.get("/api/v1/collection/runs/run-1", headers=headers).json()
@@ -159,10 +164,11 @@ def test_job_and_application_mutations_return_compact_jobs(tmp_path):
                 client,
                 headers,
                 "jobs_triage",
-                {"job_id": job["id"], "triage": "dismissed", "expected_version": 1},
+                {"items": [{"job_id": job["id"], "to": "dismissed", "reason": "Synthetic."}]},
             )
         )
-        assert via_mcp["triage"] == "dismissed" and "posting" not in via_mcp
+        item = via_mcp["items"][0]
+        assert item["ok"] and item["result"] == {"version": 2, "triage": "dismissed"}
         updated = structured(
             call(
                 client,
@@ -194,10 +200,22 @@ def test_settings_conflicts_report_current_version(tmp_path):
         profile = client.get("/api/v1/career/profile", headers=headers).json()
         settings = client.get("/api/v1/preferences", headers=headers).json()["settings"]
         collection = client.get("/api/v1/collection", headers=headers).json()
-        for method, path, body, current in [
-            ("PATCH", "/api/v1/career/profile", {"name": "Synthetic"}, profile["version"]),
-            ("PATCH", "/api/v1/settings", {"no_reply_days": 40}, settings["version"]),
-            ("PATCH", "/api/v1/collection", {"enabled": False}, collection["version"]),
+        for method, path, body, current, record in [
+            (
+                "PATCH",
+                "/api/v1/career/profile",
+                {"name": "Synthetic"},
+                profile["version"],
+                "profile",
+            ),
+            ("PATCH", "/api/v1/settings", {"no_reply_days": 40}, settings["version"], "settings"),
+            (
+                "PATCH",
+                "/api/v1/collection",
+                {"enabled": False},
+                collection["version"],
+                "collection",
+            ),
         ]:
             response = client.request(
                 method, path, headers=headers, json={**body, "expected_version": current + 5}
@@ -205,19 +223,20 @@ def test_settings_conflicts_report_current_version(tmp_path):
             assert response.status_code == 409, (path, response.text)
             error = response.json()["error"]
             assert error["code"] == "conflict"
-            assert error["details"] == {"current_version": current}, path
+            assert error["details"] == {"current_version": current, "id": record}, path
 
-        for ident, (name, arguments, current) in enumerate(
+        for ident, (name, arguments, current, record) in enumerate(
             [
-                ("profile_update", {"name": "Synthetic"}, profile["version"]),
-                ("settings_update", {"no_reply_days": 40}, settings["version"]),
-                ("collection_update", {"enabled": False}, collection["version"]),
+                ("profile_update", {"name": "Synthetic"}, profile["version"], "profile"),
+                ("settings_update", {"no_reply_days": 40}, settings["version"], "settings"),
+                ("collection_update", {"enabled": False}, collection["version"], "collection"),
             ],
             start=10,
         ):
             value = {**arguments, "expected_version": current + 5}
             error = error_body(call(client, headers, name, value, ident))
-            assert error["status"] == 409 and error["details"] == {"current_version": current}
+            assert error["status"] == 409
+            assert error["details"] == {"current_version": current, "id": record}
 
         stale = client.post(
             "/api/v1/jobs/bulk",

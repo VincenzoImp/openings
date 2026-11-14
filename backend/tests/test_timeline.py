@@ -271,7 +271,7 @@ def tool(client, headers, name, arguments):
     return result.get("structuredContent") or json.loads(result["content"][0]["text"])
 
 
-def test_both_timeline_routes_and_the_tool_read_one_timeline(tmp_path):
+def test_both_timeline_routes_read_one_timeline_and_agents_read_changes(tmp_path):
     app = create_app(tmp_path / "parity.sqlite", start_worker=False)
     app.state.auth.setup("synthetic-password")
     workspace = app.state.workspace
@@ -289,19 +289,17 @@ def test_both_timeline_routes_and_the_tool_read_one_timeline(tmp_path):
         ({"since": "2000-01-01", "until": "2999-12-31"}, "?since=2000-01-01&until=2999-12-31"),
     ]
     with TestClient(app, base_url="http://localhost:8080") as client:
-        for value, query in cases:
-            for path, arguments in (
-                (f"/api/v1/jobs/{job_id}/timeline", {"job_id": job_id}),
-                (
-                    f"/api/v1/applications/{application_id}/timeline",
-                    {"application_id": application_id},
-                ),
+        for _, query in cases:
+            for path in (
+                f"/api/v1/jobs/{job_id}/timeline",
+                f"/api/v1/applications/{application_id}/timeline",
             ):
                 rest = client.get(path + query, headers=headers)
                 assert rest.status_code == 200, rest.text
-                mcp = tool(client, headers, "timeline_get", {**arguments, **value})
-                assert mcp == rest.json(), (path, value)
-                assert mcp["items"], (path, value)
+                assert rest.json()["items"], (path, query)
+        # An agent reads the same changes in changes_list, and notes with the job.
+        changes = tool(client, headers, "changes_list", {"job_id": job_id})["items"]
+        assert changes and all(item["job_id"] == job_id for item in changes)
         # Pinning over REST and MCP alike.
         note = ids["on_job"]
         pinned = client.post(
@@ -311,7 +309,7 @@ def test_both_timeline_routes_and_the_tool_read_one_timeline(tmp_path):
         unpinned = tool(
             client,
             headers,
-            "notes_pin",
+            "notes_update",
             {"note_id": note["id"], "expected_version": 2, "pinned": False},
         )
         assert (unpinned["pinned"], unpinned["version"]) == (False, 3)

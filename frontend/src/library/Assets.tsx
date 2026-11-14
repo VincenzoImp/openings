@@ -52,7 +52,7 @@ export function Assets({
   empty,
   note,
 }: {
-  ownerType: "knowledge" | "template" | "job";
+  ownerType: "career" | "template" | "job";
   ownerId: string;
   /** What to say when there is no file yet. */
   empty: string;
