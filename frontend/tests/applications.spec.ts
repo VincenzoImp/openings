@@ -178,9 +178,7 @@ test("without LaTeX: a PDF CV and letter uploaded on the page make it Ready", as
   const app = await make(page, title);
   expect(app.missing).toEqual(["cv", "letter"]);
   await go(page, `applications/${app.id}`);
-  await expect(
-    page.getByRole("heading", { name: "What's missing" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Documents" })).toBeVisible();
   for (const [name, file] of [
     ["CV", "cv.pdf"],
     ["Letter", "letter.pdf"],
@@ -190,7 +188,7 @@ test("without LaTeX: a PDF CV and letter uploaded on the page make it Ready", as
       mimeType: "application/pdf",
       buffer: syntheticPdf(`Synthetic ${name}`),
     });
-    await expect(toast(page)).toContainText(`${name} uploaded`, {
+    await expect(toast(page)).toContainText(`Uploaded the ${name}`, {
       timeout: 15000,
     });
   }
@@ -198,6 +196,35 @@ test("without LaTeX: a PDF CV and letter uploaded on the page make it Ready", as
   // Nothing is missing: the page is the Ready page.
   await expect(visible(page, "Mark applied")).toBeVisible();
   await expect(page.getByText("Before you send")).toBeAttached();
+});
+
+test("a shortlisted page says what is missing once, with one upload each and a requirement field on intent", async ({
+  page,
+}) => {
+  const title = unique("Preparing");
+  const app = await make(page, title);
+  await go(page, `applications/${app.id}`);
+  // "Missing" once (the head), and no row repeats the page's primary upload.
+  await expect(
+    page.getByText(/missing/i).filter({ visible: true }),
+  ).toHaveCount(1);
+  await expect(visible(page, "Upload CV")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Upload PDF of the CV" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Upload PDF of the Letter" }),
+  ).toBeVisible();
+  // The whole title is on the page at every width.
+  await expect(
+    page.getByText(title, { exact: true }).filter({ visible: true }).first(),
+  ).toBeVisible();
+  // No requirement field at rest; it opens on intent and closes with Esc.
+  await expect(page.getByLabel("New requirement")).toHaveCount(0);
+  await page.getByRole("button", { name: "Add requirement" }).click();
+  await expect(page.getByLabel("New requirement")).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(page.getByLabel("New requirement")).toHaveCount(0);
 });
 
 test("an open blocking requirement keeps an application from Ready until ticked", async ({
@@ -267,7 +294,7 @@ test("close as no reply from the page with Undo, and in bulk from the list", asy
     .filter({ visible: true })
     .click();
   await page.getByRole("menuitem", { name: "Close as no reply" }).click();
-  await expect(toast(page)).toContainText("Closed as no reply");
+  await expect(toast(page)).toContainText(/^Closed “.*” as no reply/);
   await expect
     .poll(async () => (await read(page, single.id)).outcome)
     .toBe("no_response");
