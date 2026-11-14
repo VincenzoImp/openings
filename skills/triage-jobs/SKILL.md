@@ -2,8 +2,8 @@
 name: triage-jobs
 title: Go through new jobs
 summary: Have your new jobs read against your Preferences and experience, then shortlisted or dismissed with a reason.
-example: Empty my inbox using my criteria, and filter it really well.
-description: Triage the Openings inbox of new jobs by the owner's Preferences and Career - "empty my inbox", "go through new jobs", "filter the inbox", "anything good today?". Shortlists clear fits, dismisses confirmed mismatches with a reason, resolves duplicates and asks about the rest.
+example: Go through my new jobs using my criteria, and filter them really well.
+description: Triage the new jobs in Openings by the owner's Preferences and Career - "empty my inbox", "go through new jobs", "filter the inbox", "anything good today?". Shortlists clear fits, dismisses confirmed mismatches with a reason, resolves duplicates and asks about the rest.
 ---
 
 # Go through new jobs
@@ -55,7 +55,7 @@ Read every remaining posting in full, 20 at a time, and decide each:
   job: the fact and their preference, as in "Requires fluent German; you
   speak English and Italian" or "Sales role; you rule out non-engineering
   jobs".
-- **Leave in the inbox and ask**: a plausible fit that depends on a fact you do
+- **Leave it new and ask**: a plausible fit that depends on a fact you do
   not have, or a borderline case. Group these into a few questions.
 
 Never decide from the title alone, and never dismiss to empty the list. A
@@ -82,8 +82,8 @@ unsure, leave both and ask.
 
 ## 7. Check the result
 
-List the inbox again with counts. Call it empty only when that read says so;
-mention jobs that arrived meanwhile.
+List the new jobs again with counts. Say none are left only when that read
+shows it, and mention jobs that arrived meanwhile.
 
 ## Report back
 

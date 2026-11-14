@@ -1,0 +1,353 @@
+/* The first-run guide: a centred card under a stepper of dots on wide
+   screens; one step per screen with a sticky footer on phones. */
+@layer screens {
+  .setup {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--s-6);
+    padding: var(--s-10) var(--pane-pad) var(--s-16);
+  }
+
+  /* The stepper: dot + line, labels under the dots. */
+  .setup-steps {
+    width: min(100%, 600px);
+  }
+  .setup-steps ol {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .setup-steps li {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--s-2);
+    color: var(--text-3);
+    font: var(--t-xs);
+    font-weight: var(--w-medium);
+    text-align: center;
+  }
+  /* The line to the previous step. */
+  .setup-steps li + li::before {
+    content: "";
+    position: absolute;
+    top: 9px;
+    right: calc(50% + 14px);
+    left: calc(-50% + 14px);
+    height: 1px;
+    background: var(--border-strong);
+  }
+  .setup-steps li.is-done + li::before,
+  .setup-steps li.is-done::before {
+    background: var(--text-3);
+  }
+  .setup-dot {
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    border: 1.5px solid var(--border-strong);
+    border-radius: var(--r-full);
+    background: var(--bg);
+  }
+  .is-current .setup-dot {
+    border-color: var(--accent);
+    box-shadow: inset 0 0 0 3px var(--bg);
+    background: var(--accent);
+  }
+  .is-done .setup-dot {
+    border-color: var(--primary);
+    background: var(--primary);
+    color: var(--on-primary);
+  }
+  .is-current,
+  .is-done {
+    color: var(--text-2);
+  }
+  .is-current {
+    color: var(--text);
+  }
+
+  /* The card */
+  .setup-card {
+    display: flex;
+    flex-direction: column;
+    width: min(100%, 600px);
+    border: 1px solid var(--border);
+    border-radius: var(--r-xl);
+    background: var(--bg);
+    box-shadow: var(--shadow-sm);
+  }
+  .setup-card > .ui-skeleton-rows {
+    padding: var(--s-8);
+  }
+  .setup-head {
+    padding: var(--s-8) var(--s-8) 0;
+  }
+  .setup-head h1 {
+    font: var(--t-2xl);
+    font-weight: var(--w-semibold);
+    letter-spacing: var(--tr-2xl);
+  }
+  .setup-lead {
+    margin-top: var(--s-1);
+    color: var(--text-2);
+    font: var(--t-md);
+  }
+  .setup-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-8);
+    padding: var(--s-6) var(--s-8) var(--s-8);
+  }
+  .setup-foot {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    padding: var(--s-4) var(--s-8);
+    border-top: 1px solid var(--border);
+    border-radius: 0 0 var(--r-xl) var(--r-xl);
+    background: var(--bg-subtle);
+  }
+  .setup-foot-spacer {
+    flex: 1;
+  }
+
+  .setup-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+  }
+  .setup-pair {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--s-4);
+  }
+  .setup-inline {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--s-2);
+  }
+  .setup-inline .ui-field {
+    flex: 1;
+    min-width: 0;
+  }
+  .setup-inline > .ui-btn {
+    margin-top: 24px;
+  }
+  .setup-block {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-3);
+  }
+  .setup-block + .setup-block {
+    padding-top: var(--s-8);
+    border-top: 1px solid var(--border);
+  }
+  .setup-block h2,
+  .setup-agent h2 {
+    font: var(--t-md);
+    font-weight: var(--w-semibold);
+  }
+  .setup-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-2);
+  }
+
+  .setup-languages {
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  .setup-languages legend {
+    margin-bottom: var(--s-1-5);
+    padding: 0;
+    font: var(--t-sm);
+    font-weight: var(--w-medium);
+  }
+  .setup-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-1-5);
+  }
+  .setup-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-1);
+    height: 30px;
+    padding: 0 var(--s-3);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-full);
+    background: var(--surface);
+    color: var(--text-2);
+    font: var(--t-sm);
+    font-weight: var(--w-medium);
+    cursor: pointer;
+  }
+  .setup-chip:hover {
+    background: var(--hover);
+  }
+  .setup-chip[aria-pressed="true"] {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    color: var(--accent-text);
+  }
+  .setup-chip:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+  }
+
+  .setup-preview {
+    padding: var(--s-3) var(--s-4);
+    border-radius: var(--r-lg);
+    background: var(--bg-subtle);
+    font: var(--t-sm);
+  }
+  .setup-preview ul {
+    margin: var(--s-2) 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .setup-preview li {
+    display: flex;
+    gap: var(--s-2);
+    min-width: 0;
+    padding: 2px 0;
+  }
+  .setup-preview li > span:first-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .setup-muted {
+    color: var(--text-3);
+    font-weight: var(--w-regular);
+  }
+  .setup-error {
+    color: var(--danger);
+    font: var(--t-sm);
+  }
+  .setup-done {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    color: var(--text-2);
+    font: var(--t-sm);
+  }
+  .setup-done .ui-icon {
+    flex: none;
+    color: var(--success);
+  }
+
+  .setup-use {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-3);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font: var(--t-md);
+  }
+  .setup-use li {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+  }
+  .setup-use-icon {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    background: var(--bg-subtle);
+    color: var(--text-2);
+  }
+  .setup-agent {
+    display: flex;
+    gap: var(--s-3);
+    padding: var(--s-4);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+  }
+  .setup-agent > .ui-icon {
+    flex: none;
+    margin-top: 2px;
+    color: var(--text-2);
+  }
+  .setup-agent p {
+    margin: var(--s-1) 0 var(--s-2);
+    color: var(--text-2);
+    font: var(--t-sm);
+  }
+  .setup-agent .setup-muted {
+    margin-left: var(--s-1);
+    font: var(--t-xs);
+  }
+  .setup-link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-1);
+    font: var(--t-sm);
+    font-weight: var(--w-medium);
+  }
+
+  /* Phones: one step per screen; Back, Skip and Next stick to the bottom. */
+  @container app (max-width: 719px) {
+    .setup {
+      align-items: stretch;
+      gap: var(--s-4);
+      padding: var(--s-4) 0 0;
+    }
+    .setup-steps {
+      width: auto;
+    }
+    .setup-step-label {
+      display: none;
+    }
+    .setup-card {
+      flex: 1;
+      width: auto;
+      border: 0;
+      border-radius: 0;
+      box-shadow: none;
+    }
+    .setup-head {
+      padding: var(--s-2) var(--s-4) 0;
+    }
+    /* The top bar shows the step's title. */
+    .setup-head h1 {
+      display: none;
+    }
+    .setup-lead {
+      margin-top: 0;
+    }
+    .setup-body {
+      padding: var(--s-5) var(--s-4) var(--s-8);
+    }
+    .setup-foot {
+      position: sticky;
+      bottom: 0;
+      z-index: 3;
+      padding: var(--s-3) var(--s-4);
+      border-radius: 0;
+      background: var(--bg);
+    }
+    .setup-foot .ui-btn {
+      height: var(--touch);
+    }
+    .setup-pair {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .setup-chip {
+      height: 36px;
+    }
+  }
+}
