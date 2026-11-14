@@ -11,7 +11,7 @@ notes come first, then everything newest first. ``note_added`` and
 version. Event payloads hold identifiers, field names and versions, never text.
 """
 
-from ..db import decode_record
+from ..common import decode_record
 from ..errors import DomainError, missing
 from ..events import WHO
 from ..models import TimelineQuery

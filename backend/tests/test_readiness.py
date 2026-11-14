@@ -12,8 +12,7 @@ import sqlite3
 import pytest
 
 from document_fixtures import PDF, pdf_revision, source_revision
-from openings.common import new_id, now
-from openings.db import encode
+from openings.common import encode, new_id, now
 
 KINDS = ("cv", "letter")
 REQUIRED = ([], ["cv"], ["letter"], ["cv", "letter"])

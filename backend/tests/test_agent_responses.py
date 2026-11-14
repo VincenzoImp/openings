@@ -4,7 +4,7 @@ sessions. MCP serves the same records without empty fields (test_parity.py)."""
 from fastapi.testclient import TestClient
 
 from conftest import BASE_URL, PASSWORD, McpClient
-from openings.db import encode
+from openings.common import encode
 
 STAMP = "2026-01-01T00:00:00.000000+00:00"
 

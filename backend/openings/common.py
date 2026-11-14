@@ -1,8 +1,8 @@
+import json
 from datetime import UTC, datetime
 from uuid import uuid4
 
 from .actors import current_batch
-from .db import decode_record, encode
 from .errors import DomainError, conflict, missing
 
 
@@ -12,6 +12,20 @@ def now():
 
 def new_id():
     return uuid4().hex
+
+
+def encode(value):
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def decode_record(row, fields=()):
+    if row is None:
+        return None
+    row = dict(row)
+    for name in fields:
+        if isinstance(row.get(name), str):
+            row[name] = json.loads(row[name])
+    return row
 
 
 def check_version(row, expected):
