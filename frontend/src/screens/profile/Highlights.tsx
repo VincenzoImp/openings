@@ -94,8 +94,14 @@ function AutoText(props: {
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${el.scrollHeight + 2}px`;
+    const fit = () => {
+      el.style.height = "auto";
+      el.style.height = `${el.scrollHeight + 2}px`;
+    };
+    fit();
+    // In a sheet that opens after this render, measure once it is shown.
+    const frame = requestAnimationFrame(fit);
+    return () => cancelAnimationFrame(frame);
   }, [props.value]);
   return (
     <textarea
