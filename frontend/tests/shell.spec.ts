@@ -401,8 +401,10 @@ for (const width of [360, 390, 719, 720, 1024, 1600])
   test(`no horizontal scroll at ${width} px on every screen`, async ({
     page,
   }) => {
+    // Widths are set by the test, so one project is enough: the phone's,
+    // whose CI shard has fewer tests than the desktop's.
     test.skip(
-      test.info().project.name !== "chromium",
+      test.info().project.name !== "chromium-mobile",
       "Widths are set by the test; one project is enough.",
     );
     test.setTimeout(60000);
