@@ -106,6 +106,44 @@ test("twenty jobs are triaged by keyboard in at most 25 keys, each with its next
   ).not.toBeNull();
 });
 
+test("a decision answered late never replaces the toast of the next one", async ({
+  page,
+}) => {
+  test.skip(isPhone(page), "The keyboard flow is the desktop's.");
+  const tag = unique("Late");
+  const [first, second] = await jobs(page, tag, 2);
+  // The shortlist is answered only after the dismissal that follows it.
+  let release = () => {};
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route("**/api/v1/jobs/bulk", async (route) => {
+    if (route.request().postDataJSON()?.action === "shortlisted") await held;
+    await route.continue();
+  });
+  await go(page, `jobs?q=${encodeURIComponent(tag)}`);
+  await expect(title(page)).toHaveText(first.title);
+  await page.keyboard.press("s");
+  await expect(title(page)).toHaveText(second.title);
+  await page.keyboard.press("d");
+  await expect(toast(page)).toContainText(`Dismissed “${second.title}”`);
+  const answered = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/api/v1/jobs/bulk") &&
+      response.request().postDataJSON()?.action === "shortlisted",
+  );
+  release();
+  await (await answered).finished();
+  // Let the page read the answer and draw what it does with it.
+  await page.waitForFunction(
+    () =>
+      new Promise((done) =>
+        setTimeout(() => requestAnimationFrame(() => done(true)), 100),
+      ),
+  );
+  expect(await triageOf(page, first.id)).toBe("shortlisted");
+  await expect(toast(page)).toContainText(`Dismissed “${second.title}”`);
+  await expect(toast(page)).not.toContainText("Shortlisted");
+});
+
 test("j and k move, x and shift+j pick, and the bulk bar dismisses with Undo", async ({
   page,
 }) => {
