@@ -1,6 +1,6 @@
 [project]
 name = "openings"
-version = "0.24.2"
+version = "0.25.0"
 description = "A self-hosted job-search workspace: collect jobs, prepare applications and track replies, by hand or with your own AI agent."
 readme = "README.md"
 requires-python = ">=3.14"

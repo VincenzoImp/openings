@@ -21,7 +21,7 @@ COPY backend/ ./backend/
 RUN --mount=type=cache,target=/root/.cache/uv uv sync --locked --no-dev --no-editable
 
 FROM python:3.14-slim-bookworm@sha256:3fe1a0b6c2d6b2ebb572906cdabeca75aeb558c0c17db5ffefbcf8094871c32b AS runtime
-ARG VERSION=0.24.2
+ARG VERSION=0.25.0
 ARG VCS_REF=unknown
 LABEL org.opencontainers.image.title="Openings" \
       org.opencontainers.image.description="A self-hosted job-search workspace: collect jobs, prepare applications and track replies, by hand or with your own AI agent." \
