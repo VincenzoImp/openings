@@ -15,7 +15,7 @@ della", or a suffix such as "skills", "C1", "Kenntnisse", "courant", "exigé" or
 "richiesto". Names joined by "and", commas or slashes form one list sharing its
 cues; names joined by "or" are alternatives, one of which is enough. A cue such
 as "a plus", "von Vorteil", "un atout" or "titolo preferenziale" makes the list
-welcome rather than required, and a negation ("no", "keine", "pas", "non")
+an advantage, which is not a requirement, and a negation ("no", "keine", "pas", "non")
 nearby cancels it. A name that only describes something else ("German market",
 "entreprise française", "deutsche Kunden") is not a language mention.
 """
@@ -265,7 +265,7 @@ _EITHER = _phrases(
     "need|needs|we need|erforderlich|voraussetzung|zwingend|exige|exigee|requis|requise|"
     "indispensable|obligatoire|richiesto|richiesta|richiesti|indispensabile|obbligatorio"
 )
-_WELCOME = _phrases(
+_ADVANTAGE = _phrases(
     "a plus|is a plus|an asset|asset|advantage|advantageous|an advantage|nice to have|"
     "nice|bonus|preferred|preferably|desirable|desired|beneficial|welcome|ideally|"
     "appreciated|helpful|would be great|optional|is an advantage|"
@@ -286,7 +286,7 @@ _TOKEN = re.compile(r"[a-z0-9]+|[,/&()-]")
 # A name followed (English) or preceded (French, Italian) by one of these words is
 # still a language; any other word means the name describes something else.
 _FOLLOWERS = _ENGLISH_FOLLOWERS | {
-    phrase[0] for phrase in _AFTER + _EITHER + _WELCOME + _NEGATION + _TITLE_AFTER
+    phrase[0] for phrase in _AFTER + _EITHER + _ADVANTAGE + _NEGATION + _TITLE_AFTER
 }
 _PRECEDERS = _ROMANCE_PRECEDERS | {phrase[-1] for phrase in _BEFORE + _EITHER}
 _AFTER_IN_TITLE = _AFTER + _TITLE_AFTER
@@ -446,8 +446,8 @@ def _clause_requirements(clause, title=False):
     ]
     lists = _lists(tokens)
     if not lists:
-        return [], []
-    state = [{"cue": own, "welcome": False, "negated": False} for *_, own in lists]
+        return []
+    state = [{"cue": own, "advantage": False, "negated": False} for *_, own in lists]
     for start, end in _find(tokens, _BEFORE):
         bound = _nearest(lists, start, end, before=4, after=0)
         if bound is not None:
@@ -464,23 +464,19 @@ def _clause_requirements(clause, title=False):
             bound = _nearest(lists, start, end, before=5, after=0)
         if bound is not None:
             state[bound]["cue"] = True
-    for start, end in _find(tokens, _WELCOME):
+    for start, end in _find(tokens, _ADVANTAGE):
         bound = _nearest(lists, start, end, before=8, after=10)
         if bound is not None:
-            state[bound]["welcome"] = True
+            state[bound]["advantage"] = True
     for start, end in _find(tokens, _NEGATION):
         bound = _nearest(lists, start, end, before=3, after=4)
         if bound is not None:
             state[bound]["negated"] = True
-    required, welcome = [], []
+    required = []
     for (*_, groups, _own), item in zip(lists, state):
-        if item["negated"] or not (item["cue"] or item["welcome"]):
-            continue
-        if item["welcome"]:
-            welcome.extend(code for group in groups for code in group)
-        else:
+        if item["cue"] and not (item["negated"] or item["advantage"]):
             required.extend(groups)
-    return required, welcome
+    return required
 
 
 # Every word that can name a language, to skip the clauses that name none quickly.
@@ -495,14 +491,13 @@ _NAME_WORDS = set(NAMES) | {
 
 
 def language_requirements(text, title=""):
-    """Languages the text requires and welcomes.
+    """Languages the text requires.
 
     ``required`` is a list of groups, each a sorted list of codes of which one is
-    enough ("German or French" is one group of two); ``welcome`` lists the codes of
-    languages stated as an advantage. A language both required and welcome is
-    required.
+    enough ("German or French" is one group of two). A language stated only as an
+    advantage is not required.
     """
-    required, welcome = [], []
+    required = []
     for source, is_title in ((title, True), (text, False)):
         folded = fold((source or "")[:_REQUIREMENT_CHARS])
         if _NAME_WORDS.isdisjoint(_WORD.findall(folded)):
@@ -510,9 +505,7 @@ def language_requirements(text, title=""):
         for clause in _CLAUSE.split(folded):
             if _NAME_WORDS.isdisjoint(_WORD.findall(clause)):
                 continue
-            groups, extra = _clause_requirements(clause, is_title)
-            required.extend(groups)
-            welcome.extend(extra)
+            required.extend(_clause_requirements(clause, is_title))
     unique = []
     for group in required:
         if group not in unique:
@@ -520,11 +513,7 @@ def language_requirements(text, title=""):
     # A single requirement already covers any alternative that contains it.
     singles = {group[0] for group in unique if len(group) == 1}
     unique = [group for group in unique if len(group) == 1 or not singles.intersection(group)]
-    needed = {code for group in unique for code in group}
-    return {
-        "required": sorted(unique),
-        "welcome": sorted(set(welcome) - needed),
-    }
+    return {"required": sorted(unique)}
 
 
 def text_signals(title, posting):
@@ -537,5 +526,4 @@ def text_signals(title, posting):
         "language": language,
         "language_confidence": confidence,
         "required": stated["required"],
-        "welcome": stated["welcome"],
     }

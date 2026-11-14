@@ -1,6 +1,6 @@
 ---
 name: track-applications
-description: Review the Openings application pipeline - what is Ready and its priority, stale or expired postings, follow-ups, employer replies, no-reply closures and outcome insights - and record owner-reported progress without submitting anything.
+description: Review the Openings application pipeline - what is Ready and its priority, stale or expired postings, follow-ups, employer replies, no-reply closures and stats - and record owner-reported progress without submitting anything.
 compatibility: Requires access to the Openings MCP server or REST API, as described in the openings-workspace skill.
 ---
 
@@ -103,15 +103,13 @@ Nothing closes automatically. Never close an Interview or Offer as no reply.
 
 ## Patterns
 
-Read `insights_get` for employer answers: response, interview and offer rates,
-the median days to a first answer, and groups by role family, seniority,
-location, source kind, named source and month. A group below `min_sample`
-(default 5) has `withheld` instead of a rate: report its counts, never a rate
-computed from them, and do not lower `min_sample` to make a point. Applications
-never sent are counted apart in `excluded`; dismissed jobs never had an
-application. Do not read applications the owner closed without applying as
-preferences: the owner applies to every feasible prepared application, and
-closures record feasibility.
+Read `stats_get` (period `90d`, `12m` or `all`) for employer replies: the
+applications sent, reply and interview rates, the median days to a first reply,
+the funnel and, once two sources have five sent applications each, replies by
+source. With few applications report the counts, not a rate. Applications never
+sent do not count; dismissed jobs never had an application. Do not read
+applications the owner closed without applying as preferences: the owner applies
+to every feasible prepared application, and closures record feasibility.
 Present patterns as observations for the owner to weigh, not as changes to
 the Preferences. Report using the shared
 [run report](../openings-workspace/references/run-report.md).

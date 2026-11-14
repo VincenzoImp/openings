@@ -3,7 +3,7 @@
 ``Workspace`` (service.py) holds settings and the change log and is composed
 of the job services (jobs.py, job_changes.py, identity.py, notes.py), the
 application services (applications.py, application_changes.py), the timeline
-of a job or application (timeline.py), bulk.py and overview.py.
+of a job or application (timeline.py) and bulk.py.
 """
 
 from .service import Workspace

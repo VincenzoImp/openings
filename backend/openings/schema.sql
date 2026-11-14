@@ -122,11 +122,8 @@ CREATE TABLE claims (
  text TEXT NOT NULL, approved INTEGER NOT NULL DEFAULT 0, position INTEGER NOT NULL DEFAULT 0 CHECK(position>=0),
  metadata TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(metadata)),
  version INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
- -- Typed selection fields: in the CV unless the job says otherwise, how
- -- strongly the claim is preferred, and a free short group name.
- default_in_cv INTEGER NOT NULL DEFAULT 0 CHECK(default_in_cv IN (0,1)),
- role TEXT NOT NULL DEFAULT 'supporting' CHECK(role IN ('core','supporting','bench')),
- "group" TEXT NOT NULL DEFAULT ''
+ -- ★ "Always include in my CV": in the CV unless the job gives a reason to leave it out.
+ always_include INTEGER NOT NULL DEFAULT 0 CHECK(always_include IN (0,1))
 );
 CREATE TABLE templates (
  id TEXT PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL CHECK(kind IN ('cv','letter')),
@@ -238,7 +235,8 @@ CREATE INDEX files_job ON files(job_id);
 CREATE INDEX files_blob ON files(sha256);
 CREATE INDEX tasks_job ON tasks(job_id);
 CREATE INDEX tasks_source ON tasks(source_id);
-CREATE INDEX postings_source ON postings(source_id);
+-- Also counts the jobs of each source (sources_list counts, #211).
+CREATE INDEX postings_source ON postings(source_id,job_id);
 -- A question for the owner. The subject reference becomes NULL when its record is
 -- deleted; subject_type and subject_label keep the question readable.
 CREATE TABLE questions (
@@ -374,7 +372,6 @@ CREATE TABLE job_signals (
  format INTEGER NOT NULL, content_version INTEGER NOT NULL,
  language TEXT, language_confidence REAL,
  required TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(required)),
- welcome TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(welcome)),
  duplicate_checked INTEGER NOT NULL DEFAULT 0 CHECK(duplicate_checked IN (0,1)),
  duplicate_of TEXT REFERENCES jobs(id) ON DELETE SET NULL, duplicate_confidence REAL,
  distinct_from TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(distinct_from)),

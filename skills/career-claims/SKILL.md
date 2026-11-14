@@ -69,10 +69,9 @@ one continuing project as separate achievements in multiple CV sections.
 
 The Openings rules define fixed fields, permitted changes, slot counts and
 Skills selection: the Writing rules of Preferences (`writing`, scope `all`, or
-`cv` or `letter` for that document) and the template's guidance and limits. Claim selection is typed: start a CV from the
-claims with `default_in_cv`, prefer `role: core` over `supporting`, take a
-`bench` claim only when the job calls for it, and avoid two claims of one
-`group` saying the same thing. Use approved claims when they make the case well. When the
+`cv` or `letter` for that document) and the template's guidance and limits. Start a CV from the
+claims with `always_include` (★) unless the job gives a reason to leave one out,
+and avoid two claims saying the same thing. Use approved claims when they make the case well. When the
 rules allow it, write new wording from the relevant frozen Career evidence.
 Keep each contribution under its correct role and period. A related project can
 clarify that role only where the relationship and contribution are recorded.

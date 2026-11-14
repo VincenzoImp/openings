@@ -1,14 +1,12 @@
-import { useState, type FormEvent } from "react";
+import type { FormEvent } from "react";
 import {
   api,
   careerEntryLabel,
-  claimRoles,
   version,
   type Claim,
-  type Json,
   type Knowledge,
 } from "../../api";
-import { Button, Dialog, Field, KeyValueEditor } from "../../design";
+import { Button, Dialog, Field } from "../../design";
 import { useEditorRecord, useWorkspace } from "../../state";
 
 type Props = {
@@ -20,7 +18,7 @@ type Props = {
   onClose: () => void;
 };
 
-/** Add or edit one claim: wording, entry, approval, selection and details. */
+/** Add or edit one claim: wording, entry, approval and the star. */
 export function ClaimDialog(props: Props) {
   const record = useEditorRecord(
     props.record,
@@ -32,25 +30,16 @@ export function ClaimDialog(props: Props) {
 }
 
 function ClaimForm({ record, entry, entries, onClose }: Props) {
-  const { mutate, pending, notify } = useWorkspace();
-  const [details, setDetails] = useState<{
-    value: Json;
-    problem: string | null;
-  }>({ value: record?.metadata || {}, problem: null });
+  const { mutate, pending } = useWorkspace();
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (details.problem) return notify(details.problem, true);
     const form = new FormData(event.currentTarget);
-    const position = String(form.get("position") || "");
+    // Order and other details are kept as they are: they are not sent.
     const body = {
       knowledge_id: form.get("knowledge_id"),
       text: form.get("text"),
       approved: form.get("approved") === "on",
-      default_in_cv: form.get("default_in_cv") === "on",
-      role: form.get("role"),
-      group: String(form.get("group") || ""),
-      ...(position ? { position: Number(position) } : {}),
-      metadata: details.value,
+      always_include: form.get("always_include") === "on",
     };
     if (
       await mutate(
@@ -103,39 +92,7 @@ function ClaimForm({ record, entry, entries, onClose }: Props) {
             defaultValue={record?.text}
           />
         </Field>
-        <Field
-          label="Role"
-          hint="Core carries the account; bench is kept in reserve."
-        >
-          <select name="role" defaultValue={record?.role || "supporting"}>
-            {Object.entries(claimRoles).map(([role, label]) => (
-              <option key={role} value={role}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Group" hint="Optional: claims that belong together.">
-          <input
-            name="group"
-            maxLength={100}
-            list="claim-groups"
-            defaultValue={record?.group}
-          />
-        </Field>
-        <Field
-          label="Order"
-          hint="Lower numbers come first. Empty adds at the end."
-        >
-          <input
-            name="position"
-            type="number"
-            min={0}
-            step={1}
-            defaultValue={record?.position}
-          />
-        </Field>
-        <div className="field">
+        <div className="field wide">
           <label className="toggle">
             <input
               type="checkbox"
@@ -147,20 +104,12 @@ function ClaimForm({ record, entry, entries, onClose }: Props) {
           <label className="toggle">
             <input
               type="checkbox"
-              name="default_in_cv"
-              defaultChecked={record?.default_in_cv}
+              name="always_include"
+              defaultChecked={record?.always_include}
             />
-            <span>In the CV by default</span>
+            <span>Always include in my CV</span>
           </label>
         </div>
-        <fieldset className="field wide">
-          <legend>Other details</legend>
-          <KeyValueEditor
-            label="Other details of the claim as keys and values"
-            value={record?.metadata || {}}
-            onChange={(value, problem) => setDetails({ value, problem })}
-          />
-        </fieldset>
         <div className="row wide">
           <Button variant="primary" disabled={pending}>
             Save claim

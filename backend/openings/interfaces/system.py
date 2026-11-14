@@ -502,7 +502,7 @@ def register_system(router, mcp, workspace, auth, public_url):
         def records():
             json_fields = {
                 "jobs": ["metadata", "overrides"],
-                "job_signals": ["required", "welcome", "distinct_from"],
+                "job_signals": ["required", "distinct_from"],
                 "postings": ["payload"],
                 "applications": ["questions", "answers", "requirements", "required_documents"],
                 "events": ["payload"],

@@ -344,6 +344,14 @@ AFTER = (
             "json_array_length(data,'$.spoken_languages') FROM settings WHERE key='workspace'"
         ),
     ),
+    # #211 secondary features
+    (
+        "claims with role, group in metadata; always included",
+        (
+            "SELECT sum(json_type(metadata,'$.role') IS NOT NULL), "
+            "sum(json_type(metadata,'$.group') IS NOT NULL), sum(always_include) FROM claims"
+        ),
+    ),
 )
 
 
