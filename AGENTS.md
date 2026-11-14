@@ -4,8 +4,9 @@ Read README.md, CONTRIBUTING.md and docs/developer/architecture.md before changi
 behavior. The running OpenAPI schema and MCP `tools/list` are the contract.
 
 - Keep business logic in shared services. Every dashboard action is a REST
-  operation; every operation that is not owner-only is also an MCP tool. REST and
-  MCP may offer more than the dashboard.
+  operation; every operation that is not owner-only is an MCP tool or names the
+  MCP tool that does its work (`mcp=`). REST is the superset; keep `tools/list`
+  within its budget (`test_mcp_budget.py`).
 - Preserve version checks, document immutability, exact file ownership,
   reversible dismissal and deliberate permanent deletion.
 - Keep incomplete automatic candidates in collection checkpoints; admit usable

@@ -10,14 +10,21 @@ from pydantic import Field, field_validator, model_validator
 
 from ..career.models import Input
 
-OwnerType = Literal["knowledge", "template", "document", "job"]
+OwnerType = Literal["career", "template", "document", "job"]
 
 
-OWNER_COLUMNS = {name: f"{name}_id" for name in ["knowledge", "template", "document", "job"]}
+# An owner type as the API names it, and its column on files (career entries are
+# stored in the table knowledge).
+OWNER_COLUMNS = {
+    "career": "knowledge_id",
+    "template": "template_id",
+    "document": "document_id",
+    "job": "job_id",
+}
 
 
 OWNER_TABLES = {
-    "knowledge": "knowledge",
+    "career": "knowledge",
     "template": "templates",
     "document": "documents",
     "job": "jobs",
@@ -69,38 +76,38 @@ class DocumentCreate(Input):
         default=None,
         min_length=1,
         max_length=200,
-        description="Retrying with the same key and request returns the record the first request created.",
+        description="A retry with the same key returns the first revision.",
     )
     kind: DocumentKind = "cv"
     title: str = Field(default="", max_length=300)
     content: dict[str, Any] | None = Field(
         default=None,
-        description="Structured content of form answers or another document. Not accepted for a CV or letter (cv, letter): those are a PDF and an optional TeX source.",
+        description="answers or other: structured content. Not for cv or letter.",
     )
     pdf: FileSpec | None = Field(
         default=None,
-        description="CV or letter: the PDF to upload. The result's uploads.pdf is a one-shot grant: PUT the exact bytes to its url with its headers. The revision is incomplete until its PDF is stored, then complete and immutable.",
+        description="cv or letter: the PDF to PUT with uploads.pdf; complete and immutable once stored.",
     )
     source: str | None = Field(
         default=None,
-        description="CV or letter, optional: the TeX source inline (UTF-8, at most 256 KB). Its readable text is derived from it; the PDF must then be built from it (the PDF grant names its SHA-256).",
+        description="cv or letter, optional: the TeX source inline (at most 256 KB); the PDF must be built from it.",
     )
     source_file: FileSpec | None = Field(
         default=None,
-        description="CV or letter, optional, instead of source: a .tex file to upload with the grant uploads.source, before the PDF.",
+        description="Instead of source: a .tex file to PUT with uploads.source, before the PDF.",
     )
-    claim_ids: list[str] = Field(
+    highlight_ids: list[str] = Field(
         default_factory=list,
         max_length=1000,
-        description="Approved claims the revision uses.",
+        description="Approved highlights the revision uses.",
     )
-    knowledge_ids: list[str] = Field(
+    career_ids: list[str] = Field(
         default_factory=list,
         max_length=500,
         description="Career entries the revision uses.",
     )
-    note: str = Field(default="", max_length=5000, description="An optional note on the revision.")
-    previous_id: str | None = None
+    note: str = Field(default="", max_length=5000)
+    previous_id: str | None = Field(default=None, description="The revision this one replaces.")
 
     @field_validator("content")
     @classmethod
@@ -115,7 +122,7 @@ class DocumentCreate(Input):
             raise ValueError("Structured content exceeds the 1 MB limit.")
         return value
 
-    @field_validator("claim_ids", "knowledge_ids")
+    @field_validator("highlight_ids", "career_ids")
     @classmethod
     def distinct_ids(cls, value):
         return list(dict.fromkeys(value))
@@ -162,7 +169,7 @@ class FileQuery(Input):
 
 
 class UploadReservation(Input):
-    owner_type: Literal["knowledge", "template", "document", "job"]
+    owner_type: OwnerType
     owner_id: str
     name: str = Field(min_length=1, max_length=500)
     media_type: str = Field(default="application/octet-stream", min_length=1, max_length=200)
@@ -171,7 +178,7 @@ class UploadReservation(Input):
     source_sha256: str | None = Field(
         default=None,
         pattern=SHA256,
-        description="For the PDF of a CV or letter revision that has a TeX source: the SHA-256 of that source (required then; a PDF naming another source is refused). A PDF-only revision names none.",
+        description="A revision's PDF built from a TeX source: that source's SHA-256 (required then).",
     )
 
     @field_validator("name")

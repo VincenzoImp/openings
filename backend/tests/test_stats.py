@@ -104,11 +104,11 @@ def test_stats_on_mcp_and_the_removed_tools(mcp):
     assert error is None and value["period"] == "all"
     for name, replacement in (
         ("insights_get", "stats_get"),
-        ("overview_get", "stats_get"),
+        ("overview_get", "workspace_context"),
         ("sources_yield", "sources_list"),
     ):
         _, removed = mcp.call(name)
-        assert removed["code"] == "tool_removed" and replacement in removed["message"]
+        assert removed["code"] == "renamed" and removed["details"]["use"] == replacement
 
 
 def test_sources_list_counts_what_each_source_found(app, client):

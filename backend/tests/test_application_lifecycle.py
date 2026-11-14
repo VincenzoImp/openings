@@ -1,6 +1,5 @@
 """Application intent, shared interface contracts and destructive ownership."""
 
-import json
 import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 
@@ -89,9 +88,9 @@ def test_summaries_filtering_and_merge_preserve_application_intent(tmp_path):
     )
 
 
-@pytest.mark.parametrize("transport", ["rest", "mcp"])
-def test_interface_workflow_requires_explicit_outcomes_and_versioned_deletion(tmp_path, transport):
-    app = create_app(tmp_path / f"workflow-{transport}.sqlite", start_worker=False)
+def test_interface_workflow_requires_explicit_outcomes_and_versioned_deletion(tmp_path):
+    """The one-application REST routes the dashboard uses (MCP: test_mcp_tools.py)."""
+    app = create_app(tmp_path / "workflow.sqlite", start_worker=False)
     app.state.auth.setup("synthetic-password")
     token = app.state.auth.create_token("Synthetic workflow client")["token"]
     headers = {
@@ -101,40 +100,21 @@ def test_interface_workflow_requires_explicit_outcomes_and_versioned_deletion(tm
     with TestClient(app, base_url="http://localhost:8080", headers=headers) as client:
 
         def call(tool, method, path, arguments, *, error=None):
-            if transport == "rest":
-                # REST names the identifiers in the path and the rest in the body or query.
-                body = {
-                    k: v
-                    for k, v in arguments.items()
-                    if not (k.endswith("_id") and f"/{v}" in path)
-                }
-                response = client.request(
-                    method,
-                    "/api/v1" + path,
-                    params=body if method in ("GET", "DELETE") else None,
-                    json=body if method in ("POST", "PATCH") else None,
-                )
-                if error:
-                    assert response.status_code == error
-                    return response.json()
-                response.raise_for_status()
-                return response.json()
-            response = client.post(
-                "/mcp",
-                json={
-                    "jsonrpc": "2.0",
-                    "id": 1,
-                    "method": "tools/call",
-                    "params": {"name": tool, "arguments": arguments},
-                },
+            # REST names the identifiers in the path and the rest in the body or query.
+            body = {
+                k: v for k, v in arguments.items() if not (k.endswith("_id") and f"/{v}" in path)
+            }
+            response = client.request(
+                method,
+                "/api/v1" + path,
+                params=body if method in ("GET", "DELETE") else None,
+                json=body if method in ("POST", "PATCH") else None,
             )
-            response.raise_for_status()
-            result = response.json()["result"]
             if error:
-                assert result.get("isError"), result
-                return result
-            assert not result.get("isError"), result
-            return result.get("structuredContent") or json.loads(result["content"][0]["text"])
+                assert response.status_code == error
+                return response.json()
+            response.raise_for_status()
+            return response.json()
 
         job = call(
             "jobs_create",
@@ -243,11 +223,7 @@ def test_interface_workflow_requires_explicit_outcomes_and_versioned_deletion(tm
             "applications_delete",
             "DELETE",
             path,
-            {
-                "application_id": attempt["id"],
-            }
-            if transport == "mcp"
-            else {},
+            {},
             error=422,
         )
         call(
@@ -255,7 +231,6 @@ def test_interface_workflow_requires_explicit_outcomes_and_versioned_deletion(tm
             "DELETE",
             path,
             {
-                **({"application_id": attempt["id"]} if transport == "mcp" else {}),
                 "expected_version": attempt["version"] - 1,
             },
             error=409,
@@ -265,7 +240,6 @@ def test_interface_workflow_requires_explicit_outcomes_and_versioned_deletion(tm
             "DELETE",
             path,
             {
-                **({"application_id": attempt["id"]} if transport == "mcp" else {}),
                 "expected_version": attempt["version"],
             },
         )
@@ -276,11 +250,7 @@ def test_interface_workflow_requires_explicit_outcomes_and_versioned_deletion(tm
             "jobs_delete",
             "DELETE",
             f"/jobs/{job['id']}",
-            {
-                "job_id": job["id"],
-            }
-            if transport == "mcp"
-            else {},
+            {},
             error=422,
         )
         call(
@@ -288,7 +258,6 @@ def test_interface_workflow_requires_explicit_outcomes_and_versioned_deletion(tm
             "DELETE",
             f"/jobs/{job['id']}",
             {
-                **({"job_id": job["id"]} if transport == "mcp" else {}),
                 "expected_version": job["version"],
             },
             error=409,
@@ -298,7 +267,6 @@ def test_interface_workflow_requires_explicit_outcomes_and_versioned_deletion(tm
             "DELETE",
             f"/jobs/{job['id']}",
             {
-                **({"job_id": job["id"]} if transport == "mcp" else {}),
                 "expected_version": retained["version"],
             },
         )
