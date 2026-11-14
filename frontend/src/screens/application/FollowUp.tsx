@@ -64,7 +64,7 @@ export function FollowUp({ context }: { context: PageContext }) {
             {requirements.length > 0 && (
               <Requirements app={app} editable={false} />
             )}
-            <Answers app={app} editable={false} />
+            <Answers app={app} />
           </Fold>
         )}
       </div>

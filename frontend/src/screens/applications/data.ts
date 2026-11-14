@@ -353,28 +353,6 @@ export function useSaveNote() {
   });
 }
 
-/** Add a note to an application's history. */
-export function useAddNote() {
-  return useApiMutation({
-    touches: ["notes", "applications"],
-    mutationFn: ({
-      jobId,
-      applicationId,
-      body,
-    }: {
-      jobId: string;
-      applicationId: string;
-      body: string;
-    }) =>
-      call(
-        api.POST("/api/v1/jobs/{job_id}/notes", {
-          params: { path: { job_id: jobId } },
-          body: { application_id: applicationId, body, pinned: false },
-        }),
-      ),
-  });
-}
-
 async function sha256(file: File) {
   // Only in a secure context; the server then names the hash itself.
   if (!globalThis.crypto?.subtle) return undefined;

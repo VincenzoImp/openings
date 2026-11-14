@@ -2,15 +2,7 @@
 // PDF or readable text, the upload of a new one (PDF, optional .tex), and
 // its earlier revisions and changes.
 import { useRef, useState, type DragEvent, type ReactNode } from "react";
-import {
-  Download,
-  FileText,
-  History,
-  MoreHorizontal,
-  RefreshCw,
-  Trash2,
-  Upload,
-} from "lucide-react";
+import { Download, FileText, MoreHorizontal, Upload } from "lucide-react";
 import { download, save, type Schema } from "../../api/client";
 import { Button, IconButton } from "../../ui/Button";
 import { ConfirmDialog, Dialog } from "../../ui/Dialog";
@@ -189,17 +181,12 @@ export function useDocumentUpload(
       });
       return;
     }
-    upload.mutate(
-      { applicationId, kind, pdf, source, previous },
-      {
-        onSuccess: () =>
-          toast.show({
-            message: `${KIND_LABEL[kind]} uploaded`,
-            tone: "success",
-          }),
-        onError: (error) =>
-          toast.show({ message: errorText(error), tone: "error" }),
-      },
+    // The promise, not the mutate callbacks: the last upload makes the
+    // application Ready, and this part of the page gives way to Ready.
+    upload.mutateAsync({ applicationId, kind, pdf, source, previous }).then(
+      () =>
+        toast.show({ message: `${KIND_LABEL[kind]} uploaded`, tone: "success" }),
+      (error) => toast.show({ message: errorText(error), tone: "error" }),
     );
   };
   const picker = (
@@ -288,13 +275,12 @@ export function DocumentSlot({
   const history = revisions.filter((item) => item.kind === kind);
   const menu: MenuEntry[] = revision
     ? [
-        { id: "replace", label: "Replace…", icon: RefreshCw, onSelect: uploader.open },
+        { id: "replace", label: "Replace…", onSelect: uploader.open },
         ...(pdf
           ? [
               {
                 id: "download",
                 label: "Download",
-                icon: Download,
                 onSelect: () => void downloadFile(pdf),
               },
             ]
@@ -304,7 +290,6 @@ export function DocumentSlot({
               {
                 id: "versions",
                 label: "Earlier versions",
-                icon: History,
                 onSelect: () => setDialog("versions"),
               },
             ]
@@ -314,7 +299,6 @@ export function DocumentSlot({
               {
                 id: "changes",
                 label: "Show changes from previous version",
-                icon: FileText,
                 onSelect: () => setDialog("changes"),
               },
             ]
@@ -323,7 +307,6 @@ export function DocumentSlot({
         {
           id: "remove",
           label: "Remove…",
-          icon: Trash2,
           danger: true,
           onSelect: () => setDialog("remove"),
         },

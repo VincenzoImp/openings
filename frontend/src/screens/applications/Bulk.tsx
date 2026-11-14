@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { ArchiveX, Flag, RotateCcw, XCircle } from "lucide-react";
 import type { Schema } from "../../api/client";
 import { useApiMutation } from "../../query/mutation";
 import { Button } from "../../ui/Button";
@@ -164,7 +163,6 @@ export function BulkActions({
           <Button
             size="sm"
             variant="ghost"
-            icon={ArchiveX}
             disabled={busy}
             onClick={() => void close("no_response")}
           >
@@ -175,7 +173,6 @@ export function BulkActions({
           <Button
             size="sm"
             variant="ghost"
-            icon={XCircle}
             disabled={busy}
             onClick={() => {
               setOutcome(
@@ -193,7 +190,6 @@ export function BulkActions({
           <Button
             size="sm"
             variant="ghost"
-            icon={RotateCcw}
             disabled={busy}
             onClick={() => void reopen(selected)}
           >
@@ -204,7 +200,6 @@ export function BulkActions({
           <Button
             size="sm"
             variant="ghost"
-            icon={Flag}
             disabled={busy}
             onClick={() => {
               setPriority("");

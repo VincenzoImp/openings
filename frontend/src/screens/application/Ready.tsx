@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import {
-  ArrowRight,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
@@ -66,7 +65,7 @@ function QueuePlace({ queue, id }: { queue: ApplicationRow[]; id: string }) {
         <a className="apg-queue-next" href={pageHref(place.next.id)}>
           <span className="apg-queue-label">Next: </span>
           <span className="apg-queue-name">{name(place.next)}</span>
-          <Icon icon={ArrowRight} size="sm" />
+          <Icon icon={ChevronRight} size="sm" />
         </a>
       )}
     </nav>
@@ -223,6 +222,7 @@ export function ReadyView({
       )}
       {(app.questions ?? []).length > 0 && (
         <div className="apg-check-part">
+          <h3 className="ap-sub-title">Form answers</h3>
           <Answers app={app} />
         </div>
       )}

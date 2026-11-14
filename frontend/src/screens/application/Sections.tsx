@@ -4,7 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { AlertTriangle, Check, Copy, Plus, X } from "lucide-react";
 import { ConflictNotice } from "../../query/ConflictNotice";
 import { Button, IconButton } from "../../ui/Button";
-import { Checkbox, Input, Select, Textarea, Field } from "../../ui/Field";
+import { Checkbox, Input, Textarea, Field } from "../../ui/Field";
 import { formatDate, formatFull } from "../../ui/format";
 import { Icon } from "../../ui/Icon";
 import { Skeleton } from "../../ui/Page";
@@ -12,7 +12,6 @@ import { ReadEdit } from "../../ui/ReadEdit";
 import { Switch } from "../../ui/Field";
 import { useToast } from "../../ui/Toast";
 import {
-  useAddNote,
   useSaveNote,
   useTimeline,
   useVersionedUpdate,
@@ -234,42 +233,19 @@ export function Requirements({
   );
 }
 
-type Question = {
-  id: string;
-  label: string;
-  type?: string;
-  options?: string[];
-  required?: boolean;
-};
+type Question = { id: string; label: string; required?: boolean };
 const questionsOf = (app: Application) =>
   (app.questions ?? []) as unknown as Question[];
 const answerText = (value: unknown) =>
   value === true ? "Yes" : value === false ? "No" : value == null ? "" : String(value);
 
-/** The answers of the application form: question, answer, copy; Edit. */
-export function Answers({
-  app,
-  editable = true,
-}: {
-  app: Application;
-  editable?: boolean;
-}) {
+/** The answers of the application form: question, answer, copy. */
+export function Answers({ app }: { app: Application }) {
   const questions = questionsOf(app);
   const copy = useCopy();
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState<Record<string, unknown>>({});
-  const update = useVersionedUpdate();
-  const toast = useToast();
-  useEffect(() => {
-    if (!editing) setDraft({ ...(app.answers ?? {}) });
-  }, [editing, app.answers]);
   if (!questions.length) return null;
-  const changes = questions.filter(
-    (question) =>
-      answerText(draft[question.id]) !== answerText(app.answers?.[question.id]),
-  ).length;
-  const read = (
-    <dl className="ap-answers">
+  return (
+    <dl className="ap-answers" aria-label="Form answers">
       {questions.map((question) => {
         const answer = answerText(app.answers?.[question.id]);
         return (
@@ -300,98 +276,6 @@ export function Answers({
         );
       })}
     </dl>
-  );
-  if (!editable) return read;
-  const field = (question: Question) => {
-    const value = draft[question.id];
-    const set = (next: unknown) =>
-      setDraft((current) => ({ ...current, [question.id]: next }));
-    if (question.type === "boolean")
-      return (
-        <Select
-          value={value === true ? "yes" : value === false ? "no" : ""}
-          onChange={(event) =>
-            set(event.target.value ? event.target.value === "yes" : null)
-          }
-        >
-          <option value="">No answer</option>
-          <option value="yes">Yes</option>
-          <option value="no">No</option>
-        </Select>
-      );
-    if (question.type === "choice")
-      return (
-        <Select
-          value={answerText(value)}
-          onChange={(event) => set(event.target.value || null)}
-        >
-          <option value="">No answer</option>
-          {(question.options ?? []).map((option) => (
-            <option key={option}>{option}</option>
-          ))}
-        </Select>
-      );
-    if (question.type === "number")
-      return (
-        <Input
-          type="number"
-          value={answerText(value)}
-          onChange={(event) =>
-            set(event.target.value === "" ? null : Number(event.target.value))
-          }
-        />
-      );
-    return (
-      <Textarea
-        rows={3}
-        value={answerText(value)}
-        onChange={(event) => set(event.target.value || null)}
-      />
-    );
-  };
-  return (
-    <ReadEdit
-      title="Form answers"
-      editing={editing}
-      onEdit={() => setEditing(true)}
-      read={read}
-      form={
-        <>
-          {update.conflict && (
-            <ConflictNotice
-              onReload={() => {
-                void update.reload();
-                setEditing(false);
-              }}
-              onKeepEditing={() => void update.keepEditing()}
-            />
-          )}
-          {questions.map((question) => (
-            <Field key={question.id} label={question.label} required={question.required}>
-              {field(question)}
-            </Field>
-          ))}
-        </>
-      }
-      changes={changes}
-      saving={update.isPending}
-      onSave={() =>
-        update.mutate(
-          { id: app.id, version: app.version, patch: { answers: draft } },
-          {
-            onSuccess: () => {
-              setEditing(false);
-              toast.show({ message: "Answers saved", tone: "success" });
-            },
-            onError: (error) => {
-              if (!update.conflict)
-                toast.show({ message: errorText(error), tone: "error" });
-            },
-          },
-        )
-      }
-      onDiscard={() => setEditing(false)}
-    />
   );
 }
 
@@ -474,9 +358,6 @@ export function PinnedNote({ app }: { app: Application }) {
 export function HistoryList({ app }: { app: Application }) {
   const timeline = useTimeline(app.id);
   const [all, setAll] = useState(false);
-  const [note, setNote] = useState("");
-  const add = useAddNote();
-  const toast = useToast();
   const replies = new Map((app.replies ?? []).map((reply) => [reply.id, reply]));
   const items = (timeline.data?.items ?? [])
     .filter((item) => item.id !== app.pinned_note?.id)
@@ -503,35 +384,6 @@ export function HistoryList({ app }: { app: Application }) {
     .filter(({ item, line }) => all || (line.main && item.application_id));
   return (
     <div className="ap-history">
-      <form
-        className="ap-note-add"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (!note.trim()) return;
-          add.mutate(
-            { jobId: app.job_id, applicationId: app.id, body: note.trim() },
-            {
-              onSuccess: () => {
-                setNote("");
-                toast.show({ message: "Note added", tone: "success" });
-              },
-              onError: (error) =>
-                toast.show({ message: errorText(error), tone: "error" }),
-            },
-          );
-        }}
-      >
-        <Input
-          aria-label="Add a note to the history"
-          placeholder="Add a note"
-          value={note}
-          maxLength={20000}
-          onChange={(event) => setNote(event.target.value)}
-        />
-        <Button type="submit" size="sm" disabled={!note.trim() || add.isPending}>
-          Add
-        </Button>
-      </form>
       {!timeline.data ? (
         <Skeleton width="70%" />
       ) : (
@@ -570,11 +422,11 @@ export function PostingText({ text }: { text: string }) {
   return (
     <div className="ui-prose ap-posting">
       {text
-        .split(/\n{2,}/)
+        .split(/\n+/)
         .map((block) => block.trim())
         .filter(Boolean)
         .map((block, index) =>
-          block.length < 60 && !/[.:;,]$/.test(block) && !block.includes("\n") ? (
+          block.length < 48 && !/[.:;,!?]$/.test(block) ? (
             <h3 key={index}>{block}</h3>
           ) : (
             <p key={index}>{block}</p>
