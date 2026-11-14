@@ -7,6 +7,14 @@ const pages = (mode: string): Record<string, string> =>
   mode === "dashboard"
     ? { index: "index.html" }
     : { index: "index.html", ui: "ui.html" };
+// The design system ships as two chunks instead of one per module: what the
+// first screen draws, and the dialogs, forms and panes the other screens add.
+// Fewer, larger chunks compress better. The barrel (ui/index.ts) stays out,
+// or it would pull every primitive into the first chunk.
+const LATER =
+  /\/src\/ui\/(Dialog|ActionSheet|ReadEdit|CodeView|CodeBlock|Table|Choice|Disclosure|Field|Tabs|Split)\./;
+const FIRST = /\/src\/ui\/(?!index\.)/;
+
 export default defineConfig(({ mode }) => ({
   plugins: [react()],
   server: {
@@ -24,9 +32,15 @@ export default defineConfig(({ mode }) => ({
       // for its styles. The gallery's own stylesheet stays apart.
       output: {
         manualChunks: (id) =>
-          id.endsWith(".css") && !id.includes("/gallery/")
-            ? "styles"
-            : undefined,
+          id.includes("/gallery/") || !id.includes("/src/")
+            ? undefined
+            : id.endsWith(".css")
+              ? "styles"
+              : LATER.test(id)
+                ? "ui-later"
+                : FIRST.test(id)
+                  ? "ui"
+                  : undefined,
       },
     },
   },

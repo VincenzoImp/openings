@@ -1,41 +1,14 @@
 // What the Sources screen says about a source, a check and the schedule.
 // Pure functions without React, so they are tested on their own
 // (tests/sources.test.mjs).
+import type { components } from "../../api/schema";
 import { formatDate, formatDay } from "../../ui/format.ts";
 
-/** A source as the screen reads it (the API's Source, structurally). */
-export interface SourceView {
-  id: string;
-  name: string;
-  kind: string;
-  url: string;
-  enabled: boolean;
-  automatic_collection: boolean;
-  version: number;
-  config: Record<string, unknown>;
-  filters: Record<string, unknown>;
-  schedule: Record<string, unknown>;
-  counts?: Record<string, number>;
-  last_run?: Record<string, unknown> | null;
-  last_error?: string | null;
-  last_outcome?: string | null;
-  last_run_at?: unknown;
-  last_counts?: unknown;
-  next_run_at?: string | null;
-}
+/** A source as the screen reads it: the API's Source. */
+export type SourceView = components["schemas"]["Source"];
 
 /** A collection run (a check) as Recent checks reads it. */
-export interface CheckView {
-  id: string;
-  state: string;
-  source_id?: string | null;
-  source_name?: string | null;
-  counts?: Record<string, unknown>;
-  tasks?: Record<string, unknown>[];
-  created_at: string;
-  started_at?: string | null;
-  finished_at?: string | null;
-}
+export type CheckView = components["schemas"]["CollectionRun"];
 
 /** The three kinds a person chooses between. */
 export type SourceKind = "search" | "company" | "feed";

@@ -27,9 +27,9 @@ export const LOADERS: Record<RouteId, () => Module> = {
   setup: () => import("../screens/setup/Setup"),
 };
 
-const SCREENS = Object.fromEntries(
+const SCREENS: Record<string, ComponentType> = Object.fromEntries(
   Object.entries(LOADERS).map(([id, load]) => [id, lazy(load)]),
-) as unknown as Record<RouteId, ComponentType>;
+);
 
 /** Start loading a screen's code before it is opened. */
 export function preload(id: RouteId) {

@@ -133,7 +133,7 @@ export default function SourcesScreen() {
                 run: () =>
                   setEnabled.mutate(
                     {
-                      source: saved as unknown as SourceView,
+                      source: saved,
                       enabled: !enabled,
                     },
                     { onError: failed },

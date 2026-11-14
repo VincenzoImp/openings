@@ -4,7 +4,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { api, call, download, transfer, type Schema } from "../api/client";
 import { useApiMutation, useVersionedMutation } from "./mutation";
-import { POLL_MS } from "./query";
 
 export type Template = Schema<"Template">;
 export type TemplateKind = "cv" | "letter";
@@ -26,7 +25,6 @@ export function useTemplates() {
           signal,
         }),
       ),
-    refetchInterval: POLL_MS,
   });
 }
 

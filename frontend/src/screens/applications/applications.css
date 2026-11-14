@@ -77,6 +77,12 @@
     fill: var(--text-2);
   }
 
+  .ap-more {
+    display: flex;
+    justify-content: center;
+    padding: var(--s-3);
+  }
+
   /* Stats */
   .ap-body[data-view="stats"] {
     padding: var(--s-6) var(--pane-pad) var(--s-12);

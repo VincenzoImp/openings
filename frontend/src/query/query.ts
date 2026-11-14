@@ -3,8 +3,8 @@
 // Query keys start with the resource, the first segment of its REST path:
 //   ["jobs", "list", filters]   ["jobs", "one", id]   ["applications", "count"]
 // A mutation names the resources it touches and invalidates them by that
-// prefix (`touches: ["jobs", "applications"]`). Polling and refetch on focus
-// keep data fresh; there is no Refresh button.
+// prefix (`touches: ["jobs", "applications"]`). Refetch on focus, and polling
+// of what changes on its own, keep data fresh; there is no Refresh button.
 import {
   QueryClient,
   partialMatchKey,
@@ -35,7 +35,10 @@ export type Resource =
   | "tokens"
   | "workspace";
 
-/** How often a screen's lists are read again while it is open. */
+/**
+ * How often the lists that change on their own (new jobs, the counts, the
+ * first page of applications, sources being checked) are read again.
+ */
 export const POLL_MS = 30_000;
 
 export const queryClient = new QueryClient({
