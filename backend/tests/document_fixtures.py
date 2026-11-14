@@ -1,10 +1,40 @@
-"""CV and letter revisions as their source and PDF."""
+"""CV and letter revisions as their source and PDF, and an application's guidance."""
 
 import hashlib
 
 from openings.documents import DocumentCreate, UploadReservation
 
 PDF = b"%PDF-1.4\nSynthetic test PDF"
+# A CV source with macros, accents and comments, and the text derived from it.
+SOURCE = r"""\documentclass{article}
+\usepackage{hyperref}
+\newcommand{\role}[2]{\textbf{#1} \hfill #2}
+\newcommand{\myname}{Alex Example}
+\begin{document}
+{\LARGE \myname}\\[3pt]
+\href{https://example.test}{example.test}
+\section*{Experience}
+\role{Backend Engineer --- Example Cloud}{2021--present}
+\begin{itemize}[leftmargin=*]
+  \item Reduced API p95 latency by 20\% through tracing. % measured on staging
+  \item Built \textcolor{blue}{Python} services for Caf\'e~Example in M\"{u}nchen.
+\end{itemize}
+\vspace{4pt}{\small Skills: Python, SQL.}
+
+Thank you for
+your time.
+\end{document}
+"""
+TEXT = """Alex Example
+example.test
+
+Experience
+Backend Engineer — Example Cloud 2021–present
+• Reduced API p95 latency by 20% through tracing.
+• Built Python services for Café Example in München.
+Skills: Python, SQL.
+
+Thank you for your time."""
 
 
 def tex(text="Synthetic content."):
@@ -113,3 +143,10 @@ def text_pdf(*lines):
     out += "".join(f"{offset:010d} 00000 n \n" for offset in offsets)
     out += f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n"
     return out.encode("latin-1")
+
+
+def guided_application(workspace, job_id, text, **fields):
+    """Start an application whose standing guidance is its pinned note."""
+    application = workspace.create_application({"job_id": job_id, **fields})
+    workspace.add_note(job_id, {"body": text, "application_id": application["id"], "pinned": True})
+    return workspace.get_application(application["id"])

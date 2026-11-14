@@ -6,43 +6,13 @@ from pathlib import Path
 
 import pytest
 
-from document_fixtures import PDF, tex, text_pdf, upload
+from document_fixtures import PDF, SOURCE, TEXT, tex, text_pdf, upload
 from openings.documents import DocumentCreate
 from openings.documents.pdf import pdf_text
 from openings.documents.text import derive_text, revision_text, tokens
 from openings.errors import DomainError
 
 EXAMPLES = Path(__file__).resolve().parents[2] / "examples"
-
-SOURCE = r"""\documentclass{article}
-\usepackage{hyperref}
-\newcommand{\role}[2]{\textbf{#1} \hfill #2}
-\newcommand{\myname}{Alex Example}
-\begin{document}
-{\LARGE \myname}\\[3pt]
-\href{https://example.test}{example.test}
-\section*{Experience}
-\role{Backend Engineer --- Example Cloud}{2021--present}
-\begin{itemize}[leftmargin=*]
-  \item Reduced API p95 latency by 20\% through tracing. % measured on staging
-  \item Built \textcolor{blue}{Python} services for Caf\'e~Example in M\"{u}nchen.
-\end{itemize}
-\vspace{4pt}{\small Skills: Python, SQL.}
-
-Thank you for
-your time.
-\end{document}
-"""
-TEXT = """Alex Example
-example.test
-
-Experience
-Backend Engineer — Example Cloud 2021–present
-• Reduced API p95 latency by 20% through tracing.
-• Built Python services for Café Example in München.
-Skills: Python, SQL.
-
-Thank you for your time."""
 
 
 def sha(data):

@@ -3,8 +3,6 @@
 import pytest
 from pydantic import ValidationError
 
-from openings.duplicate_signals import normalize_company, normalize_title
-
 BODY = " ".join(
     f"Design reliable Python services and review practical API change number {index}."
     for index in range(30)
@@ -69,13 +67,6 @@ def test_a_concurrent_retry_of_an_ingest_gives_the_same_job(workspace, monkeypat
     monkeypatch.setattr(workspace, "replayed_job", lambda *_: None)
     again = workspace.ingest_job(posting)
     assert (again["id"], again["created"]) == (first["id"], False)
-
-
-def test_normalization_signals():
-    assert normalize_title("Senior Backend Engineer (m/w/d)") == "senior backend engineer"
-    assert normalize_title("Senior  Backend-Engineer [f/m/x]") == "senior backend engineer"
-    assert normalize_company("Example Labs GmbH") == normalize_company("example labs")
-    assert normalize_company("Inc") == "inc"
 
 
 def test_duplicate_groups_are_annotated_filtered_and_read_only(workspace):

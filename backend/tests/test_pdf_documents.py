@@ -5,9 +5,8 @@ import hashlib
 import httpx
 import pytest
 
-from document_fixtures import PDF, pdf_revision, tex, text_pdf
+from document_fixtures import PDF, SOURCE, TEXT, pdf_revision, tex, text_pdf
 from openings.documents import DocumentCreate
-from test_source_documents import SOURCE, TEXT
 
 
 def sha(data):
