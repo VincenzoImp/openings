@@ -378,7 +378,7 @@ test("a screen that fails to load offers a reload", async ({ page }) => {
     .click();
   await expect(heading(page)).toHaveText("Templates");
   await expect(
-    page.getByRole("region", { name: "Templates by kind" }),
+    page.getByRole("region", { name: "Templates", exact: true }),
   ).toBeVisible();
 });
 
@@ -414,7 +414,8 @@ for (const width of [360, 390, 600, 719, 720, 1024, 1280, 1600])
       ["profile", "Profile"],
       ["preferences", "Preferences"],
       ["templates", "Templates"],
-      ["templates?section=rules", "Templates"],
+      ["templates?tab=source", "Templates"],
+      ["templates?tab=limits", "Templates"],
       ["sources", "Sources"],
       ["sources?section=runs", "Sources"],
       ["sources?section=providers", "Sources"],
