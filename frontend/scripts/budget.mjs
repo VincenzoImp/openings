@@ -29,7 +29,7 @@ const BUDGET = {
   all: 210 * KB, // 160 kB once #228 deletes the old screens' code
   css: 24 * KB, // 20 kB once #228 deletes the old screens' stylesheet
 };
-const HOME = "src/pages/Today.tsx";
+const HOME = "src/screens/today/Today.tsx";
 
 const dist = new URL("../dist/", import.meta.url);
 let manifest;
