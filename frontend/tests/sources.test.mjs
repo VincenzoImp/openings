@@ -1,8 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 // Node strips the types of the source files; these modules have no React.
-const sources = await import("../src/pages/sources/model.ts");
-const settings = await import("../src/pages/settings/model.ts");
+const sources = await import("../src/screens/sources/model.ts");
+const settings = await import("../src/screens/settings/model.ts");
 
 const NOW = new Date(2026, 10, 14, 12, 0);
 const hoursAgo = (hours) => new Date(NOW.getTime() - hours * 3600_000);
