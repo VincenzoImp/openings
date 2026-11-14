@@ -336,9 +336,10 @@ async def test_scoped_export_and_auth_mcp_are_available(tmp_path):
     app = create_app(tmp_path / "operations.sqlite", start_worker=False)
     app.state.auth.setup("synthetic-password")
     names = {tool.name for tool in await app.state.mcp.list_tools()}
-    assert {"workspace_export", "workspace_backup", "jobs_bulk", "applications_delete"} <= names
+    assert {"workspace_backup", "jobs_triage", "applications_delete"} <= names
     # Owner-only operations and the capabilities summary are REST only.
     assert not names & {"tokens_list", "owner_password_update", "capabilities_get"}
+    assert "workspace_export" not in names
     grant = app.state.auth.operation_ticket("export")
     with TestClient(app) as client:
         response = client.get("/api/v1/export", headers={"X-Operational-Token": grant})

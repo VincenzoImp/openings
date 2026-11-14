@@ -200,7 +200,7 @@ function EntryForm({
               <span className="caption">Proof and source material</span>
             </div>
             <Assets
-              ownerType="knowledge"
+              ownerType="career"
               ownerId={record.id}
               empty="No file yet. Add a certificate, a reference or the source of a fact."
             />

@@ -51,7 +51,7 @@ def workspace(database_path):
         )
     )
     claim = career.create_claim(
-        ClaimCreate(knowledge_id=evidence["id"], text="Reduced latency by 20%.", approved=True)
+        ClaimCreate(career_id=evidence["id"], text="Reduced latency by 20%.", approved=True)
     )
     template = career.create_template(
         TemplateCreate(
@@ -124,12 +124,12 @@ def test_document_revisions_validate_evidence_and_never_inherit_old_pdf(workspac
     first = documents.create_document(
         DocumentCreate(
             application_id=application["id"],
-            claim_ids=[claim["id"], claim["id"]],
-            knowledge_ids=[evidence["id"]],
+            highlight_ids=[claim["id"], claim["id"]],
+            career_ids=[evidence["id"]],
             note="Leads with the latency work.",
         )
     )
-    assert (first["claim_ids"], first["knowledge_ids"]) == ([claim["id"]], [evidence["id"]])
+    assert (first["highlight_ids"], first["career_ids"]) == ([claim["id"]], [evidence["id"]])
     assert "content" not in first and first["text"] is None
     source = b"\\begin{document}\nReduced latency by 20\\%.\n\\end{document}\n"
     upload(documents, client, "document", first["id"], "cv.tex", source, "application/x-tex")
@@ -167,8 +167,8 @@ def test_document_revisions_validate_evidence_and_never_inherit_old_pdf(workspac
     assert second["files"] == [] and "context_id" not in second
     assert client.get(pdf["url"]).content == data
     for invented, code in (
-        ({"claim_ids": ["unknown"]}, "unapproved_claim"),
-        ({"knowledge_ids": ["unknown"]}, "unknown_evidence"),
+        ({"highlight_ids": ["unknown"]}, "unapproved_highlight"),
+        ({"career_ids": ["unknown"]}, "unknown_evidence"),
         ({"content": {"text": "Free-form wording."}}, "content_not_accepted"),
     ):
         with pytest.raises(DomainError) as error:
@@ -228,7 +228,7 @@ def test_lan_upload_without_client_crypto_still_hashes_exact_bytes(workspace):
     asset, _ = upload(
         documents,
         client,
-        "knowledge",
+        "career",
         evidence["id"],
         "notes.txt",
         b"public synthetic notes",
@@ -306,7 +306,7 @@ def test_filtered_summary_pages_keep_large_content_in_detail_and_batch_revision_
     ).json()
     assert compact["total"] == 1
     assert len(compact["items"][0]["narrative_preview"]) == 240
-    assert compact["items"][0]["claim_count"] == 1
+    assert compact["items"][0]["highlight_count"] == 1
     assert "metadata" not in compact["items"][0] and "narrative" not in compact["items"][0]
     # Lists return summaries by default; summary=false gives the full records.
     assert "narrative" not in career.list_knowledge()["items"][0]

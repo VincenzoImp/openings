@@ -9,6 +9,7 @@ from ..errors import conflict
 from ..job_signals import SignalService
 from .application_changes import ApplicationChanges
 from .applications import ApplicationReads
+from .batches import BatchOperations
 from .bulk import BulkChanges
 from .identity import JobIdentity
 from .job_changes import JobChanges
@@ -30,6 +31,7 @@ class Workspace(
     ReplyChanges,
     Shortlist,
     BulkChanges,
+    BatchOperations,
 ):
     def __init__(self, path):
         self.db = Database(path)
@@ -52,7 +54,7 @@ class Workspace(
             row = c.execute("SELECT version FROM settings WHERE key=?", (key,)).fetchone()
             version = row["version"] if row else 0
             if expected_version is not None and expected_version != version:
-                conflict(details={"current_version": version})
+                conflict(details={"current_version": version, "id": key})
             if row and self.get_settings(key)["data"] == data:
                 return {"data": data, "version": version}
             c.execute(
