@@ -68,9 +68,11 @@ When nothing needs you, Today says so.
    whole posting. If a job with that address exists, it is shown instead of a copy.
    When a page cannot be read, paste the text yourself.
 2. In **Jobs**, the **New** tab lists jobs waiting for a decision. Select one to
-   read it beside the list. Choose **Shortlist** to pursue it, or **Dismiss...**
-   to set it aside with an optional reason. Dismissed jobs stay under
-   **Dismissed** and can be restored.
+   read it beside the list. Choose **Shortlist** (`s`) to pursue it, or
+   **Dismiss** (`d`) to set it aside; the next job is shown at once, every
+   decision can be undone (`z`), and a dismissal's toast offers
+   **Add reason**. Dismissed jobs stay under **Dismissed** and can be
+   restored (`r`).
 
 ![Jobs to review beside the selected job, with its signals, posting and timeline](../images/jobs.png)
 

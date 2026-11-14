@@ -345,20 +345,47 @@ const SCREENS: Screen[] = [
   {
     name: "jobs-selected",
     route: async (page) =>
-      `jobs?job=${await first(page, "/jobs?signal=likely_duplicate&limit=1")}`,
+      `jobs?job=${await first(page, "/jobs?signal=likely_duplicate&triage=new&limit=1")}`,
   },
   {
-    name: "jobs-shortlist",
-    route: "jobs?section=shortlisted",
-    docs: "shortlist",
+    name: "jobs-bulk",
+    route: "jobs",
+    open: async (page) => {
+      await page.locator(".jobs-list .ui-row-main").first().focus();
+      await page.keyboard.press("x");
+      await page.keyboard.press("Shift+J");
+      await page.keyboard.press("Shift+J");
+      await expect(
+        page.getByRole("toolbar", { name: "3 selected" }),
+      ).toBeVisible();
+    },
   },
-  { name: "jobs-dismissed", route: "jobs?section=dismissed" },
+  {
+    name: "jobs-filter",
+    route: "jobs",
+    open: async (page) => {
+      await page
+        .getByRole("button", { name: /^Filter/ })
+        .filter({ visible: true })
+        .first()
+        .click();
+    },
+  },
+  {
+    name: "jobs-dismissed",
+    route: "jobs?section=dismissed&dismissed_by=agent",
+  },
+  { name: "jobs-all", route: "jobs?section=all" },
   { name: "jobs-empty", route: "jobs?q=no%20job%20has%20this%20title" },
   {
     name: "jobs-add-dialog",
     route: "jobs",
     open: async (page) => {
-      await page.getByRole("button", { name: "Add a job" }).click();
+      await page
+        .getByRole("button", { name: "Add job" })
+        .filter({ visible: true })
+        .first()
+        .click();
       await expect(page.locator("dialog[open]")).toBeVisible();
     },
   },

@@ -5,7 +5,6 @@ import { readFileSync } from "node:fs";
 const routes = await import("../src/shell/routes.ts");
 const shortcuts = await import("../src/shell/shortcuts.ts");
 const gestures = await import("../src/ui/gestures.ts");
-const links = await import("../src/pages/applications/links.ts");
 
 test("every screen has one hash route; an unknown or old route opens Today", () => {
   const cases = {
@@ -64,9 +63,10 @@ test("a route reads its parameters and query; href writes them back", () => {
     { label: "Data Engineer · Orbit" },
   ]);
   assert.deepEqual(routes.breadcrumb(routes.resolve("#jobs")), []);
-  // The application page the old screens link to is this route.
+  // An application's page, on one of its tabs, is this route.
   assert.equal(
-    routes.match(links.reviewHref("AP-1", "details")).id,
+    routes.match(routes.href("application", { id: "AP-1" }, { tab: "details" }))
+      .id,
     "application",
   );
 });
