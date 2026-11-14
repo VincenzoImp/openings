@@ -44,6 +44,7 @@ uv run ruff check backend scripts
 uv run ruff format --check backend scripts
 uv run pytest -n auto
 python3 scripts/bump_version.py --check
+npm --prefix frontend run api:check
 npm --prefix frontend run build
 npm --prefix frontend run budget
 npm --prefix frontend run format:check
@@ -169,11 +170,19 @@ there is no pixel comparison.
 
 Parity runs one way: every dashboard action is a REST operation, and every
 operation that is not owner-only is also an MCP tool. REST and MCP may offer
-more than the dashboard, and an owner-only operation may be REST only.
-`backend/tests/test_parity.py` computes this from the operation declarations in
-`backend/openings/interfaces/`: every `/api/v1` route belongs to exactly one
-operation or to a transport exemption with a one-line reason, and every
-operation that is not owner-only has exactly one MCP tool with its name.
+more than the dashboard; an owner-only operation is REST only.
+An operation is one typed function with `@operation` in
+`backend/openings/interfaces/` (see the architecture guide).
+`backend/tests/test_parity.py` checks that every `/api/v1` route is exactly one
+operation or a `TRANSPORT_ONLY` route with a one-line reason, and that the MCP
+tools are exactly the operations that are not owner-only.
+
+### API types
+
+The dashboard's API types are generated from the backend's OpenAPI document.
+After changing an operation or a request or response model, run
+`npm --prefix frontend run api:gen` and commit `frontend/src/api/schema.d.ts`;
+the `frontend` CI job runs `api:check`, which fails when the file is stale.
 
 ### Documentation screenshots
 

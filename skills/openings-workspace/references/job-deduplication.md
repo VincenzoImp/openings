@@ -11,12 +11,12 @@ Openings ingestion reuses exact identities: a verified source key, normalized
 source URL, or a recognized Greenhouse, Lever or Ashby posting key. It does not
 merge near-duplicates. Two read-only operations find candidates without writing:
 
-- `jobs_resolve({value: {url?, source_key?}})` or `GET /jobs/resolve?url=…`
+- `jobs_resolve({url?, source_key?})` or `GET /jobs/resolve?url=…`
   looks up a URL or source key before ingestion. It returns every matching job
   with `matched_by`, triage and all application attempts. `identity_conflict:
   true` means several records already share that identity: merge before ingesting.
-- `jobs_duplicates({value: {triage?, job_id?, match_location?, min_confidence?,
-  limit, offset}})` or `GET /jobs/duplicates` returns paginated candidate groups,
+- `jobs_duplicates({triage?, job_id?, match_location?, min_confidence?,
+  limit, offset})` or `GET /jobs/duplicates` returns paginated candidate groups,
   most confident first. Each group has a `confidence` from 0 to 1, a `tier` and
   `reasons: {matched, conflicts}`, with `signals` (the matched list),
   `identical_postings`, `open_application_ids`, `merge_blocked` and a
@@ -84,7 +84,7 @@ continuing. Repeated collection alone does not authorize another application.
 An Applied, Interview or Offer attempt is not a new preparation request. Resume
 an intended Shortlisted application; start no later attempt after Closed without explicit scope.
 
-The supported merge is `jobs_merge(job_id, value: {target_id, expected_version,
+The supported merge is `jobs_merge({job_id, target_id, expected_version,
 target_version})` or `POST /jobs/{source_id}/merge` with the same body. Read both
 versions immediately before it. The source is merged into the chosen target;
 source identities, postings, applications, events, notes and owned files move to
