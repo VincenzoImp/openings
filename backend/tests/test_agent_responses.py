@@ -90,9 +90,7 @@ def test_lists_default_to_compact_records_with_full_opt_in(tmp_path):
         faceted = client.get("/api/v1/jobs?include_facets=true", headers=headers).json()
         assert faceted["facets"]["companies"] == ["Example 0", "Example 1"]
         assert faceted["items"] == rest["items"]
-        mcp_faceted = structured(
-            call(client, headers, "jobs_list", {"value": {"include_facets": True}}, 2)
-        )
+        mcp_faceted = structured(call(client, headers, "jobs_list", {"include_facets": True}, 2))
         assert mcp_faceted == faceted
 
         documents = client.get("/api/v1/documents", headers=headers).json()
@@ -161,7 +159,7 @@ def test_job_and_application_mutations_return_compact_jobs(tmp_path):
                 client,
                 headers,
                 "jobs_triage",
-                {"job_id": job["id"], "value": {"triage": "dismissed", "expected_version": 1}},
+                {"job_id": job["id"], "triage": "dismissed", "expected_version": 1},
             )
         )
         assert via_mcp["triage"] == "dismissed" and "posting" not in via_mcp
@@ -170,7 +168,7 @@ def test_job_and_application_mutations_return_compact_jobs(tmp_path):
                 client,
                 headers,
                 "jobs_update",
-                {"job_id": job["id"], "value": {"title": "Renamed", "expected_version": 2}},
+                {"job_id": job["id"], "title": "Renamed", "expected_version": 2},
                 2,
             )
         )
@@ -211,14 +209,14 @@ def test_settings_conflicts_report_current_version(tmp_path):
 
         for ident, (name, arguments, current) in enumerate(
             [
-                ("profile_update", {"value": {"name": "Synthetic"}}, profile["version"]),
-                ("settings_update", {"value": {"no_reply_days": 40}}, settings["version"]),
-                ("collection_update", {"value": {"enabled": False}}, collection["version"]),
+                ("profile_update", {"name": "Synthetic"}, profile["version"]),
+                ("settings_update", {"no_reply_days": 40}, settings["version"]),
+                ("collection_update", {"enabled": False}, collection["version"]),
             ],
             start=10,
         ):
-            value = {**arguments["value"], "expected_version": current + 5}
-            error = error_body(call(client, headers, name, {"value": value}, ident))
+            value = {**arguments, "expected_version": current + 5}
+            error = error_body(call(client, headers, name, value, ident))
             assert error["status"] == 409 and error["details"] == {"current_version": current}
 
         stale = client.post(
@@ -226,7 +224,10 @@ def test_settings_conflicts_report_current_version(tmp_path):
             headers=headers,
             json={"action": "shortlisted", "items": [{"id": jobs[1]["id"], "expected_version": 9}]},
         ).json()
-        assert stale["items"][0]["error"]["details"] == {"current_version": jobs[1]["version"]}
+        assert stale["items"][0]["error"]["details"] == {
+            "current_version": jobs[1]["version"],
+            "id": jobs[1]["id"],
+        }
 
 
 def test_logout_revokes_browser_sessions_but_keeps_api_tokens(tmp_path):

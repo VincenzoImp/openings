@@ -55,7 +55,7 @@ def test_a_reply_without_a_date_is_recorded_on_today(app):
             json={"kind": "other"},
             headers=headers,
         )
-        assert gone.status_code in {404, 405}
+        assert gone.status_code == 410
         recorded = client.patch(
             f"/api/v1/applications/{application['id']}",
             json={

@@ -1,199 +1,108 @@
-"""REST routes and MCP tools of documents."""
+"""Operations of document revisions and files. Raw bytes use transfer routes (transport.py)."""
 
-from typing import Annotated
-
-from fastapi import Query, Request
-from mcp.types import ToolAnnotations
-
-from ..documents import (
-    DocumentCreate,
-    DocumentService,
-    UploadReservation,
-)
+from ..documents import DocumentCreate, UploadReservation
 from ..documents.models import DocumentQuery, FileQuery
-from .registry import (
-    REQUIRED,
-    Exemption,
-    Operation,
-    Param,
-    Route,
-    Tool,
-    bind_mcp,
-    bind_rest,
-    query_model,
+from ..responses import (
+    Comparison,
+    Deleted,
+    Document,
+    DocumentPage,
+    FileGrant,
+    FilePage,
+    NewDocument,
+    WorkspaceFile,
 )
-
-LOOKUP = ToolAnnotations(
-    readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False
-)
-REPLACE = ToolAnnotations(
-    readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False
-)
-ADD = ToolAnnotations(
-    readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False
-)
-DELETE = ToolAnnotations(
-    readOnlyHint=False, destructiveHint=True, idempotentHint=False, openWorldHint=False
-)
-
-# Every delete names the version it deletes (a file's version is always 1).
-EXPECTED_VERSION = Param("expected_version", int, rest=(Annotated[int, Query(ge=1)], REQUIRED))
-
-OPERATIONS = (
-    Operation(
-        "documents.list",
-        "documents",
-        "list",
-        "Applications and documents",
-        "List/filter paginated revision summaries",
-        params=(query_model(DocumentQuery),),
-        call=lambda s, value: s.list_documents(**(value or DocumentQuery()).model_dump()),
-        rest=(Route("GET", "/documents", "list_documents"),),
-        tool=Tool(
-            LOOKUP,
-            DocumentService.list_documents.__doc__,
-        ),
-    ),
-    Operation(
-        "documents.create",
-        "documents",
-        "create",
-        "Applications and documents",
-        "Create a new revision (CV/letter: a PDF and an optional TeX source, uploaded with the grants it returns)",
-        params=(Param("value", DocumentCreate),),
-        call=lambda s, value: s.create_document(value),
-        rest=(Route("POST", "/documents", "create_document", status_code=201),),
-        tool=Tool(REPLACE, method="create_document"),
-    ),
-    Operation(
-        "documents.read",
-        "documents",
-        "get",
-        "Applications and documents",
-        "Read a revision: derived text or form content, evidence, chain number and files",
-        params=(Param("document_id", str),),
-        call=lambda s, document_id: s.get_document(document_id),
-        rest=(Route("GET", "/documents/{document_id}", "get_document"),),
-        tool=Tool(LOOKUP, method="get_document"),
-    ),
-    Operation(
-        "documents.compare",
-        "documents",
-        "compare",
-        "Applications and documents",
-        "Compare the text of two revisions line by line",
-        params=(Param("document_id", str), Param("other_id", str, "")),
-        call=lambda s, document_id, other_id: s.compare_documents(document_id, other_id),
-        rest=(Route("GET", "/documents/{document_id}/comparison", "compare_documents"),),
-        tool=Tool(LOOKUP, method="compare_documents"),
-    ),
-    Operation(
-        "documents.delete",
-        "documents",
-        "delete",
-        "Applications and documents",
-        "Delete an entire revision and its files",
-        params=(Param("document_id", str), EXPECTED_VERSION),
-        call=lambda s, document_id, expected_version: s.delete_document(
-            document_id, expected_version
-        ),
-        rest=(Route("DELETE", "/documents/{document_id}", "delete_document"),),
-        tool=Tool(DELETE, DocumentService.delete_document.__doc__),
-    ),
-    Operation(
-        "files.list",
-        "files",
-        "list",
-        "Applications and documents",
-        "List/filter paginated file metadata",
-        params=(query_model(FileQuery),),
-        call=lambda s, value: s.list_files(**(value or FileQuery()).model_dump()),
-        rest=(Route("GET", "/files", "list_files"),),
-        tool=Tool(LOOKUP, DocumentService.list_files.__doc__),
-    ),
-    Operation(
-        "files.upload",
-        "files",
-        "reserve_upload",
-        "Applications and documents",
-        "Upload exact raw bytes to a mutable owner",
-        params=(Param("value", UploadReservation),),
-        call=lambda s, value: s.reserve_upload(value),
-        rest=(
-            Route("POST", "/files/uploads", "reserve_upload", status_code=201),
-            Route("PUT", "/transfers", "upload", custom=True),
-        ),
-        tool=Tool(ADD, method="reserve_upload"),
-    ),
-    Operation(
-        "files.read",
-        "files",
-        "get",
-        "Applications and documents",
-        "Read immutable file metadata and content URL",
-        params=(Param("file_id", str),),
-        call=lambda s, file_id: s.get_file(file_id),
-        rest=(Route("GET", "/files/{file_id}", "get_file"),),
-        tool=Tool(LOOKUP, method="get_file"),
-    ),
-    Operation(
-        "files.download",
-        "files",
-        "reserve_download",
-        "Applications and documents",
-        "Download/preview exact file bytes",
-        params=(Param("file_id", str),),
-        call=lambda s, file_id: s.reserve_download(file_id),
-        rest=(
-            Route(
-                "GET",
-                "/files/{file_id}/content",
-                "get_file_content",
-                params=(Param("file_id", str), Param("inline", bool, True)),
-                call=lambda s, file_id, inline: s.file_response(file_id, inline),
-            ),
-            Route("POST", "/files/{file_id}/download", "reserve_download"),
-            Route("GET", "/transfers", "download", custom=True),
-        ),
-        tool=Tool(ADD, method="reserve_download"),
-    ),
-    Operation(
-        "files.delete",
-        "files",
-        "delete",
-        "Applications and documents",
-        "Delete a live knowledge/template/job asset",
-        params=(Param("file_id", str), EXPECTED_VERSION),
-        call=lambda s, file_id, expected_version: s.delete_file(file_id, expected_version),
-        rest=(Route("DELETE", "/files/{file_id}", "delete_file"),),
-        tool=Tool(DELETE, DocumentService.delete_file.__doc__),
-    ),
-)
-
-EXEMPTIONS = (
-    Exemption(
-        "immutable.records",
-        "Lifecycle history has no arbitrary PATCH/DELETE. Document content changes create revisions; a complete revision (its PDF stored) stays immutable.",
-    ),
-    Exemption(
-        "binary.transfers",
-        "Logical file actions are equivalent across interfaces; raw HTTP bytes use scoped grants rather than base64 MCP payloads. Backup/export use their own scoped operational grants.",
-    ),
-)
+from .core import Version
+from .operation import DESTRUCTIVE, WRITE, WS, Q, operation
 
 
-def register_api(router, documents: DocumentService):
-    bind_rest(router, OPERATIONS, documents)
+@operation("GET /documents", tags=["documents"])
+def documents_list(ws: WS, query: Q[DocumentQuery]) -> DocumentPage:
+    """List document revisions.
 
-    # Raw bytes under a scoped grant (custom routes of files.upload and files.download).
-    @router.put("/transfers")
-    async def upload(request: Request):
-        return await documents.upload(request)
-
-    @router.get("/transfers")
-    def download(request: Request):
-        return documents.download(request)
+    By application and kind (cv, letter, answers, other), each with complete; q searches
+    titles, notes and text. summary=false adds text, content and files.
+    """
+    return ws.documents.list_documents(**query.model_dump())
 
 
-def register_mcp(mcp, documents: DocumentService):
-    bind_mcp(mcp, OPERATIONS, documents)
+@operation("POST /documents", access=WRITE, status=201, tags=["documents"])
+def documents_create(ws: WS, body: DocumentCreate) -> NewDocument:
+    """Create a document revision.
+
+    A CV or letter gives pdf (name, size) and optionally its TeX source; PUT the bytes to the
+    returned uploads grants, source first. Complete once its PDF is stored. Never sends.
+    """
+    return ws.documents.create_document(body)
+
+
+@operation("GET /documents/{document_id}", tags=["documents"])
+def documents_get(ws: WS, document_id: str) -> Document:
+    """Read a document revision.
+
+    complete, readable text and text_from (tex or pdf), cited evidence, note and files; for
+    other kinds the structured content.
+    """
+    return ws.documents.get_document(document_id)
+
+
+@operation("GET /documents/{document_id}/comparison", tags=["documents"])
+def documents_compare(ws: WS, document_id: str, other_id: str = "") -> Comparison:
+    """Compare two revisions line by line.
+
+    With other_id, or by default the revision it replaces; CV and letter compare their text.
+    """
+    return ws.documents.compare_documents(document_id, other_id)
+
+
+@operation("DELETE /documents/{document_id}", access=DESTRUCTIVE, tags=["documents"])
+def documents_delete(ws: WS, document_id: str, expected_version: Version) -> Deleted:
+    """Delete a document revision.
+
+    Permanently, with its files and version; other revisions stay.
+    """
+    return ws.documents.delete_document(document_id, expected_version)
+
+
+@operation("GET /files", tags=["files"])
+def files_list(ws: WS, query: Q[FileQuery]) -> FilePage:
+    """List file metadata.
+
+    By owner, name, media type or an application's revisions. Bytes go through transfers.
+    """
+    return ws.documents.list_files(**query.model_dump())
+
+
+@operation("POST /files/uploads", access=WRITE, status=201, tags=["files"])
+def files_reserve_upload(ws: WS, body: UploadReservation) -> FileGrant:
+    """Reserve a file upload.
+
+    A short-lived PUT grant for one owner, name and size: send the raw bytes to its url with
+    its headers. sha256 is verified when given.
+    """
+    return ws.documents.reserve_upload(body)
+
+
+@operation("GET /files/{file_id}", tags=["files"])
+def files_get(ws: WS, file_id: str) -> WorkspaceFile:
+    """Read file metadata and its content URL."""
+    return ws.documents.get_file(file_id)
+
+
+@operation("POST /files/{file_id}/download", access=WRITE, tags=["files"])
+def files_reserve_download(ws: WS, file_id: str) -> FileGrant:
+    """Reserve a file download.
+
+    A short-lived GET grant for one file; resolve its url against this workspace.
+    """
+    return ws.documents.reserve_download(file_id)
+
+
+@operation("DELETE /files/{file_id}", access=DESTRUCTIVE, tags=["files"])
+def files_delete(ws: WS, file_id: str, expected_version: Version) -> Deleted:
+    """Delete a file.
+
+    A career entry, template or job file, with version 1. Revision files are immutable:
+    delete the revision.
+    """
+    return ws.documents.delete_file(file_id, expected_version)

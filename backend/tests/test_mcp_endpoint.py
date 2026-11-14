@@ -198,17 +198,17 @@ def test_handshake_and_per_request_protocols_report_the_same_static_server(tmp_p
 
 
 def test_context_and_staleness_tools_answer_with_their_replacement(mcp, agent_token):
-    # Frozen contexts and staleness are gone (0.24); REST answers 404.
+    # Frozen contexts and staleness are gone (0.24); REST answers 410 Gone.
     for name, replacement in (
         ("contexts_create", "applications_get"),
         ("contexts_get", "preferences_get"),
         ("contexts_list", "documents_create"),
         ("staleness_get", "documents_list"),
-        ("staleness_list", "applications_list"),
+        ("staleness_list", "documents_list"),
     ):
         _, removed = mcp.call(name, {})
         assert removed["code"] == "tool_removed" and replacement in removed["message"]
         assert removed["details"] == {"tool": name}
     for path in ("/contexts", "/contexts/any", "/staleness", "/applications/any/staleness"):
         response = mcp.client.get("/api/v1" + path, headers=agent_token["headers"])
-        assert response.status_code == 404
+        assert response.status_code == 410

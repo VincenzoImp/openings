@@ -53,8 +53,7 @@ def test_stale_edit_is_rejected(workspace):
     assert error.value.status == 409
 
 
-@pytest.mark.asyncio
-async def test_completeness_filter_matches_page_totals_on_rest_and_mcp(tmp_path):
+def test_completeness_filter_matches_page_totals(tmp_path):
     app = create_app(tmp_path / "complete.sqlite", start_worker=False)
     complete = job(app.state.workspace)
     incomplete = job(
@@ -97,14 +96,9 @@ async def test_completeness_filter_matches_page_totals_on_rest_and_mcp(tmp_path)
                 item["id"] not in missing_ids
             )
         assert client.get("/api/v1/jobs?complete=invalid").status_code == 422
-    result = await app.state.mcp.call_tool("jobs_list", {"value": {"complete": False}})
-    structured = json.loads(result.content[0].text)
-    assert structured["total"] == 3
-    assert {row["id"] for row in structured["items"]} == missing_ids
 
 
-@pytest.mark.asyncio
-async def test_active_job_filter_matches_attention_counts_without_dismissed_jobs(tmp_path):
+def test_active_job_filter_matches_attention_counts_without_dismissed_jobs(tmp_path):
     app = create_app(tmp_path / "active.sqlite", start_worker=False)
     workspace = app.state.workspace
     for state in ("new", "shortlisted", "dismissed"):
@@ -117,10 +111,6 @@ async def test_active_job_filter_matches_attention_counts_without_dismissed_jobs
         assert result["total"] == 2
         assert {row["triage"] for row in result["items"]} == {"new", "shortlisted"}
         assert client.get("/api/v1/jobs?triage=dismissed&complete=false").json()["total"] == 1
-    result = await app.state.mcp.call_tool(
-        "jobs_list", {"value": {"triage": "active", "complete": False}}
-    )
-    assert json.loads(result.content[0].text)["total"] == 2
 
 
 def test_attempts_and_recorded_funnel_are_separate_from_job_triage(workspace):
@@ -346,16 +336,9 @@ async def test_scoped_export_and_auth_mcp_are_available(tmp_path):
     app = create_app(tmp_path / "operations.sqlite", start_worker=False)
     app.state.auth.setup("synthetic-password")
     names = {tool.name for tool in await app.state.mcp.list_tools()}
-    assert {
-        "tokens_list",
-        "tokens_create",
-        "tokens_revoke",
-        "owner_password_update",
-        "capabilities_get",
-        "workspace_export",
-        "jobs_bulk",
-        "applications_delete",
-    } <= names
+    assert {"workspace_export", "workspace_backup", "jobs_bulk", "applications_delete"} <= names
+    # Owner-only operations and the capabilities summary are REST only.
+    assert not names & {"tokens_list", "owner_password_update", "capabilities_get"}
     grant = app.state.auth.operation_ticket("export")
     with TestClient(app) as client:
         response = client.get("/api/v1/export", headers={"X-Operational-Token": grant})
@@ -390,7 +373,6 @@ async def test_url_extraction_rejects_challenge_or_generic_html():
 
 
 def test_restore_keeps_provider_requests_and_future_cooldown(workspace, tmp_path):
-    import json
     from datetime import UTC, datetime, timedelta
 
     from openings.discovery import DiscoveryService

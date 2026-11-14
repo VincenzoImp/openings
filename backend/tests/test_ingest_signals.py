@@ -247,7 +247,7 @@ def test_a_board_that_stops_listing_a_posting_marks_it_and_dismisses_nothing(tmp
     assert workspace.list_jobs(signal="no_longer_listed")["total"] == 1
 
 
-def test_rest_and_mcp_expose_signals_alike(tmp_path):
+def test_signal_filter_dismissal_reason_and_distinct_over_the_interfaces(tmp_path):
     app = create_app(tmp_path / "interfaces.sqlite", start_worker=False)
     app.state.auth.setup("synthetic-password")
     workspace = app.state.workspace
@@ -275,11 +275,6 @@ def test_rest_and_mcp_expose_signals_alike(tmp_path):
         listed = client.get(
             "/api/v1/jobs?signal=likely_duplicate&include_counts=true", headers=headers
         ).json()
-        assert listed == tool(
-            client,
-            "jobs_list",
-            {"value": {"signal": "likely_duplicate", "include_counts": True}},
-        )
         assert [item["id"] for item in listed["items"]] == [copy["id"]]
         dismissed = client.post(
             f"/api/v1/jobs/{first['id']}/triage",
@@ -290,9 +285,7 @@ def test_rest_and_mcp_expose_signals_alike(tmp_path):
             dismissed["dismissal"]["reason"] == "Seen."
             and dismissed["dismissal"]["category"] == "agent"
         )
-        distinct = tool(
-            client, "jobs_distinct", {"job_id": copy["id"], "value": {"other_id": first["id"]}}
-        )
+        distinct = tool(client, "jobs_distinct", {"job_id": copy["id"], "other_id": first["id"]})
         assert distinct["signals"]["duplicate"] is None
         over_rest = client.post(
             f"/api/v1/jobs/{copy['id']}/distinct", json={"other_id": first["id"]}, headers=headers
