@@ -26,7 +26,6 @@ import { Button, IconButton } from "../../ui/Button";
 import { ConfirmDialog, Dialog } from "../../ui/Dialog";
 import { SearchField } from "../../ui/Field";
 import { formatTime, plural } from "../../ui/format";
-import { isModKey, isTyping } from "../../ui/keys";
 import { BulkBar, useSelection } from "../../ui/List";
 import { LoadError } from "../../ui/LoadError";
 import { Menu, Popover, type MenuEntry } from "../../ui/Menu";
@@ -35,7 +34,6 @@ import { SplitPane } from "../../ui/Split";
 import { FilterChips, Tabs, Toolbar } from "../../ui/Tabs";
 import { useToast } from "../../ui/Toast";
 import {
-  fetchJob,
   prefetchJob,
   useBulk,
   useCollection,
@@ -67,6 +65,7 @@ import {
   type Sort,
   type View,
 } from "./model";
+import { useJobKeys } from "./keys";
 import { useSeen } from "./seen";
 import "./jobs.css";
 
@@ -261,10 +260,11 @@ export default function Jobs() {
 
   // A new tab or filter starts without a selection and from the first page.
   const scope = JSON.stringify([view.section, view.q, view.filters, view.sort]);
+  const clearPicked = picked.clear;
   useEffect(() => {
-    picked.clear();
+    clearPicked();
     setLimit(PAGE);
-  }, [scope]); // Only when the tab or a filter changes.
+  }, [scope, clearPicked]);
 
   // The job on screen is read; the next one is read ahead.
   const shown = wide || open ? selected : "";
@@ -272,7 +272,7 @@ export default function Jobs() {
     if (!shown) return;
     mark(shown);
     prefetchJob(ids[ids.indexOf(shown) + 1] ?? "");
-  }, [shown]); // Only when another job is shown.
+  }, [shown, ids, mark]);
 
   // After a decision, focus follows the selection to the next row.
   useLayoutEffect(() => {
@@ -560,147 +560,26 @@ export default function Jobs() {
   const pickedJobs = rows.filter((job) => picked.ids.has(job.id));
   const current = rows.find((job) => job.id === active);
 
-  // The screen's keys, before the shell's: a key handled here is not read
-  // again by the shell (`/` searches this list instead of opening ⌘K).
-  const state = {
-    active,
-    current,
-    pickedJobs,
-    move,
-    decide,
-    undo,
-    picked,
-    ids,
-    wide,
-    open,
-    openJob,
-    close,
-    phone,
-    setCorrecting,
-  };
-  const latest = useRef(state);
-  latest.current = state;
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (document.querySelector("dialog[open]")) return;
-      const state = latest.current;
-      const target = event.target as HTMLElement;
-      const consume = () => {
-        event.preventDefault();
-        event.stopPropagation();
-      };
-      if (event.altKey) return;
-      if (isModKey(event)) {
-        if (
-          event.key.toLowerCase() === "z" &&
-          !event.shiftKey &&
-          !isTyping(target)
-        ) {
-          consume();
-          state.undo();
-        }
-        return;
-      }
-      if (isTyping(target)) {
-        if (event.key === "Escape" && target === searchRef.current) {
-          consume();
-          target.blur();
-        }
-        return;
-      }
-      if (target.closest?.("[role=menu], [popover], [role=tablist]")) return;
-      const inList = !!target.closest?.(".jobs-list");
-      const neutral =
-        inList || target === document.body || target.id === "content";
-      const job = state.current;
-      const many = state.pickedJobs;
-      switch (event.key) {
-        case "j":
-        case "k":
-          consume();
-          return state.move(event.key === "j" ? 1 : -1, inList || neutral);
-        case "ArrowDown":
-        case "ArrowUp":
-          if (!neutral) return;
-          consume();
-          return state.move(event.key === "ArrowDown" ? 1 : -1, true);
-        case "J":
-        case "K": {
-          consume();
-          const step = event.key === "J" ? 1 : -1;
-          const index = state.ids.indexOf(state.active);
-          const next = state.ids[index + step];
-          if (!state.picked.ids.size && state.active)
-            state.picked.toggle(state.active);
-          if (next) {
-            state.picked.extend(state.ids, next);
-            state.move(step, inList || neutral);
-          }
-          return;
-        }
-        case "x":
-          if (!state.active) return;
-          consume();
-          return state.picked.toggle(state.active);
-        case "s":
-        case "d":
-        case "r": {
-          const to: BulkAction =
-            event.key === "s"
-              ? "shortlisted"
-              : event.key === "d"
-                ? "dismissed"
-                : "new";
-          const from = to === "new" ? "dismissed" : "new";
-          const jobs = (many.length ? many : job ? [job] : []).filter(
-            (item) => item.triage === from,
-          );
-          if (!jobs.length) return;
-          consume();
-          return void state.decide(jobs, to);
-        }
-        case "z":
-          consume();
-          return state.undo();
-        case "o":
-          if (!job?.url) return;
-          consume();
-          window.open(job.url, "_blank", "noopener,noreferrer");
-          return;
-        case "e":
-          if (!job) return;
-          consume();
-          return void fetchJob(job.id).then(
-            state.setCorrecting,
-            () => undefined,
-          );
-        case "Enter":
-          if (!neutral || !state.active) return;
-          consume();
-          if (state.wide) document.getElementById("job-title")?.focus();
-          else state.openJob(state.active);
-          return;
-        case "/":
-          // On a phone, and while the bulk bar hides the search, `/` is
-          // the shell's search.
-          if (state.phone || !searchRef.current) return;
-          consume();
-          searchRef.current.focus();
-          return;
-        case "Escape":
-          if (state.picked.ids.size) {
-            consume();
-            state.picked.clear();
-          } else if (!state.wide && state.open) {
-            consume();
-            state.close();
-          }
-          return;
-      }
-    };
-    document.addEventListener("keydown", onKey, true);
-    return () => document.removeEventListener("keydown", onKey, true);
-  }, []);
+  // The screen's keys (keys.ts) act on this render's state.
+  useJobKeys(
+    {
+      active,
+      current,
+      pickedJobs,
+      move,
+      decide,
+      undo,
+      picked,
+      ids,
+      wide,
+      open,
+      openJob,
+      close,
+      phone,
+      setCorrecting,
+    },
+    searchRef,
+  );
   useEffect(() => {
     if (searching) searchRef.current?.focus();
   }, [searching]);

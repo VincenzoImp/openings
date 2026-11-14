@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { Schema } from "../../api/client";
 import { isConflict } from "../../query/mutation";
 import { invalidate } from "../../query/query";
 import { formatNumber } from "../../ui/format";
@@ -11,14 +12,7 @@ import { useProviders, useUpdateProvider, useWorkspaceInfo } from "./queries";
 import { SettingsGroup, SettingsSection } from "./Rows";
 import { LoadError } from "../../ui/LoadError";
 
-type Provider = {
-  id: string;
-  name: string;
-  version: number;
-  capability: Record<string, unknown>;
-  policy: Record<string, unknown>;
-  runtime: Record<string, unknown>;
-};
+type Provider = Schema<"Provider">;
 
 /** Request limits of the job sites in use, and this workspace's version. */
 export function Advanced() {
@@ -69,9 +63,7 @@ function Limits() {
       />
     );
   const used = sitesInUse(sources.data);
-  const rows = (providers.data as unknown as Provider[]).filter((provider) =>
-    used.has(provider.id),
-  );
+  const rows = providers.data.filter((provider) => used.has(provider.id));
   if (!rows.length)
     return (
       <p className="set-row-desc">

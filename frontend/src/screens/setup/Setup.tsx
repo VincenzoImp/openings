@@ -1,6 +1,7 @@
 import { usePreferences, useProfile } from "../../query/setup";
 import { useTitle } from "../../shell/context";
 import { href, navigate, useRoute } from "../../shell/router";
+import { LoadError } from "../../ui/LoadError";
 import { SkeletonRows } from "../../ui/Page";
 import { Stepper } from "./Frame";
 import { AboutStep, CvStep, DoneStep, JobsStep } from "./Steps";
@@ -27,10 +28,20 @@ export default function Setup() {
   const back = index > 0 ? () => go(STEPS[index - 1].id) : undefined;
 
   const ready = profile.data && preferences.data;
+  const error = profile.error ?? preferences.error;
   return (
     <div className="setup">
       <Stepper current={index} />
-      {!ready ? (
+      {!ready && error ? (
+        <LoadError
+          what="your setup"
+          error={error}
+          retry={() => {
+            void profile.refetch();
+            void preferences.refetch();
+          }}
+        />
+      ) : !ready ? (
         <div className="setup-card">
           <SkeletonRows rows={4} />
         </div>

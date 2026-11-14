@@ -14,7 +14,10 @@ reply. It is one Docker container and one SQLite file, with no account and no
 telemetry. Openings has no AI inside: use it by hand, or connect your own agent
 (Claude Code, Codex, ...) through MCP.
 
-![Today: applications ready to send, the pipeline and replies to record](docs/images/today.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/today-dark.png">
+  <img alt="Today: applications ready to send, what needs attention, replies to wait for and new jobs" src="docs/images/today.png">
+</picture>
 
 ## How it works
 

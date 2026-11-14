@@ -1,16 +1,17 @@
-/* Profile: a CV-like column (at most 760 px) with an "On this page" rail on
-   wide screens. Hierarchy by type and space; a block gets a frame only
+/* Profile: a CV-like reading column with an "On this page" rail on wide
+   screens. Hierarchy by type and space; a block gets a frame only
    while it is edited. */
 @layer screens {
   .pf-body {
     padding: var(--s-4) var(--pane-pad) var(--s-16);
   }
+  /* Its actions end where the CV does, above it rather than the rail. */
   .pf > .ui-page-header {
-    max-width: calc(968px + 2 * var(--pane-pad));
+    max-width: calc(var(--content) + 2 * var(--pane-pad));
   }
   .pf-layout {
     display: grid;
-    grid-template-columns: minmax(0, 760px) 160px;
+    grid-template-columns: minmax(0, var(--content)) 160px;
     gap: var(--s-12);
     align-items: start;
   }
@@ -75,6 +76,10 @@
   .pf-block:hover > .pf-block-actions,
   .pf-block:focus-within > .pf-block-actions,
   .pf-block-actions:has([aria-expanded="true"]) {
+    opacity: 1;
+  }
+  /* The header's Edit shows at rest: the first sign that the CV can change. */
+  .pf-header > .pf-block-actions {
     opacity: 1;
   }
   .pf-block:hover .pf-entry-dates,
@@ -552,20 +557,17 @@
 
   @container app (max-width: 1279px) {
     .pf-layout {
-      grid-template-columns: minmax(0, 760px);
+      grid-template-columns: minmax(0, var(--content));
     }
     .pf-rail {
       display: none;
-    }
-    .pf > .ui-page-header {
-      max-width: calc(760px + 2 * var(--pane-pad));
     }
   }
 
   /* Touch: the CV reads as text; tapping a block shows its Edit and …
      (the block takes the focus), and the dates stay. */
   @media (hover: none) {
-    .pf-block:not(:focus-within)
+    .pf-block:not(.pf-header, :focus-within)
       > .pf-block-actions:not(:has([aria-expanded="true"])) {
       visibility: hidden;
     }
@@ -576,16 +578,12 @@
       visibility: hidden;
     }
   }
-  .pf-block:focus {
-    outline: none;
-  }
-
   @container app (max-width: 719px) {
     /* The phone's top bar carries the title. */
     .pf > .ui-page-header {
       display: none;
     }
-    .pf-block:not(:focus-within)
+    .pf-block:not(.pf-header, :focus-within)
       > .pf-block-actions:not(:has([aria-expanded="true"])) {
       visibility: hidden;
     }

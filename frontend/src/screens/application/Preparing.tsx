@@ -1,6 +1,7 @@
 import { useRef } from "react";
 import { Upload } from "lucide-react";
 import { Button } from "../../ui/Button";
+import { Disclosure } from "../../ui/Disclosure";
 import { ActionBar } from "../../ui/Split";
 import { jobOf } from "../applications/data";
 import { firstMissing } from "../applications/model";
@@ -14,7 +15,6 @@ import {
 import type { PageContext } from "./Page";
 import {
   Answers,
-  Fold,
   HistoryList,
   PinnedNote,
   PostingText,
@@ -71,7 +71,6 @@ export function Preparing({ context }: { context: PageContext }) {
                   <DocumentSlot
                     key={kind}
                     kind={kind}
-                    primary={kind === first}
                     revision={current[kind]}
                     revisions={current.revisions}
                     loading={current.loading}
@@ -91,14 +90,14 @@ export function Preparing({ context }: { context: PageContext }) {
               <Answers app={app} />
             </Section>
           )}
-          <Fold title="Notes and history">
+          <Disclosure className="ap-fold" title="Notes and history">
             <PinnedNote app={app} />
             <HistoryList app={app} />
-          </Fold>
+          </Disclosure>
           <div className="apg-posting-fold">
-            <Fold title="Posting">
+            <Disclosure className="ap-fold" title="Posting">
               <PostingText text={posting} />
-            </Fold>
+            </Disclosure>
           </div>
         </div>
         <aside className="apg-side" aria-label="Posting">

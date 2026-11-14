@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { LogOut } from "lucide-react";
 import { useShell } from "../../shell/context";
-import { useTheme } from "../../shell/theme";
+import { useTheme } from "../../ui/theme";
 import { Button } from "../../ui/Button";
 import { Dialog } from "../../ui/Dialog";
 import { Field, Input, Select } from "../../ui/Field";

@@ -29,7 +29,12 @@ export class ApiError extends Error {
   code: string;
   details: unknown;
   constructor(body: Partial<ErrorBody>, status: number) {
-    super(body.message || `Request failed (${status})`);
+    super(
+      body.message ||
+        (status >= 500
+          ? "Something went wrong on the server; nothing was saved. Try again."
+          : `Request failed (${status})`),
+    );
     this.status = body.status ?? status;
     this.code = body.code || "request_failed";
     this.details = body.details ?? null;
@@ -140,4 +145,22 @@ export function save(blob: Blob, filename: string) {
   link.download = filename;
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// A request cut off by leaving or reloading the page is not a failure: Safari
+// rejects it as a TypeError ("Load failed") that nothing is left to handle.
+// Those rejections, and every aborted request, are dropped quietly.
+let leaving = false;
+if (typeof window !== "undefined") {
+  window.addEventListener("pagehide", () => (leaving = true));
+  window.addEventListener("pageshow", () => (leaving = false));
+  window.addEventListener("beforeunload", () => (leaving = true));
+  window.addEventListener("unhandledrejection", (event) => {
+    const reason = event.reason as { name?: string } | null;
+    if (
+      reason?.name === "AbortError" ||
+      (leaving && reason instanceof TypeError)
+    )
+      event.preventDefault();
+  });
 }

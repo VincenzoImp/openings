@@ -138,10 +138,10 @@ export function replyDays(text: string) {
   return Number.isInteger(value) && value >= 1 && value <= 365 ? value : null;
 }
 
-/** "would hide 4 of the 31 new jobs" */
+/** "Hides 4 of your 31 new jobs in Jobs" */
 export function hiddenLine(hidden: number, total: number) {
   const jobs = total === 1 ? "new job" : "new jobs";
-  return `would hide ${hidden} of the ${total} ${jobs}`;
+  return `Hides ${hidden} of your ${total} ${jobs} in Jobs`;
 }
 
 /** The languages Preferences offers, by ISO 639-1 code. */

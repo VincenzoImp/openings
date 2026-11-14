@@ -30,7 +30,7 @@ import { href, navigate, useRoute } from "./router";
 import { ROUTES } from "./routes";
 import { Screen, preload } from "./Screens";
 import { CHORD_MS, readKey, type ShellAction } from "./shortcuts";
-import { useTheme } from "./theme";
+import { useTheme } from "../ui/theme";
 import "./shell.css";
 
 type Overlay = "palette" | "add" | "help" | null;
@@ -167,8 +167,10 @@ export function Shell({ onSignOut }: { onSignOut: () => void }) {
     ].map(item),
   }));
   const all = sections.flatMap((section) => section.items);
-  const bottom = all.filter((nav) => BOTTOM.includes(nav.id as never));
-  const rest = all.filter((nav) => !BOTTOM.includes(nav.id as never));
+  const onBar = (nav: { id: string }) =>
+    (BOTTOM as readonly string[]).includes(nav.id);
+  const bottom = all.filter(onBar);
+  const rest = all.filter((nav) => !onBar(nav));
   const parent = route.def.parent ? ROUTES[route.def.parent] : null;
 
   return (

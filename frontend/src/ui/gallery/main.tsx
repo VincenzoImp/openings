@@ -6,7 +6,7 @@ import { createRoot } from "react-dom/client";
 import Gallery from "./Gallery";
 import { applyTheme, readTheme } from "../theme";
 
-applyTheme(readTheme(), false);
+applyTheme(readTheme());
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

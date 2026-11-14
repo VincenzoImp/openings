@@ -232,6 +232,11 @@ test("Settings: sections, sizes, access, snippets and request limits", () => {
   assert.equal(settings.sectionOf("data"), "data");
   assert.equal(settings.sectionOf("skills"), null);
   assert.equal(settings.sectionOf(null), null);
+  assert.equal(settings.upgradeOf("openings.pre-0.24.sqlite"), "Before 0.24");
+  assert.equal(
+    settings.upgradeOf("w.pre-schema13-20260101T080000Z.sqlite"),
+    "Before schema 13",
+  );
   assert.deepEqual(
     [512, 934_000, 1_400_000, 146_520_264_704].map(settings.bytes),
     ["512 bytes", "934 KB", "1.4 MB", "147 GB"],

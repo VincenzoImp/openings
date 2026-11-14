@@ -61,7 +61,7 @@ changes with the version you run. Say it in your own words.
    `workspace_context` read, loads the skill for the task and asks you for what it
    does not know.
 
-![Settings, API & agents: the three steps, the tokens and the client configuration](../images/agent-access.png)
+![Settings, API & agents: the three steps, the tokens and the client configuration](../images/agents.png)
 
 For a persistent setup, an optional [agent workspace](../../examples/operator-workspace/README.md)
 holds the connection setup for six clients, a launcher and a script that fetches

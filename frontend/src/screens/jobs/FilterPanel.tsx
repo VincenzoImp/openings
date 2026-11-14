@@ -36,7 +36,7 @@ const LABELS: Record<Exclude<Field, "hide_unspoken">, string> = {
   location: "Location",
   posting_language: "Posting language",
   requires: "Required language",
-  signal: "Signal",
+  signal: "Label",
   created_since: "Found",
   dismissed_by: "Dismissed by",
 };

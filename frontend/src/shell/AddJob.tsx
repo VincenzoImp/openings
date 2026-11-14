@@ -49,13 +49,15 @@ export function AddJob({
   const pasted = readPasted(value);
   const known = useKnownJob(checked);
 
+  // Reset when the dialog opens.
+  const { reset } = add;
   useEffect(() => {
     if (!open) return;
     setValue("");
     setChecked("");
     setDetails({ title: "", company: "", location: "" });
-    add.reset();
-  }, [open]); // Reset when the dialog opens, not when `add` changes.
+    reset();
+  }, [open, reset]);
 
   function openJob(id: string) {
     onClose();

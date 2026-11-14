@@ -225,7 +225,7 @@ export function BulkActions({
       <Dialog
         open={dialog === "close"}
         onClose={() => setDialog(null)}
-        title={`Close ${selected.length} applications`}
+        title={`Close ${plural(selected.length, "application")}`}
         footer={
           <>
             <Button variant="ghost" onClick={() => setDialog(null)}>
@@ -254,7 +254,7 @@ export function BulkActions({
       <Dialog
         open={dialog === "priority"}
         onClose={() => setDialog(null)}
-        title={`Priority of ${selected.length} applications`}
+        title={`Priority of ${plural(selected.length, "application")}`}
         footer={
           <>
             <Button variant="ghost" onClick={() => setDialog(null)}>

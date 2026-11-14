@@ -56,81 +56,6 @@
     letter-spacing: 0;
   }
 
-  /* Frames */
-  .gx-frame {
-    overflow: hidden;
-    border: 1px solid var(--border);
-    border-radius: var(--r-xl);
-    background: var(--bg);
-    box-shadow: var(--shadow-sm);
-  }
-  .gx-frame .ui-app {
-    height: 720px;
-  }
-  .gx-split-host {
-    display: flex;
-    flex: 1;
-    min-height: 0;
-  }
-  .gx-phones {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--s-6);
-  }
-  .gx-phone {
-    width: 375px;
-    max-width: 100%;
-    overflow: hidden;
-    border: 1px solid var(--border);
-    border-radius: 28px;
-    background: var(--bg);
-    box-shadow: var(--shadow-sm);
-  }
-  .gx-phone .ui-app {
-    height: 720px;
-  }
-  .gx-scroll {
-    flex: 1;
-    min-height: 0;
-    overflow: auto;
-  }
-  .gx-pushed {
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    min-height: 0;
-    overflow: auto;
-  }
-  .gx-pushed > .ui-detail-body {
-    flex: 1;
-  }
-
-  /* Detail content */
-  .gx-detail-title {
-    font: var(--t-2xl);
-    font-weight: var(--w-semibold);
-    letter-spacing: var(--tr-2xl);
-  }
-  .gx-stack-8 {
-    margin-top: var(--s-2);
-  }
-  .gx-actions {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--s-2);
-    margin-top: var(--s-4);
-  }
-  .gx-block {
-    margin-top: var(--s-5);
-  }
-  .gx-block-lg {
-    margin-top: var(--s-6);
-  }
-  .gx-search .ui-search {
-    width: 220px;
-  }
-
   /* Foundations */
   .gx-swatches {
     display: grid;
@@ -398,25 +323,6 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* Profile read view */
-  .gx-profile-top {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-  }
-  .gx-profile-name {
-    font: 600 20px/26px var(--font);
-    letter-spacing: -0.015em;
-  }
-  .gx-profile-headline {
-    color: var(--text-2);
-  }
-  .gx-profile-summary {
-    max-width: 62ch;
-    margin-top: var(--s-4);
-    font: 14px/22px var(--font);
-  }
-
   /* Narrow widths */
   @container app (max-width: 1100px) {
     .gx-swatches {
@@ -454,13 +360,7 @@
       grid-template-columns: minmax(0, 1fr);
       gap: 2px;
     }
-    .gx-phone {
-      width: 100%;
-    }
-    .gx-frame .ui-app,
-    .gx-phone .ui-app {
-      height: 680px;
-    }
+
     .gx-cell {
       padding: var(--s-4);
     }

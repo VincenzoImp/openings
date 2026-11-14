@@ -98,7 +98,7 @@ You can do this without an agent or LaTeX. Have your CV and letter ready as PDFs
 6. Back in Openings, choose **Mark applied**. **Undo** is offered, and the next
    Ready application opens.
 
-![The Ready page: before you send, the posting, the CV and the letter, and Mark applied](../images/review.png)
+![The Ready page: before you send, the posting, the CV and the letter, and Mark applied](../images/ready.png)
 
 When the employer answers, choose **Record reply**, say what happened and give the
 date. After the no-reply period (30 days unless you change it in

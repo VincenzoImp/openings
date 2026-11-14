@@ -160,7 +160,7 @@ site names; the pause survives restarts. REST and MCP can lift it early with
 A login page is reported as blocked. A portal can still block requests or change
 its pages; paste the posting when a page cannot be read.
 
-![Sources with the schedule line, source rows and their status](../images/collection.png)
+![Sources with the schedule line, source rows and their status](../images/sources.png)
 
 Source fields and defaults are read from the running server: REST
 `GET /api/v1/sources/schemas`, or `collection_get` over MCP.

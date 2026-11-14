@@ -21,6 +21,7 @@ import { useToast } from "../../ui/Toast";
 import { BulkActions } from "./Bulk";
 import {
   jobOf,
+  PAGE,
   useApplicationList,
   useUpdateApplication,
   type ApplicationRow,
@@ -168,28 +169,36 @@ export default function ApplicationsScreen() {
   const [search, setSearch] = useState(filters.q);
   const [searching, setSearching] = useState(!!filters.q);
   useEffect(() => setSearch(filters.q), [filters.q]);
+  // The address of the typed search, written after a pause in typing.
+  const searched = href(
+    "applications",
+    {},
+    writeFilters({ ...filters, q: search.trim() }),
+  );
   useEffect(() => {
     if (search === filters.q) return;
-    const timer = setTimeout(() => set({ q: search.trim() }), 250);
+    const timer = setTimeout(() => navigate(searched, { replace: true }), 250);
     return () => clearTimeout(timer);
-  }, [search]);
+  }, [search, filters.q, searched]);
 
-  const list = useApplicationList({
-    stage: filters.stage,
-    q: filters.q,
-    outcome: filters.outcome,
-    waiting: filters.waiting,
-    sort: filters.sort,
-  });
+  // Show more reads the next rows; another list starts from one page.
+  const [shown, setShown] = useState({ hash: route.hash, limit: PAGE });
+  const limit = shown.hash === route.hash ? shown.limit : PAGE;
+  const list = useApplicationList(
+    {
+      stage: filters.stage,
+      q: filters.q,
+      outcome: filters.outcome,
+      waiting: filters.waiting,
+      sort: filters.sort,
+    },
+    limit,
+  );
   const days = list.noReplyDays;
-  const rows = useMemo(
-    () =>
-      sortApplications(
-        list.items.filter((app) => passes(app, filters)),
-        filters.sort,
-        days,
-      ),
-    [list.items, route.hash, days],
+  const rows = sortApplications(
+    list.items.filter((app) => passes(app, filters)),
+    filters.sort,
+    days,
   );
   const sources = useMemo(
     () =>
@@ -201,7 +210,8 @@ export default function ApplicationsScreen() {
 
   const selection = useSelection();
   const [active, setActive] = useState<string | null>(null);
-  useEffect(() => selection.clear(), [route.hash]);
+  const { clear } = selection;
+  useEffect(() => clear(), [route.hash, clear]);
   const selected = rows.filter((app) => selection.ids.has(app.id));
 
   const [dialog, setDialog] = useState<{
@@ -349,6 +359,19 @@ export default function ApplicationsScreen() {
           ))
         ) : (
           <ListRows>{rows.map((app) => row(app))}</ListRows>
+        )}
+        {list.more > 0 && (
+          <div className="ap-more">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() =>
+                setShown({ hash: route.hash, limit: limit + PAGE })
+              }
+            >
+              Show more ({list.more})
+            </Button>
+          </div>
         )}
       </List>
     );

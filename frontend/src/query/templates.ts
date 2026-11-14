@@ -4,7 +4,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { api, call, download, transfer, type Schema } from "../api/client";
 import { useApiMutation, useVersionedMutation } from "./mutation";
-import { POLL_MS } from "./query";
 
 export type Template = Schema<"Template">;
 export type TemplateKind = "cv" | "letter";
@@ -26,7 +25,6 @@ export function useTemplates() {
           signal,
         }),
       ),
-    refetchInterval: POLL_MS,
   });
 }
 
@@ -93,6 +91,10 @@ export function useUpdateTemplate(
 export function useDeleteTemplate() {
   return useApiMutation({
     touches: ["templates", "files"],
+    drops: (template) => [
+      templateKeys.one(template.id),
+      templateKeys.files(template.id),
+    ],
     mutationFn: (template: Template) =>
       call(
         api.DELETE("/api/v1/templates/{template_id}", {

@@ -2,7 +2,7 @@
 // every career entry, every highlight and the entries' files.
 import { useQuery } from "@tanstack/react-query";
 import { api, call, transfer, type Schema } from "../../api/client";
-import { POLL_MS, queryClient } from "../../query/query";
+import { queryClient } from "../../query/query";
 import { shellKeys } from "../../query/shell";
 
 export type Profile = Schema<"Profile">;
@@ -38,7 +38,6 @@ export function useProfile() {
     queryKey: keys.profile,
     queryFn: ({ signal }) =>
       call(api.GET("/api/v1/career/profile", { signal })),
-    refetchInterval: POLL_MS,
   });
 }
 
@@ -54,7 +53,6 @@ export function useEntries() {
           }),
         ),
       ),
-    refetchInterval: POLL_MS,
   });
 }
 
@@ -70,7 +68,6 @@ export function useHighlights() {
           }),
         ),
       ),
-    refetchInterval: POLL_MS,
   });
 }
 
@@ -88,7 +85,6 @@ export function useEntryFiles() {
           }),
         ),
       ),
-    refetchInterval: POLL_MS,
   });
 }
 

@@ -270,9 +270,8 @@ test("Data: download a backup, the restore dialog, kept copies", async ({
   await copies.first().hover();
   await copies
     .first()
-    .getByRole("button", { name: /^More actions for / })
+    .getByRole("button", { name: /^Delete .*\.sqlite$/ })
     .click();
-  await page.getByRole("menuitem", { name: "Delete…" }).click();
   const confirm = page.getByRole("dialog", { name: "Delete this copy?" });
   await expect(confirm).toContainText(/\d+(\.\d)? (KB|MB)/);
   await confirm.getByRole("button", { name: "Delete copy" }).click();

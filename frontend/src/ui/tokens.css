@@ -41,7 +41,6 @@
     --on-danger: #ffffff;
 
     --backdrop: rgb(16 16 20 / 0.36);
-    --ring-floating: rgb(16 16 20 / 0.06);
 
     /* Elevation: only things that float */
     --shadow-xs: 0 1px 2px rgb(16 16 20 / 0.06);
@@ -79,7 +78,6 @@
     --measure: 66ch;
 
     /* Space: a 4px grid */
-    --s-0-5: 2px;
     --s-1: 4px;
     --s-1-5: 6px;
     --s-2: 8px;
@@ -92,6 +90,10 @@
     --s-12: 48px;
     --s-16: 64px;
     --pane-pad: 24px;
+    /* Every screen's content starts at the pane padding, left-aligned under
+       its title; a reading column (Today, Preferences, the CV, an
+       application) is at most this wide. Lists and panes take the width. */
+    --content: 760px;
 
     /* Sizes */
     --control-h: 32px;
@@ -153,7 +155,6 @@
       --danger-soft: #341617;
       --on-danger: #1a0909;
       --backdrop: rgb(0 0 0 / 0.6);
-      --ring-floating: rgb(255 255 255 / 0.07);
       --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.4);
       --shadow-sm:
         0 1px 2px rgb(0 0 0 / 0.4), inset 0 1px 0 rgb(255 255 255 / 0.04);
@@ -193,7 +194,6 @@
     --danger-soft: #341617;
     --on-danger: #1a0909;
     --backdrop: rgb(0 0 0 / 0.6);
-    --ring-floating: rgb(255 255 255 / 0.07);
     --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.4);
     --shadow-sm:
       0 1px 2px rgb(0 0 0 / 0.4), inset 0 1px 0 rgb(255 255 255 / 0.04);

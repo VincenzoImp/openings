@@ -2,6 +2,7 @@
 // note, the history and the posting.
 import { useEffect, useState, type ReactNode } from "react";
 import { AlertTriangle, Check, Copy, Plus, X } from "lucide-react";
+import type { Schema } from "../../api/client";
 import { ConflictNotice } from "../../query/ConflictNotice";
 import { Button, IconButton } from "../../ui/Button";
 import { Checkbox, Input, Textarea, Field } from "../../ui/Field";
@@ -48,29 +49,6 @@ export function Section({
   );
 }
 
-/** A section folded until opened: the posting, notes and history. */
-export function Fold({
-  title,
-  count,
-  children,
-  open,
-}: {
-  title: string;
-  count?: number;
-  children: ReactNode;
-  open?: boolean;
-}) {
-  return (
-    <details className="ap-fold" open={open}>
-      <summary>
-        <span className="ap-section-title">{title}</span>
-        {count != null && <span className="ui-count">{count}</span>}
-      </summary>
-      <div className="ap-fold-body">{children}</div>
-    </details>
-  );
-}
-
 /** Copy a text, saying so. */
 export function useCopy() {
   const toast = useToast();
@@ -112,7 +90,8 @@ export function Requirements({
           requirements: next.map((item) => ({
             id: item.id,
             text: item.text,
-            kind: item.kind as never,
+            // Stored requirements carry one of the kinds the input takes.
+            kind: item.kind as Schema<"Requirement">["kind"],
             note: item.note ?? "",
             blocking: item.blocking,
             resolved: item.resolved,
@@ -262,9 +241,6 @@ export function Requirements({
   );
 }
 
-type Question = { id: string; label: string; required?: boolean };
-const questionsOf = (app: Application) =>
-  (app.questions ?? []) as unknown as Question[];
 const answerText = (value: unknown) =>
   value === true
     ? "Yes"
@@ -276,7 +252,7 @@ const answerText = (value: unknown) =>
 
 /** The answers of the application form: question, answer, copy. */
 export function Answers({ app }: { app: Application }) {
-  const questions = questionsOf(app);
+  const questions = app.questions ?? [];
   const copy = useCopy();
   if (!questions.length) return null;
   return (
