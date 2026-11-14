@@ -120,7 +120,7 @@ const SOURCES_AND_SETTINGS: Screen[] = [
       await page.getByRole("button", { name: "Add source" }).first().click();
       const editor = page.getByRole("dialog", { name: "Add a source" });
       await editor.getByLabel("Keywords").fill("data engineer");
-      await editor.getByLabel("Location", { exact: true }).fill("Zurich");
+      await editor.getByLabel(/^Location/).fill("Zurich");
       await editor.getByLabel("Country").fill("switzerland");
       await editor.getByRole("button", { name: "Test" }).click();
       await expect(editor.getByText("14 jobs found")).toBeVisible();

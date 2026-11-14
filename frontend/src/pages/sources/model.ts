@@ -203,14 +203,16 @@ export function sourceStatus(
     (run?.finished_at as string | undefined) ||
     (source.last_run_at as string | undefined) ||
     (run?.started_at as string | undefined);
-  if (!when) return { text: source.enabled ? "Not checked yet" : "Paused" };
+  // A paused source says so beside its name.
+  if (!when) return { text: "Not checked yet" };
   const counts = (run?.counts ?? source.last_counts ?? {}) as Record<
     string,
     unknown
   >;
   const fresh = number(counts.created);
-  const checked = `Checked ${ago(when, now)} · ${fresh ? `${fresh} new` : "nothing new"}`;
-  return { text: source.enabled ? checked : `Paused · ${checked}` };
+  return {
+    text: `Checked ${ago(when, now)} · ${fresh ? `${fresh} new` : "nothing new"}`,
+  };
 }
 
 /** Failing sources first, then active ones, then paused; by name within. */

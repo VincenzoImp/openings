@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { CircleAlert, FlaskConical } from "lucide-react";
 import { ApiError, type Schema } from "../../api/client";
 import { ConflictNotice } from "../../query/ConflictNotice";
@@ -597,8 +597,15 @@ function TestResults({
     })
     .filter(Boolean);
   const total = preview?.total ?? 0;
+  // A result shows itself: on a phone it sits below the form.
+  const ref = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!pending && (preview || error))
+      ref.current?.scrollIntoView?.({ block: "nearest" });
+  }, [pending, preview, error]);
   return (
     <section
+      ref={ref}
       className="src-test"
       aria-labelledby="src-test-title"
       aria-live="polite"
