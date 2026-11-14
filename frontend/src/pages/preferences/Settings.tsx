@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import type { WorkspaceSettings } from "../../api";
 import { Button, Icon } from "../../design";
 import { useWorkspace } from "../../state";
-import { LANGUAGES, languageName } from "../jobs/model";
+import { LANGUAGES, languageName } from "../../screens/jobs/model";
 import type { Outcome } from "./Section";
 import { replyDays } from "./model";
 

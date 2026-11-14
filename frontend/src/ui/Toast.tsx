@@ -30,6 +30,8 @@ export interface ToastOptions {
   tone?: "action" | "success" | "error";
   icon?: LucideIcon;
   action?: ToastAction;
+  /** A second, quieter control after the action (Open, Add reason). */
+  extra?: ReactNode;
 }
 interface Shown extends ToastOptions {
   key: number;
@@ -44,6 +46,7 @@ export function ToastView({
   tone = "action",
   icon,
   action,
+  extra,
   onClose,
   onHold,
 }: ToastOptions & {
@@ -81,6 +84,7 @@ export function ToastView({
           {action.undo && <Kbd>⌘Z</Kbd>}
         </button>
       )}
+      {extra}
       {onClose && (
         <button
           type="button"
