@@ -7,7 +7,6 @@ import { Button } from "../../ui/Button";
 import { ConfirmDialog, Drawer } from "../../ui/Dialog";
 import { Checkbox, Field, Input, Select } from "../../ui/Field";
 import { Callout } from "../../ui/Page";
-import { Segmented } from "../../ui/Tabs";
 import { useToast } from "../../ui/Toast";
 import {
   KIND_LABELS,
@@ -365,15 +364,18 @@ function Editor({
             <p className="src-form-kind">{KIND_LABELS[draft.kind]}</p>
           ) : (
             <Field label="Kind">
-              <Segmented<SourceKind>
-                label="Kind of source"
+              <Select
                 value={draft.kind}
-                onChange={(kind) => set("kind", kind)}
-                options={(Object.keys(KIND_LABELS) as SourceKind[]).map(
-                  (kind) => ({ value: kind, label: KIND_LABELS[kind] }),
-                )}
-                className="src-kind"
-              />
+                onChange={(event) =>
+                  set("kind", event.target.value as SourceKind)
+                }
+              >
+                {(Object.keys(KIND_LABELS) as SourceKind[]).map((kind) => (
+                  <option key={kind} value={kind}>
+                    {KIND_LABELS[kind]}
+                  </option>
+                ))}
+              </Select>
             </Field>
           )}
           {draft.kind === "search" ? (

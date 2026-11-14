@@ -274,11 +274,6 @@
     font-weight: var(--w-medium);
     letter-spacing: 0;
   }
-  .src-kind {
-    align-self: flex-start;
-    max-width: 100%;
-    overflow-x: auto;
-  }
   .src-form-pair {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
@@ -345,6 +340,10 @@
   }
 
   @container app (max-width: 719px) {
+    /* The phone's top bar carries the title. */
+    .src-screen > .ui-page-header {
+      display: none;
+    }
     .src-topline {
       padding-left: var(--s-4);
     }

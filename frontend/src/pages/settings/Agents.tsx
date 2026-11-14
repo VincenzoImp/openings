@@ -3,12 +3,11 @@ import { Ellipsis, ExternalLink, KeyRound, Plus, Trash2 } from "lucide-react";
 import { Button, IconButton } from "../../ui/Button";
 import { CodeBlock } from "../../ui/CodeBlock";
 import { ConfirmDialog, Dialog } from "../../ui/Dialog";
-import { Field, Input } from "../../ui/Field";
+import { Field, Input, Select } from "../../ui/Field";
 import { formatDay, formatFull } from "../../ui/format";
 import { Icon } from "../../ui/Icon";
 import { Menu } from "../../ui/Menu";
 import { SkeletonRows } from "../../ui/Page";
-import { Segmented } from "../../ui/Tabs";
 import { useToast } from "../../ui/Toast";
 import { ago } from "../sources/model";
 import {
@@ -294,7 +293,6 @@ export function NewTokenDialog({
                 <input
                   type="radio"
                   name="token-access"
-                  className="set-radio"
                   value={value}
                   checked={kind === value}
                   onChange={() => setKind(value)}
@@ -323,12 +321,18 @@ export function ConnectSnippet({ origin }: { origin: string }) {
   const base = origin.replace(/\/$/, "");
   return (
     <div className="set-connect">
-      <Segmented<ClientId>
-        label="Agent"
+      <Select
+        aria-label="Agent"
+        className="set-select"
         value={client}
-        onChange={setClient}
-        options={CLIENTS.map((item) => ({ value: item.id, label: item.label }))}
-      />
+        onChange={(event) => setClient(event.target.value as ClientId)}
+      >
+        {CLIENTS.map((item) => (
+          <option key={item.id} value={item.id}>
+            {item.label}
+          </option>
+        ))}
+      </Select>
       <CodeBlock
         code={connectSnippet(client, base)}
         label="MCP configuration"

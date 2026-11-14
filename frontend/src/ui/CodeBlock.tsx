@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { Check, Copy } from "lucide-react";
+import { Copy } from "lucide-react";
 import { IconButton } from "./Button";
 import { cx } from "./cx";
 import "./codeblock.css";
@@ -27,7 +26,7 @@ export async function copyText(value: string) {
 /**
  * A command or configuration in monospace, wrapped so nothing hides past the
  * edge, with its copy button inside, top right. `inline` is one short value
- * (an address). The copy icon becomes a check for a moment once copied.
+ * (an address).
  */
 export function CodeBlock({
   code,
@@ -44,14 +43,13 @@ export function CodeBlock({
   onCopied?: (ok: boolean) => void;
   className?: string;
 }) {
-  const [copied, setCopied] = useState(false);
   return (
     <div className={cx("ui-code", className)} data-inline={inline || undefined}>
       <pre role="region" aria-label={label} tabIndex={0}>
         <code>{code}</code>
       </pre>
       <IconButton
-        icon={copied ? Check : Copy}
+        icon={Copy}
         label={`Copy ${label.toLowerCase()}`}
         size="sm"
         tooltip="above"
@@ -59,9 +57,6 @@ export function CodeBlock({
         onClick={async () => {
           const ok = await copyText(code);
           onCopied?.(ok);
-          if (!ok) return;
-          setCopied(true);
-          setTimeout(() => setCopied(false), 1500);
         }}
       />
     </div>

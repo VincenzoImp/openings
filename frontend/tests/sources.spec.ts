@@ -131,7 +131,7 @@ test("a company page names its job board from the address", async ({
   await go(page, "sources");
   await page.getByRole("button", { name: "Add source" }).first().click();
   const form = editor(page);
-  await form.getByRole("radio", { name: "Company careers page" }).click();
+  await form.getByLabel("Kind").selectOption("company");
   const address = form.getByLabel("Careers page address");
   await address.fill("https://boards.greenhouse.io/syntheticlabs");
   await expect(form).toContainText("Detected: Greenhouse · syntheticlabs");
@@ -358,9 +358,7 @@ test("the empty state offers a search and a company page", async ({ page }) => {
     page.getByText("Add a search to get new jobs every few hours."),
   ).toBeVisible();
   await page.getByRole("button", { name: "Add a company page" }).click();
-  await expect(
-    editor(page).getByRole("radio", { name: "Company careers page" }),
-  ).toHaveAttribute("aria-checked", "true");
+  await expect(editor(page).getByLabel("Kind")).toHaveValue("company");
 });
 
 test("Sources with its menu and editor open has no serious accessibility finding", async ({

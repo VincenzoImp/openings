@@ -1,11 +1,10 @@
 import { useState, type FormEvent } from "react";
-import { LogOut, Monitor, Moon, Sun } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { useShell } from "../../shell/context";
 import { useTheme } from "../../shell/theme";
 import { Button } from "../../ui/Button";
 import { Dialog } from "../../ui/Dialog";
-import { Field, Input } from "../../ui/Field";
-import { Segmented } from "../../ui/Tabs";
+import { Field, Input, Select } from "../../ui/Field";
 import type { ThemeMode } from "../../ui/theme";
 import { useToast } from "../../ui/Toast";
 import { useChangePassword, useIsOwner } from "./queries";
@@ -33,16 +32,16 @@ export function Account() {
       <SettingRow
         title="Theme"
         control={
-          <Segmented<ThemeMode>
-            label="Theme"
+          <Select
+            aria-label="Theme"
+            className="set-select"
             value={theme}
-            onChange={setTheme}
-            options={[
-              { value: "system", label: "System", icon: Monitor },
-              { value: "light", label: "Light", icon: Sun },
-              { value: "dark", label: "Dark", icon: Moon },
-            ]}
-          />
+            onChange={(event) => setTheme(event.target.value as ThemeMode)}
+          >
+            <option value="system">Same as the system</option>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </Select>
         }
       >
         Remembered in this browser.
