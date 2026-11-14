@@ -143,12 +143,13 @@ def remove_installation_credentials(path):
     """
     with closing(sqlite3.connect(path)) as conn:
         conn.execute("PRAGMA journal_mode=DELETE")
-        # Overwrite the deleted rows instead of leaving them in free pages.
-        conn.execute("PRAGMA secure_delete=ON")
         conn.execute("DELETE FROM settings WHERE key='auth'")
         conn.execute("DELETE FROM api_tokens")
         conn.execute("DELETE FROM transfer_grants")
         conn.commit()
+        # The copy also holds the live database's free pages, where earlier versions
+        # of these rows remain; rebuilding the file keeps only the live rows.
+        conn.execute("VACUUM")
 
 
 def restore_database(workspace, source_path):
