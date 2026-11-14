@@ -18,7 +18,6 @@ import {
   RotateCcw,
   Search,
   Trash2,
-  TriangleAlert,
   X,
 } from "lucide-react";
 import { useShell, TopBarActions } from "../../shell/context";
@@ -29,11 +28,12 @@ import { SearchField } from "../../ui/Field";
 import { formatTime, plural } from "../../ui/format";
 import { isModKey, isTyping } from "../../ui/keys";
 import { BulkBar, useSelection } from "../../ui/List";
+import { LoadError } from "../../ui/LoadError";
 import { Menu, Popover, type MenuEntry } from "../../ui/Menu";
-import { Callout, EmptyState, PageHeader, SkeletonRows } from "../../ui/Page";
+import { EmptyState, PageHeader, SkeletonRows } from "../../ui/Page";
 import { SplitPane } from "../../ui/Split";
 import { FilterChips, Tabs, Toolbar } from "../../ui/Tabs";
-import { useToast, type ToastOptions } from "../../ui/Toast";
+import { useToast } from "../../ui/Toast";
 import {
   fetchJob,
   prefetchJob,
@@ -85,8 +85,19 @@ function useMedia(query: string) {
 }
 
 const title = (job: { title?: string }) => `“${job.title || "Untitled role"}”`;
-const reasonOf = (error: unknown) =>
-  (error as Error)?.message || "Something went wrong.";
+/** What a decision is called in a sentence: "Couldn't dismiss …". */
+const VERB: Record<BulkAction, string> = {
+  shortlisted: "shortlist",
+  dismissed: "dismiss",
+  new: "restore",
+  forget: "forget",
+};
+const DONE: Record<BulkAction, string> = {
+  shortlisted: "Shortlisted",
+  dismissed: "Dismissed",
+  new: "Restored",
+  forget: "Forgot",
+};
 
 /** The reason of a dismissal, typed in its toast after the fact. */
 function ReasonButton({ onSave }: { onSave: (reason: string) => void }) {
@@ -119,6 +130,40 @@ function ReasonButton({ onSave }: { onSave: (reason: string) => void }) {
         onChange={(event) => setReason(event.target.value)}
       />
     </form>
+  );
+}
+
+/**
+ * The pane beside a selection: what is picked, while the bar above the list
+ * carries the actions, so one Shortlist is on screen.
+ */
+function Picked({ jobs }: { jobs: JobSummary[] }) {
+  const shown = jobs.slice(0, 8);
+  return (
+    <div className="jobs-picked" aria-live="polite">
+      <h2>{plural(jobs.length, "job")} selected</h2>
+      <ul>
+        {shown.map((job) => (
+          <li key={job.id}>
+            <span className="jobs-picked-title">
+              {job.title || "Untitled role"}
+            </span>
+            {job.company && (
+              <span className="jobs-picked-company">{job.company}</span>
+            )}
+          </li>
+        ))}
+      </ul>
+      {jobs.length > shown.length && (
+        <p className="jobs-picked-more">
+          and {plural(jobs.length - shown.length, "more job", "more jobs")}
+        </p>
+      )}
+      <p className="jobs-picked-hint">
+        Choose what to do with them in the bar above the list. Esc clears the
+        selection.
+      </p>
+    </div>
   );
 }
 
@@ -337,11 +382,11 @@ export default function Jobs() {
   async function addReason(jobs: JobSummary[], reason: string) {
     try {
       await run("dismissed", jobs, reason);
-      toast.show({ tone: "success", message: "Reason saved" });
-    } catch (error) {
+      toast.show({ tone: "success", message: "Saved the reason" });
+    } catch {
       toast.show({
         tone: "error",
-        message: `The reason was not saved: ${reasonOf(error)}`,
+        message: "Couldn't save the reason. Try again.",
       });
     }
   }
@@ -357,6 +402,7 @@ export default function Jobs() {
     picked.clear();
     if (!moving.length) return;
     const movingIds = moving.map((job) => job.id);
+    const before = active;
     const leaving = to === "forget" || leaves(view.section, to);
     if (leaving) {
       hide(movingIds);
@@ -394,24 +440,28 @@ export default function Jobs() {
         if (done.length === 1) select(done[0].id);
         toast.show({
           tone: "success",
-          message: `Undone: ${done.length === 1 ? title(done[0]) : plural(done.length, "job")} back`,
+          message: `Undid ${DONE[to].toLowerCase()} ${done.length === 1 ? title(done[0]) : plural(done.length, "job")}`,
         });
-      } catch (error) {
+      } catch {
         toast.show({
           tone: "error",
-          message: `Could not undo: ${reasonOf(error)}`,
+          message: "Couldn't undo. Try again.",
         });
       }
     });
     let results;
     try {
       results = await pending;
-    } catch (error) {
+    } catch {
       forgetUndo(entry);
-      if (leaving) unhide(movingIds);
+      if (leaving) {
+        unhide(movingIds);
+        // The job stays where it was: the selection comes back to it.
+        if (one) select(before);
+      }
       toast.show({
         tone: "error",
-        message: `Nothing was changed: ${reasonOf(error)}`,
+        message: `Couldn't ${VERB[to]} ${what}. Try again.`,
       });
       return;
     }
@@ -419,27 +469,27 @@ export default function Jobs() {
     const done = doneOf(results);
     if (failed.length) {
       unhide(failed.map((item) => item.id ?? ""));
-      const first = failed[0].error as { message?: string } | null;
+      if (leaving && one) select(before);
+      const conflict = failed.some(
+        (item) => (item.error as { code?: string } | null)?.code === "conflict",
+      );
       toast.show({
         tone: "error",
-        message: `${one ? what : `${failed.length} of ${what}`} not changed: ${first?.message || "it changed elsewhere."}`,
+        message: `Couldn't ${VERB[to]} ${one ? what : `${failed.length} of ${what}`}${
+          conflict ? ": changed elsewhere. Try again." : ". Try again."
+        }`,
       });
     }
     if (to === "forget" || !done.length) {
       forgetUndo(entry);
       if (to === "forget" && done.length && !failed.length)
-        toast.show({ tone: "success", message: `Forgot ${what}` });
+        toast.show({ tone: "success", message: `${DONE.forget} ${what}` });
       return;
     }
     if (undone) return;
     if (failed.length) return;
     toast.show({
-      message:
-        to === "shortlisted"
-          ? one
-            ? "Shortlisted — application started"
-            : `Shortlisted ${what} — applications started`
-          : `${to === "dismissed" ? "Dismissed" : "Restored"} ${what}`,
+      message: `${DONE[to]} ${what}`,
       icon:
         to === "dismissed"
           ? EyeOff
@@ -447,24 +497,13 @@ export default function Jobs() {
             ? Bookmark
             : RotateCcw,
       action: { label: "Undo", undo: true, run: () => undo(entry.id) },
+      // The only second action: why a job was dismissed.
       extra:
         to === "dismissed" ? (
           <ReasonButton
             key={entry.id}
             onSave={(reason) => void addReason(done, reason)}
           />
-        ) : one && to === "shortlisted" ? (
-          <button
-            type="button"
-            className="ui-toast-action"
-            onClick={async () => {
-              toast.close();
-              const started = (await fetchJob(one.id, 0)).application;
-              if (started) navigate(href("application", { id: started.id }));
-            }}
-          >
-            Open
-          </button>
         ) : undefined,
     });
   }
@@ -477,23 +516,14 @@ export default function Jobs() {
       await merge.mutateAsync({ job, target });
       toast.show({
         tone: "success",
-        message: `Merged into ${title(target)}`,
-        extra: (
-          <button
-            type="button"
-            className="ui-toast-action"
-            onClick={() => {
-              toast.close();
-              setView({ job: target.id });
-            }}
-          >
-            Open
-          </button>
-        ),
+        message: `Merged ${title(job)} into ${title(target)}`,
       });
-    } catch (error) {
+    } catch {
       unhide([job.id]);
-      toast.show({ tone: "error", message: `Not merged: ${reasonOf(error)}` });
+      toast.show({
+        tone: "error",
+        message: `Couldn't merge ${title(job)}. Try again.`,
+      });
     }
   }
 
@@ -509,9 +539,15 @@ export default function Jobs() {
     keepBoth: async (job, other) => {
       try {
         await distinct.mutateAsync({ id: job.id, otherId: other.id });
-        toast.show({ tone: "success", message: "Kept as two different jobs" });
-      } catch (error) {
-        toast.show({ tone: "error", message: reasonOf(error) });
+        toast.show({
+          tone: "success",
+          message: `Kept ${title(job)} and ${title(other)} as two jobs`,
+        });
+      } catch {
+        toast.show({
+          tone: "error",
+          message: "Couldn't keep both. Try again.",
+        });
       }
     },
     select: (id) => setView({ job: id }),
@@ -790,7 +826,11 @@ export default function Jobs() {
         }
         items={SECTIONS.map((item) => ({
           ...item,
-          count: item.id === "new" ? (newCount ?? undefined) : undefined,
+          // A search or filter narrows the list, not the count of New.
+          count:
+            item.id === "new" && !filtered
+              ? (newCount ?? undefined)
+              : undefined,
         }))}
       />
     </Toolbar>
@@ -798,23 +838,25 @@ export default function Jobs() {
 
   const next = collection.data?.next_run_at;
   const empty = !list.isPending && !list.isError && !rows.length;
+  const onlySearch = !!view.q && !chips.length;
   const emptyState = filtered ? (
     <EmptyState
       icon={Search}
       title="No jobs match"
       actions={
         <Button
-          onClick={() =>
+          onClick={() => {
+            setSearch("");
             setView({
               q: "",
               job: "",
               filters: Object.fromEntries(
                 Object.keys(view.filters).map((key) => [key, ""]),
               ) as View["filters"],
-            })
-          }
+            });
+          }}
         >
-          Clear filters
+          {onlySearch ? "Clear search" : "Clear filters"}
         </Button>
       }
     >
@@ -861,14 +903,7 @@ export default function Jobs() {
 
   return (
     <div className="jobs" data-pushed={(!wide && open) || undefined}>
-      <PageHeader
-        title="Jobs"
-        action={
-          <Button icon={Plus} kbd="N" onClick={shell.addJob}>
-            Add job
-          </Button>
-        }
-      />
+      <PageHeader title="Jobs" />
       <TopBarActions>
         <IconButton
           icon={Search}
@@ -927,18 +962,11 @@ export default function Jobs() {
       />
       {list.isError && (
         <div className="jobs-error">
-          <Callout
-            icon={TriangleAlert}
-            tone="danger"
-            title="The jobs could not be loaded"
-            actions={
-              <Button size="sm" onClick={() => void list.refetch()}>
-                Try again
-              </Button>
-            }
-          >
-            {reasonOf(list.error)}
-          </Callout>
+          <LoadError
+            what="your jobs"
+            error={list.error}
+            retry={() => void list.refetch()}
+          />
         </div>
       )}
       <div
@@ -984,7 +1012,9 @@ export default function Jobs() {
               )
             }
             detail={
-              selected ? (
+              wide && pickedJobs.length > 0 ? (
+                <Picked jobs={pickedJobs} />
+              ) : selected ? (
                 <JobDetail
                   key={selected}
                   id={selected}
