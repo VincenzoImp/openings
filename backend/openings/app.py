@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from fastapi import APIRouter, FastAPI, Request
+from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -200,11 +200,10 @@ def create_app(database=None, start_worker=True):
             DomainError(409, "constraint", "This change conflicts with existing workspace data.")
         )
 
-    router = APIRouter(prefix="/api/v1")
-
-    register_transport(app, router, public_url)
-    bind_rest(router, errors)
-    app.include_router(router)
+    # Routes go on the application's own router: an included router would build
+    # every route a second time on the first request.
+    register_transport(app, app.router, public_url)
+    bind_rest(app.router, errors)
     # Building the transport also creates the session manager the lifespan runs.
     app.mount(
         "/mcp",
