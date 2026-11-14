@@ -422,11 +422,17 @@ class RunOperations:
                 source["schedule"], source["last_scheduled_at"] or source["created_at"], moment
             )
             if due <= moment:
-                self.queue_collection(
-                    source["id"],
-                    manual=False,
-                    _stopping=stopping,
-                    planned_at=(
-                        moment if source["schedule"]["kind"] == "interval" else due
-                    ).isoformat(timespec="microseconds"),
-                )
+                planned = (
+                    due if (source["schedule"] or {}).get("kind") == "daily" else moment
+                ).isoformat(timespec="microseconds")
+                try:
+                    self.queue_collection(
+                        source["id"], manual=False, _stopping=stopping, planned_at=planned
+                    )
+                except DomainError as error:
+                    # A saved source that no longer validates waits for an edit until its
+                    # next slot; the owner sees why and the other sources still run.
+                    self.db.execute(
+                        "UPDATE sources SET last_error=?,last_scheduled_at=? WHERE id=?",
+                        (error.message[:1000], planned, source["id"]),
+                    )
