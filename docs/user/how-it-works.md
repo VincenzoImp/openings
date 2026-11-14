@@ -1,14 +1,16 @@
 # How it works
 
-Openings is one workspace for one person's job search. What the dashboard does,
-REST does too, and so does MCP except for owner-only actions, under the same words.
+Openings is one workspace for one person's job search. Everything you do in the
+dashboard can also be done by a script (the REST API) or by your AI agent (MCP),
+with the same names. Only a few owner actions, such as the password, tokens and
+restore, stay with you.
 
 ## The concepts
 
 1. **Job.** A posting you might apply to: title, company, location, text and where it came from.
-2. **Source.** A saved search or company board that collects jobs on a schedule. Jobs you add by hand have no source.
+2. **Source.** A search, company careers page or RSS feed that collects jobs on a schedule. Jobs you add by hand have no source.
 3. **Triage.** Where a job stands in review: **New**, **Shortlisted** or **Dismissed**. Dismissing keeps the job, remembers it and can be undone.
-4. **Signal.** A label computed without a model: the posting's language, the languages it requires, a likely duplicate, or no longer listed. Signals label and filter; they never dismiss.
+4. **Label.** A mark computed without a model: the posting's language, the languages it requires, a likely duplicate, or no longer listed. Labels describe and filter; they never dismiss.
 5. **Application.** Your attempt to get one job. A job has at most one open application. Shortlisting a job starts it.
 6. **Stage.** Where the application stands: **Shortlisted**, **Applied**, **Interview**, **Offer** or **Closed** (Accepted, Rejected, Not pursued or No reply).
 7. **Ready.** Computed, never set by hand: a Shortlisted application whose required documents are complete and that no blocking requirement holds back.
@@ -43,16 +45,8 @@ career import and downloading kept backups.
 
 ## Words
 
-The word on screen is the word in REST, MCP and these pages.
-
-| Word | Where |
-|---|---|
-| `new`, `shortlisted`, `dismissed` | the triage of a job |
-| `shortlisted`, `applied`, `interview`, `offer`, `closed` | the stage of an application |
-| `ready`, `missing` | computed on every application |
-| `cv`, `letter` | the kinds of document you send |
-| career entry (`career_id`) | an item of your record |
-| highlight (`highlight_id`, `always_include`) | reusable wording |
-| Preferences (`preferences`) | what you want, in your words |
-| reply (`reply`, `replies`) | what an employer did |
-| source (`sources_*`) | where jobs come from |
+The word on screen is the word in REST, MCP and these pages: a job's **triage**
+(New, Shortlisted, Dismissed), an application's **stage** (Shortlisted, Applied,
+Interview, Offer, Closed), **Ready**, **CV** and **letter**, **career entry**,
+**highlight**, **Preferences**, **reply** and **source**. The
+[REST API](api.md#names) page lists the field names behind them.

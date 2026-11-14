@@ -31,9 +31,9 @@ def test_url_option_rewrites_every_client_adapter_and_needs_https(tmp_path):
     )
     assert (
         json.loads((workspace / ".mcp.json").read_text())["mcpServers"]["openings"]["url"]
-        == "https://openings.example/mcp"
+        == "https://openings.example/mcp/"
     )
-    assert 'url = "https://openings.example/mcp"' in (workspace / ".codex/config.toml").read_text()
+    assert 'url = "https://openings.example/mcp/"' in (workspace / ".codex/config.toml").read_text()
     assert (
         'bearer_token_env_var = "OPENINGS_TOKEN"' in (workspace / ".codex/config.toml").read_text()
     )

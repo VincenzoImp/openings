@@ -1,18 +1,13 @@
 # Operations
 
-## Install and update
+## Update
 
-The single `openings` container has a Compose budget of 0.5 CPU and 512 MiB; leave
-room for the host. The `workspace` volume holds `/data/openings.sqlite`, its
-journals and every uploaded file. The core runs as UID/GID 10001, so a
-bind-mounted `/data` must be writable by it; the default named volume is.
-
-To update, read the [changelog](../../CHANGELOG.md), back up, then:
+Read the [changelog](../../CHANGELOG.md), back up, then:
 
 ```bash
 git pull
 docker compose pull
-docker compose up -d --no-build
+docker compose up -d
 ```
 
 Compose pins the release in `docker-compose.yml`. Other commands:
@@ -31,7 +26,7 @@ recreated; `OPENINGS_PASSWORD` never resets an existing owner. See
 
 ## Reach it from other devices
 
-Set the address clients can reach in `.env`, then `docker compose up -d --no-build`:
+Set the address clients can reach in `.env`, then `docker compose up -d`:
 
 ```dotenv
 OPENINGS_BIND=0.0.0.0
@@ -96,28 +91,31 @@ curl --fail "$OPENINGS_URL/api/v1/backup/restore" \
 ```
 
 Restore checks integrity, keeps the destination's owner credentials and tokens,
-and clears pending transfer grants. `.env` stays host-local. Check the enabled
+and clears pending upload and download links. `.env` stays host-local. Check the enabled
 sources after moving. The restore limit follows the free space of the data volume
 (about four times the backup's size when restoring over itself); Settings shows it,
 and a larger upload is refused with `413 backup_size`.
 
 ## Upgrades
 
-A release opens a workspace of its own format or of the **previous format only**
-and upgrades the latter at start. An older one is refused with the release to open
-it with first; a newer one is refused too. Back up before upgrading.
+A release opens a workspace of its own data format or of the **previous format
+only**, and upgrades the latter at start. An older one is refused with the release
+to open it with first; a newer one is refused too. Most releases keep the format;
+the [changelog](../../CHANGELOG.md) says when one changes it, with its upgrade
+notes. Back up before upgrading.
 
 The upgrade builds a new file with the data copied in, so an upgraded workspace has
-exactly the layout of a new one. It needs free space of 2.2 times the database; if
-there is not enough, the server does not start and changes nothing. The original is
-kept byte for byte as `openings.pre-0.24.sqlite` and is never deleted automatically;
-delete it under **Automatic backups** when you no longer need to go back. Records
-and fields the release no longer keeps are written to
-`openings.pre-0.24-archive.json` beside the database, readable only by the owner of
-the file. If a check fails, the start stops with the reason and the original is
+exactly the layout of a new one. It needs free space of about 2.2 times the
+database; if there is not enough, the server does not start and changes nothing.
+The original is kept byte for byte beside the database as
+`openings.pre-<release>.sqlite` and is never deleted automatically; delete it
+under **Settings › Data › Automatic backups** when you no longer need to go back.
+Records and fields the release no longer keeps are written to
+`openings.pre-<release>-archive.json` beside it, readable only by the owner of the
+file. If a check fails, the start stops with the reason and the original is
 untouched.
 
-**Roll back** with the copy:
+**Roll back** with the copy, here from the upgrade to 0.24:
 
 ```bash
 docker compose down
@@ -147,7 +145,7 @@ shows the size, free space and retention.
   beyond localhost.
 - Revoke a token in Settings to end its access on its next request. Changing the
   password signs out browsers and keeps tokens.
-- Transfer grants for backups and exports work once and expire after 120 seconds.
+- Download links for backups and exports work once and expire after 120 seconds.
 - Report vulnerabilities as described in [SECURITY.md](../../SECURITY.md).
 
 ## Troubleshooting
@@ -155,11 +153,18 @@ shows the size, free space and retention.
 | Symptom | Check |
 |---|---|
 | Sign-in returns 429 for everyone behind a proxy | Set `OPENINGS_TRUSTED_PROXIES` and recreate the container. |
-| A grant returns `transfer_used` | Grants work once; request a new one. |
+| A download link returns `transfer_used` | A link works once; request a new one. |
 | MCP rejects the host, or links point to the wrong machine | Set `OPENINGS_PUBLIC_URL` to the origin clients use. |
-| A job has incomplete text | Paste the posting under Details, Correct the job. |
-| Collection is waiting | Read the reason and resume time; provider cooldowns survive restarts. |
+| A job has incomplete text | Open the job's `…` › **Correct details** and paste the posting. |
+| A source is waiting | Read the reason and the time it resumes; a pause of a job site survives restarts. |
 | Starting an application returns 409 | Open the existing open attempt named in the error. |
-| An upload fails | Check the size (20 MiB), the grant's age and that the revision is still incomplete. |
+| An upload fails | Check the size (20 MiB), the upload link's age and that the revision is still incomplete. |
 | An edit returns 409 | Reload, then apply your change again. |
 | The core cannot create SQLite | Make `/data` writable by UID/GID 10001. |
+
+## Container details
+
+The single `openings` container has a Compose budget of 0.5 CPU and 512 MiB; leave
+room for the host. The `workspace` volume holds `/data/openings.sqlite`, its
+journals and every uploaded file. The core runs as UID/GID 10001, so a
+bind-mounted `/data` must be writable by it; the default named volume is.

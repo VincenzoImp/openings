@@ -3,14 +3,14 @@ name: Weekly
 # The slow and environment-dependent checks that stay out of the pull request
 # path: performance budgets, WebKit, the large-workspace browser budget and the
 # dependency audits. Failures open nothing automatically; each release checks
-# the latest run of this workflow on main.
+# the latest run of this workflow on main (docs/developer/maintaining.md).
 
 on:
   schedule:
     - cron: '0 4 * * 1' # Monday 04:00 UTC
   workflow_dispatch:
   pull_request:
-    paths: ['.github/workflows/nightly.yml']
+    paths: ['.github/workflows/weekly.yml']
 
 permissions:
   contents: read
@@ -28,7 +28,6 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
-          version: '0.13.8'
           python-version: '3.14'
           enable-cache: true
       - run: uv sync --locked
@@ -51,14 +50,13 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
-          version: '0.13.8'
           python-version: '3.14'
           enable-cache: true
       - run: uv sync --locked
       - run: npm --prefix frontend ci
       - run: npm --prefix frontend run build
       - name: WebKit and the large-workspace budget
-        run: npm --prefix frontend run test:e2e -- --project=webkit --project=webkit-mobile --project=chromium-performance
+        run: npm --prefix frontend run test:e2e:all
       - name: Upload Playwright traces
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -76,15 +74,10 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
-          version: '0.13.8'
           python-version: '3.14'
           enable-cache: true
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '26'
-      - name: Audit locked runtime Python dependencies
-        run: |
-          uv export --locked --no-dev --no-emit-project --no-hashes --output-file /tmp/openings-requirements.txt
-          uvx --from pip-audit==2.10.1 pip-audit --requirement /tmp/openings-requirements.txt --no-deps --disable-pip
-      - name: Audit npm dependencies
-        run: npm --prefix frontend audit --audit-level=moderate
+      - name: Audit dependencies
+        run: scripts/audit_dependencies.sh

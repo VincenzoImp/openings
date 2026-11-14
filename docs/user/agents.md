@@ -63,8 +63,9 @@ changes with the version you run. Say it in your own words.
 
 ![Settings, API & agents: the three steps, the tokens and the client configuration](../images/agent-access.png)
 
-For a persistent setup, an optional [operator workspace](../../examples/operator-workspace/README.md)
-holds the connection setup, a skills list and launcher scripts for six clients. You do not need it.
+For a persistent setup, an optional [agent workspace](../../examples/operator-workspace/README.md)
+holds the connection setup for six clients, a launcher and a script that fetches
+the skills. You do not need it.
 
 ## Token kinds
 
@@ -95,8 +96,8 @@ Skills are served as shipped and are not edited in the workspace.
 Every change records who made it: **you**, the agent token by name, or **job
 sources**. One call that changes many records shares one batch.
 
-- **Jobs › Dismissed** shows the reason and who dismissed each job. Filter **By
-  agent**, select and **Restore**.
+- **Jobs › Dismissed** shows the reason and who dismissed each job. Choose
+  **Filter › Dismissed by › An agent**, select the jobs and **Restore** them.
 - Job and application **Timelines** label each change with its author.
 - Notes the agent writes are marked with its token name.
 - When you correct something the agent did, such as restoring a job it dismissed,

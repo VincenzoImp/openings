@@ -48,7 +48,7 @@ A highlight is a draft until you **Approve** it (an agent's new highlights show
 remove and reorder highlights (drag the handle, or its **Move up**/**Move
 down**); highlights you write there are approved. Dates are none, a single date
 or a period (year and optional month; **Present** for an open end); unknown
-dates stay empty. An entry's location is kept as `location` in its metadata. Skill tags are comma-separated, with duplicates removed.
+dates stay empty. Skill tags are comma-separated, with duplicates removed.
 Facts and narratives are context for an agent; highlights are wording it may
 reuse, not the only wording it may use.
 

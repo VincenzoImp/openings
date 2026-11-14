@@ -8,7 +8,6 @@ import gzip
 import hashlib
 import json
 import re
-import runpy
 import shutil
 import sqlite3
 import stat
@@ -24,6 +23,23 @@ from openings.operations import restore_database
 from openings.workspace import Workspace
 
 FIXTURE = Path(__file__).with_name("fixtures") / f"workspace-{SCHEMA_VERSION - 1}.sql.gz"
+
+# Ready as 0.24 computes it right after the upgrade, on the schema-14 original: a
+# draft whose current CV and letter revisions both have a PDF and that has no
+# unresolved blocking requirement.
+_LEAF = (
+    "EXISTS(SELECT 1 FROM documents d WHERE d.application_id=a.id AND d.kind='{kind}' AND NOT "
+    "EXISTS(SELECT 1 FROM documents c WHERE c.previous_id=d.id) AND EXISTS(SELECT 1 FROM files "
+    "f WHERE f.document_id=d.id AND f.media_type='application/pdf'))"
+)
+COMPUTED_READY = (
+    "a.status='draft' AND "
+    + _LEAF.format(kind="resume")
+    + " AND "
+    + _LEAF.format(kind="cover_letter")
+    + " AND NOT EXISTS(SELECT 1 FROM json_each(a.requirements) r WHERE "
+    "json_extract(r.value,'$.blocking') AND NOT coalesce(json_extract(r.value,'$.resolved'),0))"
+)
 
 # Tables 0.24 removes (archived whole) and adds (filled by the upgrade's folds).
 REMOVED_TABLES = {"policy_sections", "policy_items"}  # #213
@@ -335,14 +351,11 @@ def test_stored_ready_marks_are_archived_with_an_event_and_ready_is_computed(tmp
         "WHERE ready_at IS NOT NULL",
     )
     assert sorted(events) == sorted(labelled)
-    # Ready is computed: the upgraded workspace lists what the rehearsal's rule
-    # computes on the original, and the rehearsal counts where the stored marks differ.
-    verify = runpy.run_path(str(Path(__file__).parents[2] / "scripts" / "verify_m15.py"))
+    # Ready is computed: the upgraded workspace lists what the rule of 0.24 computes
+    # on the original, whatever the stored marks said.
     computed = {
         row[0]
-        for row in query(
-            pre_upgrade, "SELECT id FROM applications a WHERE " + verify["COMPUTED_READY"]
-        )
+        for row in query(pre_upgrade, "SELECT id FROM applications a WHERE " + COMPUTED_READY)
     }
     # The shared upgraded file is only read: the workspace opens a copy.
     copy = tmp_path / "openings.sqlite"
@@ -350,12 +363,6 @@ def test_stored_ready_marks_are_archived_with_an_event_and_ready_is_computed(tmp
     listed = Workspace(copy).list_applications(stage="ready", limit=200)
     assert {item["id"] for item in listed["items"]} == computed
     assert listed["stage_counts"]["ready"] == len(computed)
-    stored = {row[0] for row in marks}
-    assert verify["aggregates"](pre_upgrade)["ready"] == {
-        "stored and computed": len(stored & computed),
-        "stored, not computed": len(stored - computed),
-        "computed, not stored": len(computed - stored),
-    }
 
 
 # #213 Preferences replace Policy.
@@ -528,13 +535,14 @@ def test_long_preference_texts_become_several_items_within_the_limit(tmp_path):
         f"UPDATE settings SET data='{instructions}' WHERE key='instructions'; "
         f"UPDATE policy_items SET note='{note}' WHERE label='Work authorization';",
     )
-    # The rehearsal reports the items after splitting (scripts/verify_m15.py).
-    verify = runpy.run_path(str(Path(__file__).parents[2] / "scripts" / "verify_m15.py"))
-    assert verify["aggregates"](path)["preference_items_after_splitting"] == {
-        "texts longer than 2000 characters": 2,
-        "items they become": 5,
-        "items longer than 2000 characters after splitting": 0,
-    }
+    # Before the upgrade: two texts are too long, and they split into five items.
+    with closing(sqlite3.connect("file::memory:", uri=True)) as conn:
+        conn.executescript(m15.SCHEMA_SQL.read_text())
+        conn.execute("ATTACH DATABASE ? AS old", (path.resolve().as_uri() + "?mode=ro",))
+        statements = m15.preference_statements(conn)[0].values()
+        every = [item["text"] for items in statements for item in items]
+    pieces = [m15.split_text(text) for text in every if len(text) > m15.PREFERENCE_ITEM_LIMIT]
+    assert len(pieces) == 2 and sum(len(split) for split in pieces) == 5
     Database(path)
     sections = preferences(path)
     every = [item for section in sections.values() for item in section[0]]
