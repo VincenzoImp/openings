@@ -216,25 +216,6 @@ def seed_library(app, agent):
         )
 
 
-# What a search needs to open in the source editor with its fields filled in.
-SEARCHES = {
-    "Python engineer Zurich": {"query": "python engineer", "location": "Zurich"},
-    "Data engineer remote Europe": {"query": "data engineer", "location": "Remote"},
-}
-
-
-def complete_searches(workspace):
-    """Give the seeded searches their keywords, place and country, as the editor saves them."""
-    with workspace.db.transaction() as conn:
-        for name, fields in SEARCHES.items():
-            row = conn.execute("SELECT id,config FROM sources WHERE name=?", (name,)).fetchone()
-            config = {**json.loads(row["config"]), **fields, "country": "switzerland"}
-            conn.execute(
-                "UPDATE sources SET config=?,schedule=? WHERE id=?",
-                (json.dumps(config), json.dumps({"kind": "interval"}), row["id"]),
-            )
-
-
 def seed(path, jobs=60, applications=53):
     """Build the synthetic workspace at `path`; return the owner's session cookie.
 
@@ -271,7 +252,6 @@ def seed(path, jobs=60, applications=53):
         # Before the numbered jobs, so those stay the newest records of every list.
         seed_today(app, client, lambda agent: seed_library(app, agent))
         seed_jobs(app)
-        complete_searches(workspace)
         cookie = client.post("/api/v1/auth/login", json={"password": PASSWORD}).cookies[COOKIE]
     # A large workspace (the performance budget) is written in one transaction.
     if jobs > LARGE:
