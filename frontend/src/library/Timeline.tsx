@@ -44,7 +44,6 @@ const SCOPES = [
   "applications",
   "notes",
   "documents",
-  "contexts",
   "files",
   "questions",
   "requests",
@@ -72,7 +71,6 @@ const TITLES: Record<string, string> = {
   note_unpinned: "Note unpinned",
   document_created: "Document revision saved",
   document_reviewed: "Document revision approved",
-  context_prepared: "Frozen copy of your record prepared",
 };
 const REPLIES: Record<ReplyKind, string> = {
   rejection: "Rejection",

@@ -24,7 +24,6 @@ export const subjectNames: Record<string, string> = {
   task: "Collection task",
   profile: "Profile",
   note: "Note",
-  context: "Context",
   document: "Document",
   file: "File",
   question: "Question",
@@ -43,7 +42,7 @@ export const changeGroups = [
   {
     id: "documents",
     label: "Documents",
-    types: ["document", "context", "file"],
+    types: ["document", "file"],
   },
   {
     id: "career",

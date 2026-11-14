@@ -201,7 +201,7 @@ class EventQuery(Input):
     subject_types: list[Annotated[str, Field(min_length=1, max_length=50)]] | None = Field(
         default=None,
         max_length=20,
-        description="Changes to any of these kinds of record, for example document, context and file.",
+        description="Changes to any of these kinds of record, for example document and file.",
     )
     job_id: str | None = Field(default=None, max_length=100)
     application_id: str | None = Field(default=None, max_length=100)

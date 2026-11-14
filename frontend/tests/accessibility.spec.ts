@@ -279,7 +279,6 @@ for (const theme of ["light", "dark"]) {
       for (const [id, tab] of [
         [ready.id, "answers"],
         [ready.id, "requirements"],
-        [ready.id, "inputs"],
         [ready.id, "documents"],
         [ready.id, "details"],
         [sent.id, "timeline"],

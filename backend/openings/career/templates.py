@@ -102,7 +102,7 @@ class TemplateOperations:
         return record_id
 
     def update_template(self, template_id: str, value: TemplateUpdate) -> dict:
-        """Revise template source/default/guidance with optimistic version checking; old contexts stay frozen."""
+        """Revise template source/default/guidance with optimistic version checking."""
         data = values(value)
         expected = data.pop("expected_version")
         with self.db.transaction() as conn:
@@ -146,7 +146,7 @@ class TemplateOperations:
         return self.get_template(template_id)
 
     def delete_template(self, template_id: str, expected_version: int) -> dict:
-        """Delete a live template and assets; prior application contexts retain their exact template/asset copies."""
+        """Delete a live template and its assets; document revisions are unchanged."""
         with self.db.transaction() as conn:
             row = _get(conn, "templates", template_id, "Template")
             check_version(row, expected_version)

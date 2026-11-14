@@ -64,10 +64,6 @@ const counted: Record<string, [string, string]> = {
     "applications marked ready",
   ],
   application_updated: ["application updated", "applications updated"],
-  context_prepared: [
-    "frozen copy of your record",
-    "frozen copies of your record",
-  ],
   document_created: ["document revision", "document revisions"],
   document_reviewed: ["document review", "document reviews"],
   file_uploaded: ["file uploaded", "files uploaded"],

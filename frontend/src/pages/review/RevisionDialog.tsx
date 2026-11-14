@@ -8,14 +8,10 @@ import {
   type DocumentWithUploads,
   type Document,
   type Json,
-  type ListResult,
 } from "../../api";
 import { Button, Dialog, Field, KeyValueEditor } from "../../design";
-import { dayTime } from "../../library/time";
-import { useResource, useWorkspace } from "../../state";
+import { useWorkspace } from "../../state";
 import { isSourceKind, kindLabels } from "./model";
-
-const NONE = { items: [], total: 0 };
 
 /**
  * Save a document as a new revision. A CV or letter is its PDF, with an
@@ -53,12 +49,6 @@ export function RevisionDialog({
   const [created, setCreated] = useState<string | null>(null);
   const [sourceSha, setSourceSha] = useState<string | null>(null);
   const [pdfDone, setPdfDone] = useState(false);
-  const contexts = useResource<ListResult<Json>>(
-    previous
-      ? null
-      : `/contexts?application_id=${application.id}&summary=true&limit=50`,
-    NONE,
-  );
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (structured && content.problem) return;
@@ -72,7 +62,6 @@ export function RevisionDialog({
       if (!id) {
         const document = await api<DocumentWithUploads>("/documents", "POST", {
           application_id: application.id,
-          context_id: previous?.context_id || form.get("context_id") || null,
           previous_id: previous?.id || null,
           kind,
           title: String(form.get("title") || ""),
@@ -149,19 +138,6 @@ export function RevisionDialog({
               disabled={locked}
             />
           </Field>
-          {!previous && (
-            <Field label="Written from" className="wide">
-              <select name="context_id" defaultValue="" disabled={locked}>
-                <option value="">No frozen copy</option>
-                {contexts.data.items.map((context) => (
-                  <option key={String(context.id)} value={String(context.id)}>
-                    {dayTime(String(context.created_at))}
-                    {context.template_name ? ` · ${context.template_name}` : ""}
-                  </option>
-                ))}
-              </select>
-            </Field>
-          )}
         </div>
         {sourceKind ? (
           <>

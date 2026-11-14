@@ -18,7 +18,7 @@ an agent can, without waiting for each request:
 | Prepare the CV and letter of every Shortlisted application until it is Ready, with PDF checks | [prepare-shortlist](../../skills/prepare-shortlist/SKILL.md) |
 | Keep searches and monitored companies effective; reduce noise | [manage-sources](../../skills/manage-sources/SKILL.md) |
 | Improve your Career record, claims, CV MASTER and letter template | [maintain-career](../../skills/maintain-career/SKILL.md) |
-| Prioritize Ready applications, find stale or expired ones, record what you report | [track-applications](../../skills/track-applications/SKILL.md) |
+| Prioritize Ready applications, find expired ones, record what you report | [track-applications](../../skills/track-applications/SKILL.md) |
 | Prepare you for interviews from the documents the employer received | [prepare-interview](../../skills/prepare-interview/SKILL.md) |
 | Write factual, evidence-based wording | [career-claims](../../skills/career-claims/SKILL.md) |
 | Connection, versions, transfers, shared references | [openings-workspace](../../skills/openings-workspace/SKILL.md) |

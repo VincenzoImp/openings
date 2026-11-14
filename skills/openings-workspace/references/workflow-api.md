@@ -48,18 +48,13 @@ mechanics, not personal selection or writing rules.
   a key reused for another job also conflicts. Resume the intended open attempt.
   Starting a later attempt after Closed requires the actual task's authority.
 
-## Contexts and documents
+## Inputs and documents
 
-- `contexts_create` / `POST /contexts` takes `application_id`,
-  explicit `template_ids`, optional `knowledge_ids`, `claim_ids`, `note` and
-  `idempotency_key`. It freezes job, Profile, the Preferences sections with
-  their versions (`preferences`), template guidance, evidence, claims, templates and selected source-file bytes,
-  and the application's pinned note as `instructions.application_note`, followed
-  by this request's `note`. Same key/request reuses the context; changed
-  input with the same key conflicts. Omitted selections use current defaults.
-- A context is a fixed input snapshot. Compare versions and relevant content
-  before reusing it. Prepare a new context when different inputs are needed.
-- `documents_create` / `POST /documents` takes application/context IDs,
+- Documents are written from the live records: `applications_get` (with
+  `pinned_note`), `jobs_get`, `profile_get`, `knowledge_list`, `claims_list`,
+  `templates_list`/`templates_get` and `preferences_get`. Read them again before
+  a new revision when inputs may have changed.
+- `documents_create` / `POST /documents` takes `application_id`,
   `kind: cv | letter | answers | other`, `title`, optional `note`,
   `claim_ids`, `knowledge_ids` and `previous_id`. A CV or letter takes no
   `content` (`422 content_not_accepted`): it is a required PDF
@@ -70,14 +65,13 @@ mechanics, not personal selection or writing rules.
   `idempotency_key`, returns the same revision. Changed output needs the proper
   parent; child revisions inherit no files.
 - Cite the evidence a revision uses: `claim_ids` of reused approved claims,
-  `knowledge_ids` of the Career entries behind new wording. Include them in the
-  context. Unknown frozen evidence/claim IDs are rejected; entailment is not
-  checked.
+  `knowledge_ids` of the Career entries behind new wording. Unapproved claims
+  (`unapproved_claim`) and unknown entries (`unknown_evidence`) are rejected;
+  entailment is not checked.
 - `documents_get` returns a CV or letter's `complete`, its `text` and
   `text_from` (`tex`: derived from the source without a TeX runtime; `pdf`:
   extracted from the PDF when there is no source; no text when extraction
-  fails), `source_sha256`, the cited ids, `note`, its files and,
-  for revisions saved before 0.22, the read-only `legacy_content`.
+  fails), `source_sha256`, the cited ids, `note` and its files.
   `documents_compare(document_id, other_id?)` /
   `GET /documents/{id}/comparison` compares the text with the revision it
   replaces (or `other_id`) line by line: `lines` of `same`, `added`, `removed`.

@@ -74,8 +74,7 @@ and in `writing` also `scope` (`all`, `cv` or `letter`):
 
 Writes record `preferences_updated` events (section, version, number of
 statements) and `settings_updated` events (changed names, version), never the
-text. A prepared application freezes the sections with their versions; the
-record export and backups include them. Synthetic Preferences to try are in
+text. The record export and backups include them. Synthetic Preferences to try are in
 [`examples/preferences.json`](../../examples/preferences.json).
 
 ## Upgrades
