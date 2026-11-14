@@ -12,6 +12,8 @@
     display: flex;
     flex: 1;
     min-height: 0;
+    /* The closed drawer waits just off the edge. */
+    overflow: clip;
   }
   .jobs-panel > .ui-split {
     flex: 1;
@@ -396,6 +398,18 @@
   @container app (max-width: 1023px) {
     .jobs-hint {
       display: none;
+    }
+    /* Beside the sidebar the tools keep to their icons. */
+    .jobs .ui-toolbar-tools .ui-search {
+      width: 140px;
+    }
+    .jobs .ui-toolbar-tools .ui-btn-label {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
     }
   }
   @container app (max-width: 719px) {

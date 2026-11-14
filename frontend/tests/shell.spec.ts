@@ -408,7 +408,8 @@ for (const width of [360, 390, 600, 719, 720, 1024, 1280, 1600])
       [`applications/${sent.id}?tab=timeline`, sent.job.title],
       [`applications/${ready.id}?tab=details`, ready.job.title],
       ["jobs", "Jobs"],
-      [`jobs?job=${flagged.id}`, "Jobs"],
+      // On a phone the job is its own page, titled by the job.
+      [`jobs?job=${flagged.id}`, width < 720 ? flagged.title : "Jobs"],
       ["jobs?section=dismissed", "Jobs"],
       ["jobs?section=all", "Jobs"],
       ["profile?section=knowledge", "Profile"],
