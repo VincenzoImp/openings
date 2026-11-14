@@ -40,7 +40,7 @@ class JobInput(Input):
         default=None,
         min_length=1,
         max_length=200,
-        description="Retrying with the same key and request returns the record the first request created.",
+        description="A retry with the same key returns the first result.",
     )
 
     @field_validator("url")
@@ -104,16 +104,12 @@ class NoteInput(Input):
         default=None,
         min_length=1,
         max_length=200,
-        description="Retrying with the same key and request returns the record the first request created.",
+        description="A retry with the same key returns the first note.",
     )
     application_id: str | None = Field(
-        default=None,
-        description="Write the note on this application of the job; omit for a note on the job itself.",
+        default=None, description="Put the note on this application of the job."
     )
-    pinned: bool = Field(
-        default=False,
-        description="Pin the note: it is listed first in its timeline. A job and an application each have at most one pinned note; pinning another unpins it.",
-    )
+    pinned: bool = False
 
 
 class NotePin(Versioned):
@@ -146,24 +142,22 @@ Priority = Annotated[int, Field(ge=1, le=5, description="1 is the highest priori
 
 
 class Requirement(Input):
-    """One employer requirement found in a posting or application form."""
+    """An employer requirement from the posting or the form."""
 
     id: str | None = Field(
         default=None,
         min_length=1,
         max_length=100,
-        description="Stable identifier; assigned when omitted.",
+        description="Assigned when omitted.",
     )
     kind: RequirementKind = "other"
     text: str = Field(min_length=1, max_length=2000, description="The requirement as stated.")
     blocking: bool = Field(
         default=False,
-        description="True when documents must not be prepared or submitted until it is resolved.",
+        description="Blocks Ready until resolved.",
     )
     resolved: bool = False
-    note: str = Field(
-        default="", max_length=2000, description="Resolution, owner decision or open question."
-    )
+    note: str = Field(default="", max_length=2000, description="Resolution or open question.")
 
 
 def valid_deadline(value):
@@ -251,7 +245,7 @@ def required_documents_field(default):
     return Field(
         default=default,
         max_length=2,
-        description="The documents Ready needs: a subset of cv and letter (both by default). Form answers never affect Ready.",
+        description="What Ready needs (default cv and letter).",
     )
 
 
@@ -293,7 +287,9 @@ class ReplyChange(Input):
         return self
 
 
-class ApplicationPatch(Versioned):
+class ApplicationFields(Input):
+    """The fields of an application change; ApplicationPatch adds its version."""
+
     status: Stage | None = Field(
         default=None,
         description="applied is Mark applied (applied_at defaults to now); shortlisted again undoes it while the application has no reply, clearing applied_at. Record an employer reply with reply, which sets the stage itself.",
@@ -344,8 +340,22 @@ class ApplicationPatch(Versioned):
         return self
 
 
+class ApplicationPatch(Versioned, ApplicationFields):
+    """A change of one application, with its version."""
+
+
 class NotePatch(Versioned):
-    body: str = Field(min_length=1, max_length=30_000)
+    body: str | None = Field(default=None, min_length=1, max_length=30_000)
+    pinned: bool | None = Field(
+        default=None,
+        description="true pins it (unpinning the other note of its job or application); false unpins it.",
+    )
+
+    @model_validator(mode="after")
+    def some_change(self):
+        if self.body is None and self.pinned is None:
+            raise ValueError("Give body, pinned or both.")
+        return self
 
 
 TimelineKind = Literal["note", "event", "reply"]
@@ -445,9 +455,14 @@ class DuplicateQuery(Input):
 
 class JobQuery(Input):
     q: str = Field(default="", max_length=1000)
+    url: str | None = Field(
+        default=None,
+        max_length=4000,
+        description="Jobs posted at this URL (board and redirect variants too).",
+    )
     triage: Literal["new", "shortlisted", "dismissed", "active"] | None = Field(
         default=None,
-        description="new (to review), shortlisted (each has an application), dismissed, or active (not dismissed).",
+        description="new, shortlisted, dismissed or active (not dismissed).",
     )
     company: str | None = Field(default=None, max_length=300)
     location: str | None = Field(default=None, max_length=500)
@@ -461,53 +476,51 @@ class JobQuery(Input):
         Literal["likely_duplicate", "no_longer_listed", "language_required", "pending"] | None
     ) = Field(
         default=None,
-        description="Only jobs with this ingest signal: likely_duplicate (flagged as a copy of an earlier job), no_longer_listed (the board stopped listing it), language_required (the posting states a required language) or pending (signals not computed yet).",
+        description="likely_duplicate, no_longer_listed, language_required or pending (not computed yet).",
     )
     posting_language: str | None = Field(
         default=None,
         max_length=40,
-        description="Only postings written in this language (ISO 639-1 code such as de, or a name such as German).",
+        description="Written in this language (ISO 639-1 code or name).",
     )
     posting_language_not: str | None = Field(
         default=None,
         max_length=40,
-        description="Only postings whose detected language is another one; postings of unknown language are left out.",
+        description="Written in another known language.",
     )
     requires: str | None = Field(
         default=None,
         max_length=40,
-        description="Only postings that state this language as required (alone or as one of alternatives).",
+        description="Postings that require this language.",
     )
     dismissed_by: str | None = Field(
         default=None,
         max_length=200,
         pattern=r"^(owner|agent|system|agent:.+)$",
-        description="Only dismissed jobs, by who dismissed them: agent (any agent token), agent:<token name>, owner (dashboard or owner token) or system (job sources, or before 0.21 without a record).",
+        description="Dismissed by owner, agent, agent:<token name> or system.",
     )
     batch_id: str | None = Field(
         default=None,
         max_length=100,
-        description="Only jobs changed by one REST request or MCP tool call (its batch_id, as events_list and histories show it). Restore an agent's dismissals with jobs_bulk action inbox.",
+        description="Jobs changed by one call (its batch_id in changes_list).",
     )
-    since: Since | None = Field(
-        default=None, description="Only jobs dismissed at or after this time."
-    )
+    since: Since | None = Field(default=None, description="Dismissed at or after this time.")
     hide_unspoken_required: bool | None = Field(
         default=None,
-        description="true: leave out jobs that require a language outside the owner's spoken_languages (settings); nothing is dismissed. With true or false the response's unspoken_required gives how many jobs of these filters require such a language. No effect while spoken_languages is empty.",
+        description="true hides jobs requiring a language outside spoken_languages; unspoken_required counts them.",
     )
     sort: Literal["newest", "oldest", "company", "title", "dismissed"] = Field(
-        default="newest", description="dismissed: most recently dismissed first."
+        default="newest", description="dismissed: latest dismissal first."
     )
     limit: int = Field(default=50, ge=1, le=200)
     offset: int = Field(default=0, ge=0)
     include_facets: bool = Field(
         default=False,
-        description="Also return up to 200 distinct companies/locations/sources/job types matching the filters.",
+        description="Also distinct companies, locations, sources and job types.",
     )
     include_counts: bool = Field(
         default=False,
-        description="Also return counts: jobs by triage (new, shortlisted, dismissed, all) and dismissed jobs by who dismissed them, for the same search, company, location, source, date and signal filters.",
+        description="Also totals by triage and by who dismissed.",
     )
 
     @model_validator(mode="after")
@@ -523,21 +536,19 @@ class ApplicationQuery(Input):
     stage: Literal["shortlisted", "ready", "applied", "interview", "offer", "closed"] | None = (
         Field(
             default=None,
-            description="Only applications in this stage; ready is the Shortlisted ones that are Ready (every required document complete, no open blocking requirement).",
+            description="ready: Shortlisted with every required document complete and nothing blocking.",
         )
     )
     needs: Literal["documents", "reply_overdue"] | None = Field(
         default=None,
-        description="documents: Shortlisted applications missing a required document; reply_overdue: Applied applications without a reply for longer than the no-reply period, to close as no_response by hand.",
+        description="documents: Shortlisted, missing a document; reply_overdue: Applied, no reply past no_reply_days.",
     )
     outcome: Outcome | None = None
     company: str | None = Field(default=None, max_length=300)
-    applied_since: Since | None = Field(
-        default=None, description="Only applications recorded as applied at or after this time."
-    )
+    applied_since: Since | None = Field(default=None, description="Applied at or after this time.")
     applied_until: Until | None = Field(
         default=None,
-        description="Only applications recorded as applied at or before this time; with stage=applied, the ones still waiting for a reply.",
+        description="Applied at or before this time.",
     )
     sort: Literal[
         "updated",
@@ -551,3 +562,95 @@ class ApplicationQuery(Input):
     ] = "updated"
     limit: int = Field(default=100, ge=1, le=200)
     offset: int = Field(default=0, ge=0)
+
+
+# Batch reads and writes (the MCP tools and their REST twins). Each item of a batch
+# write succeeds or fails on its own: rules are checked per item by the services.
+Identifier = Annotated[str, Field(min_length=1, max_length=100)]
+
+
+class JobIds(Input):
+    ids: list[Identifier] = Field(min_length=1, max_length=20, description="Up to 20 job ids.")
+
+
+class ApplicationIds(Input):
+    ids: list[Identifier] = Field(
+        min_length=1, max_length=20, description="Up to 20 application ids."
+    )
+
+
+class TriageItem(Input):
+    job_id: Identifier
+    to: Triage = Field(description="new, shortlisted (starts its application) or dismissed.")
+    reason: str | None = Field(
+        default=None,
+        max_length=500,
+        description="Required with dismissed: one sentence the owner reads.",
+    )
+
+
+class JobTriage(Input):
+    items: list[TriageItem] = Field(min_length=1, max_length=200)
+
+
+class LinkInput(Input):
+    other_id: Identifier = Field(description="The job flagged as its likely duplicate.")
+    decision: Literal["same", "different"] = Field(
+        description="same merges job_id into other_id (other_id survives); different clears the flag."
+    )
+    expected_version: int | None = Field(
+        default=None, ge=1, description="Required with same: job_id's version."
+    )
+    other_version: int | None = Field(
+        default=None, ge=1, description="With same, optional: other_id's version."
+    )
+
+
+class ApplicationsCreate(Input):
+    items: list[ApplicationInput] = Field(min_length=1, max_length=50)
+
+
+class NewReply(Input):
+    kind: ReplyKind
+    date: PastDay | None = Field(default=None, description="YYYY-MM-DD; today when omitted.")
+    note: str | None = Field(default=None, max_length=2000)
+
+
+class ReplyFix(Input):
+    reply_id: Identifier
+    kind: ReplyKind | None = None
+    date: PastDay | None = None
+    note: str | None = Field(default=None, max_length=2000)
+    delete: bool = False
+
+
+class ApplicationItem(Input):
+    application_id: Identifier
+    stage: Stage | None = Field(
+        default=None,
+        description="applied only when the owner says they applied; closed needs outcome.",
+    )
+    outcome: Outcome | None = None
+    applied_on: PastDay | None = Field(
+        default=None, description="With applied: the day it was sent; today when omitted."
+    )
+    concluded_on: PastDay | None = None
+    reply: NewReply | None = Field(
+        default=None,
+        description="An employer reply: interview, offer and rejection move the stage; other never does.",
+    )
+    reply_fix: ReplyFix | None = Field(
+        default=None, description="Correct or delete a recorded reply."
+    )
+    priority: Priority | None = None
+    deadline: Day | None = None
+    required_documents: list[DocumentKindRequired] | None = Field(default=None, max_length=2)
+    requirements: list[Requirement] | None = Field(
+        default=None, max_length=100, description="Replaces the list; keep ids to keep items."
+    )
+    questions: list[Question] | None = Field(default=None, max_length=100)
+    answers: dict[str, Any] | None = None
+
+
+class ApplicationsUpdate(Input):
+    items: list[ApplicationItem] = Field(min_length=1, max_length=200)

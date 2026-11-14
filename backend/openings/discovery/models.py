@@ -7,6 +7,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from ..collectors.catalog import COMPANY_KINDS
+from ..collectors.policy import ProviderPatch
 from ..scheduling import IntervalSchedule, Schedule
 
 SourceKind = Literal["auto", "jobspy", "rss", *COMPANY_KINDS]
@@ -42,7 +43,7 @@ class SourceCreate(SourcePreview):
         default=None,
         min_length=1,
         max_length=200,
-        description="Retrying with the same key and request returns the record the first request created.",
+        description="A retry with the same key returns the first result.",
     )
 
 
@@ -68,9 +69,27 @@ class SourcePatch(Input):
         return self
 
 
+class ProviderChange(ProviderPatch):
+    provider_id: str = Field(min_length=1, max_length=100)
+
+
 class CollectionWrite(Input):
-    enabled: bool
-    expected_version: int = Field(ge=0)
+    """The collection switch with its version; also provider limits and fetches to stop
+    or retry (each applied on its own, results in ``results``)."""
+
+    expected_version: int = Field(ge=0, description="The collection's version.")
+    enabled: bool | None = Field(default=None, description="Scheduled collection on or off.")
+    providers: list[ProviderChange] = Field(
+        default_factory=list,
+        max_length=50,
+        description="Provider limits, each with its own expected_version.",
+    )
+    cancel: list[str] = Field(
+        default_factory=list, max_length=200, description="Fetch (task) or run ids to stop."
+    )
+    retry: list[str] = Field(
+        default_factory=list, max_length=200, description="Failed or cancelled fetch ids."
+    )
 
 
 class SourceVersion(Input):
@@ -109,6 +128,43 @@ class SourceConfigure(Input):
         return self
 
 
+class SourceItem(Input):
+    """A source to create (no source_id) or update (source_id and expected_version)."""
+
+    source_id: str | None = Field(default=None, description="Update this source; omit to add.")
+    expected_version: int | None = Field(default=None, ge=1, description="Required to update.")
+    name: str | None = Field(default=None, max_length=200)
+    url: str | None = Field(default=None, max_length=2000)
+    kind: SourceKind | None = None
+    config: dict[str, Any] | None = None
+    filters: Filters | None = None
+    enabled: bool | None = Field(default=None, description="false pauses it.")
+    schedule: Schedule | None = None
+    idempotency_key: str | None = Field(default=None, min_length=1, max_length=200)
+
+
+class SourcesSave(Input):
+    items: list[SourceItem] = Field(min_length=1, max_length=50)
+
+
+class SourceRunInput(Input):
+    """Fetch a saved source now, or preview a saved or unsaved one without storing jobs."""
+
+    source_id: str | None = Field(default=None, description="The saved source.")
+    expected_version: int | None = Field(
+        default=None, ge=1, description="Required to fetch a saved source."
+    )
+    preview: bool = Field(
+        default=False, description="true: up to 20 postings it would collect, nothing stored."
+    )
+    name: str | None = Field(default=None, max_length=200)
+    url: str | None = Field(default=None, max_length=2000)
+    kind: SourceKind | None = None
+    config: dict[str, Any] | None = None
+    filters: Filters | None = None
+    overrides: RunOverrides | None = None
+
+
 class Query(BaseModel):
     """The filters and page of a list: MCP's value, REST's query string (not strict)."""
 
@@ -127,6 +183,14 @@ class SourceQuery(Query):
     limit: int = 100
     offset: int = 0
     summary: bool = True
+
+
+class CollectionQuery(Query):
+    include: list[Literal["kinds", "providers", "fetches"]] = Field(
+        default_factory=list,
+        description="kinds: source kinds and their config fields; providers: limits and "
+        "cooldowns; fetches: active and failed fetches.",
+    )
 
 
 class TaskQuery(Query):

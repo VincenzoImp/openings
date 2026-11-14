@@ -12,7 +12,7 @@ import {
 import { useWorkspace } from "../../state";
 
 interface Preview {
-  knowledge: Partial<Knowledge>[];
+  entries: Partial<Knowledge>[];
   profile?: Record<string, unknown>;
   expected_profile_version?: number;
   warnings: string[];
@@ -38,7 +38,7 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
       await mutate(
         () =>
           api("/career/import", "POST", {
-            knowledge: preview.knowledge,
+            entries: preview.entries,
             profile: preview.profile,
             expected_profile_version: preview.expected_profile_version,
           }),
@@ -131,7 +131,7 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
             )}
             <div className="card preview-list">
               <List label="Entries to add">
-                {preview.knowledge.map((entry, index) => (
+                {preview.entries.map((entry, index) => (
                   <ListRow
                     key={index}
                     title={entry.title}

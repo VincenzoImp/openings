@@ -18,7 +18,7 @@ from ..auth import COOKIE, MAX_AGE
 from ..db import SCHEMA_VERSION
 from ..errors import DomainError
 from ..operations import backup_file_for, restore_upload
-from ..removed import REMOVED
+from ..removed import ROUTES
 from ..skills import read_skill
 from ..transfers import RecordsResponse, export_records
 from .operation import API_PREFIX, capability_entries
@@ -33,10 +33,10 @@ TRANSPORT_ONLY = (
     ("GET", "/backup", "Streams a SQLite backup, with a session, a token or a grant."),
     ("POST", "/backup/restore", "Owner only: receives a raw SQLite upload that replaces data."),
     ("GET", "/backups/{name}", "Owner only: streams a kept backup file."),
-    ("GET", "/export", "Streams the JSON records, with a session, a token or a grant."),
+    ("GET", "/export", "Owner only: streams the JSON records, with a session, a token or a grant."),
     ("GET", "/examples", "Lists the shipped example files, not workspace records."),
     ("GET", "/examples/{name}", "Downloads a shipped example file."),
-    ("PUT", "/transfers", "Receives raw file bytes under an upload grant (files_reserve_upload)."),
+    ("PUT", "/transfers", "Receives raw file bytes under an upload grant (files_upload)."),
     ("GET", "/transfers", "Streams raw file bytes under a download grant."),
     ("GET", "/files/{file_id}/content", "Streams a file's bytes for the dashboard preview."),
     ("GET", "/skills/{name}/files/{path}", "A skill file by path, so relative links resolve."),
@@ -142,9 +142,10 @@ def register_transport(app, router, public_url):
         _, path = backups.find(workspace.db, name)
         return FileResponse(path, media_type="application/vnd.sqlite3", filename=path.name)
 
-    @router.get("/export", tags=["workspace"])
+    @router.get("/export", tags=["owner"], openapi_extra={"x-openings-access": "owner"})
     def export():
-        """Download the workspace records as JSON, without file bytes or credentials."""
+        """Download the workspace records as JSON, without file bytes or credentials (owner only)."""
+        require_owner("export the records")
         return RecordsResponse(export_records(workspace.db))
 
     @router.get("/examples", tags=["workspace"])
@@ -171,8 +172,8 @@ def register_transport(app, router, public_url):
     async def upload(request: Request):
         """Upload raw file bytes with a grant.
 
-        The second step of files_reserve_upload or of a revision's uploads: PUT the exact
-        bytes to the grant's url with its headers (X-Transfer-Token). Returns the file.
+        The second step of files_upload or of a revision's uploads: PUT the exact bytes to
+        the grant's url with its headers (X-Transfer-Token). Returns the file.
         """
         return await app.state.documents.upload(request)
 
@@ -209,7 +210,7 @@ def register_transport(app, router, public_url):
             return JSONResponse({**body, "status": "worker_stalled"}, status_code=503)
         return body
 
-    for item in REMOVED:
+    for item in ROUTES:
         for route in item.routes:
             method, path = route.split(" ", 1)
             router.add_api_route(path, _gone(item), methods=[method], include_in_schema=False)

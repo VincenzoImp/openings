@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from ..collectors.policy import ProviderBudget, ProviderStore, provider_for_url
+from .batches import SourceBatches
 from .network import MAX_FEED_BYTES, fetch_bytes, public_addresses, public_url
 from .runs import RunOperations
 from .sources import SourceOperations
 from .tasks import TaskOperations
 
 
-class DiscoveryService(SourceOperations, RunOperations, TaskOperations):
+class DiscoveryService(SourceBatches, SourceOperations, RunOperations, TaskOperations):
     def __init__(self, workspace):
         self.workspace = workspace
         self.db = workspace.db

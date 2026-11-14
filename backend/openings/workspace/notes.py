@@ -115,11 +115,16 @@ class Notes:
         return {"deleted": True}
 
     def update_note(self, note_id, value):
+        """Edit a note's body, pin or unpin it, or both, with its version."""
         value = value if isinstance(value, NotePatch) else NotePatch.model_validate(value)
         with self.db.transaction() as connection:
             row = connection.execute("SELECT * FROM notes WHERE id=?", (note_id,)).fetchone()
             check_version(row, value.expected_version)
-            self.edit_note_body(connection, row, value.body)
+            if value.body is not None:
+                self.edit_note_body(connection, row, value.body)
+                row = connection.execute("SELECT * FROM notes WHERE id=?", (note_id,)).fetchone()
+            if value.pinned is not None:
+                self._pin(connection, row, value.pinned)
         return self.get_note(note_id)
 
     def edit_note_body(self, conn, row, body):
@@ -144,12 +149,15 @@ class Notes:
         with self.db.transaction() as conn:
             row = conn.execute("SELECT * FROM notes WHERE id=?", (note_id,)).fetchone()
             check_version(row, value.expected_version)
-            if value.pinned and row["pinned_at"] is None:
-                self._unpin_scope(conn, row["job_id"], row["application_id"], note_id)
-                self._set_pin(conn, row, now(), "note_pinned")
-            elif not value.pinned and row["pinned_at"] is not None:
-                self._set_pin(conn, row, None, "note_unpinned")
+            self._pin(conn, row, value.pinned)
         return self.get_note(note_id)
+
+    def _pin(self, conn, row, pinned):
+        if pinned and row["pinned_at"] is None:
+            self._unpin_scope(conn, row["job_id"], row["application_id"], row["id"])
+            self._set_pin(conn, row, now(), "note_pinned")
+        elif not pinned and row["pinned_at"] is not None:
+            self._set_pin(conn, row, None, "note_unpinned")
 
     def _set_pin(self, conn, row, stamp, kind, payload=None):
         conn.execute(

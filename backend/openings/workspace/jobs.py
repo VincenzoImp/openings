@@ -242,7 +242,12 @@ class JobReads:
         hide_unspoken_required=None,
         batch_id=None,
         since=None,
+        url=None,
     ):
+        if url:
+            # The archived jobs posted at a URL (its identities), as resolve_jobs finds them.
+            found = self.resolve_jobs({"url": url})
+            return {"items": found["items"], "total": found["total"]}
         limit, offset = min(max(int(limit), 1), 200), max(int(offset), 0)
         signal_filters = {
             "signal": signal,
