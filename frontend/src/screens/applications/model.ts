@@ -151,7 +151,7 @@ export function statusPhrase(
   const sent = `Applied ${shortDay(app.applied_at, now)}`;
   if (reply) return { text: `${sent} · replied ${shortDay(reply, now)}` };
   const waited = daysBetween(app.applied_at, now);
-  if (waited <= 0) return { text: `${sent} · today` };
+  if (waited <= 0) return { text: "Applied today" };
   return toned(
     `${sent} · no reply ${plural(waited, "day")}`,
     waited > noReplyDays ? "warning" : undefined,
@@ -369,7 +369,7 @@ export function followUpLine(
   if (!app.applied_at) return { text: "Applied" };
   const waited = daysBetween(app.applied_at, now);
   return waited <= 0
-    ? { text: `${sent} · today` }
+    ? { text: "Applied today" }
     : toned(
         `${sent} · no reply for ${plural(waited, "day")}`,
         waited > noReplyDays ? "warning" : undefined,
@@ -407,11 +407,11 @@ export function closedSummary(
   }
 }
 
-/** "by you", "by career-agent", "by job sources"; nothing when unknown. */
+/** "by you", "by career-agent", "automatically"; nothing when unknown. */
 export function actorPhrase(label?: string | null) {
   if (!label) return "";
   if (label === "owner") return "by you";
-  if (label === "system") return "by job sources";
+  if (label === "system") return "automatically";
   if (label.startsWith("agent:")) return `by ${label.slice(6) || "an agent"}`;
   return `by ${label}`;
 }

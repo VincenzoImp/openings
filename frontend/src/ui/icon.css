@@ -18,7 +18,7 @@
     color: var(--text-2);
   }
   .ui-glyph[data-stage="interview"] {
-    color: var(--warning);
+    color: var(--text);
   }
   .ui-glyph[data-stage="offer"] {
     color: var(--success);

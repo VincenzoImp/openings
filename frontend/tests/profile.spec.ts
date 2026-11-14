@@ -97,6 +97,19 @@ test("the header is edited and cancelled; leaving with changes asks first", asyn
     const ask = page.getByRole("dialog", { name: "Discard unsaved changes?" });
     await ask.getByRole("button", { name: "Keep editing" }).click();
     await expect(header.getByLabel("Headline")).toHaveValue("Changed headline");
+    // Leaving the screen asks in the page's own dialog, never the browser's.
+    let native = false;
+    page.on("dialog", (dialog) => {
+      native = true;
+      void dialog.dismiss();
+    });
+    await page.getByRole("link", { name: /^Jobs/ }).first().click();
+    const leave = page.getByRole("dialog", {
+      name: "Discard unsaved changes?",
+    });
+    await leave.getByRole("button", { name: "Keep editing" }).click();
+    await expect(page).toHaveURL(/#profile/);
+    expect(native).toBe(false);
   }
   await header.getByLabel("Headline").press("Escape");
   await page
