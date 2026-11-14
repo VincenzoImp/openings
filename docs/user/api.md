@@ -5,10 +5,12 @@ Base path: `/api/v1`. The server describes every operation, field and error: rea
 installation. They are the reference; this page covers only what they do not.
 Without a server, `uv run python -m openings.openapi` prints the schema.
 
-The dashboard, REST and MCP use the same operations. `operationId` in OpenAPI is
-the MCP tool name, and `x-openings-access: owner` marks the owner-only routes,
-which are not MCP tools. `GET /api/v1/capabilities` (authenticated) lists each
-operation's MCP name, route and access.
+The dashboard, REST and MCP use the same operations. Each operation's `summary`
+is the first line of its description. For an operation that is also an MCP tool,
+the `operationId` is the tool's name; a REST-only operation names the tool that
+does its work in `x-openings-mcp`. `x-openings-access: owner` marks the
+owner-only operations, which are not MCP tools. `GET /api/v1/capabilities`
+(authenticated) lists each operation's name, route and access.
 
 ## Authentication
 
@@ -107,18 +109,42 @@ MCP and JSON carry no file bytes, so a file goes up in two steps:
    template or job file. The result has `uploads`, one grant per file, each with an
    absolute `url`, `headers` and a ready `curl` line.
 2. `PUT` the exact bytes to the grant's `url` with its headers (`X-Transfer-Token`;
-   no bearer token). When `uploads` has a source grant too, send the source first. With a source, the
-   PDF's request names its SHA-256, and a PDF built from another source is
-   refused.
+   no bearer token). When `uploads` has a source grant too, send the source first.
+   With a source, the PDF's request names its SHA-256, and a PDF built from another
+   source is refused.
 
 ```bash
-curl -fsS -X PUT -H 'X-Transfer-Token: ...' --data-binary @'cv.pdf' \
-  'http://127.0.0.1:8080/api/v1/transfers'
+# 1. A CV revision for an application; the answer holds uploads.pdf.
+curl -fsS "$OPENINGS_URL/api/v1/documents" \
+  -H "Authorization: Bearer $OPENINGS_TOKEN" -H 'Content-Type: application/json' \
+  --data '{"kind":"cv","application_id":"a_01","pdf":{"name":"cv.pdf","size":48213}}'
+# 2. The bytes, with the grant's url and header.
+curl -fsS -X PUT -H 'X-Transfer-Token: ...' --data-binary @cv.pdf "$GRANT_URL"
+# 3. The revision is complete.
+curl -fsS "$OPENINGS_URL/api/v1/documents/d_01" -H "Authorization: Bearer $OPENINGS_TOKEN"
 ```
 
-A grant works once and expires after ten minutes; files are limited to 20 MiB. The
+An upload grant accepts one file and expires after ten minutes; sending the same
+bytes again is safe, and other bytes are refused. Files are limited to 20 MiB. The
 revision is complete when its PDF is stored, and a complete revision never changes.
-A download works the same way: `POST /files/{id}/download` returns a grant to `GET`.
+A download works the same way: `POST /files/{id}/download` returns a link to `GET`,
+which works once.
 
 The origin of the grant's `url` and `curl` line is `OPENINGS_PUBLIC_URL` (else the origin
 the request reached), so it must be reachable from the machine that runs it.
+
+## Names
+
+Values and fields behind the words of the dashboard:
+
+| Word | In REST and MCP |
+|---|---|
+| Triage of a job | `triage`: `new`, `shortlisted`, `dismissed` |
+| Stage of an application | `stage`: `shortlisted`, `applied`, `interview`, `offer`, `closed` |
+| Ready, and what is missing | `ready`, `missing`, computed on every application |
+| CV, letter | document `kind`: `cv`, `letter` |
+| Career entry | `/career/entries`, `career_id` |
+| Highlight | `/career/highlights`, `highlight_id`; the star is `always_include` |
+| Preferences | `/preferences/{section}` |
+| Reply | `reply`, `replies` |
+| Source | `/sources`, tools `sources_*` |

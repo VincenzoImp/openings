@@ -1,6 +1,6 @@
 ## Why
 
-<!-- The problem or user workflow this change addresses. Link issues with "Fixes #123". -->
+<!-- The problem or workflow this change addresses. Link issues with "Fixes #123". -->
 
 ## What
 
@@ -8,31 +8,13 @@
 
 ## Checks
 
-<!-- Commands you ran and their results; see CONTRIBUTING.md → Verify a change. -->
-
-- [ ] `uv run ruff check backend scripts` and `uv run ruff format --check backend scripts`
-- [ ] `uv run pytest -n auto` (and `-m performance` for hot paths or migrations)
-- [ ] `npm --prefix frontend run build`, `npm --prefix frontend run format:check` and `npm --prefix frontend test`
-- [ ] Browser workflows (`npm run test:e2e` in `frontend`) for dashboard changes
-- [ ] `python3 scripts/bump_version.py --check` (releases only change versions with `scripts/bump_version.py`)
-
-## Contract
-
-- [ ] Business logic lives in shared services; new operations are declared in `interfaces/`
-- [ ] Parity: every dashboard action is a REST operation, and every operation that is not owner-only is also an MCP tool (`backend/tests/test_parity.py`)
-- [ ] Versioned updates, immutable contexts/revisions, exact file ownership and deletion rules still hold
-- [ ] Database changes include a migration, backup/restore handling and a CHANGELOG note on the schema
-- [ ] Dashboard changes checked with populated data at desktop and mobile widths, keyboard access and loading/error states
+- [ ] I ran the checks in CONTRIBUTING.md › Check a change, and the browser tests for a dashboard change
+- [ ] Business logic stays in shared services; every dashboard action is a REST operation, and every operation that is not owner-only is an MCP tool or names one (`mcp=`)
+- [ ] Versioned updates, immutable document revisions, exact file ownership and deletion rules still hold
+- [ ] A schema change edits the unreleased migration and its tests, and the CHANGELOG says what it means for upgrade and restore
+- [ ] Tests, fixtures, examples and screenshots use synthetic data only
+- [ ] User docs, skills and CHANGELOG (Unreleased) follow any change of behavior
 
 ## Screens
 
-<!-- For a dashboard change: images from the `screenshots` artifact of the Screenshots workflow, or `npm --prefix frontend run screenshots`. Delete this section otherwise. -->
-
-- [ ] Every changed screen is embedded below (before and after for a rebuilt screen)
-- [ ] Desktop (1440×1000) and mobile (390×844)
-- [ ] Light and dark themes
-
-## Public repository
-
-- [ ] Tests, fixtures, examples and screenshots use synthetic data only; no databases, credentials or personal documents
-- [ ] User docs, skills and CHANGELOG (Unreleased) are updated where behavior changes
+<!-- For a dashboard change: images of every changed screen, desktop and mobile, light and dark, from the Screenshots workflow's artifact or `npm --prefix frontend run screenshots`. Delete this section otherwise. -->

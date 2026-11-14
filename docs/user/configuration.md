@@ -1,19 +1,20 @@
 # Configuration
 
 Openings reads a few environment variables at start. With Docker Compose, set them
-in `.env` next to `docker-compose.yml` (see [`.env.example`](../../.env.example))
-and recreate the container with `docker compose up -d`; a restart alone keeps the
+in `.env` next to `docker-compose.yml` (copy [`.env.example`](../../.env.example),
+which lists them) and recreate the container with `docker compose up -d`; a restart alone keeps the
 old values. From source, export them before `uv run openings`, or use the matching
 command-line option where one exists.
 
 Every other setting lives in the workspace and is changed in the dashboard, REST or
-MCP: sources, provider request spacing, Preferences, tokens and the owner password.
+MCP: sources, the spacing of requests to job sites, Preferences, tokens and the
+owner password.
 
 ## Server
 
 | Variable | Default | What it does |
 |---|---|---|
-| `OPENINGS_PUBLIC_URL` | unset (Compose: `http://127.0.0.1:8080`) | The origin browsers and agents use. MCP accepts this host besides `localhost`; file-transfer grants and their `curl` lines start with it; cookies are secure when it starts with `https://`. |
+| `OPENINGS_PUBLIC_URL` | unset (Compose: `http://127.0.0.1:8080`) | The address browsers and agents use to reach Openings. Set it when other devices or agents connect. MCP accepts its host besides `localhost`, upload and download links start with it, and cookies are secure when it starts with `https://`. |
 | `OPENINGS_PASSWORD` | unset | First-run owner password, at least 10 characters. Used only while no owner password exists. |
 | `OPENINGS_TRUSTED_PROXIES` | empty: trust none | Comma-separated IPs or CIDR ranges of reverse proxies whose `X-Forwarded-For` and `X-Forwarded-Proto` are trusted. An invalid entry stops the start. Option `--trusted-proxies`. |
 | `OPENINGS_RETENTION_DAYS` | `90` | Days finished collection runs and tasks are kept; `0` keeps all. The 20 newest runs of every source always stay. |
@@ -30,7 +31,7 @@ A retention or backup count that is not a number falls back to its default with 
 |---|---|---|
 | `OPENINGS_BIND` | `127.0.0.1` | Host address the port is published on; `0.0.0.0` exposes it to the network. |
 | `OPENINGS_PORT` | `8080` | Host port; the container listens on 8080. Update `OPENINGS_PUBLIC_URL` to match. |
-| `OPENINGS_IMAGE` | the released image | The image to run, for a mirror or a local build. |
+| `OPENINGS_IMAGE` | the released image | The image to run, for a mirror or a local build (`docker build -t openings:dev .`). |
 
 ## Process and paths
 
@@ -50,6 +51,5 @@ own image.
 
 The server does not read these. Your scripts and agent use `OPENINGS_URL` and
 `OPENINGS_TOKEN` (see [REST API](api.md) and [Work with an agent](agents.md)), and
-`OPENINGS_CA_FILE` names a private certificate authority for the operator workspace
-launcher. The browser tests' server reads `OPENINGS_E2E_PORT`, `OPENINGS_E2E_JOBS`
-and `OPENINGS_E2E_APPLICATIONS`.
+`OPENINGS_CA_FILE` names a private certificate authority for the launcher of the
+[agent workspace](../../examples/operator-workspace/README.md).

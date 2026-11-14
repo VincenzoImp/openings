@@ -33,10 +33,10 @@ body:
       label: Area
       multiple: true
       options:
-        - Collection
-        - Inbox and Shortlist
+        - Jobs and triage
+        - Job sources
         - Applications and documents
-        - Career and templates
+        - Profile, Preferences and templates
         - Agents, MCP and skills
         - REST API
         - Installation and operations

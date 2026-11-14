@@ -10,25 +10,30 @@ You need Docker with Compose v2. The host needs no Python, Node or TeX.
 ```bash
 git clone https://github.com/VincenzoImp/openings.git
 cd openings
-cp .env.example .env
-docker compose pull
-docker compose up -d --no-build
+docker compose up -d
 ```
 
-Open **http://127.0.0.1:8080** and choose an owner password of at least 10
-characters (or set `OPENINGS_PASSWORD` in `.env` before the first start). To reach
-Openings from other devices, see [Operations](operations.md#reach-it-from-other-devices).
+Check that it runs:
+
+```bash
+docker compose ps
+curl --fail http://127.0.0.1:8080/health
+```
+
+Every setting has a default. To change one, copy `.env.example` to `.env` first
+(see [Configuration](configuration.md)). To reach Openings from other devices,
+see [Operations](operations.md#reach-it-from-other-devices).
 
 ## Set up your workspace
 
-Open `http://127.0.0.1:8080` and choose an owner password of at least 10
+Open **http://127.0.0.1:8080** and choose an owner password of at least 10
 characters (or set `OPENINGS_PASSWORD` in `.env` before the first start). A new
 installation then opens the **setup guide**, four short steps about you:
 
 1. **About you.** Your name, the roles you are after and where (saved as
    statements under Preferences, *What I'm looking for*), and the languages you
    speak. Only the name is required.
-2. **Find jobs.** A saved search, prefilled from step 1, that you can **Test**
+2. **Find jobs.** A search, prefilled from step 1, that you can **Test**
    before you save it; or one job added by its link.
 3. **Your CV.** Paste your CV text and add the career entries read from it, or
    start from the example CV template.
@@ -44,29 +49,19 @@ are read from the workspace, so every browser shows the same state.
 
 ## Find your way
 
-The navigation has three parts:
+The navigation has three groups: **Today**, **Jobs** and **Applications** for the
+daily work; **You** (Profile, Preferences, Templates) for what Openings knows
+about you; **Workspace** (Sources, Settings) for the rest.
 
-**Today** is the first screen: a greeting with one line of counts, then
-
-- **Ready to apply:** the Ready applications, closest deadline first, with the
-  priority as a glyph and the deadline in colour when it is near.
-  **Start applying** opens the first one.
-- **Needs attention:** Shortlisted applications due within a week that are not
-  Ready, and Ready ones with an open requirement, each naming what is missing.
-- **Waiting for a reply:** applications sent longer ago than the no-reply period
-  (Preferences, 30 days unless you change it). On a row, **Record reply** (`r`)
-  or **Close as no reply** (`c`); **Close all as no reply** closes them
-  together. Closing is undone from the toast. Nothing closes by itself.
-- **New jobs:** how many, the newest three and **Go through them**.
-- The count of applications in each stage, each a link to its list.
-
-When nothing needs you, Today says so.
+**Today** shows what is ready to send, what needs attention, applications waiting
+for a reply and new jobs. When nothing needs you, it says so.
 
 ## Add your first job
 
-1. Choose **Add a job**. Paste the job's URL, or enter the title, company and the
-   whole posting. If a job with that address exists, it is shown instead of a copy.
-   When a page cannot be read, paste the text yourself.
+1. Choose **Add job** (the **+** button, or `n`). Paste the job's URL, or enter
+   the title, company and the whole posting. If a job with that address exists,
+   it is shown instead of a copy. When a page cannot be read, paste the text
+   yourself.
 2. In **Jobs**, the **New** tab lists jobs waiting for a decision. Select one to
    read it beside the list. Choose **Shortlist** (`s`) to pursue it, or
    **Dismiss** (`d`) to set it aside; the next job is shown at once, every
@@ -74,18 +69,18 @@ When nothing needs you, Today says so.
    **Add reason**. Dismissed jobs stay under **Dismissed** and can be
    restored (`r`).
 
-![Jobs to review beside the selected job, with its signals, posting and timeline](../images/jobs.png)
+![Jobs to review beside the selected job, with its labels, posting and timeline](../images/jobs.png)
 
 Shortlisting starts the job's application. Undoing it removes that application
 while nothing has been added to it.
 
 ## Add a source
 
-Jobs can also arrive by themselves. Under **Sources**, choose **Add a search**
-(a query and a place on LinkedIn, Indeed or Glassdoor) or **Add a company board**,
-then **Preview results**. A preview saves nothing. Save the source and turn its
-schedule on: new sources start paused. [Jobs and sources](jobs-and-sources.md)
-explains every setting.
+Jobs can also arrive by themselves. Under **Sources**, choose **Add source**: a
+**Search** (a query and a place on LinkedIn, Indeed or Glassdoor), a **Company
+careers page** or an **RSS feed**. **Test** shows the first results and saves
+nothing. **Save** adds the source, and it is checked on the schedule.
+[Jobs and sources](jobs-and-sources.md) explains every setting.
 
 ## Prepare your first application
 
@@ -118,18 +113,10 @@ Under **You**, add your **Profile** and career entries, state what you want in
 **Preferences**, and add a CV and letter **Template** if an agent will write your
 documents. None of this is needed to apply by hand.
 [Profile, Preferences and Templates](profile-preferences-templates.md) explains
-each. Synthetic examples are in the `examples/` folder.
+each. Synthetic examples are in the [`examples/`](../../examples/README.md) folder.
 
 ## Optional: an agent
 
 If you want an agent to triage jobs and write documents, follow
-[Work with an agent](agents.md).
-
-## Check that it runs
-
-```bash
-docker compose ps
-curl --fail http://127.0.0.1:8080/health
-```
-
-Back up before you upgrade: see [Operations](operations.md).
+[Work with an agent](agents.md). Back up before you upgrade: see
+[Operations](operations.md).
