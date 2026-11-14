@@ -69,7 +69,7 @@ head shows the role, company, stage, deadline and priority, **Open posting** and
 - **Closed:** how it ended ("Rejected on 2 Nov after interview"), the notes, the
   history and the sent documents; `…` **Reopen**s it.
 
-![The Ready page: before you send, the posting, the CV and the letter, and Mark applied](../images/review.png)
+![The Ready page: before you send, the posting, the CV and the letter, and Mark applied](../images/ready.png)
 
 **Mark applied** (`⇧↵`) records that you sent it, today unless you pick another
 day beside the button. Only you do this. The next Ready application opens at once
