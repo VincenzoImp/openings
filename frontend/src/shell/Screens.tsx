@@ -18,8 +18,8 @@ type Module = Promise<{ default: ComponentType }>;
 export const LOADERS: Record<RouteId, () => Module> = {
   today: () => import("../screens/today/Today"),
   jobs: () => import("../pages/Jobs"),
-  applications: () => import("../pages/Applications"),
-  application: () => import("../pages/Review"),
+  applications: () => import("../screens/applications/Applications"),
+  application: () => import("../screens/application/Page"),
   profile: () => import("../screens/profile/Profile"),
   preferences: () => import("../screens/preferences/Preferences"),
   templates: () => import("../screens/templates/Templates"),
@@ -41,7 +41,7 @@ export function preload(id: RouteId) {
 
 // The screens built before the design system keep their own frame until
 // their issue rebuilds them (#222–#227); a rebuilt screen leaves this list.
-const LEGACY = new Set<RouteId>(["jobs", "applications", "application"]);
+const LEGACY = new Set<RouteId>(["jobs"]);
 
 /**
  * A screen whose code or first render fails says so and offers a reload; a

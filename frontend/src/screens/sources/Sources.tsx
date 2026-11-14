@@ -411,10 +411,7 @@ function ScheduleLine({
             bulk.mutate(
               { action: "run", items: versions(targets) },
               {
-                onSuccess: () =>
-                  toast.show({
-                    message: `Checking ${targets.length} ${targets.length === 1 ? "source" : "sources"} now`,
-                  }),
+                onSuccess: (result) => toast.show(checkAllMessage(result)),
                 onError: failed,
               },
             )
@@ -446,6 +443,19 @@ function ScheduleLine({
       </div>
     </div>
   );
+}
+
+/** What Check all now did: how many it queued, and what it could not. */
+function checkAllMessage(result: Schema<"BatchResult">) {
+  const plural = (count: number) =>
+    `${count} ${count === 1 ? "source" : "sources"}`;
+  if (!result.failed)
+    return { message: `Checking ${plural(result.succeeded)} now` };
+  const reason = result.items.find((item) => !item.ok)?.error?.message;
+  return {
+    message: `Checking ${plural(result.succeeded)} now; ${plural(result.failed)} could not be checked${reason ? `: ${reason}` : "."}`,
+    tone: "error" as const,
+  };
 }
 
 /** The last check of a failing source: what happened, and Check now. */

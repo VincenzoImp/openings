@@ -231,6 +231,11 @@ async function emptyWorkspace(page: Page) {
 const first = async (page: Page, path: string) =>
   (await call(page, path)).items[0].id as string;
 
+/** A rebuilt screen has drawn its data: no skeleton is left. */
+async function settledScreen(page: Page) {
+  await expect(page.locator(".ui-skeleton")).toHaveCount(0);
+}
+
 /** The default CV, given the example source so its views have content. */
 async function exampleCv(page: Page) {
   const cv = (await call(page, "/templates?kind=cv&limit=200")).items.find(
@@ -272,13 +277,69 @@ const SCREENS: Screen[] = [
       await expect(page.locator("dialog[open]")).toBeVisible();
     },
   },
-  { name: "applications", route: "applications", docs: "applications" },
-  { name: "applications-stats", route: "applications?section=stats" },
+  {
+    name: "applications",
+    route: "applications",
+    docs: "applications",
+    open: settledScreen,
+  },
+  {
+    name: "applications-applied",
+    route: "applications?stage=applied",
+    open: settledScreen,
+  },
+  {
+    name: "applications-stats",
+    route: "applications?section=stats",
+    open: settledScreen,
+  },
+  {
+    name: "application-shortlisted",
+    route: async (page) =>
+      `applications/${await first(page, "/applications?stage=shortlisted&needs=documents&limit=1")}`,
+    open: settledScreen,
+  },
   {
     name: "review",
     route: async (page) =>
-      `applications/${await first(page, "/applications?stage=ready&limit=1")}`,
+      `applications/${await first(page, "/applications?stage=ready&sort=deadline&limit=1")}`,
     docs: "review",
+    open: settledScreen,
+  },
+  {
+    name: "application-after-mark-applied",
+    route: async (page) =>
+      `applications/${await first(page, "/applications?stage=ready&sort=deadline&limit=1")}`,
+    open: async (page) => {
+      await settledScreen(page);
+      await page
+        .getByRole("button", { name: "Mark applied" })
+        .filter({ visible: true })
+        .first()
+        .click();
+      await expect(page.getByText(/^Marked applied/)).toBeVisible();
+      await settledScreen(page);
+    },
+  },
+  {
+    name: "application-applied",
+    route: async (page) =>
+      `applications/${await first(page, "/applications?stage=interview&q=Research&limit=1")}`,
+    open: settledScreen,
+  },
+  {
+    name: "application-record-reply",
+    route: async (page) =>
+      `applications/${await first(page, "/applications?stage=applied&limit=1")}`,
+    open: async (page) => {
+      await settledScreen(page);
+      await page
+        .getByRole("button", { name: "Record reply" })
+        .filter({ visible: true })
+        .first()
+        .click();
+      await expect(page.locator("dialog[open]")).toBeVisible();
+    },
   },
   { name: "jobs", route: "jobs", docs: "jobs" },
   {
