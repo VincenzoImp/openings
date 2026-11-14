@@ -9,6 +9,7 @@ from openings import __version__
 from openings.app import create_app
 from openings.common import now
 from openings.errors import DomainError
+from openings.stats import StatsQuery, StatsService
 from openings.workspace import Workspace
 
 
@@ -53,7 +54,7 @@ def test_stale_edit_is_rejected(workspace):
 
 
 @pytest.mark.asyncio
-async def test_completeness_filter_matches_overview_and_page_totals_on_rest_and_mcp(tmp_path):
+async def test_completeness_filter_matches_page_totals_on_rest_and_mcp(tmp_path):
     app = create_app(tmp_path / "complete.sqlite", start_worker=False)
     complete = job(app.state.workspace)
     incomplete = job(
@@ -79,9 +80,8 @@ async def test_completeness_filter_matches_overview_and_page_totals_on_rest_and_
     missing_ids = {incomplete["id"], preview["id"], placeholder["id"]}
     with TestClient(app) as client:
         client.post("/api/v1/auth/setup", json={"password": "synthetic-password"})
-        overview = client.get("/api/v1/overview").json()
         missing = client.get("/api/v1/jobs?complete=false&limit=1").json()
-        assert missing["total"] == overview["incomplete"] == 3
+        assert missing["total"] == 3
         assert missing["items"][0]["id"] in missing_ids
         assert not missing["items"][0]["complete"]
         assert client.get("/api/v1/jobs?complete=false&offset=3").json()["items"] == []
@@ -114,7 +114,7 @@ async def test_active_job_filter_matches_attention_counts_without_dismissed_jobs
     with TestClient(app) as client:
         client.post("/api/v1/auth/setup", json={"password": "synthetic-password"})
         result = client.get("/api/v1/jobs?triage=active&complete=false").json()
-        assert result["total"] == client.get("/api/v1/overview").json()["incomplete"] == 2
+        assert result["total"] == 2
         assert {row["triage"] for row in result["items"]} == {"new", "shortlisted"}
         assert client.get("/api/v1/jobs?triage=dismissed&complete=false").json()["total"] == 1
     result = await app.state.mcp.call_tool(
@@ -130,14 +130,15 @@ def test_attempts_and_recorded_funnel_are_separate_from_job_triage(workspace):
         workspace.create_application({"job_id": original["id"], "idempotency_key": "once"})["id"]
         == first["id"]
     )
-    assert workspace.overview()["sent"] == 0
+    stats = StatsService(workspace)
+    assert stats.stats(StatsQuery(period="all"))["applied"] == 0
     first = workspace.update_application(
         first["id"], {"expected_version": first["version"], "status": "applied"}
     )
     first = workspace.update_application(
         first["id"], {"expected_version": first["version"], "status": "interview"}
     )
-    assert workspace.overview()["interviews"] == 1
+    assert stats.stats(StatsQuery(period="all"))["interviews"] == 1
     workspace.update_application(
         first["id"],
         {"expected_version": first["version"], "status": "closed", "outcome": "rejected"},
@@ -148,8 +149,9 @@ def test_attempts_and_recorded_funnel_are_separate_from_job_triage(workspace):
     workspace.update_application(
         second["id"], {"expected_version": second["version"], "status": "offer"}
     )
-    assert workspace.overview()["sent"] == 2
-    assert workspace.overview()["offers"] == 1
+    counted = stats.stats(StatsQuery(period="all"))
+    assert (counted["applied"], counted["interviews"]) == (2, 2)
+    assert counted["funnel"][3] == {"stage": "offer", "count": 1}
     other = job(workspace, url="https://jobs.lever.co/example/different-role")
     with pytest.raises(DomainError):
         workspace.create_application({"job_id": other["id"], "idempotency_key": "once"})

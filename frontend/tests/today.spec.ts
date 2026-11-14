@@ -164,11 +164,11 @@ test("Today says what is ready, where applications stand and what waits for a re
   await expect(dialog.getByRole("listitem")).toHaveCount(waiting.total);
   await dialog.getByRole("button", { name: "Keep them open" }).click();
   await expect(dialog).toHaveCount(0);
-  // The progress of sent applications moved to Applications, Insights.
+  // The numbers of sent applications are in Applications, Stats.
   await expect(card(page, "Progress")).toHaveCount(0);
-  await expect(wait.getByRole("link", { name: "Insights" })).toHaveAttribute(
+  await expect(wait.getByRole("link", { name: "Stats" })).toHaveAttribute(
     "href",
-    "#applications?section=insights",
+    "#applications?section=stats",
   );
   await fitsViewport(page);
 

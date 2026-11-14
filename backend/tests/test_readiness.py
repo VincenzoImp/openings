@@ -106,7 +106,6 @@ def test_ready_truth_table(workspace):
     page = workspace.list_applications(stage="ready", limit=200)
     assert {item["id"] for item in page["items"]} == ready and page["total"] == len(ready)
     assert page["stage_counts"]["ready"] == len(ready)
-    assert workspace.overview()["ready"] == len(ready)
     shortlisted = {
         item["id"]
         for offset in range(0, len(cases), 200)

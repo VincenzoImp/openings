@@ -27,17 +27,14 @@ answer the owner did not give. Report what you did in the chat.
 
 ## Measure before changing
 
-For each source, read its configuration, schedule, last runs and errors. Measure
-yield with `sources_yield` (REST `GET /collection/yield`) over a stated
-period (`since`, `until`): per source and per search, the jobs it collected
-first, still to review, shortlisted, applied to, answered by an employer
-(replies, interviews, offers), dismissed by an agent, the owner or other, likely duplicates and postings no longer listed; searches are also
-split by job board (`providers`). Each job counts once, for the source that
-found it first, so a search whose jobs are mostly `likely_duplicates` of other
-sources adds little. `kept_rate` is withheld below `min_sample` collected jobs:
-do not judge a small source on it. Separate history from the current filters:
-jobs collected before a filter change do not describe it, so set `since` to the
-change when you re-measure.
+For each source, read its configuration, schedule, last runs and errors with
+`sources_list` (REST `GET /sources`). Each source's `counts` give the jobs it
+found and how many were shortlisted, applied to and got a reply; `stats_get`
+gives replies by source once two sources have five sent applications each. A
+search whose jobs are mostly flagged as likely duplicates of other sources
+(`jobs_list` with `signal: likely_duplicate`) adds little. Do not judge a source
+that found few jobs. Separate history from the current filters: jobs collected
+before a filter change do not describe it.
 
 Dismissals were made by agents applying the Preferences, so a high dismissal
 rate measures collected text outside them, not the owner's taste. A source
@@ -64,13 +61,12 @@ Prefer the narrowest change that removes a measured, recurring mismatch:
 Read the current source schemas before writing; a source's service is fixed after
 creation. Preserve omitted configuration and use expected versions. Use a run
 override or preview to test a change before saving it when the service allows.
-Do not disable a source only because its yield is low when it is cheap and
+Do not disable a source only because it keeps few jobs when it is cheap and
 targeted. Excluding a term removes jobs before any agent reads them, so prefer
 terms with no ambiguous technical use and leave borderline titles to triage.
 
 ## Report
 
-List each changed source with before/after configuration and the yield that
-justified it (period, collected, shortlisted, applied, replies), in the chat.
-Re-measure after
+List each changed source with before/after configuration and the counts that
+justified it (found, shortlisted, applied, replied), in the chat. Re-measure after
 the next collection cycles before tuning the same source again.

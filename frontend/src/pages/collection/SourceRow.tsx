@@ -8,6 +8,7 @@ import {
   isSearch,
   providersOf,
   scheduleLabel,
+  sourceCountsLine,
   sourceLine,
   stateTag,
   waitReason,
@@ -80,6 +81,7 @@ export function SourceRow({
   const { mutate, pending } = useWorkspace();
   const run = source.last_run;
   const running = active(run?.state);
+  const counts = sourceCountsLine(source.counts);
   return (
     <tr className={selected ? "is-selected" : undefined}>
       <td className="select">
@@ -113,6 +115,7 @@ export function SourceRow({
           {source.name}
         </button>
         <div className="meta">{sourceLine(source)}</div>
+        {counts && <div className="meta source-counts">{counts}</div>}
       </td>
       <td data-label="Providers">
         <span className="tags">

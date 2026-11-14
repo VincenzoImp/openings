@@ -24,7 +24,7 @@ def add(workspace, title):
 def test_triage_follows_the_application_and_explicit_deletion(tmp_path):
     ws = Workspace(tmp_path / "queues.sqlite")
     job = add(ws, "Backend engineer")
-    assert ws.list_jobs(triage="new")["total"] == ws.overview()["new"] == 1
+    assert ws.list_jobs(triage="new")["total"] == 1
     job = ws.set_triage(job["id"], "shortlisted", job["version"])
     assert ws.list_jobs(triage="new")["total"] == 0
     assert ws.list_jobs(triage="shortlisted")["total"] == 1

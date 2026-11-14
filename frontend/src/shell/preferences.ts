@@ -1,11 +1,8 @@
-// Theme and density: chosen by the owner, remembered in this browser, applied
-// to <html> before the first paint. With nothing stored, the theme follows the
-// system and the density is comfortable.
+// Theme: chosen by the owner, remembered in this browser, applied to <html>
+// before the first paint. With nothing stored, the theme follows the system.
 
 export type Theme = "light" | "dark";
-export type Density = "comfortable" | "compact";
 export const THEME_KEY = "openings-theme";
-export const DENSITY_KEY = "openings-density";
 
 interface Store {
   getItem(key: string): string | null;
@@ -35,9 +32,6 @@ export function initialTheme(
   if (saved === "light" || saved === "dark") return saved;
   return systemDark ? "dark" : "light";
 }
-export function initialDensity(store: Store | null = storage()): Density {
-  return read(store, DENSITY_KEY) === "compact" ? "compact" : "comfortable";
-}
 
 function remember(key: string, value: string) {
   try {
@@ -55,14 +49,7 @@ export function applyTheme(theme: Theme, persist = true) {
     .querySelector('meta[name="theme-color"]')
     ?.setAttribute("content", getComputedStyle(root).getPropertyValue("--bg"));
 }
-export function applyDensity(density: Density, persist = true) {
-  const root = document.documentElement;
-  if (density === "compact") root.dataset.density = "compact";
-  else delete root.dataset.density;
-  if (persist) remember(DENSITY_KEY, density);
-}
 /** Called once before React renders, so the first paint has the right look. */
 export function applyStoredPreferences() {
   applyTheme(initialTheme(), false);
-  applyDensity(initialDensity(), false);
 }

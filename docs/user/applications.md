@@ -43,7 +43,7 @@ can deliberately start another.
 
 ## The pipeline
 
-**Applications** has two tabs, **Pipeline** and **Insights**. The pipeline counts
+**Applications** has two tabs, **Pipeline** and **Stats**. The pipeline counts
 every stage with a chip: **Shortlisted**, **Ready** (the Shortlisted applications
 that are Ready, see below), **Applied**, **Interview**, **Offer** and
 **Closed**. Search by role or company, filter by outcome, and sort by deadline,
@@ -57,10 +57,7 @@ otherwise), the state of the CV and letter ("Missing: letter" names what Ready
 still lacks), what the employer answered (or how long the wait is, highlighted
 once it is longer than the no-reply period) and the next action: **Review** a
 Ready application, **Decide** on a blocking requirement, or **Record reply** for
-one that was sent. **Board** shows the open stages side by side; **Show closed**
-adds the closed ones and **N more** opens the rest of a stage in the list.
-
-![Applications as a board: Shortlisted, Ready, Applied, Interview and Offer, with their tags](../images/applications-board.png)
+one that was sent.
 
 Select rows (or every row shown) to act on them together: **Close as no reply**,
 **Close…** with an outcome, **Reopen…** to a stage or **Delete…**. Each
@@ -109,9 +106,6 @@ Below, six tabs hold the rest:
 | **Inputs** | The frozen copies of your record the documents were written from, their files, and what changed since. |
 | **Documents** | Every document revision: open, revise, add files to an incomplete one, delete. |
 | **Details** | Stage and outcome, priority, deadline, the time sent, the required documents and whether it is Ready, the pinned note, the job and deletion. |
-
-Old links to an application (`#applications?application=…&detail=…`) open this
-page on the matching tab.
 
 ## Write, compile and upload
 
@@ -234,45 +228,22 @@ replies** opens them in the list. Nothing closes by itself. Your agent may close
 them too, but only when you ask or say so under Working with me; otherwise it
 asks you.
 
-## Insights
+## Stats
 
-The **Insights** tab shows how employers answered the applications you sent.
+The **Stats** tab shows how employers answered the applications you sent, for
+the **Last 90 days**, the **Last 12 months** or **All time** (by the day each
+was sent; all time also counts sent applications without a date).
 
-![Insights: applications sent, the share that got an answer and led to an interview, offers, the median time to an answer, and tables by role family, source and location](../images/insights.png)
-
-- **Only employer answers count.** The sample is the sent applications: those
-  with a sent date, in Applied, Interview or Offer, or with a reply.
-  Shortlisted applications you never sent and applications closed without
-  being sent are counted apart, and jobs your agent dismissed never had an
-  application.
-- **Got an answer** is the share with any reply; **Led to an interview** the
-  share with an interview or an offer reply; **Offers** the number with an
-  offer. **Median time to an answer** is the day of the first reply minus the
-  day it was sent; applications without a sent date are counted but not timed.
-- **Small samples are not read.** A rate is shown from 5 sent applications in
-  its group, and the median and the time table from 5 dated answers; below that
-  the group shows its counts and "Too few to show a rate". REST and MCP take a
-  different `min_sample` (1 to 100).
-- Groups: **role family** and **seniority** read from the job title, **source**
-  (the collection source that found the job, else the board it came from, else
-  added by hand), **location** (the first part, "Zurich" of "Zurich,
-  Switzerland") and **month sent**. **Last 90 days** narrows it to applications
-  sent in that time.
-- **Progress** at the end shows, for a period of sending, how far the sent
-  applications went: reached each stage, waiting there, rejected, no reply or not
-  pursued.
-
-Role family and seniority come from fixed keywords in English, German, French
-and Italian, never from a model: for example *Data Engineer*, *Dateningenieur*,
-*Ingénieur de données* and *Ingegnere dei dati* are Data engineering; *Senior*,
-*erfahrener*, *confirmé* and *esperto* are Senior; *Werkstudent*, *stagiaire* and
-*stagista* are Intern or trainee. The first family that matches wins, the more
-specific first (*Analytics Engineer* is Analytics, *Python Engineer* Backend);
-a title without a known word is Unknown, and most titles state no seniority. The
-families are Engineering management, Data science and ML, Analytics, Data
-engineering, Platform and reliability, Security, Mobile, Full stack, Frontend,
-Backend, Quality and testing, Research, Product, Design and Software
-engineering.
+- **Applied:** the applications you sent: those with a sent date, in Applied,
+  Interview or Offer, or with a reply. Shortlisted applications you never sent
+  do not count.
+- **Reply rate:** the share with any reply; **Interview rate:** the share with an
+  interview or offer reply, or moved to Interview or Offer.
+- **Median days to a reply:** the day of the first reply minus the day it was
+  sent.
+- **Funnel:** how many were sent, got a reply, reached an interview and an offer.
+- **Replies by source** appears once at least two sources (the collection
+  source that first found the job) have five or more sent applications each.
 
 ## Plan and track requirements
 
@@ -334,21 +305,18 @@ and returns the job to New.
 
 A job collected after another that probably describes the same vacancy (the
 same posting from several job boards and the employer's site) carries the
-signal **Likely duplicate** with a confidence; the **Likely duplicate** filter
-of each tab lists them. The job shows **Is this the same vacancy?** with the
+label **Possible duplicate** (the API also gives a confidence); the duplicate
+filter of each tab lists them. The job shows **Is this the same vacancy?** with the
 earlier job and the reasons: the same apply link or requisition ID, identical or
 nearly identical text, the same company, role and location, and anything that
 speaks against it, such as a different location, requisition, level or a
 posting published months apart. Company names are compared without legal,
 corporate and country suffixes.
 
-**Same vacancy: merge** opens the merge dialog; **Different** records that the
-two jobs are separate vacancies, and the signal does not return. Nothing is
-merged automatically. **Details**, **Possible copies and merging** lists every
-other record that may be this vacancy, at any confidence, and merges with any
-job you choose.
-
-![A likely duplicate: the earlier job, the confidence and the reasons, with Same vacancy and Different](../images/duplicates.png)
+**Merge into one job** opens the merge dialog; **Keep both** records that the
+two jobs are separate vacancies, and the label does not return. Nothing is
+merged automatically. **Merge with another job…** under **Details** merges the
+job with any other job you choose.
 
 Dismissing a job preserves its closed applications; an open one with work in
 it must be closed first. Restore a dismissed job before preparing new documents:

@@ -63,7 +63,7 @@ class ContextOperations:
             ]
             for claim in claims:
                 claim["approved"] = bool(claim["approved"])
-                claim["default_in_cv"] = bool(claim["default_in_cv"])
+                claim["always_include"] = bool(claim["always_include"])
             if value.claim_ids is not None:
                 selected = set(value.claim_ids)
                 if selected - {row["id"] for row in claims}:

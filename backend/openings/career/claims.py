@@ -6,7 +6,7 @@ from .. import events
 from ..common import check_version, encode, new_id, now
 from ..errors import missing
 from ..idempotency import fingerprint, remember, replay
-from .models import CLAIM_FIELDS, ClaimCreate, ClaimUpdate
+from .models import ClaimCreate, ClaimUpdate
 from .records import _claim, _get, _page, values
 
 
@@ -22,7 +22,7 @@ class ClaimOperations:
         summary: bool = True,
         q: str = "",
     ) -> dict:
-        """List reusable claims by evidence (knowledge_id), approval or text (q). summary=true (the default) omits metadata and bounds wording previews; summary=false returns full claims. The typed selection fields (default_in_cv, role, group) are always returned."""
+        """List reusable claims by evidence (knowledge_id), approval or text (q). summary=true (the default) omits metadata and bounds wording previews; summary=false returns full claims. always_include is always returned."""
         _page(limit, offset)
         where, params = [], []
         if knowledge_id:
@@ -38,7 +38,7 @@ class ClaimOperations:
             params.extend([f"%{q}%"] * 3)
         clause = " WHERE " + " AND ".join(where) if where else ""
         columns = (
-            'id,knowledge_id,approved,position,default_in_cv,role,"group",version,created_at,updated_at,substr(text,1,240) AS text_preview,'
+            "id,knowledge_id,approved,position,always_include,version,created_at,updated_at,substr(text,1,240) AS text_preview,"
             "(SELECT title FROM knowledge WHERE knowledge.id=claims.knowledge_id) AS knowledge_title,"
             "(SELECT organization FROM knowledge WHERE knowledge.id=claims.knowledge_id) AS knowledge_organization"
             if summary
@@ -63,7 +63,7 @@ class ClaimOperations:
         return _claim(row)
 
     def create_claim(self, value: ClaimCreate) -> dict:
-        """Create reusable claim wording tied to evidence. Approval defaults to false. Selection is typed: default_in_cv, role (core, supporting, bench) and group."""
+        """Create reusable claim wording tied to evidence. Approval defaults to false. always_include marks a claim to include in every CV unless the job gives a reason to leave it out; any other selection hints go in metadata."""
         record_id, timestamp, digest = new_id(), now(), fingerprint(value)
         with self.db.transaction() as conn:
             replayed = replay(conn, "claims", value.idempotency_key, digest)
@@ -77,7 +77,7 @@ class ClaimOperations:
     def _insert_claim(self, conn, value, record_id, timestamp):
         _get(conn, "knowledge", value.knowledge_id, "Career knowledge")
         conn.execute(
-            'INSERT INTO claims(id,knowledge_id,text,approved,position,default_in_cv,role,"group",metadata,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)',
+            "INSERT INTO claims(id,knowledge_id,text,approved,position,always_include,metadata,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
             (
                 record_id,
                 value.knowledge_id,
@@ -86,9 +86,7 @@ class ClaimOperations:
                 value.position
                 if value.position is not None
                 else self._next_position(conn, "claims", value.knowledge_id),
-                int(value.default_in_cv),
-                value.role,
-                value.group,
+                int(value.always_include),
                 encode(value.metadata),
                 timestamp,
                 timestamp,
@@ -120,7 +118,7 @@ class ClaimOperations:
                     "text",
                     "approved",
                     "position",
-                    *CLAIM_FIELDS,
+                    "always_include",
                     "metadata",
                 ]
                 if previous[key] != merged[key]
@@ -137,15 +135,13 @@ class ClaimOperations:
                     },
                 )
                 conn.execute(
-                    'UPDATE claims SET knowledge_id=?,text=?,approved=?,position=?,default_in_cv=?,role=?,"group"=?,metadata=?,version=version+1,updated_at=? WHERE id=?',
+                    "UPDATE claims SET knowledge_id=?,text=?,approved=?,position=?,always_include=?,metadata=?,version=version+1,updated_at=? WHERE id=?",
                     (
                         merged["knowledge_id"],
                         merged["text"],
                         int(merged["approved"]),
                         merged["position"],
-                        int(merged["default_in_cv"]),
-                        merged["role"],
-                        merged["group"],
+                        int(merged["always_include"]),
                         encode(merged["metadata"]),
                         now(),
                         claim_id,

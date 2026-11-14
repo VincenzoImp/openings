@@ -335,13 +335,12 @@ test("keyboard only: move through the Collection tabs and pause collection", asy
 }) => {
   await go(page, "collection");
   const before = await call(page, "/collection");
+  await expect(page.getByRole("tab")).toHaveText([
+    "Sources",
+    "Runs and tasks",
+    "Providers",
+  ]);
   await page.getByRole("tab", { name: "Sources" }).focus();
-  await page.keyboard.press("ArrowRight");
-  await expect(page.getByRole("tab", { name: "Yield" })).toBeFocused();
-  await expect(page).toHaveURL(/#collection\?section=yield$/);
-  await expect(
-    page.getByRole("table", { name: "Yield by source" }),
-  ).toBeVisible();
   await page.keyboard.press("ArrowRight");
   await expect(page.getByRole("tab", { name: "Runs and tasks" })).toBeFocused();
   await expect(page).toHaveURL(/#collection\?section=runs$/);
@@ -364,15 +363,7 @@ test("keyboard only: move through the Collection tabs and pause collection", asy
   await expect
     .poll(async () => (await call(page, "/collection")).enabled)
     .toBe(before.enabled);
-  // Old addresses open the parts that moved here.
-  await page.goto("/#settings?section=collection");
-  await expect(page).toHaveURL(/#collection\?section=providers$/);
-  await expect(page.getByRole("tab", { name: "Providers" })).toHaveAttribute(
-    "aria-selected",
-    "true",
-  );
-  await page.goto("/#settings?section=activity&activity_view=tasks");
-  await expect(page).toHaveURL(/#collection\?section=runs&view=tasks$/);
+  await go(page, "collection?section=runs&view=tasks");
   const tasks = page.getByRole("table", { name: "Collection tasks" });
   await expect(tasks).toBeVisible();
   // A task's details: what it was asked and what it recorded.

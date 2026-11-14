@@ -143,7 +143,7 @@ OPERATIONS = (
         rest=(Route("GET", "/sources", "sources_list"),),
         tool=Tool(
             READ,
-            "List saved portal searches and selected company/feed sources, schedules and outcomes. summary=false adds last-run diagnostics and full task records.",
+            "List saved portal searches and selected company/feed sources, schedules and outcomes, with counts of the jobs each found and how many were shortlisted, applied to and got a reply. summary=false adds last-run diagnostics and full task records.",
         ),
     ),
     Operation(

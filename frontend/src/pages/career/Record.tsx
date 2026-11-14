@@ -13,7 +13,7 @@ import { Pager, plural } from "../../library/common";
 import { useFresh } from "../../library/useFresh";
 import { useDebounce } from "../../state";
 import { ClaimDialog } from "./ClaimDialog";
-import { ClaimGroups, ClaimRow, replaced } from "./Claims";
+import { ClaimRow, replaced } from "./Claims";
 
 /** Search and kind filters above the record. */
 export function RecordFilters({
@@ -212,7 +212,6 @@ export function AllClaims({
         total={data.total}
         onChange={(offset) => onChange({ offset: String(offset) })}
       />
-      <ClaimGroups claims={data.items} />
       {editing && editing !== "new" && (
         <ClaimDialog
           record={editing}

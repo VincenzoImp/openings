@@ -128,7 +128,7 @@ mechanics, not personal selection or writing rules.
   `GET /applications?needs=reply_overdue` lists the Applied applications without
   a reply past the no-reply period. Closing one as `outcome: "no_response"` (with
   `concluded_on`) is manual, single or with `applications_bulk`; nothing closes
-  automatically. `insights_get` / `GET /insights` reads the rates.
+  automatically. `stats_get` / `GET /stats` reads the rates.
 
 ## The change log
 

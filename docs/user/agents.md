@@ -80,8 +80,8 @@ skills: discover the tools/resources and their typed input schemas.
    of one vacancy across sources, with a confidence, tier and reasons, for review
    before `jobs_merge` (`min_confidence` defaults to 0.5; 0 lists every candidate).
    Each job carries `signals` computed without a model when it was collected:
-   the posting's `language`, `required` language groups and `welcome`
-   languages, a likely `duplicate` of an earlier job with its confidence,
+   the posting's `language`, its `required` language groups, a likely
+   `duplicate` of an earlier job with its confidence,
    and `no_longer_listed` for a company-board posting the board stopped listing.
    `jobs_list` filters on them (`signal`, `posting_language`,
    `posting_language_not`, `requires`, `dismissed_by`), and
@@ -194,16 +194,15 @@ Its source settings are frozen at enqueue time. Use `collection_runs_list` and
 cooldowns apply to agent operations as they do to the dashboard. Use
 `providers_list` and `providers_update` for provider enable/pause and request
 interval. Description retrieval is automatic; incomplete candidates stay in the
-run checkpoint until usable text is available. `sources_yield` measures each
-source over a period: the jobs it collected first, kept, applied to, answered
-and dismissed (by an agent, the owner or the system); the
-[manage-sources skill](../../skills/manage-sources/SKILL.md) uses it.
+run checkpoint until usable text is available. `sources_list` gives each source's
+`counts`: the jobs it found and how many were shortlisted, applied to and got a
+reply; the [manage-sources skill](../../skills/manage-sources/SKILL.md) uses them.
 
 Prefer a compatible bulk patch when applying the same schedule or acquisition
 settings to several sources. Read per-source failures and retain untouched fields.
 The [Collection guide](sources.md) explains daily time slots, defaults and counters.
 
-## Employer replies and insights
+## Employer replies and stats
 
 The owner sends applications and tells the agent what the employer did; record
 only outcomes the owner reported, never ones you infer from mail or a portal.
@@ -228,11 +227,10 @@ sent the application. `status: "shortlisted"` undoes it while no reply exists.
   with `applications_bulk`, `concluded_on` today by default) only when the
   owner asks or Working with me says to; otherwise propose the list and ask the
   owner in the chat. Nothing closes automatically.
-- `insights_get` returns response, interview and offer rates for sent
-  applications, the median days to a first answer and groups by role family,
-  seniority, location, source kind, named source and month. A group below
-  `min_sample` (default 5) shows counts and `withheld` instead of a rate.
-  Applications never sent are counted apart; dismissed jobs never count.
+- `stats_get` with `period` (`90d`, `12m` or `all`) returns the applications
+  sent, replied and interview counts and rates, the median days from applied to
+  the first reply, the funnel and `by_source` (replies per source, only when at
+  least two sources have five or more sent applications; otherwise `null`).
 
 ## State rules
 
