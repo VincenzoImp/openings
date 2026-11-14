@@ -108,10 +108,10 @@ async def exercise(base, agent_token, owner_token, folder, tectonic):
                 and tools["jobs_delete"].annotations.destructive_hint is not False
                 and tools["sources_run"].annotations.open_world_hint is not False
             )
-            renamed = error_of(await call.raw("jobs_bulk", {}))
-            checks["0_23_names_answer_their_replacement"] = (
-                renamed["code"] == "renamed" and renamed["details"]["use"] == "jobs_triage"
-            )
+            rest_only = error_of(await call.raw("jobs_bulk", {}))
+            checks["rest_only_names_its_tools"] = rest_only["code"] == "rest_only" and rest_only[
+                "details"
+            ]["use"] == ["jobs_triage", "jobs_delete"]
             wrapped = error_of(await call.raw("jobs_list", {"value": {"q": "x"}}))
             checks["flat_arguments_only"] = wrapped["code"] == "validation"
 
@@ -319,16 +319,19 @@ async def exercise(base, agent_token, owner_token, folder, tectonic):
                 },
             )
             checks["reply_moves_the_stage"] = (
-                sent["items"][0]["result"]["status"] == "applied"
-                and replied["items"][0]["result"]["status"] == "interview"
+                sent["items"][0]["result"]["stage"] == "applied"
+                and replied["items"][0]["result"]["stage"] == "interview"
             )
 
             # The owner restores one dismissal; the agent reads it as feedback.
             dismissed = next(item for item in decisions if item["to"] == "dismissed")
             job = (await owner.get(f"{base}/api/v1/jobs/{dismissed['job_id']}")).json()
             restored = await owner.post(
-                f"{base}/api/v1/jobs/{job['id']}/triage",
-                json={"triage": "new", "expected_version": job["version"]},
+                f"{base}/api/v1/jobs/bulk",
+                json={
+                    "action": "new",
+                    "items": [{"id": job["id"], "expected_version": job["version"]}],
+                },
             )
             feedback = (await call("workspace_context"))["feedback"]
             checks["owner_correction_is_feedback"] = restored.status_code == 200 and any(

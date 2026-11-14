@@ -12,7 +12,7 @@ from ..actors import current_actor
 from ..common import check_version, new_id, now
 from ..errors import DomainError, missing
 from ..idempotency import fingerprint, remember, replay
-from ..models import NoteInput, NotePatch, NotePin
+from ..models import NoteInput, NotePatch
 
 NOTE_SELECT = "SELECT n.* FROM notes n"
 
@@ -142,15 +142,6 @@ class Notes:
             job_id=row["job_id"],
             application_id=row["application_id"],
         )
-
-    def pin_note(self, note_id, value):
-        """Pin a note (unpinning the one pinned in its scope) or unpin it, with its version."""
-        value = value if isinstance(value, NotePin) else NotePin.model_validate(value)
-        with self.db.transaction() as conn:
-            row = conn.execute("SELECT * FROM notes WHERE id=?", (note_id,)).fetchone()
-            check_version(row, value.expected_version)
-            self._pin(conn, row, value.pinned)
-        return self.get_note(note_id)
 
     def _pin(self, conn, row, pinned):
         if pinned and row["pinned_at"] is None:

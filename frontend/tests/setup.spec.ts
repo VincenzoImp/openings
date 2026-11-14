@@ -102,7 +102,7 @@ test("first run: about you, a search and a job, a CV and the example template, t
 
   // Step 3: pasted CV text read into entries, and the example template.
   await noAgentText(page);
-  const entries = (await call(page, "/career/knowledge?limit=1")).total;
+  const entries = (await call(page, "/career/entries?limit=1")).total;
   await page
     .getByLabel("CV text")
     .fill(
@@ -115,7 +115,7 @@ test("first run: about you, a search and a job, a CV and the example template, t
   await expect(
     page.getByText(/^Added \d+ entr.* to your Profile\.$/),
   ).toBeVisible();
-  expect((await call(page, "/career/knowledge?limit=1")).total).toBeGreaterThan(
+  expect((await call(page, "/career/entries?limit=1")).total).toBeGreaterThan(
     entries,
   );
   await page.getByRole("button", { name: "Use the example template" }).click();

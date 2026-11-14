@@ -4,7 +4,6 @@ An agent uses sources_list/get/save/delete/run and collection_get/update; the
 one-record and operator routes stay on REST for the dashboard and scripts.
 """
 
-from ..collectors.policy import ProviderPatch
 from ..discovery import (
     CollectionWrite,
     SourceBulk,
@@ -16,10 +15,10 @@ from ..discovery import (
 from ..discovery.models import (
     CollectionQuery,
     CollectionRunQuery,
+    ProviderUpdate,
     SourceQuery,
     SourceRunInput,
     SourcesSave,
-    TaskQuery,
 )
 from ..responses import (
     BatchResult,
@@ -35,7 +34,6 @@ from ..responses import (
     SourcePreviewResult,
     SourceSchemas,
     Task,
-    TaskPage,
 )
 from .core import Version
 from .operation import DESTRUCTIVE, WRITE, WS, Q, operation
@@ -69,21 +67,15 @@ def providers_list(ws: WS) -> ProviderList:
 @operation(
     "PATCH /providers/{provider_id}", access=WRITE, tags=["collection"], mcp="collection_update"
 )
-def providers_update(ws: WS, provider_id: str, body: ProviderPatch) -> Provider:
+def providers_update(ws: WS, provider_id: str, body: ProviderUpdate) -> Provider:
     """Edit a provider's HTTP policy, with its version."""
-    return ws.discovery.update_provider(provider_id, body)
+    return ws.discovery.update_provider(provider_id, body.patch(), body.clear_cooldown)
 
 
 @operation("GET /collection/runs", tags=["collection"], mcp="sources_get")
 def collection_runs_list(ws: WS, query: Q[CollectionRunQuery]) -> CollectionRunPage:
     """List collection runs by source or state."""
     return ws.discovery.list_runs(**query.model_dump())
-
-
-@operation("GET /collection/runs/{run_id}", tags=["collection"], mcp="sources_get")
-def collection_runs_get(ws: WS, run_id: str) -> CollectionRun:
-    """Read a collection run with its frozen settings and fetches."""
-    return ws.discovery.get_run(run_id)
 
 
 @operation(
@@ -156,7 +148,7 @@ def sources_create(ws: WS, body: SourceCreate) -> Source:
     access=DESTRUCTIVE,
     open_world=True,
     tags=["sources"],
-    mcp="sources_save",
+    mcp=("sources_save", "sources_run", "sources_delete"),
 )
 def sources_bulk(ws: WS, body: SourceBulk) -> BatchResult:
     """Enable, pause, run, configure or delete selected sources, one result each."""
@@ -199,26 +191,6 @@ def sources_run_one(ws: WS, source_id: str, body: SourceRun) -> Task:
     return ws.discovery.queue_collection(
         source_id, expected_version=body.expected_version, overrides=body.overrides
     )
-
-
-@operation("GET /tasks", tags=["collection"], mcp="collection_get")
-def tasks_list(ws: WS, query: Q[TaskQuery]) -> TaskPage:
-    """List collection fetches (tasks) by state, kind, source or job."""
-    return ws.discovery.list_tasks(**query.model_dump())
-
-
-@operation("GET /tasks/{task_id}", tags=["collection"], mcp="collection_get")
-def tasks_get(ws: WS, task_id: str) -> Task:
-    """Read a fetch: inputs, result, HTTP diagnostics and next run time."""
-    return ws.discovery.get_task(task_id)
-
-
-@operation(
-    "POST /tasks/{task_id}/cancel", access=WRITE, tags=["collection"], mcp="collection_update"
-)
-def tasks_cancel(ws: WS, task_id: str) -> Task:
-    """Cancel a queued or running fetch."""
-    return ws.discovery.cancel_task(task_id)
 
 
 @operation(

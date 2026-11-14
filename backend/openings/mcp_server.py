@@ -14,12 +14,11 @@ from pydantic import ValidationError
 
 from .actors import batch
 from .errors import DomainError
-from .removed import TOOLS, tool_message
 
 # Sent on initialize: what an agent must know before its first call (at most 1,500
 # characters; test_mcp_budget.py checks it). The skills hold the methods.
 INSTRUCTIONS = """\
-Openings is the owner's job-search workspace: collected job postings, their career record and \
+Openings is the owner's job-search workspace: collected job postings, their Profile, career entries and \
 Preferences, CV and letter templates, applications and their documents. The owner works in \
 the dashboard; you work here when they ask you in your chat.
 
@@ -75,9 +74,9 @@ class OpeningsMCP(MCPServer):
     """Return REST-shaped error bodies; the SDK runs sync tools in worker threads."""
 
     # Owner-only operation name -> its REST route, and REST-only operation name -> the
-    # tool that does its work, for an agent that calls one.
+    # tools that do its work, for an agent that calls one.
     owner_only: dict[str, str] = {}  # noqa: RUF012 - replaced per instance by bind_mcp
-    rest_only: dict[str, str] = {}  # noqa: RUF012 - replaced per instance by bind_mcp
+    rest_only: dict[str, tuple[str, ...]] = {}  # noqa: RUF012 - replaced per instance by bind_mcp
 
     async def call_tool(self, name, arguments, context=None):
         try:
@@ -96,27 +95,29 @@ class OpeningsMCP(MCPServer):
             raise ToolError(error_text(domain)) from error.__cause__
 
     def _refuse_other_tool(self, name):
-        """A 0.23 name, an owner-only or a REST-only operation: say what to use instead."""
-        gone = TOOLS.get(name)
+        """An owner-only, a REST-only or an unknown name: say what to use instead."""
         if name in self.owner_only:
-            use = gone.use if gone else ""
             raise DomainError(
                 404,
                 "owner_only",
                 f"{name} is owner-only and not an MCP tool: the owner uses the dashboard "
-                f"or {self.owner_only[name]} with an owner token."
-                + (f" Use {use} for your part." if use else ""),
-                {"tool": name, "use": use or None},
-            )
-        if gone is not None:
-            raise DomainError(
-                404, gone.code, tool_message(name, gone), {"tool": name, "use": gone.use or None}
+                f"or {self.owner_only[name]} with an owner token.",
+                {"tool": name},
             )
         if name in self.rest_only:
-            use = self.rest_only[name]
+            tools = self.rest_only[name]
             raise DomainError(
-                404, "renamed", f"{name} is REST only: use {use}.", {"tool": name, "use": use}
+                404,
+                "rest_only",
+                f"{name} is REST only: use {' or '.join(tools)}.",
+                {"tool": name, "use": list(tools)},
             )
+        raise DomainError(
+            404,
+            "unknown_tool",
+            f"There is no tool {name}: tools/list lists the tools.",
+            {"tool": name},
+        )
 
     def _refuse_unknown_arguments(self, name, arguments):
         """An argument the tool does not take is refused, never ignored: a misspelt

@@ -53,7 +53,7 @@ class JobReads:
         columns += [
             "substr(j.posting,1,240) AS j_posting_preview",
             posting_complete_sql() + " AS j_complete",
-            "(SELECT json_object('id',id,'status',status,'outcome',outcome,'version',version) FROM applications WHERE job_id=j.id ORDER BY (status='closed'),created_at DESC,id DESC LIMIT 1) AS j_application",
+            "(SELECT json_object('id',id,'stage',status,'outcome',outcome,'version',version) FROM applications WHERE job_id=j.id ORDER BY (status='closed'),created_at DESC,id DESC LIMIT 1) AS j_application",
             "(SELECT count(*) FROM applications WHERE job_id=j.id) AS j_application_count",
             SIGNALS_SQL.format(alias="j") + " AS j_signals",
             UNLISTED_SQL.format(alias="j") + " AS j_unlisted_at",
@@ -90,7 +90,7 @@ class JobReads:
             ):
                 row["postings"].append(dict(posting))
             application = connection.execute(
-                "SELECT id,status,outcome,version,(SELECT count(*) FROM applications WHERE job_id=?) AS application_count FROM applications WHERE job_id=? ORDER BY (status='closed'),created_at DESC,id DESC LIMIT 1",
+                "SELECT id,status AS stage,outcome,version,(SELECT count(*) FROM applications WHERE job_id=?) AS application_count FROM applications WHERE job_id=? ORDER BY (status='closed'),created_at DESC,id DESC LIMIT 1",
                 (row["id"], row["id"]),
             ).fetchone()
             row["application"] = dict(application) if application else None
@@ -241,7 +241,7 @@ class JobReads:
         include_counts=False,
         hide_unspoken_required=None,
         batch_id=None,
-        since=None,
+        dismissed_since=None,
         url=None,
     ):
         if url:
@@ -272,7 +272,7 @@ class JobReads:
                 complete,
                 dismissed_by=dismissed_by,
                 batch_id=batch_id,
-                since=since,
+                since=dismissed_since,
                 **signal_filters,
             )
             base = " FROM jobs j"
@@ -316,7 +316,7 @@ class JobReads:
                     complete=complete,
                     dismissed_by=dismissed_by,
                     batch_id=batch_id,
-                    since=since,
+                    since=dismissed_since,
                     **{**signal_filters, "unspoken": None},
                 )
             if include_counts:

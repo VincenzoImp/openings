@@ -4,7 +4,7 @@
 /** The fields of an application row Today reads. */
 export interface Row {
   id: string;
-  status: string;
+  stage: string;
   ready: boolean;
   deadline?: string | null;
   priority?: number | null;

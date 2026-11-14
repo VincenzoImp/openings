@@ -33,7 +33,7 @@ def test_triage_follows_the_application_and_explicit_deletion(tmp_path):
             first["id"],
             {
                 "expected_version": first["version"],
-                "status": stage,
+                "stage": stage,
                 **({"outcome": "rejected"} if stage == "closed" else {}),
             },
         )
@@ -42,11 +42,11 @@ def test_triage_follows_the_application_and_explicit_deletion(tmp_path):
         assert ws.list_jobs(triage="new")["total"] == 0
     job = ws.get_job(job["id"])
     dismissed = ws.set_triage(job["id"], "dismissed", job["version"])
-    assert dismissed["application"]["status"] == "closed"
+    assert dismissed["application"]["stage"] == "closed"
     restored = ws.set_triage(job["id"], "shortlisted", dismissed["version"])
     # Shortlisting a job whose applications are all closed starts a new one.
     later = restored["application"]
-    assert later["status"] == "shortlisted" and later["id"] != first["id"]
+    assert later["stage"] == "shortlisted" and later["id"] != first["id"]
     ws.delete_application(later["id"], later["version"])
     assert ws.get_job(job["id"])["triage"] == "shortlisted"  # Older attempt remains.
     assert ws.get_application(first["id"])["applied_at"]

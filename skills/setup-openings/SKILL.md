@@ -1,9 +1,9 @@
 ---
 name: setup-openings
 title: Set up your workspace
-summary: Get connected, then have your Career record, Preferences, templates and first sources set up from your CV and a short interview.
+summary: Get connected, then have your career entries, Preferences, templates and first sources set up from your CV and a short interview.
 example: Set up my Openings workspace from my CV.
-description: Set up a new or empty Openings workspace for its owner - "set up my Openings workspace", "get me started". Checks the connection and local tools, builds the Career record from a CV, records Preferences from a short interview, creates CV and letter templates, adds first sources and runs a first triage.
+description: Set up a new or empty Openings workspace for its owner - "set up my Openings workspace", "get me started". Checks the connection and local tools, builds the Profile and career entries from a CV, records Preferences from a short interview, creates CV and letter templates, adds first sources and runs a first triage.
 ---
 
 # Set up your workspace
@@ -15,14 +15,14 @@ what the previous one recorded. Skip what is already done.
 
 - Call `workspace_context`. If it fails, the owner needs a running server
   (the repository's getting-started guide) and an Agent token from Settings ›
-  Agent access in your client's environment. Never ask for the token in chat.
+  API & agents in your client's environment. Never ask for the token in chat.
   When it names you as the owner, suggest an Agent token: it can do all of
   this work.
 - Check you have a shell with `curl` for uploads, and `pdflatex` or another
   TeX engine for PDFs. If TeX is missing, offer to install a small
   distribution (such as TinyTeX) with the owner's agreement.
 
-## 2. Career record
+## 2. Career entries
 
 Ask for a CV, LinkedIn export or a description of their work, and follow
 [maintain-career](../maintain-career/SKILL.md) to build the Profile, entries

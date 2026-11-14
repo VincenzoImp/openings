@@ -1,7 +1,7 @@
 """A realistic synthetic workspace for the start read: what an owner has after a few months."""
 
 from openings.actors import OWNER, acting_as
-from openings.career import ClaimCreate, KnowledgeCreate, ProfileUpdate, TemplateCreate
+from openings.career import EntryCreate, HighlightCreate, ProfileUpdate, TemplateCreate
 
 NARRATIVE = (
     "Led the design of a service that ingests partner data, validates it and publishes it to "
@@ -42,8 +42,8 @@ def realistic(app, entries=18, jobs=60):
                 items = [{**item, "scope": "cv"} for item in items]
             preferences.update_preferences(section, {"expected_version": 0, "items": items})
         for index in range(entries):
-            entry = career.create_knowledge(
-                KnowledgeCreate(
+            entry = career.create_entry(
+                EntryCreate(
                     kind="experience" if index % 3 else "project",
                     title=f"Synthetic role {index}",
                     organization=f"Example Org {index}",
@@ -52,8 +52,8 @@ def realistic(app, entries=18, jobs=60):
                 )
             )
             for number in range(3):
-                career.create_claim(
-                    ClaimCreate(
+                career.create_highlight(
+                    HighlightCreate(
                         career_id=entry["id"],
                         text=f"Synthetic highlight {number} of role {index}: cut latency by 20%.",
                         approved=number < 2,

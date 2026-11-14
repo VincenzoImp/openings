@@ -3,20 +3,13 @@
 User docs are at most 10,000 words, the README at most 1,000, CONTRIBUTING at most 80
 lines and the architecture guide at most 150. Every relative link and image resolves,
 the changelog's too, and every image in docs/images is embedded. The MCP endpoint is
-spelled `/mcp/`, and no removed tool name or earlier vocabulary appears outside the
-changelog: not in the docs, nor in the skills and the agent workspace's instructions,
-where only a quoted phrase of the owner may use an earlier word.
+spelled `/mcp/`, and no earlier vocabulary appears outside the changelog: not in the
+docs, nor in the skills and the agent workspace's instructions, where only a quoted
+phrase of the owner may use an earlier word.
 """
 
 import re
 from pathlib import Path
-
-import pytest
-
-try:  # the table of removed names is deleted with the 0.25 release
-    from openings.removed import TOOLS
-except ImportError:
-    TOOLS = {}
 
 ROOT = Path(__file__).resolve().parents[2]
 USER_DOCS = sorted((ROOT / "docs" / "user").glob("*.md"))
@@ -99,15 +92,11 @@ def test_every_anchor_names_a_heading():
 
 def vocabulary(pages, text_of=lambda page: page.read_text()):
     """Earlier names and words in `pages`, and an MCP endpoint without its slash."""
-    names = [name for name in TOOLS if "_" in name]
     found = []
     for page in pages:
         text = text_of(page)
         if re.search(r"/mcp(?![/\w]|\.json)", text):
             found.append(f"{page.relative_to(ROOT)}: /mcp without its slash")
-        for name in names:
-            if re.search(rf"\b{re.escape(name)}\b", text):
-                found.append(f"{page.relative_to(ROOT)}: {name}")
         for word in RETIRED:
             if word in text.lower():
                 found.append(f"{page.relative_to(ROOT)}: {word}")
@@ -118,7 +107,6 @@ def test_one_vocabulary_and_the_mcp_endpoint_with_its_slash():
     assert not vocabulary(PAGES), vocabulary(PAGES)
 
 
-@pytest.mark.xfail(reason="the skills still say inbox; remove this mark with that fix")
 def test_agents_read_the_same_vocabulary():
     found = vocabulary(AGENT_PAGES, lambda page: QUOTED.sub("", page.read_text()))
     assert not found, found

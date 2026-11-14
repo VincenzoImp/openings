@@ -3,7 +3,7 @@ name: prepare-applications
 title: Prepare CVs and letters
 summary: Have a tailored CV and cover letter written, compiled and checked for each shortlisted job until it is Ready.
 example: Prepare a CV and cover letter for every job on my shortlist.
-description: Prepare the CV and cover letter of Openings applications from the owner's Career record, templates and Writing rules - "prepare CV and letter for every shortlisted job", "prepare the application for X", "redo the letter for Y". Compiles PDFs locally, uploads them and leaves each application Ready for the owner to send.
+description: Prepare the CV and cover letter of Openings applications from the owner's career entries, templates and Writing rules - "prepare CV and letter for every shortlisted job", "prepare the application for X", "redo the letter for Y". Compiles PDFs locally, uploads them and leaves each application Ready for the owner to send.
 ---
 
 # Prepare CVs and letters
@@ -44,7 +44,8 @@ Read it with `applications_get` (up to 20 at a time) and its job with
   without inferring rights; an open question is a requirement, not a guess;
 - a closing date: set the deadline; a closed posting is reported, not prepared.
 
-Record them with `applications_update`. A blocking one keeps it from Ready
+Record them with `applications_update` and the version you read. A blocking
+one keeps it from Ready
 until the owner resolves it.
 
 **Select.** Pick the three to five needs of the role, then the career entries
@@ -73,6 +74,11 @@ redo, the revision it replaces. PUT the PDF with the returned grant (see
 [openings](../openings/SKILL.md)). A revision is complete and final once its
 PDF is stored: check before uploading, and make a new revision for any
 change.
+
+**Form questions.** Record the employer's form questions as the application's
+`questions` and draft `answers` from the record, never inventing; a long
+form can be an `answers` revision with `documents_create`. The owner submits
+them.
 
 **Gaps.** What the record cannot support goes in an unpinned note on the
 application for the owner, never into the documents.

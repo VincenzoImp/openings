@@ -63,7 +63,7 @@ const REPLY_WORDS: Record<string, string> = {
 /** The fields of an application these words are made from. */
 export interface AppFacts {
   id: string;
-  status: string;
+  stage: string;
   ready: boolean;
   missing?: string[];
   deadline?: string | null;
@@ -78,11 +78,11 @@ export interface AppFacts {
 }
 
 /** The stage shown: Ready is a Shortlisted application with nothing missing. */
-export function stageOf(app: Pick<AppFacts, "status" | "ready">): StageKey {
-  if (app.status === "shortlisted") return app.ready ? "ready" : "shortlisted";
+export function stageOf(app: Pick<AppFacts, "stage" | "ready">): StageKey {
+  if (app.stage === "shortlisted") return app.ready ? "ready" : "shortlisted";
   return (
-    ["applied", "interview", "offer", "closed"].includes(app.status)
-      ? app.status
+    ["applied", "interview", "offer", "closed"].includes(app.stage)
+      ? app.stage
       : "shortlisted"
   ) as StageKey;
 }
@@ -161,7 +161,7 @@ export function statusPhrase(
 /** Whether a sent application has waited longer than the no-reply period. */
 export function overdue(app: AppFacts, noReplyDays: number, now = new Date()) {
   return (
-    app.status === "applied" &&
+    app.stage === "applied" &&
     !app.last_reply &&
     !!app.applied_at &&
     daysBetween(app.applied_at, now) > noReplyDays
@@ -237,10 +237,10 @@ export function sortApplications<T extends AppFacts>(
 export type BulkAction = "no_reply" | "close" | "reopen" | "priority";
 const BULK_VALID: Record<BulkAction, (app: AppFacts) => boolean> = {
   // As the server decides: no_response only for a sent application.
-  no_reply: (app) => app.status !== "closed" && !!app.applied_at,
-  close: (app) => app.status !== "closed",
-  reopen: (app) => app.status === "closed",
-  priority: (app) => app.status !== "closed",
+  no_reply: (app) => app.stage !== "closed" && !!app.applied_at,
+  close: (app) => app.stage !== "closed",
+  reopen: (app) => app.stage === "closed",
+  priority: (app) => app.stage !== "closed",
 };
 /** The bulk actions valid for every selected application, in the bar's order. */
 export function bulkActions(selected: AppFacts[]): BulkAction[] {
@@ -354,13 +354,13 @@ export function followUpLine(
   const reply = replyDate(app);
   const kind = String(app.last_reply?.kind ?? "");
   const sent = app.applied_at ? `Applied ${shortDay(app.applied_at, now)}` : "";
-  if (app.status === "interview")
+  if (app.stage === "interview")
     return {
       text: reply
         ? `Interview invitation ${shortDay(reply, now)}`
         : sent || "Interview",
     };
-  if (app.status === "offer")
+  if (app.stage === "offer")
     return { text: reply ? `Offer ${shortDay(reply, now)}` : sent || "Offer" };
   if (reply)
     return {

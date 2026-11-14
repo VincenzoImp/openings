@@ -5,7 +5,7 @@ import hashlib
 import httpx
 import pytest
 
-from document_fixtures import PDF, tex, text_pdf
+from document_fixtures import PDF, pdf_revision, tex, text_pdf
 from openings.documents import DocumentCreate
 from test_source_documents import SOURCE, TEXT
 
@@ -145,9 +145,58 @@ def test_inputs_of_a_cv_or_letter_only_are_refused_elsewhere(setup):
         {"kind": "cv", "source": "x", "source_file": {"name": "cv.tex", "size": 1}},
         {"kind": "cv", "source": "x" * (256 * 1024 + 1)},
         {"kind": "resume"},
+        # A CV or letter is its PDF: a revision that could never be completed is refused.
+        {"kind": "letter"},
+        # The PDF names its source's hash, so a source file declares it.
+        {
+            "kind": "cv",
+            "source_file": {"name": "cv.tex", "size": 1},
+            "pdf": {"name": "cv.pdf", "size": 1},
+        },
     ):
         body = {"application_id": application["id"], **value}
         assert client.post("/api/v1/documents", json=body).status_code == 422, value["kind"]
+
+
+def test_the_pdf_header_is_checked_whatever_the_case_of_the_media_type(setup):
+    client, _, documents, application = setup
+    created = documents.create_document(
+        DocumentCreate(
+            application_id=application["id"], kind="cv", pdf={"name": "cv.pdf", "size": 9}
+        )
+    )
+    grant = client.post(
+        "/api/v1/files/uploads",
+        json={
+            "owner_type": "document",
+            "owner_id": created["id"],
+            "name": "cv.pdf",
+            "media_type": "Application/PDF",
+            "size": 9,
+        },
+    ).json()
+    assert code(put(client, grant, b"not a pdf")) == (422, "pdf_header")
+    assert documents.get_document(created["id"])["complete"] is False
+
+
+def test_every_grant_works_once(setup):
+    client, _, documents, application = setup
+    revision = pdf_revision(documents, client.put, application["id"])
+    grant = client.post(f"/api/v1/files/{revision['files'][0]['id']}/download").json()
+    headers = grant["headers"]
+    assert client.get(grant["url"], headers=headers).content == PDF
+    assert code(client.get(grant["url"], headers=headers)) == (401, "transfer_used")
+    # A used upload grant takes no other bytes; the same bytes again replay the file.
+    created = documents.create_document(
+        DocumentCreate(
+            application_id=application["id"], kind="letter", pdf={"name": "l.pdf", "size": len(PDF)}
+        )
+    )
+    upload = created["uploads"]["pdf"]
+    stored = put(client, upload, PDF).json()
+    assert put(client, upload, PDF).json()["id"] == stored["id"]
+    other = PDF[:-1] + b"!"
+    assert code(put(client, upload, other)) == (401, "transfer_used")
 
 
 def test_text_of_a_pdf_stored_without_text_is_read_on_first_read(setup):

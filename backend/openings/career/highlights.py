@@ -1,19 +1,19 @@
-"""Claims: reusable, approved wording tied to a Career entry."""
+"""Highlights: reusable, approved wording tied to a career entry."""
 
 from __future__ import annotations
 
 from .. import events
-from ..common import check_version, encode, new_id, now
+from ..common import check_page, check_version, encode, get_row, new_id, now
 from ..errors import missing
 from ..idempotency import fingerprint, remember, replay
-from .models import ClaimCreate, ClaimUpdate
-from .records import _claim, _get, _page, values
+from .models import HighlightCreate, HighlightUpdate
+from .records import _highlight, values
 
 
-class ClaimOperations:
-    """Listing, reading and writing claims."""
+class HighlightOperations:
+    """Listing, reading and writing highlights."""
 
-    def list_claims(
+    def list_highlights(
         self,
         career_id: str = "",
         approved: bool | None = None,
@@ -22,8 +22,8 @@ class ClaimOperations:
         summary: bool = True,
         q: str = "",
     ) -> dict:
-        """List highlights by career entry (career_id), approval or text (q). summary=true (the default) omits metadata and bounds wording previews; summary=false returns full claims. always_include is always returned."""
-        _page(limit, offset)
+        """List highlights by career entry (career_id), approval or text (q). summary=true (the default) omits metadata and bounds wording previews; summary=false returns full highlights. always_include is always returned."""
+        check_page(limit, offset)
         where, params = [], []
         if career_id:
             where.append("knowledge_id=?")
@@ -49,33 +49,33 @@ class ClaimOperations:
             (*params, limit, offset),
         )
         return {
-            "items": [_claim(row, full=not summary) for row in rows],
+            "items": [_highlight(row, full=not summary) for row in rows],
             "total": self.db.one(f"SELECT COUNT(*) AS n FROM claims{clause}", params)["n"],
             "limit": limit,
             "offset": offset,
         }
 
-    def get_claim(self, claim_id: str) -> dict:
-        """Read a reusable claim and its evidence ID."""
-        row = self.db.one("SELECT * FROM claims WHERE id=?", (claim_id,))
+    def get_highlight(self, highlight_id: str) -> dict:
+        """Read a highlight and its career entry id."""
+        row = self.db.one("SELECT * FROM claims WHERE id=?", (highlight_id,))
         if not row:
             missing("Highlight")
-        return _claim(row)
+        return _highlight(row)
 
-    def create_claim(self, value: ClaimCreate) -> dict:
-        """Create reusable claim wording tied to evidence. Approval defaults to false. always_include marks a claim to include in every CV unless the job gives a reason to leave it out; any other selection hints go in metadata."""
+    def create_highlight(self, value: HighlightCreate) -> dict:
+        """Create a highlight tied to a career entry. Approval defaults to false. always_include marks a highlight to include in every CV unless the job gives a reason to leave it out; any other selection hints go in metadata."""
         record_id, timestamp, digest = new_id(), now(), fingerprint(value)
         with self.db.transaction() as conn:
             replayed = replay(conn, "claims", value.idempotency_key, digest)
             if replayed:
                 record_id = replayed
             else:
-                self._insert_claim(conn, value, record_id, timestamp)
+                self._insert_highlight(conn, value, record_id, timestamp)
                 remember(conn, "claims", value.idempotency_key, digest, record_id)
-        return self.get_claim(record_id)
+        return self.get_highlight(record_id)
 
-    def _insert_claim(self, conn, value, record_id, timestamp):
-        _get(conn, "knowledge", value.career_id, "Career entry")
+    def _insert_highlight(self, conn, value, record_id, timestamp):
+        get_row(conn, "knowledge", value.career_id, "Career entry")
         conn.execute(
             "INSERT INTO claims(id,knowledge_id,text,approved,position,always_include,metadata,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
             (
@@ -99,16 +99,16 @@ class ClaimOperations:
             {"career_id": value.career_id, "approved": value.approved},
         )
 
-    def update_claim(self, claim_id: str, value: ClaimUpdate) -> dict:
-        """Revise or approve a claim with version checking; document generation does not silently approve new facts."""
+    def update_highlight(self, highlight_id: str, value: HighlightUpdate) -> dict:
+        """Revise or approve a highlight with version checking; document generation does not silently approve new facts."""
         data = values(value)
         expected = data.pop("expected_version")
         with self.db.transaction() as conn:
-            row = _get(conn, "claims", claim_id, "Highlight")
+            row = get_row(conn, "claims", highlight_id, "Highlight")
             check_version(row, expected)
-            previous = _claim(row)
+            previous = _highlight(row)
             merged = {**previous, **data}
-            _get(conn, "knowledge", merged["career_id"], "Career entry")
+            get_row(conn, "knowledge", merged["career_id"], "Career entry")
             if previous["career_id"] != merged["career_id"] and "position" not in data:
                 merged["position"] = self._next_position(conn, "claims", merged["career_id"])
             changed = [
@@ -127,7 +127,7 @@ class ClaimOperations:
                 events.record(
                     conn,
                     "highlight_updated",
-                    ("highlight", claim_id),
+                    ("highlight", highlight_id),
                     {
                         "career_id": merged["career_id"],
                         "fields": changed,
@@ -144,21 +144,21 @@ class ClaimOperations:
                         int(merged["always_include"]),
                         encode(merged["metadata"]),
                         now(),
-                        claim_id,
+                        highlight_id,
                     ),
                 )
-        return self.get_claim(claim_id)
+        return self.get_highlight(highlight_id)
 
-    def delete_claim(self, claim_id: str, expected_version: int) -> dict:
-        """Permanently delete a reusable claim; document revisions keep the ids they cite."""
+    def delete_highlight(self, highlight_id: str, expected_version: int) -> dict:
+        """Permanently delete a highlight; document revisions keep the ids they cite."""
         with self.db.transaction() as conn:
-            row = _get(conn, "claims", claim_id, "Highlight")
+            row = get_row(conn, "claims", highlight_id, "Highlight")
             check_version(row, expected_version)
-            conn.execute("DELETE FROM claims WHERE id=?", (claim_id,))
+            conn.execute("DELETE FROM claims WHERE id=?", (highlight_id,))
             events.record(
                 conn,
                 "highlight_deleted",
-                ("highlight", claim_id),
+                ("highlight", highlight_id),
                 {"career_id": row["knowledge_id"]},
             )
-        return {"deleted": True, "id": claim_id}
+        return {"deleted": True, "id": highlight_id}

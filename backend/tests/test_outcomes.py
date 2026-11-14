@@ -27,7 +27,7 @@ def attempt(workspace, title="Synthetic data engineer", status=None, **fields):
     if status:
         application = workspace.update_application(
             application["id"],
-            {"expected_version": application["version"], "status": status, **fields},
+            {"expected_version": application["version"], "stage": status, **fields},
         )
     return application
 
@@ -72,7 +72,7 @@ def test_recording_a_reply_moves_the_stage_by_its_kind_in_one_event(workspace):
         sent = attempt(workspace, f"Synthetic {kind} role", status="applied")
         before = last_rowid(workspace)
         recorded = reply(workspace, sent, kind=kind, note="Synthetic note.")
-        assert (recorded["status"], recorded["outcome"]) == (status, outcome)
+        assert (recorded["stage"], recorded["outcome"]) == (status, outcome)
         assert kinds(recorded) == [(kind, today())]  # The date defaults to today.
         assert recorded["last_reply"]["kind"] == kind
         assert recorded["version"] == sent["version"] + 1
@@ -96,7 +96,7 @@ def test_replies_need_a_sent_application_and_move_only_forward(workspace):
     sent = attempt(workspace, "Synthetic backend engineer", status="applied")
     # A reply sets the stage itself.
     with pytest.raises(DomainError) as error:
-        move(workspace, sent, status="interview", reply={"kind": "interview"})
+        move(workspace, sent, stage="interview", reply={"kind": "interview"})
     assert error.value.code == "reply_stage"
     with pytest.raises(ValidationError):
         reply(workspace, sent, date=today())
@@ -105,7 +105,7 @@ def test_replies_need_a_sent_application_and_move_only_forward(workspace):
     offer = reply(workspace, sent, kind="offer", date=days_ago(3))
     # A later interview round does not move an Offer back.
     again = reply(workspace, offer, kind="interview", date=days_ago(1))
-    assert again["status"] == "offer"
+    assert again["stage"] == "offer"
     # One reply of a kind per day; other may repeat.
     with pytest.raises(DomainError) as error:
         reply(workspace, sent, kind="offer", date=days_ago(3))
@@ -115,12 +115,12 @@ def test_replies_need_a_sent_application_and_move_only_forward(workspace):
     assert len(workspace.get_application(sent["id"])["replies"]) == 4
     # A rejection after an offer closes it.
     closed = reply(workspace, sent, kind="rejection")
-    assert (closed["status"], closed["outcome"]) == ("closed", "rejected")
+    assert (closed["stage"], closed["outcome"]) == ("closed", "rejected")
     # A late reply reopens an application closed as no reply.
     waited = attempt(workspace, "Synthetic analyst", status="applied")
-    waited = move(workspace, waited, status="closed", outcome="no_response")
+    waited = move(workspace, waited, stage="closed", outcome="no_response")
     reopened = reply(workspace, waited, kind="interview")
-    assert (reopened["status"], reopened["outcome"], reopened["concluded_on"]) == (
+    assert (reopened["stage"], reopened["outcome"], reopened["concluded_on"]) == (
         "interview",
         None,
         None,
@@ -136,18 +136,18 @@ def test_replies_are_corrected_and_removed_through_the_same_update(workspace):
     assert first["created_by"] == "agent:Synthetic agent" and first["version"] == 1
     before = last_rowid(workspace)
     corrected = reply(workspace, sent, id=first["id"], date=days_ago(4), note="Second round.")
-    assert corrected["status"] == "interview"
+    assert corrected["stage"] == "interview"
     item = corrected["replies"][0]
     assert (item["date"], item["version"], item["note"]) == (days_ago(4), 2, "Second round.")
     # A correction of the kind never moves the stage.
-    assert reply(workspace, sent, id=first["id"], kind="offer")["status"] == "interview"
+    assert reply(workspace, sent, id=first["id"], kind="offer")["stage"] == "interview"
     with pytest.raises(DomainError) as error:
         reply(workspace, sent, id="missing", note="x")
     assert error.value.status == 404
     with pytest.raises(ValidationError):
         reply(workspace, sent, id=first["id"], remove=True, note="x")
     removed = reply(workspace, sent, id=first["id"], remove=True)
-    assert removed["replies"] == [] and removed["status"] == "interview"
+    assert removed["replies"] == [] and removed["stage"] == "interview"
     events = events_of(workspace, sent["id"], before)
     assert [event["kind"] for event in events] == ["reply_edited", "reply_edited", "reply_removed"]
     assert json.loads(events[0]["payload"]) == {"fields": ["date", "note"], "version": 2}
@@ -156,27 +156,27 @@ def test_replies_are_corrected_and_removed_through_the_same_update(workspace):
 
 def test_mark_applied_and_its_undo_while_no_reply_exists(workspace):
     application = attempt(workspace)
-    applied = move(workspace, application, status="applied")
+    applied = move(workspace, application, stage="applied")
     assert applied["applied_at"] and applied["ready"] is False
     edited = move(workspace, applied, applied_at="2026-01-05")
     assert edited["applied_at"].startswith("2026-01-05")
-    undone = move(workspace, edited, status="shortlisted")
-    assert (undone["status"], undone["applied_at"]) == ("shortlisted", None)
-    applied = move(workspace, undone, status="applied")
+    undone = move(workspace, edited, stage="shortlisted")
+    assert (undone["stage"], undone["applied_at"]) == ("shortlisted", None)
+    applied = move(workspace, undone, stage="applied")
     reply(workspace, applied, kind="other")
     with pytest.raises(DomainError) as error:
-        move(workspace, applied, status="shortlisted")
+        move(workspace, applied, stage="shortlisted")
     assert (error.value.status, error.value.code) == (409, "application_has_replies")
 
 
 def test_no_reply_closes_only_sent_applications_by_hand(workspace):
     shortlisted = attempt(workspace)
     with pytest.raises(DomainError) as error:
-        move(workspace, shortlisted, status="closed", outcome="no_response")
+        move(workspace, shortlisted, stage="closed", outcome="no_response")
     assert (error.value.status, error.value.code) == (409, "application_not_sent")
 
     sent = attempt(workspace, "Synthetic backend engineer", status="applied")
-    closed = move(workspace, sent, status="closed", outcome="no_response")
+    closed = move(workspace, sent, stage="closed", outcome="no_response")
     assert (closed["outcome"], closed["concluded_on"]) == ("no_response", today())
     assert closed["replies"] == []
     corrected = move(workspace, sent, concluded_on=days_ago(2))
@@ -184,7 +184,7 @@ def test_no_reply_closes_only_sent_applications_by_hand(workspace):
     with pytest.raises(DomainError) as error:
         move(workspace, sent, outcome="not_pursued", concluded_on=days_ago(2))
     assert error.value.code == "application_concluded_on"
-    reopened = move(workspace, sent, status="applied")
+    reopened = move(workspace, sent, stage="applied")
     assert (reopened["outcome"], reopened["concluded_on"]) == (None, None)
 
     bulk = attempt(workspace, "Synthetic analyst", status="applied")
@@ -222,7 +222,7 @@ def test_the_no_reply_period_lists_overdue_applications_and_closes_nothing(works
     # Applied, without a reply, past the period; listing closes nothing.
     assert [item["id"] for item in overdue["items"]] == [old["id"]]
     assert overdue["no_reply"] == {"days": 30, "source": "default", "overdue": 1}
-    assert workspace.get_application(old["id"])["status"] == "applied"
+    assert workspace.get_application(old["id"])["stage"] == "applied"
     with acting_as(OWNER):
         PreferencesService(workspace).update_settings({"expected_version": 0, "no_reply_days": 7})
     listed = workspace.list_applications(needs="reply_overdue")

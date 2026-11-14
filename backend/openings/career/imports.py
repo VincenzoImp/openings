@@ -8,27 +8,23 @@ from pydantic import ValidationError
 
 from ..common import now
 from ..errors import DomainError
-from .models import DEFAULT_PROFILE, CareerImport, ImportPreview, KnowledgeCreate, ProfileUpdate
+from .models import DEFAULT_PROFILE, CareerImport, EntryCreate, ImportPreview, ProfileUpdate
 from .records import values
 
 
 class ImportOperations:
-    """Previewing and applying a Career import."""
+    """Previewing and applying a career import."""
 
     def preview_import(self, value: ImportPreview) -> dict:
         """Preview JSON or plain-text career import without modifying stored information."""
         try:
             data = json.loads(value.text)
         except json.JSONDecodeError:
-            item = KnowledgeCreate(kind="other", title=value.title, narrative=value.text)
+            item = EntryCreate(kind="other", title=value.title, narrative=value.text)
             return {
                 "entries": [item.model_dump()],
                 "warnings": ["Text is preserved as one narrative. Review before importing."],
             }
-        if isinstance(data, dict) and "knowledge" in data and "entries" not in data:
-            # The file format of 0.23 named the entries "knowledge".
-            data = {**data, "entries": data["knowledge"]}
-            del data["knowledge"]
         if isinstance(data, list):
             data = {"entries": data}
         elif isinstance(data, dict) and "title" in data and "entries" not in data:
@@ -48,8 +44,7 @@ class ImportOperations:
             )
         try:
             items = [
-                KnowledgeCreate.model_validate(item).model_dump()
-                for item in data.get("entries", [])
+                EntryCreate.model_validate(item).model_dump() for item in data.get("entries", [])
             ]
             result = {"entries": items}
             if data.get("profile") is not None:
@@ -80,7 +75,7 @@ class ImportOperations:
             )
         return result
 
-    def import_knowledge(self, value: CareerImport) -> dict:
+    def import_entries(self, value: CareerImport) -> dict:
         """Confirm a previewed career import: append narratives and optionally apply explicitly versioned profile fields."""
         profile_data = None
         if value.profile is not None:
@@ -109,9 +104,9 @@ class ImportOperations:
             if profile_data is not None:
                 self._apply_profile(conn, profile_data, value.expected_profile_version)
             for item in value.entries:
-                identifiers.append(self._insert_knowledge(conn, item, timestamp))
+                identifiers.append(self._insert_entry(conn, item, timestamp))
         return {
             "profile": self.get_profile(),
-            "items": [self.get_knowledge(record_id) for record_id in identifiers],
+            "items": [self.get_entry(record_id) for record_id in identifiers],
             "total": len(identifiers),
         }

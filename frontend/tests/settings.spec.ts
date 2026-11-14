@@ -92,6 +92,9 @@ test("Account: theme, setup guide, sign out and a checked password", async ({
 
   await page.getByRole("button", { name: "Change password" }).click();
   const dialog = page.getByRole("dialog", { name: "Change password" });
+  await dialog.getByRole("button", { name: "Change password" }).click();
+  await expect(dialog).toContainText("Enter your current password.");
+  await dialog.getByLabel("Current password").fill("synthetic-old-password");
   await dialog.getByLabel("New password", { exact: true }).fill("short");
   await dialog.getByRole("button", { name: "Change password" }).click();
   await expect(dialog).toContainText("Use at least 10 characters.");
@@ -109,7 +112,12 @@ test("Account: theme, setup guide, sign out and a checked password", async ({
   await expect(
     page.getByRole("button", { name: "Sign in", exact: true }),
   ).toBeVisible();
-  expect(sent).toEqual([{ password: "synthetic-new-password" }]);
+  expect(sent).toEqual([
+    {
+      current_password: "synthetic-old-password",
+      password: "synthetic-new-password",
+    },
+  ]);
 });
 
 test("API & agents: three steps, an Agent token by default, copy, revoke", async ({

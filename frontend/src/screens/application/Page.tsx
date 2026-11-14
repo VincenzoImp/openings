@@ -184,15 +184,15 @@ function menuOf(
 ): MenuEntry[] {
   const { open, move } = context;
   const stage = stageOf(app);
-  const back = { status: app.status } as Patch;
+  const back = { stage: app.stage } as Patch;
   const staged: MenuEntry[] = [];
-  if (isSent(app.status)) {
+  if (isSent(app.stage)) {
     staged.push({
       id: "no-reply",
       label: "Close as no reply",
       onSelect: () =>
         move(
-          { status: "closed", outcome: "no_response" },
+          { stage: "closed", outcome: "no_response" },
           `Closed ${quoted(jobOf(app).title)} as no reply`,
           back,
         ),
@@ -202,18 +202,18 @@ function menuOf(
       label: "Withdraw",
       onSelect: () =>
         move(
-          { status: "closed", outcome: "not_pursued" },
+          { stage: "closed", outcome: "not_pursued" },
           `Withdrew ${quoted(jobOf(app).title)}`,
           back,
         ),
     });
-    if (app.status === "offer")
+    if (app.stage === "offer")
       staged.push({
         id: "accept",
         label: "Accept offer",
         onSelect: () =>
           move(
-            { status: "closed", outcome: "accepted" },
+            { stage: "closed", outcome: "accepted" },
             `Accepted the offer for ${quoted(jobOf(app).title)}`,
             back,
           ),
@@ -238,16 +238,16 @@ function menuOf(
           },
         ]
       : []),
-    app.status === "closed"
+    app.stage === "closed"
       ? {
           id: "reopen",
           label: "Reopen",
           onSelect: () =>
             move(
-              { status: reopenStage(app) },
+              { stage: reopenStage(app) },
               `Reopened ${quoted(jobOf(app).title)}`,
               {
-                status: "closed",
+                stage: "closed",
                 outcome: app.outcome as Patch["outcome"],
               },
             ),
@@ -335,7 +335,7 @@ export default function ApplicationPage() {
   const job = app ? jobOf(app) : null;
   useTitle(allSent ? "All sent" : (job?.title ?? null));
   const top = useRef<HTMLDivElement>(null);
-  const sent = !!app && isSent(app.status);
+  const sent = !!app && isSent(app.stage);
   useEffect(() => {
     if (!sent) return;
     const onKey = (event: KeyboardEvent) => {
@@ -391,7 +391,7 @@ export default function ApplicationPage() {
   const target: Target = {
     id: app.id,
     version: app.version,
-    status: app.status,
+    stage: app.stage,
     title: job.title,
     applied_at: app.applied_at,
     outcome: app.outcome,
@@ -444,7 +444,7 @@ export default function ApplicationPage() {
         id: app!.id,
         version: app!.version,
         patch: {
-          status: "applied",
+          stage: "applied",
           ...(day
             ? { applied_at: new Date(`${day}T12:00:00`).toISOString() }
             : {}),
@@ -462,7 +462,7 @@ export default function ApplicationPage() {
                   {
                     id: changed.id,
                     version: changed.version,
-                    patch: { status: "shortlisted" },
+                    patch: { stage: "shortlisted" },
                   },
                   {
                     onSuccess: () => {
@@ -507,9 +507,9 @@ export default function ApplicationPage() {
               label: "Not pursuing",
               onSelect: () =>
                 move(
-                  { status: "closed", outcome: "not_pursued" },
+                  { stage: "closed", outcome: "not_pursued" },
                   `Closed ${quoted(job.title)} · not pursuing`,
-                  { status: "shortlisted" },
+                  { stage: "shortlisted" },
                 ),
             },
           ]
@@ -547,7 +547,7 @@ export default function ApplicationPage() {
       key={app.id}
     >
       {body}
-      {isSent(app.status) && (
+      {isSent(app.stage) && (
         <ActionBar>
           <Button variant="primary" onClick={() => setDialog("reply")}>
             Record reply

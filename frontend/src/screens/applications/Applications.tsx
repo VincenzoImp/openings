@@ -215,7 +215,7 @@ export default function ApplicationsScreen() {
       {
         id: app.id,
         version: app.version,
-        patch: { status: reopenStage(app) },
+        patch: { stage: reopenStage(app) },
       },
       {
         onSuccess: () =>
@@ -327,7 +327,7 @@ export default function ApplicationsScreen() {
         shortcuts={{
           r: (id) => {
             const app = rows.find((item) => item.id === id);
-            if (app && isSent(app.status)) setDialog({ kind: "reply", app });
+            if (app && isSent(app.stage)) setDialog({ kind: "reply", app });
           },
         }}
       >
@@ -357,7 +357,7 @@ export default function ApplicationsScreen() {
   const target = dialog && {
     id: dialog.app.id,
     version: dialog.app.version,
-    status: dialog.app.status,
+    stage: dialog.app.stage,
     title: jobOf(dialog.app).title,
     applied_at: dialog.app.applied_at,
     outcome: dialog.app.outcome,

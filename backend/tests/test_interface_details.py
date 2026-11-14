@@ -26,7 +26,7 @@ def test_a_reply_without_a_date_is_recorded_on_today(app, client):
     job = workspace.ingest_job({"title": "Synthetic analyst", "posting": "Model data."})
     application = workspace.create_application({"job_id": job["id"]})
     application = workspace.update_application(
-        application["id"], {"expected_version": application["version"], "status": "applied"}
+        application["id"], {"expected_version": application["version"], "stage": "applied"}
     )
     tools = asyncio.run(app.state.mcp.list_tools())
     tool = next(item for item in tools if item.name == "applications_update")
@@ -44,7 +44,7 @@ def test_a_reply_without_a_date_is_recorded_on_today(app, client):
     )
     assert recorded.status_code == 200, recorded.text
     body = recorded.json()
-    assert body["status"] == "interview" and body["replies"][0]["date"] == today()
+    assert body["stage"] == "interview" and body["replies"][0]["date"] == today()
 
 
 def test_tool_schemas_have_no_titles_and_idempotency_keys_have_one_length(app):

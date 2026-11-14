@@ -16,6 +16,7 @@ def test_preparation_counts_current_revisions_and_complete_ones(app, client):
             application_id=application["id"],
             kind="cv",
             title="CV",
+            pdf={"name": "cv.pdf", "size": 1},
         )
     )
 
@@ -34,11 +35,12 @@ def test_preparation_counts_current_revisions_and_complete_ones(app, client):
             kind="cv",
             title="Revised CV",
             previous_id=first["id"],
+            pdf={"name": "cv.pdf", "size": 1},
         )
     )
     # The new revision is current and incomplete; its parent's PDF does not count.
     assert current() == [{"kind": "cv", "revisions": 1, "complete": 0}]
-    assert workspace.get_application(application["id"])["status"] == "shortlisted"
+    assert workspace.get_application(application["id"])["stage"] == "shortlisted"
     documents.delete_document(second["id"], second["version"])
     assert current()[0]["complete"] == 1
 

@@ -183,11 +183,11 @@ def test_ready_follows_uploads_new_revisions_and_required_documents(app, put):
     assert json.loads(stored["required_documents"]) == ["cv"]
     # Mark applied leaves Ready; its undo returns to it.
     applied = workspace.update_application(
-        application["id"], {"expected_version": read["version"], "status": "applied"}
+        application["id"], {"expected_version": read["version"], "stage": "applied"}
     )
     assert applied["ready"] is False and applied["missing"] == []
     undone = workspace.update_application(
-        application["id"], {"expected_version": applied["version"], "status": "shortlisted"}
+        application["id"], {"expected_version": applied["version"], "stage": "shortlisted"}
     )
     assert undone["ready"] is True
     # Deleting the complete CV removes Ready.

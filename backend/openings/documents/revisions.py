@@ -14,10 +14,10 @@ import hashlib
 import json
 
 from .. import events
-from ..career.records import _get, _page
-from ..common import check_version, encode, new_id, now
+from ..common import check_page, check_version, encode, get_row, new_id, now
 from ..errors import DomainError, missing
 from ..idempotency import fingerprint, remember, replay
+from .files import drop_grants
 from .models import SOURCE_KINDS, DocumentCreate, UploadReservation
 from .pdf import pdf_text
 from .sources import PDF, refresh_text, source_hash, store_pdf_text
@@ -103,9 +103,9 @@ class RevisionOperations:
         with self.db.transaction() as conn:
             document_id = replay(conn, "documents", value.idempotency_key, digest)
             if document_id is None:
-                application = _get(conn, "applications", value.application_id, "Application")
+                application = get_row(conn, "applications", value.application_id, "Application")
                 previous = (
-                    _get(conn, "documents", value.previous_id, "Document revision")
+                    get_row(conn, "documents", value.previous_id, "Document revision")
                     if value.previous_id
                     else None
                 )
@@ -203,7 +203,7 @@ class RevisionOperations:
 
     def _create_grants(self, conn, document_id, value):
         """One-shot grants for the files the create declared and the revision still lacks."""
-        document = _get(conn, "documents", document_id, "Document revision")
+        document = get_row(conn, "documents", document_id, "Document revision")
         names = {
             row[0]
             for row in conn.execute("SELECT name FROM files WHERE document_id=?", (document_id,))
@@ -344,7 +344,7 @@ class RevisionOperations:
         q: str = "",
     ) -> dict:
         """List revisions by application and kind (cv, letter, answers, other), each with complete (a CV or letter whose PDF is stored); q searches titles, notes and readable text. summary=true (default) omits text, content and file entries; summary=false includes them."""
-        _page(limit, offset)
+        check_page(limit, offset)
         where, params = [], []
         if application_id:
             where.append("application_id=?")
@@ -416,21 +416,13 @@ class RevisionOperations:
     def delete_document(self, document_id: str, expected_version: int) -> dict:
         """Permanently remove one document revision and its attached files, with its current expected_version; other revisions remain."""
         with self.db.transaction() as conn:
-            document = _get(conn, "documents", document_id, "Document revision")
+            document = get_row(conn, "documents", document_id, "Document revision")
             check_version(document, expected_version)
             application = conn.execute(
                 "SELECT applications.job_id FROM applications JOIN documents ON documents.application_id=applications.id WHERE documents.id=?",
                 (document_id,),
             ).fetchone()
-            rows = conn.execute("SELECT token_hash,payload FROM transfer_grants").fetchall()
-            for row in rows:
-                if (
-                    json.loads(row["payload"]).get("owner_type") == "document"
-                    and json.loads(row["payload"]).get("owner_id") == document_id
-                ):
-                    conn.execute(
-                        "DELETE FROM transfer_grants WHERE token_hash=?", (row["token_hash"],)
-                    )
+            drop_grants(conn, owner_type="document", owner_id=document_id)
             conn.execute("DELETE FROM documents WHERE id=?", (document_id,))
             if application:
                 events.record(
