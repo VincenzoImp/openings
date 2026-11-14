@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.24.2 — 2026-11-14
+
+Security fix. No schema change.
+
+- A backup taken with an agent token no longer carries owner credentials. The copy already removed the password hash, the session secret and the API tokens, but earlier versions of those rows could remain in its free pages, and an agent could use them to sign in as the owner. The copy is now rebuilt so only live rows remain. If you gave an agent a token and it took a backup, change your password (this replaces the session secret) and revoke tokens you no longer use.
+
 ## 0.24.1 — 2026-11-14
 
 Smoother document uploads for agents and cleaner document text. No schema change.
