@@ -82,7 +82,8 @@ test("twenty jobs are triaged by keyboard in at most 25 keys, each with its next
     await press(index % 2 ? "d" : "s");
     decided.set(shown, index % 2 ? "dismissed" : "shortlisted");
     if (index === 3) {
-      await expect(toast(page)).toContainText("Dismissed");
+      // The toast follows the server's answer, which a loaded runner delays.
+      await expect(toast(page)).toContainText("Dismissed", { timeout: 15_000 });
       await press("z");
       await expect(title(page)).toHaveText(shown);
       await expect(row(page, shown)).toHaveCount(1);
