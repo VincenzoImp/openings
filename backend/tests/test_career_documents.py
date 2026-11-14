@@ -6,6 +6,7 @@ from unittest.mock import patch
 import pytest
 from pydantic import ValidationError
 
+from document_fixtures import guided_application
 from openings.career import (
     EntryCreate,
     EntryUpdate,
@@ -20,7 +21,6 @@ from openings.documents import (
     UploadReservation,
 )
 from openings.errors import DomainError
-from timeline_fixtures import guided_application
 
 
 @pytest.fixture

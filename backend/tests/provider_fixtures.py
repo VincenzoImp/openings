@@ -1,12 +1,8 @@
 """Synthetic postings in every shape the collectors and manual input produce.
 
 Each item is what a collector hands to ingestion: the archive fields plus ``raw``,
-the provider's own row. ``released_payload`` is the observation payload releases up
-to 0.17 (schema 8) stored for such an item: the whole validated input.
+the provider's own row.
 """
-
-from openings.identities import normalize_url
-from openings.models import JobInput
 
 TEXT = "Design, build and operate the synthetic platform services of Example. " * 12
 # Every column of the vendored JobSpy row (JobPost), as its serializer emits it.
@@ -410,16 +406,3 @@ def provider_postings():
             "raw": {"job_url_direct": {"href": "https://example.org/apply/odd"}, "n": 1},
         },
     ]
-
-
-def released_payload(item):
-    """The stored observation payload of releases up to 0.17, as plain data."""
-    value = JobInput.model_validate(item)
-    data = value.model_dump()
-    url = normalize_url(value.url)
-    data.update(
-        title=value.title.strip() or "Untitled opportunity",
-        company=value.company.strip() or "Unknown company",
-        url=url,
-    )
-    return data
