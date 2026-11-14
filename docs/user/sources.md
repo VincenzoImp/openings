@@ -168,28 +168,16 @@ unavailable descriptions; completion does not imply every matching job was fetch
 
 ![Saved search form with query, portal selection, role filters and excluded role terms](../images/collection-settings.png)
 
-## Measure what each source yields
+## What each source found
 
-**Collection → Yield** counts, for the last 30 or 90 days or all time, what each
-saved search and company board brought: the jobs it **Collected** first, how
-many are still **New**, **Shortlisted** (kept, including those with an
-application of any outcome), **Applied** to, with employer **Answers** (and
-interviews), and **Dismissed**, split by who dismissed them: an agent, you, or
-other (dismissals without a record). Each job counts once, for the source that found it first, so the
-rows add up to the total; jobs you added yourself and jobs of a removed source
-have a row of their own. A search also shows how many of its jobs came from each
-job board.
+Each row under **Sources** shows what the source found, for example "31 found ·
+9 shortlisted · 3 applied · 1 replied": the jobs it found (each once), how many
+of them you shortlisted or started an application for, sent an application to,
+and got an employer reply for. Zero counts are left out. A source that finds
+many jobs and few you keep is a candidate to narrow or pause. **Applications →
+Stats** shows replies by source once two sources have enough applications.
 
-**Kept** is the share of collected jobs that were shortlisted; below 10
-collected jobs it reads **Too few jobs to judge**. A source that collects many
-jobs and keeps few is named in a notice above the table: narrow its terms or
-places, or pause it, under **Sources**.
-
-![Yield by source: collected, kept, applied, answered and dismissed jobs for each saved search and company board](../images/yield.png)
-
-REST `GET /collection/yield?since=&until=&min_sample=` and MCP `sources_yield`
-return the same counts with `likely_duplicates`, `no_longer_listed` and
-`dismissed_by`.
+REST `GET /sources` and MCP `sources_list` return the same numbers as `counts`.
 
 ## Request pacing
 

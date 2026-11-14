@@ -288,7 +288,7 @@ def test_records_are_compared_by_the_content_documents_use(tmp_path):
 
     # New versions that change nothing documents use.
     edit_entry(metadata={"source": "https://example.test/synthetic"}, position=4)
-    edit_claim(metadata={"source": "synthetic"}, role="core", group="Scale", default_in_cv=True)
+    edit_claim(metadata={"source": "synthetic", "role": "core"}, always_include=True)
     general = services.section("writing")["items"][0]["text"]
     edit_writing("Changed for a moment.")
     edit_writing(general)

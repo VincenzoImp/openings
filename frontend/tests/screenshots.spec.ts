@@ -28,11 +28,7 @@ const SCREENS: Screen[] = [
   { name: "setup", route: "setup?step=record", docs: "setup" },
   { name: "today", route: "today", docs: "today" },
   { name: "applications", route: "applications", docs: "applications" },
-  {
-    name: "applications-board",
-    route: "applications?view=board",
-    docs: "applications-board",
-  },
+  { name: "applications-stats", route: "applications?section=stats" },
   {
     name: "review",
     route: async (page) =>

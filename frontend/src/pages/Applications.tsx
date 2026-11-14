@@ -1,21 +1,19 @@
 import { Tabs } from "../design";
 import { PageHead } from "../library/common";
 import { useUrlFilters } from "../state";
-import { Insights } from "./applications/Insights";
 import { DEFAULTS, type Filters } from "./applications/model";
 import { Pipeline } from "./applications/Pipeline";
+import { Stats } from "./applications/Stats";
 
 /**
  * Every application from its shortlist to the employer's reply: the
- * pipeline as a list or a board, and Insights from the employers' answers.
- * `#applications?stage=…` opens a stage and `section=insights` the insights;
- * the shell rewrites the old page's `status=` and `readiness=ready`
- * (shell/routes.ts).
+ * pipeline, and Stats on the applications sent. `#applications?stage=…`
+ * opens a stage and `section=stats` the stats.
  */
 export default function ApplicationsPage() {
   const [values, setValues] = useUrlFilters({ ...DEFAULTS, section: "" });
   const { section, ...filters } = values;
-  const insights = section === "insights";
+  const stats = section === "stats";
   return (
     <>
       <PageHead title="Applications">
@@ -25,17 +23,15 @@ export default function ApplicationsPage() {
       <Tabs
         id="applications"
         label="Applications views"
-        value={insights ? "insights" : "pipeline"}
-        onChange={(id) =>
-          setValues({ section: id === "insights" ? "insights" : "" })
-        }
+        value={stats ? "stats" : "pipeline"}
+        onChange={(id) => setValues({ section: id === "stats" ? "stats" : "" })}
         items={[
           { id: "pipeline", label: "Pipeline" },
-          { id: "insights", label: "Insights" },
+          { id: "stats", label: "Stats" },
         ]}
       >
-        {insights ? (
-          <Insights />
+        {stats ? (
+          <Stats />
         ) : (
           <Pipeline
             filters={filters as Filters}

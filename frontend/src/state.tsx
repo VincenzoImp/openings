@@ -425,8 +425,7 @@ function affected(read: string, changed: string) {
   if (a === b) return true;
   // The change log and run details reflect every write.
   if (a === "events" || a === "runs") return true;
-  if (a === "overview")
-    return ["jobs", "applications", "career", "sources"].includes(b);
+  if (a === "stats") return ["jobs", "applications", "sources"].includes(b);
   if (a === "jobs") return ["applications", "career", "notes"].includes(b);
   if (a === "applications")
     return [

@@ -84,10 +84,6 @@ def test_a_refresh_is_an_event_only_when_a_visible_field_changes(tmp_path):
     assert event["payload"] == {"fields": ["title", "location"]}
     assert event["subject"]["id"] == job["id"] and event["actor"]["kind"] == "system"
     assert activity.list_events({"kind": "posting_updated"})["total"] == 0
-    assert [item["kind"] for item in workspace.overview()["activity"]] == [
-        "job_refreshed",
-        "job_added",
-    ]
 
 
 def test_an_owner_correction_is_not_refreshed_away_or_reported(tmp_path):

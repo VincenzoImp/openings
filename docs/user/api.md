@@ -37,17 +37,17 @@ Paste the posting when extraction cannot obtain the complete text.
 | Archive | `GET/POST /jobs`, `GET /jobs/resolve`, `GET /jobs/duplicates`, `POST /jobs/bulk`, `GET/PATCH/DELETE /jobs/{id}`, `POST /jobs/{id}/triage`, `/merge`, `/distinct`, `GET/POST /jobs/{id}/notes` |
 | Notes and timelines | `GET/PATCH/DELETE /notes/{id}`, `POST /notes/{id}/pin` plus job-owned list/create routes; `GET /jobs/{id}/timeline`, `GET /applications/{id}/timeline` |
 | Applications | `GET/POST /applications`, `POST /applications/bulk`, `GET/PATCH/DELETE /applications/{id}`, `GET /applications/{id}/events`, `GET /applications/{id}/staleness`, `GET /staleness` |
-| Employer replies | `PATCH /applications/{id}` with `reply`; `GET /insights` |
+| Employer replies | `PATCH /applications/{id}` with `reply`; `GET /stats` |
 | Career | `GET/PATCH /career/profile`, CRUD `/career/knowledge` and `/career/claims`, `POST /career/import/preview` then `/career/import` |
 | Preferences | `GET /preferences`, `PUT /preferences/{section}`, `PATCH /settings` |
 | Templates | CRUD `/templates` |
-| Collection | `GET/PATCH /collection`, `GET /providers`, `PATCH /providers/{id}`, CRUD `/sources`, `/sources/schemas`, preview/run, `/sources/bulk`, `/collection/runs` and `GET /collection/yield` |
+| Collection | `GET/PATCH /collection`, `GET /providers`, `PATCH /providers/{id}`, CRUD `/sources`, `/sources/schemas`, preview/run, `/sources/bulk` and `/collection/runs` |
 | Tasks | `GET /tasks`, `GET /tasks/{id}`, `POST /tasks/{id}/cancel` or `/retry` |
 | Documents | `GET/POST /contexts`, `GET /contexts/{id}`, `GET/POST /documents`, `GET/DELETE /documents/{id}`, `GET /documents/{id}/comparison` |
 | Files | `GET /files`, `GET/DELETE /files/{id}`, `GET /files/{id}/content`, `POST /files/uploads`, `POST /files/{id}/download` |
 | Agent activity | `GET /events`; `GET/POST /runs`, `GET/PATCH /runs/{id}`, `POST /runs/{id}/finish`; `GET/POST /questions`, `GET /questions/{id}`, `POST /questions/{id}/answer`, `POST /questions/{id}/withdraw`; `GET/POST /requests`, `GET /requests/{id}`, `POST /requests/{id}/take`, `/complete`, `/decline`, `/withdraw` |
 | Skills | `GET /skills`, `GET /skills/{name}`, `GET /skills/{name}/files/{path}`, `GET/PUT /skills/{name}/notes` |
-| Operations | `GET /workspace`, `/capabilities`, `/overview`, `/export`, `/backup`; `POST /backup/restore`; `/tokens`; `POST /auth/password` |
+| Operations | `GET /workspace`, `/capabilities`, `/export`, `/backup`; `POST /backup/restore`; `/tokens`; `POST /auth/password` |
 
 Paged list routes take bounded `limit` and `offset` and return `items`, `total`,
 `limit` and `offset`. `GET /jobs/{id}/notes`, `/providers`, `/skills` and `/tokens` are bounded by one job, one application or
@@ -123,7 +123,7 @@ its title or posting changes:
 
 ```json
 {"computed": true, "language": "de", "language_confidence": 0.93,
- "required": [["de"], ["en", "fr"]], "welcome": ["it"],
+ "required": [["de"], ["en", "fr"]],
  "duplicate_checked": true,
  "duplicate": {"job_id": "EARLIER_JOB_ID", "confidence": 0.91, "tier": "high"},
  "no_longer_listed": false, "unlisted_at": null}
@@ -132,7 +132,7 @@ its title or posting changes:
 `language` is the language the posting is written in (ISO 639-1, or null when
 the text is too short or mixed). `required` lists groups of required languages:
 one language of a group is enough, so the example needs German and English or
-French. `welcome` lists languages described as a plus. `duplicate` names an
+French; a language described only as a plus is not required. `duplicate` names an
 earlier job this one likely repeats, from the medium tier up; it is a review
 signal and nothing is merged. `POST /jobs/{id}/distinct` with
 `{"other_id": "EARLIER_JOB_ID"}` records two different vacancies: the signal
@@ -154,15 +154,11 @@ jobs under the other filters and whether they are `hidden`. `include_counts=true
 
 Whether a company board still lists a posting is `signals.no_longer_listed`.
 
-`GET /collection/yield?since=2026-08-01&until=&min_sample=10` returns, per
-source (`items`, with `source_id`, `name`, `kind`, `providers` for searches) and
-in `total`: `collected`, `to_review`, `shortlisted`, `applied`, `responded`,
-`interviews`, `offers`, `dismissed`, `dismissed_by` (`agent`, `owner`,
-`other`), `likely_duplicates`, `no_longer_listed` and
-`kept_rate` (shortlisted over collected; `null` with `withheld:
-"too_few_collected"` below `min_sample`). Each job counts once, for the source that collected it first and
-by the time it was added; jobs added by hand or by a removed source have a row
-with `source_id: null`.
+Each source of `GET /sources` (and `GET /sources/{id}`) has `counts`:
+`{"found": 31, "shortlisted": 9, "applied": 3, "replied": 1}`, the jobs the
+source found (each once) and how many of them are shortlisted or have an
+application, had one sent, and got an employer reply. A job found by two sources
+counts for both.
 
 `POST /applications` starts an application in stage Shortlisted and shortlists
 its job; shortlisting the job starts one too. Application stages are
@@ -183,7 +179,7 @@ revision, and no blocking requirement is unresolved. Reads and rows return
 `stage=shortlisted|ready|applied|interview|offer|closed` filters by stage
 (`ready` is the Shortlisted ones that are Ready), and `needs=documents` lists
 the Shortlisted ones missing a required document. `stage_counts` include
-`ready`, and the overview returns `ready`. `sort=deadline` or `sort=priority`
+`ready`. `sort=deadline` or `sort=priority`
 lists planned attempts first. Rows include `priority`, `deadline`,
 `open_requirements` and `blocking_requirements`; the full `requirements` list
 is on the single read.
@@ -212,7 +208,7 @@ no-reply period; only for a sent application, with `concluded_on`, today by
 default). Closing as no reply is always manual, one by one or with
 `POST /applications/bulk`; nothing closes automatically.
 
-### Employer replies and insights
+### Employer replies and stats
 
 A reply records what an employer did about a sent application: `kind`
 (`interview`, `rejection`, `offer` or `other`), the `date` it arrived (not in
@@ -234,18 +230,15 @@ kind (other than `other`) on a day. `{"reply": {"id": "REPLY_ID", "date":
 "REPLY_ID", "remove": true}}` removes one; neither moves the stage. The
 application read lists its `replies` and `last_reply`.
 
-`GET /insights` reports how employers answered the sent applications: `sent`,
-`responded`, `interviews` (an interview or offer reply), `offers`,
-`rejections`, `no_reply`, `waiting`, the `response_rate`, `interview_rate` and
-`offer_rate`, and the `median_days_to_response` (first reply day minus the
-`applied_at` day), overall and in `groups` by `role_family`, `seniority`,
-`location`, `source_kind`, `source` and `month` applied, plus a
-`time_to_response` table. A rate is `null` with `withheld: "too_few_sent"` when
-fewer than `min_sample` applications (default 5, 1 to 100) were sent; a median
-needs as many dated answers. `applied_since` and `applied_until` narrow the
-sample. Shortlisted applications and attempts closed without being sent are
-counted in `excluded` (`shortlisted`, `closed_unsent`), never in a rate. Role family and seniority come from the job title
-(see [Applications](applications.md#insights)).
+`GET /stats?period=90d` (`90d`, `12m` or `all`) reports the applications sent
+in the period (by `applied_at`; `all` also counts sent ones without a date):
+`applied`, `replied` and `reply_rate`, `interviews` (an interview or offer
+reply, or a move to Interview or Offer) and `interview_rate`,
+`median_days_to_reply` (first reply day minus the `applied_at` day), the
+`funnel` (`applied`, `replied`, `interview`, `offer`) and `by_source`: replies
+per source that first found the job, only when at least two sources have five
+or more sent applications each (otherwise `null`). A rate is `null` when
+nothing was sent. Shortlisted applications never sent are not counted.
 Updating `questions` without `answers` preserves compatible existing answers.
 Incompatible answers reject the update atomically; explicitly update or remove
 only the affected answer when that is intended.
@@ -269,12 +262,10 @@ caller's `token_kind` and, for each operation, its MCP `name`, its main REST
 token may not call it. OpenAPI and MCP `tools/list` are the full contract. Lists
 support server filters; `/jobs/bulk`, `/applications/bulk` and `/sources/bulk`
 accept at most 200 versioned items and return per-item outcomes. Application `stage_counts` span all matching
-attempts, independent of pagination. Overview accepts `since`/`until` for the
-submitted-attempt cohort. Career nonnullable PATCH fields reject explicit null:
+attempts, independent of pagination. Career nonnullable PATCH fields reject explicit null:
 omit unchanged fields, or clear text/lists/objects with empty values. Entry dates
 are nullable; `dates: null` clears them. See [Career](career.md) for structured
-headers, partial dates, skills, ordering and the typed selection fields of a
-claim (`default_in_cv`, `role`, `group`), and [Preferences](preferences.md)
+headers, partial dates, skills, ordering and a claim's `always_include` (★), and [Preferences](preferences.md)
 for what the owner is looking for, rules out, states as facts and wants in
 documents. Template `rules` hold the typed limits (`max_pages`, `max_bullets`,
 `max_bullet_chars`) and free keys such as `engine` or `date_format`; writing
@@ -325,7 +316,7 @@ sending one is refused with `422 validation`.
 
 Each write records its actor: `owner` for the dashboard session, `token` with the
 token's id, name and `token_kind` (`owner` or `agent`), or `system`. History entries (`GET /applications/{id}/events`,
-`GET /events`, the overview activity) return `actor`, `run_id` and `subject`;
+`GET /events`) return `actor`, `run_id` and `subject`;
 notes return `author` and `run`. Entries from before version 0.17 have
 `actor.kind = "unknown"`. A source refresh is an entry only when it changed the
 title, company, location or posting text (`job_refreshed`, with the field names);
@@ -643,7 +634,7 @@ Only what documents use is compared:
   use: a template's kind, source, guidance and rules; an
   entry's kind, title, organization, dates, skills and narrative; a claim's text
   and entry. A new version that only changes a name, a position, the default
-  flag, a claim's selection fields (`default_in_cv`, `role`, `group`) or
+  flag, a claim's `always_include` or
   free-form `metadata` keeps documents current, and so does a change undone. A
   claim that is no longer approved still counts. Entries and claims the context
   did not freeze are ignored.

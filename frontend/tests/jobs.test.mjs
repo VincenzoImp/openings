@@ -9,7 +9,6 @@ const signals = (fields = {}) => ({
   language: "en",
   language_confidence: 0.9,
   required: [],
-  welcome: [],
   duplicate_checked: true,
   duplicate: null,
   no_longer_listed: false,
@@ -83,7 +82,6 @@ test("signals read as tags; the owner's languages decide what needs attention", 
     signals: signals({
       language: "de",
       required: [["de"], ["en", "fr"]],
-      welcome: ["it"],
       duplicate: { job_id: "j0", confidence: 0.93, tier: "high" },
       no_longer_listed: true,
     }),
@@ -91,11 +89,10 @@ test("signals read as tags; the owner's languages decide what needs attention", 
   });
   assert.deepEqual(model.signalTags(german), [
     { text: "No longer listed", tone: "danger" },
-    { text: "Likely duplicate 0.93", tone: "info" },
+    { text: "Possible duplicate", tone: "info" },
     { text: "Requires German", tone: undefined },
     { text: "Requires English or French", tone: undefined },
     { text: "In German" },
-    { text: "Italian welcome" },
     { text: "Text incomplete", tone: "attention" },
   ]);
   const own = new Set(["en", "it"]);
@@ -103,10 +100,9 @@ test("signals read as tags; the owner's languages decide what needs attention", 
     model.signalTags(german, { own }).map((tag) => [tag.text, tag.tone]),
     [
       ["No longer listed", "danger"],
-      ["Likely duplicate 0.93", "info"],
+      ["Possible duplicate", "info"],
       ["Requires German", "attention"],
       ["In German", undefined],
-      ["Italian welcome", undefined],
       ["Text incomplete", "attention"],
     ],
   );
@@ -114,7 +110,7 @@ test("signals read as tags; the owner's languages decide what needs attention", 
   assert.deepEqual(model.signalTags(job(), { own }), []);
   assert.deepEqual(
     model.signalTags(job(), { own, full: true }).map((tag) => tag.text),
-    ["Posting in English"],
+    ["In English"],
   );
 });
 

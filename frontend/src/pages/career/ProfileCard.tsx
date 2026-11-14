@@ -1,13 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { api, type Json, type Profile } from "../../api";
-import {
-  Button,
-  ErrorBanner,
-  Field,
-  IconButton,
-  KeyValueEditor,
-  Loading,
-} from "../../design";
+import { Button, ErrorBanner, Field, IconButton, Loading } from "../../design";
 import { useResource, useWorkspace } from "../../state";
 
 const blank: Profile = {
@@ -33,7 +26,7 @@ const linkOf = (item: unknown): Link =>
         url: String((item as Json)?.url ?? ""),
       };
 
-/** The Profile: who the owner is, with typed fields and free-form details. */
+/** The Profile: who the owner is. Its metadata is kept, not edited here. */
 export function ProfileCard() {
   const { data, loading, error, reload } = useResource<Profile>(
     "/career/profile",
@@ -45,15 +38,10 @@ export function ProfileCard() {
 }
 
 function ProfileForm({ profile }: { profile: Profile }) {
-  const { mutate, pending, notify } = useWorkspace();
+  const { mutate, pending } = useWorkspace();
   const [links, setLinks] = useState(() => profile.links.map(linkOf));
-  const [details, setDetails] = useState<{
-    value: Json;
-    problem: string | null;
-  }>({ value: profile.metadata, problem: null });
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (details.problem) return notify(details.problem, true);
     const form = new FormData(event.currentTarget);
     const text = (name: string) => String(form.get(name) ?? "");
     await mutate(
@@ -67,7 +55,6 @@ function ProfileForm({ profile }: { profile: Profile }) {
           phone: text("phone"),
           summary: text("summary"),
           links: links.filter((link) => link.url.trim()),
-          metadata: details.value,
         }),
       "Profile saved.",
     );
@@ -178,17 +165,6 @@ function ProfileForm({ profile }: { profile: Profile }) {
           writing rules are statements in your{" "}
           <a href="#preferences">Preferences</a>.
         </p>
-        <fieldset className="field wide">
-          <legend>Other details</legend>
-          <p className="caption">
-            Free-form values the product does not act on.
-          </p>
-          <KeyValueEditor
-            label="Other profile details as keys and values"
-            value={profile.metadata}
-            onChange={(value, problem) => setDetails({ value, problem })}
-          />
-        </fieldset>
       </div>
     </form>
   );

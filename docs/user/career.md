@@ -26,29 +26,15 @@ and claims for reusable wording.
 
 ![Career record grouped by kind, with one entry open beside the list](../images/career.png)
 
-## Claims and their selection
+## Claims
 
 A claim is a draft until you approve it; only approved claims reach an
-application. Each claim has three selection fields, set with the controls on
-its row:
-
-| Field | Meaning |
-|---|---|
-| **Default in CV** | The claim is in the CV unless the job gives a reason to leave it out. |
-| **Role** | **Core** carries your account, **Supporting** is used when the job calls for it, **Bench** is kept in reserve. |
-| **Group** | A free short name for claims that belong together, for example "Scale" or "Leadership". |
-
-They are the API fields `default_in_cv`, `role` (`core`, `supporting`, `bench`)
-and `group`. New claims are supporting, not in the default CV and without a
-group.
-
-## Other details
-
-The Profile, entries and claims can hold free-form values the product does not
-act on. **Other details** shows them as rows with a key, a type (text, number,
-yes or no, list) and a value. A nested value, such as an object written by an
-agent, is shown collapsed and read-only; **Edit as fields** opens its keys as
-rows, one level down. Nothing is edited as JSON text.
+application. Each claim row shows its text, **Approved** or **Not approved**,
+**Approve** for a draft, a ★ to **Always include in my CV** (the claim is in the
+CV unless the job gives a reason to leave it out) and a **…** menu with **Edit**
+and **Delete**. The ★ is the API field `always_include`. Anything else an agent
+wants to keep about a claim, such as how strongly to prefer it, goes in the
+claim's `metadata` in the API; the dashboard does not show or edit metadata.
 
 ## Dates and ordering
 
@@ -56,7 +42,8 @@ Choose no date, a single date or a period. Each supplied date has a year and an
 optional month. A period has a start and either an end or **Present**. Unknown
 dates stay empty. Entry dates never fall back to the record's modification date.
 
-The **Order** field controls entry order and claim order within an entry. New
+The **Order** field controls entry order; claims keep the order they were added
+in (the API's `position` changes it). New
 records append by default. Templates and agents can select and arrange relevant
 material without changing the stored facts.
 
@@ -74,8 +61,8 @@ sentence. Choose the convention that suits your templates and writing rules.
 
 REST and MCP expose the same fields and validation. Entry fields `organization`,
 `dates`, `skills` and `position` are structured fields, separate from free-form
-`metadata`. Do not repeat them inside metadata. A claim's selection fields are
-typed in the same way; skills read them instead of metadata.
+`metadata`. Do not repeat them inside metadata. A claim's `always_include` is
+typed in the same way; other selection hints of an agent stay in metadata.
 
 ```json
 {
