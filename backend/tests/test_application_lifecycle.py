@@ -1,55 +1,15 @@
-"""Application intent, shared interface contracts and destructive ownership."""
+"""Application intent, the one-application REST routes and versioned deletion.
 
-import sqlite3
-from concurrent.futures import ThreadPoolExecutor
+Concurrent creation and the SQLite guard of one open application per job are in
+test_shortlist.py.
+"""
 
 import pytest
-from fastapi.testclient import TestClient
 
-from openings.app import create_app
 from openings.errors import DomainError
-from openings.workspace import Workspace
 
 
-def test_only_one_open_attempt_survives_concurrent_creation_and_reopening(tmp_path):
-    path = tmp_path / "attempts.sqlite"
-    workspace = Workspace(path)
-    job = workspace.ingest_job({"title": "Engineer", "posting": "Build APIs."})
-
-    def start(_):
-        try:
-            return Workspace(path).create_application({"job_id": job["id"]})
-        except DomainError as error:
-            return error
-
-    with ThreadPoolExecutor(max_workers=2) as pool:
-        results = list(pool.map(start, range(2)))
-    first = next(result for result in results if isinstance(result, dict))
-    conflict = next(result for result in results if isinstance(result, DomainError))
-    assert conflict.code == "application_in_progress"
-    assert conflict.details == {"application_id": first["id"], "status": "shortlisted"}
-    assert workspace.get_job(job["id"])["triage"] == "shortlisted"
-    with pytest.raises(sqlite3.IntegrityError), workspace.db.transaction() as connection:
-        connection.execute(
-            "INSERT INTO applications(id,job_id,created_at,updated_at) VALUES('bypass',?,?,?)",
-            (job["id"], first["created_at"], first["created_at"]),
-        )
-
-    first = workspace.update_application(
-        first["id"],
-        {"expected_version": first["version"], "status": "closed", "outcome": "not_pursued"},
-    )
-    second = workspace.create_application({"job_id": job["id"]})
-    with pytest.raises(DomainError) as reopening:
-        workspace.update_application(
-            first["id"], {"expected_version": first["version"], "status": "shortlisted"}
-        )
-    assert reopening.value.details["application_id"] == second["id"]
-    assert workspace.get_application(first["id"])["status"] == "closed"
-
-
-def test_summaries_filtering_and_merge_preserve_application_intent(tmp_path):
-    workspace = Workspace(tmp_path / "summaries.sqlite")
+def test_summaries_filtering_and_merge_preserve_application_intent(workspace):
     first = workspace.ingest_job({"title": "First", "posting": "Build APIs."})
     second = workspace.ingest_job({"title": "Second", "posting": "Operate infrastructure."})
     assert first["application"] is None and first["application_count"] == 0
@@ -59,6 +19,13 @@ def test_summaries_filtering_and_merge_preserve_application_intent(tmp_path):
         {"expected_version": previous["version"], "status": "closed", "outcome": "rejected"},
     )
     current = workspace.create_application({"job_id": first["id"]})
+    # A closed application cannot reopen while another one is open.
+    with pytest.raises(DomainError) as reopening:
+        workspace.update_application(
+            previous["id"], {"expected_version": previous["version"], "status": "shortlisted"}
+        )
+    assert reopening.value.code == "application_in_progress"
+    assert reopening.value.details["application_id"] == current["id"]
     workspace.create_application({"job_id": second["id"]})
     expected = {key: current[key] for key in ("id", "status", "outcome", "version")}
     summary = next(row for row in workspace.list_jobs()["items"] if row["id"] == first["id"])
@@ -88,186 +55,53 @@ def test_summaries_filtering_and_merge_preserve_application_intent(tmp_path):
     )
 
 
-def test_interface_workflow_requires_explicit_outcomes_and_versioned_deletion(tmp_path):
+def test_interface_workflow_requires_explicit_outcomes_and_versioned_deletion(client):
     """The one-application REST routes the dashboard uses (MCP: test_mcp_tools.py)."""
-    app = create_app(tmp_path / "workflow.sqlite", start_worker=False)
-    app.state.auth.setup("synthetic-password")
-    token = app.state.auth.create_token("Synthetic workflow client")["token"]
-    headers = {
-        "Authorization": "Bearer " + token,
-        "Accept": "application/json, text/event-stream",
-    }
-    with TestClient(app, base_url="http://localhost:8080", headers=headers) as client:
 
-        def call(tool, method, path, arguments, *, error=None):
-            # REST names the identifiers in the path and the rest in the body or query.
-            body = {
-                k: v for k, v in arguments.items() if not (k.endswith("_id") and f"/{v}" in path)
-            }
-            response = client.request(
-                method,
-                "/api/v1" + path,
-                params=body if method in ("GET", "DELETE") else None,
-                json=body if method in ("POST", "PATCH") else None,
-            )
-            if error:
-                assert response.status_code == error
-                return response.json()
-            response.raise_for_status()
-            return response.json()
+    def ok(response):
+        assert response.is_success, response.text
+        return response.json()
 
-        job = call(
-            "jobs_create",
-            "POST",
-            "/jobs",
-            {"title": "Engineer", "company": "Example", "posting": "Build APIs."},
-        )
-        attempt = call(
-            "applications_create",
-            "POST",
-            "/applications",
-            {"job_id": job["id"], "priority": 2, "idempotency_key": "start"},
-        )
-        retry = call(
-            "applications_create",
-            "POST",
-            "/applications",
-            {"job_id": job["id"], "priority": 2, "idempotency_key": "start"},
-        )
-        assert retry["id"] == attempt["id"]
-        call(
-            "applications_create",
-            "POST",
-            "/applications",
-            {"job_id": job["id"], "priority": 5},
-            error=409,
-        )
-        assert client.get(f"/api/v1/applications/{attempt['id']}").json()["priority"] == 2
-        listed = call(
-            "applications_list",
-            "GET",
-            "/applications",
-            {"job_id": job["id"]},
-        )
-        assert listed["total"] == 1 and listed["stage_counts"]["shortlisted"] == 1
+    def status(response):
+        return response.status_code
 
-        path = f"/applications/{attempt['id']}"
-        attempt = call(
-            "applications_update",
-            "PATCH",
-            path,
-            {
-                "application_id": attempt["id"],
-                "expected_version": attempt["version"],
-                "status": "applied",
-            },
+    job = ok(
+        client.post(
+            "/api/v1/jobs", json={"title": "Engineer", "company": "Example", "posting": "Build."}
         )
-        assert attempt["applied_at"]
-        attempt = call(
-            "applications_update",
-            "PATCH",
-            path,
-            {
-                "application_id": attempt["id"],
-                "expected_version": attempt["version"],
-                "applied_at": None,
-            },
-        )
-        assert attempt["applied_at"] is None
-        call(
-            "applications_update",
-            "PATCH",
-            path,
-            {
-                "application_id": attempt["id"],
-                "expected_version": attempt["version"],
-                "status": "closed",
-            },
-            error=422,
-        )
-        attempt = call(
-            "applications_update",
-            "PATCH",
-            path,
-            {
-                "application_id": attempt["id"],
-                "expected_version": attempt["version"],
-                "status": "closed",
-                "outcome": "rejected",
-            },
-        )
-        attempt = call(
-            "applications_update",
-            "PATCH",
-            path,
-            {
-                "application_id": attempt["id"],
-                "expected_version": attempt["version"],
-                "priority": 1,
-            },
-        )
-        assert attempt["outcome"] == "rejected"
-        # The application note field was removed in 0.23: its pinned note replaces it.
-        call(
-            "applications_update",
-            "PATCH",
-            path,
-            {
-                "application_id": attempt["id"],
-                "expected_version": attempt["version"],
-                "note": "Removed field",
-            },
-            error=422,
-        )
-        call(
-            "applications_delete",
-            "DELETE",
-            path,
-            {},
-            error=422,
-        )
-        call(
-            "applications_delete",
-            "DELETE",
-            path,
-            {
-                "expected_version": attempt["version"] - 1,
-            },
-            error=409,
-        )
-        call(
-            "applications_delete",
-            "DELETE",
-            path,
-            {
-                "expected_version": attempt["version"],
-            },
-        )
-        retained = client.get(f"/api/v1/jobs/{job['id']}").json()
-        # Deleting a job's last application returns it to New.
-        assert retained["triage"] == "new" and retained["application_count"] == 0
-        call(
-            "jobs_delete",
-            "DELETE",
-            f"/jobs/{job['id']}",
-            {},
-            error=422,
-        )
-        call(
-            "jobs_delete",
-            "DELETE",
-            f"/jobs/{job['id']}",
-            {
-                "expected_version": job["version"],
-            },
-            error=409,
-        )
-        call(
-            "jobs_delete",
-            "DELETE",
-            f"/jobs/{job['id']}",
-            {
-                "expected_version": retained["version"],
-            },
-        )
-        assert client.get("/api/v1/jobs").json()["total"] == 0
+    )
+    start = {"job_id": job["id"], "priority": 2, "idempotency_key": "start"}
+    attempt = ok(client.post("/api/v1/applications", json=start))
+    assert ok(client.post("/api/v1/applications", json=start))["id"] == attempt["id"]
+    assert status(client.post("/api/v1/applications", json={"job_id": job["id"]})) == 409
+    assert ok(client.get(f"/api/v1/applications/{attempt['id']}"))["priority"] == 2
+    listed = ok(client.get("/api/v1/applications", params={"job_id": job["id"]}))
+    assert listed["total"] == 1 and listed["stage_counts"]["shortlisted"] == 1
+
+    path = f"/api/v1/applications/{attempt['id']}"
+
+    def patch(**fields):
+        return client.patch(path, json={"expected_version": attempt["version"], **fields})
+
+    attempt = ok(patch(status="applied"))
+    assert attempt["applied_at"]
+    attempt = ok(patch(applied_at=None))
+    assert attempt["applied_at"] is None
+    # Closing names its outcome.
+    assert status(patch(status="closed")) == 422
+    attempt = ok(patch(status="closed", outcome="rejected"))
+    attempt = ok(patch(priority=1))
+    assert attempt["outcome"] == "rejected"
+
+    # Deletion is deliberate: it names the current version.
+    assert status(client.delete(path)) == 422
+    assert status(client.delete(path, params={"expected_version": attempt["version"] - 1})) == 409
+    ok(client.delete(path, params={"expected_version": attempt["version"]}))
+    retained = ok(client.get(f"/api/v1/jobs/{job['id']}"))
+    # Deleting a job's last application returns it to New.
+    assert retained["triage"] == "new" and retained["application_count"] == 0
+    job_path = f"/api/v1/jobs/{job['id']}"
+    assert status(client.delete(job_path)) == 422
+    assert status(client.delete(job_path, params={"expected_version": job["version"]})) == 409
+    ok(client.delete(job_path, params={"expected_version": retained["version"]}))
+    assert ok(client.get("/api/v1/jobs"))["total"] == 0

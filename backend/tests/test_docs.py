@@ -33,17 +33,14 @@ def words(path):
     return len(path.read_text().split())
 
 
-def test_user_docs_are_at_most_ten_thousand_words():
+def test_the_docs_fit_their_limits():
     assert sum(words(path) for path in USER_DOCS) <= 10_000
-
-
-def test_readme_and_developer_docs_fit_their_limits():
     assert words(ROOT / "README.md") <= 1_000
     assert len((ROOT / "CONTRIBUTING.md").read_text().splitlines()) <= 80
     assert len((ROOT / "docs/developer/architecture.md").read_text().splitlines()) <= 150
 
 
-def test_every_relative_link_and_image_resolves():
+def test_every_relative_link_and_image_resolves_and_every_image_is_used():
     missing = []
     for page in PAGES:
         for target in LINK.findall(page.read_text()):
@@ -53,9 +50,7 @@ def test_every_relative_link_and_image_resolves():
             if not path.exists():
                 missing.append(f"{page.relative_to(ROOT)} -> {target}")
     assert not missing, missing
-
-
-def test_every_image_in_docs_images_is_embedded():
+    # Every image in docs/images is embedded.
     embedded = {
         (page.parent / target).resolve()
         for page in PAGES
@@ -90,16 +85,12 @@ def test_every_anchor_names_a_heading():
     assert not bad, bad
 
 
-def test_the_mcp_endpoint_is_spelled_with_its_slash():
-    for page in PAGES:
-        assert not re.search(r"/mcp(?![/\w])", page.read_text()), page
-
-
-def test_no_removed_tool_or_retired_word_appears_outside_the_changelog():
+def test_one_vocabulary_and_the_mcp_endpoint_with_its_slash():
     names = [name for name in TOOLS if "_" in name]
     found = []
     for page in PAGES:
         text = page.read_text()
+        assert not re.search(r"/mcp(?![/\w])", text), page
         for name in names:
             if re.search(rf"\b{re.escape(name)}\b", text):
                 found.append(f"{page.relative_to(ROOT)}: {name}")

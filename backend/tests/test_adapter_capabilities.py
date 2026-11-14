@@ -2,11 +2,9 @@
 
 import httpx
 import pytest
-from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from discovery_fixtures import patch_discovery
-from openings.app import create_app
 from openings.discovery import DiscoveryService, SourceCreate, SourcePreview
 from openings.errors import DomainError
 from openings.workspace import Workspace
@@ -85,59 +83,40 @@ def test_metadata_only_source_can_be_previewed_but_not_saved_as_an_automatic_wat
     assert service.list_sources()["total"] == service.workspace.list_jobs()["total"] == 0
 
 
-@pytest.mark.parametrize(
-    "status,body,state,code",
-    [
+def test_ashby_unavailable_board_empty_board_and_transient_failure_are_distinct(
+    tmp_path, monkeypatch
+):
+    patch_discovery(monkeypatch, "public_url", lambda url: url)
+    responses = {}
+    transport(monkeypatch, lambda request: responses["send"](request))
+    for status, body, state, code in (
         (404, None, "failed", "ashby_board_unavailable"),
         (200, {"jobs": []}, "succeeded", None),
         (503, None, "queued", "source_http"),
         (429, None, "queued", "provider_cooldown"),
-    ],
-)
-def test_ashby_unavailable_board_empty_board_and_transient_failure_are_distinct(
-    service, monkeypatch, status, body, state, code
-):
-    calls = []
+    ):
+        workspace = Workspace(tmp_path / f"ashby-{status}.sqlite")
+        service = workspace.discovery = DiscoveryService(workspace)
+        calls = []
 
-    def send(request):
-        calls.append(str(request.url))
-        return httpx.Response(
-            status, json=body, headers={"Retry-After": "60"} if status == 429 else {}
+        def send(request, status=status, body=body, calls=calls):
+            calls.append(str(request.url))
+            return httpx.Response(
+                status, json=body, headers={"Retry-After": "60"} if status == 429 else {}
+            )
+
+        responses["send"] = send
+        source = service.create_source(
+            SourceCreate(name="Example", kind="ashby", config={"board": "example"})
         )
-
-    transport(monkeypatch, send)
-    source = service.create_source(
-        SourceCreate(name="Example", kind="ashby", config={"board": "example"})
-    )
-    task = run(service, source)
-    assert task["state"] == state
-    assert len(calls) == 1 and task["result"]["http_requests"] == 1
-    assert service.workspace.list_jobs()["total"] == 0
-    if code:
-        assert task["result"]["attempt_history"][-1]["reason"] == code
-    if status == 404:
-        assert "Check the exact board URL" in task["error"]
-        assert task["attempts"] == 1
-    if status == 200:
-        assert task["error"] is None
-
-
-def test_adapter_options_are_validated_on_rest_and_mcp(tmp_path):
-    app = create_app(tmp_path / "interfaces.sqlite", start_worker=False)
-    app.state.auth.setup("synthetic-password")
-    token = app.state.auth.create_token("Synthetic check")["token"]
-    headers = {"Authorization": "Bearer " + token, "Accept": "application/json, text/event-stream"}
-    with TestClient(app, base_url="http://localhost:8080") as client:
-        bad = {"name": "Example", "kind": "lever", "config": {"board": "example", "max_details": 1}}
-        assert client.post("/api/v1/sources", headers=headers, json=bad).status_code == 422
-        response = client.post(
-            "/mcp/",
-            headers=headers,
-            json={
-                "jsonrpc": "2.0",
-                "id": 2,
-                "method": "tools/call",
-                "params": {"name": "sources_create", "arguments": bad},
-            },
-        )
-        assert response.json()["result"]["isError"]
+        task = run(service, source)
+        assert task["state"] == state, status
+        assert len(calls) == 1 and task["result"]["http_requests"] == 1, status
+        assert service.workspace.list_jobs()["total"] == 0
+        if code:
+            assert task["result"]["attempt_history"][-1]["reason"] == code, status
+        if status == 404:
+            assert "Check the exact board URL" in task["error"]
+            assert task["attempts"] == 1
+        if status == 200:
+            assert task["error"] is None

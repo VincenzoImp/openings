@@ -48,35 +48,26 @@ def test_cross_provider_redirect_is_rejected_before_destination_request(tmp_path
 def test_detail_refresh_rotates_across_pages_and_sources_without_material_timestamp(
     tmp_path, monkeypatch
 ):
+    # Workday lists 20 rows per page, so 21 jobs span two pages.
     workspace = Workspace(tmp_path / "fresh.sqlite")
     discovery = DiscoveryService(workspace)
     workspace.discovery = discovery
-    source = discovery.create_source(
-        SourceCreate(
-            name="Example",
-            kind="smartrecruiters",
-            config={"board": "example", "max_results": 101},
-        )
-    )
+    board = "example.wd5.myworkdayjobs.com/Careers"
+    config = {"board": board, "max_results": 21}
+    source = discovery.create_source(SourceCreate(name="Example", kind="workday", config=config))
     clock = ["2026-01-01T00:00:00.000000+00:00"]
     monkeypatch.setattr(company, "now", lambda: clock[0])
     calls = []
-    body = ["Build APIs"]
+    text = ["Build APIs"]
 
-    def fetch(url, **kwargs):
-        parts = urlsplit(url)
-        if parts.query:
-            offset = int(parse_qs(parts.query)["offset"][0])
+    def fetch(url, *, body=None, **kwargs):
+        if body is not None:
+            rows = range(body["offset"], min(body["offset"] + 20, 21))
             return json.dumps(
-                {
-                    "content": [
-                        {"id": str(i), "name": "Engineer"}
-                        for i in range(offset, min(offset + 100, 101))
-                    ]
-                }
+                {"jobPostings": [{"externalPath": f"/job/{i}", "title": "Engineer"} for i in rows]}
             ).encode()
-        calls.append(parts.path.rsplit("/", 1)[-1])
-        return json.dumps({"jobAd": {"sections": {"jobDescription": {"text": body[0]}}}}).encode()
+        calls.append(url.rsplit("/", 1)[-1])
+        return json.dumps({"jobPostingInfo": {"jobDescription": text[0]}}).encode()
 
     patch_discovery(monkeypatch, "fetch_bytes", fetch)
 
@@ -86,71 +77,60 @@ def test_detail_refresh_rotates_across_pages_and_sources_without_material_timest
         discovery.run_task(task, "owner")
         assert discovery.get_task(task["id"])["state"] == "succeeded"
 
+    def identity(i):
+        return f"workday:{board}:/job/{i}"
+
     # Seed successful freshness for the first page. The next run must reach page 2.
-    for i in range(100):
+    for i in range(20):
         item = workspace.ingest_job(
             {
-                "source_key": f"smartrecruiters:example:{i}",
-                "url": f"https://jobs.smartrecruiters.com/example/{i}",
+                "source_key": identity(i),
+                "url": f"https://{board}/job/{i}",
                 "title": "Engineer",
                 "company": "Example",
-                "posting": body[0],
+                "posting": text[0],
                 "metadata": feeds.normalize_posting(
                     {
                         "metadata": {
-                            "source": "smartrecruiters",
-                            "ats": "smartrecruiters",
-                            "board": "example",
-                            "external_id": str(i),
+                            "source": "workday",
+                            "ats": "workday",
+                            "board": board,
+                            "external_id": f"/job/{i}",
                         }
                     }
                 )["metadata"],
             }
         )
         workspace.db.execute(
-            "INSERT INTO posting_details VALUES(?,?,?)",
-            (f"smartrecruiters:example:{i}", item["id"], clock[0]),
+            "INSERT INTO posting_details VALUES(?,?,?)", (identity(i), item["id"], clock[0])
         )
     run()
-    assert calls == ["100"]
+    assert calls == ["20"]
     # Overlapping saved sources reuse the same provider/board cache.
-    second = discovery.create_source(
-        SourceCreate(
-            name="Example",
-            kind="smartrecruiters",
-            config={"board": "example", "max_results": 101},
-        )
-    )
+    second = discovery.create_source(SourceCreate(name="Example", kind="workday", config=config))
     run(second)
-    assert calls == ["100"]
-    job = workspace.get_job(
-        workspace.db.one(
-            "SELECT job_id FROM job_identities WHERE identity='smartrecruiters:example:0'"
-        )["job_id"]
-    )
-    version = job["content_version"]
+    assert calls == ["20"]
+
+    def job_of(i):
+        row = workspace.db.one("SELECT job_id FROM job_identities WHERE identity=?", (identity(i),))
+        return workspace.get_job(row["job_id"])
+
+    version = job_of(0)["content_version"]
     clock[0] = "2026-01-03T00:00:00.000000+00:00"
     workspace.db.execute(
-        "UPDATE posting_details SET checked_at=? WHERE identity<>?",
-        (clock[0], "smartrecruiters:example:0"),
+        "UPDATE posting_details SET checked_at=? WHERE identity<>?", (clock[0], identity(0))
     )
     run()
-    assert calls == ["100", "0"]
-    assert workspace.get_job(job["id"])["content_version"] == version
-    body[0] = "Build a different system"
+    assert calls == ["20", "0"]
+    assert job_of(0)["content_version"] == version
+    text[0] = "Build a different system"
     clock[0] = "2026-01-05T00:00:00.000000+00:00"
     workspace.db.execute(
-        "UPDATE posting_details SET checked_at=? WHERE identity<>?",
-        (clock[0], "smartrecruiters:example:1"),
+        "UPDATE posting_details SET checked_at=? WHERE identity<>?", (clock[0], identity(1))
     )
     run()
     assert calls[-1] == "1"  # oldest check, not the first listing row again
-    updated = workspace.get_job(
-        workspace.db.one(
-            "SELECT job_id FROM job_identities WHERE identity='smartrecruiters:example:1'"
-        )["job_id"]
-    )
-    assert updated["posting"] == body[0]
+    assert job_of(1)["posting"] == text[0]
 
 
 def test_greenhouse_filters_metadata_before_bounded_detail_requests(tmp_path, monkeypatch):
@@ -251,26 +231,7 @@ def test_later_listing_page_failure_stages_metadata_without_archiving_empty_jobs
     assert workspace.list_jobs()["total"] == 0
 
 
-def test_bounded_description_is_explicitly_incomplete():
-    source = {
-        "kind": "bamboohr",
-        "name": "Example",
-        "config": {"board": "example"},
-    }
-
-    def request(url, **kwargs):
-        payload = (
-            {"result": [{"id": 1, "jobOpeningName": "Engineer"}]}
-            if url.endswith("/list")
-            else {"result": {"jobOpening": {"description": "A" * 200001}}}
-        )
-        return json.dumps(payload).encode()
-
-    item = company.collect(source, request, feeds.html_text)[0]
-    assert len(item["posting"]) == 200000 and item["metadata"]["description_complete"] is False
-
-
-def test_bamboohr_filters_before_result_and_detail_caps():
+def test_bamboohr_filters_before_result_and_detail_caps_and_bounds_descriptions():
     source = {
         "kind": "bamboohr",
         "name": "Example",
@@ -281,6 +242,7 @@ def test_bamboohr_filters_before_result_and_detail_caps():
         },
     }
     calls = []
+    description = ["Build APIs"]
 
     def request(url, **kwargs):
         calls.append(url)
@@ -293,7 +255,7 @@ def test_bamboohr_filters_before_result_and_detail_caps():
                 + [{"id": 400, "jobOpeningName": "Engineer", "location": {"city": "Zurich"}}]
             }
             if url.endswith("/list")
-            else {"result": {"jobOpening": {"description": "Build APIs"}}}
+            else {"result": {"jobOpening": {"description": description[0]}}}
         )
         return json.dumps(payload).encode()
 
@@ -303,6 +265,10 @@ def test_bamboohr_filters_before_result_and_detail_caps():
         "https://example.bamboohr.com/careers/list",
         "https://example.bamboohr.com/careers/400/detail",
     ]
+    # A description over the bound is cut and marked incomplete.
+    description[0] = "A" * 200001
+    item = company.collect(source, request, feeds.html_text)[0]
+    assert len(item["posting"]) == 200000 and item["metadata"]["description_complete"] is False
 
 
 def test_workday_filters_later_metadata_pages_and_reports_candidate_cap():
@@ -341,19 +307,3 @@ def test_workday_filters_later_metadata_pages_and_reports_candidate_cap():
     assert listing_calls == list(range(0, 200, 20)) and len(details) == 1
     assert rows[0]["source_key"].endswith("/job/150")
     assert source["candidate_capped"] is True
-
-
-@pytest.mark.asyncio
-async def test_manual_import_reports_cross_provider_destination_url(tmp_path, monkeypatch):
-    from openings.fetching import read_posting
-
-    discovery = DiscoveryService(Workspace(tmp_path / "manual-redirect.sqlite"))
-    target = "https://www.linkedin.com/jobs/view/123"
-
-    def blocked(*args, **kwargs):
-        raise DomainError(422, "provider_redirect", f"Import the destination directly: {target}")
-
-    monkeypatch.setattr(discovery, "fetch_bytes", blocked)
-    result = await read_posting("https://example.org/job", discovery)
-    assert result["metadata"]["extraction"] == "needs_text"
-    assert target in result["metadata"]["extraction_error"]

@@ -9,7 +9,6 @@ import pytest
 from fastapi.testclient import TestClient
 from starlette.requests import ClientDisconnect
 
-from openings.app import create_app
 from openings.interfaces.system import grant
 from openings.models import JobInput
 from openings.transfers import RecordsResponse
@@ -31,10 +30,9 @@ def snapshots(monkeypatch):
         snapshot.close()
 
 
-def test_export_stream_survives_worker_thread_changes(tmp_path, monkeypatch, snapshots):
+def test_export_stream_survives_worker_thread_changes(app, client, monkeypatch, snapshots):
     import starlette.responses
 
-    app = create_app(tmp_path / "export.sqlite", start_worker=False)
     workspace = app.state.workspace
     workspace.ingest_job(
         JobInput(title="Synthetic role", company="Example", posting="Build Python APIs.")
@@ -64,9 +62,7 @@ def test_export_stream_survives_worker_thread_changes(tmp_path, monkeypatch, sna
 
     monkeypatch.setattr(starlette.responses, "iterate_in_threadpool", alternate_threads)
     try:
-        with TestClient(app) as client:
-            client.post("/api/v1/auth/setup", json={"password": "synthetic-password"})
-            response = client.get("/api/v1/export")
+        response = client.get("/api/v1/export")
         assert response.status_code == 200
         archive = response.json()
         assert archive["format"] == "openings-records-v1"
@@ -82,8 +78,7 @@ def test_export_stream_survives_worker_thread_changes(tmp_path, monkeypatch, sna
             executor.shutdown()
 
 
-def test_export_keeps_one_snapshot_during_concurrent_writes(tmp_path, monkeypatch):
-    app = create_app(tmp_path / "snapshot.sqlite", start_worker=False)
+def test_export_keeps_one_snapshot_during_concurrent_writes(app, client, monkeypatch):
     workspace = app.state.workspace
     workspace.ingest_job(
         JobInput(title="First role", company="Example", posting="Build reliable services.")
@@ -102,10 +97,8 @@ def test_export_keeps_one_snapshot_during_concurrent_writes(tmp_path, monkeypatc
             workspace.set_settings("workspace", {"no_reply_days": 60})
         return dumps(value, *args, **kwargs)
 
-    with TestClient(app) as client:
-        client.post("/api/v1/auth/setup", json={"password": "synthetic-password"})
-        monkeypatch.setattr(json, "dumps", write_during_export)
-        response = client.get("/api/v1/export")
+    monkeypatch.setattr(json, "dumps", write_during_export)
+    response = client.get("/api/v1/export")
     archive = response.json()
     assert changed
     assert [job["title"] for job in archive["jobs"]] == ["First role"]
@@ -113,8 +106,7 @@ def test_export_keeps_one_snapshot_during_concurrent_writes(tmp_path, monkeypatc
     assert workspace.db.one("SELECT count(*) n FROM jobs")["n"] == 2
 
 
-def test_export_preparation_failure_closes_snapshot_before_response(tmp_path, snapshots):
-    app = create_app(tmp_path / "invalid-record.sqlite", start_worker=False)
+def test_export_preparation_failure_closes_snapshot_before_response(app, owner_token, snapshots):
     # The schema refuses text that is not JSON; a damaged file can still hold it.
     with app.state.workspace.db.transaction() as conn:
         conn.execute("PRAGMA ignore_check_constraints=ON")
@@ -130,8 +122,7 @@ def test_export_preparation_failure_closes_snapshot_before_response(tmp_path, sn
             ),
         )
     with TestClient(app, raise_server_exceptions=False) as client:
-        client.post("/api/v1/auth/setup", json={"password": "synthetic-password"})
-        response = client.get("/api/v1/export")
+        response = client.get("/api/v1/export", headers=owner_token["headers"])
     assert response.status_code == 500
     assert b"openings-records-v1" not in response.content
     assert snapshots and all(snapshot.closed for snapshot in snapshots)
@@ -164,10 +155,9 @@ async def test_export_disconnect_closes_snapshot(spec_version, snapshots):
 
 
 @pytest.mark.asyncio
-async def test_export_preserves_nullable_career_dates_and_scoped_mcp_download(tmp_path):
+async def test_export_preserves_nullable_career_dates_and_scoped_mcp_download(app, client):
     from openings.career import ClaimCreate, KnowledgeCreate, TemplateCreate
 
-    app = create_app(tmp_path / "nullable-export.sqlite", start_worker=False)
     career, workspace, documents = app.state.career, app.state.workspace, app.state.documents
     undated = career.create_knowledge(
         KnowledgeCreate(title="Undated project", kind="project", skills=["Python"])
@@ -184,17 +174,15 @@ async def test_export_preserves_nullable_career_dates_and_scoped_mcp_download(tm
     job = workspace.ingest_job({"title": "Synthetic role", "posting": "Build reliable services."})
     application = workspace.create_application({"job_id": job["id"]})
     documents.create_document({"application_id": application["id"], "career_ids": [undated["id"]]})
-    with TestClient(app) as client:
-        assert client.get("/api/v1/export").status_code == 401
-        client.post("/api/v1/auth/setup", json={"password": "synthetic-password"})
-        archive = client.get("/api/v1/export").json()
-        # The owner's export grant (workspace_export, owner only).
-        ticket = grant(app.state.workspace, "export")
-        client.cookies.clear()
-        scoped = client.get(ticket["url"], headers=ticket["headers"])
-        assert scoped.status_code == 200
-        assert scoped.json() == archive
-        assert client.get("/api/v1/career/profile", headers=ticket["headers"]).status_code == 401
+    archive = client.get("/api/v1/export").json()
+    # The owner's export grant (workspace_export, owner only).
+    ticket = grant(app.state.workspace, "export")
+    client.cookies.clear()
+    assert client.get("/api/v1/export").status_code == 401
+    scoped = client.get(ticket["url"], headers=ticket["headers"])
+    assert scoped.status_code == 200
+    assert scoped.json() == archive
+    assert client.get("/api/v1/career/profile", headers=ticket["headers"]).status_code == 401
     entries = {row["title"]: row for row in archive["knowledge"]}
     assert entries["Undated project"]["dates"] is None
     assert entries["Dated project"]["dates"]["start"] == "2025"

@@ -9,6 +9,7 @@ import hashlib
 import json
 import re
 import runpy
+import shutil
 import sqlite3
 import stat
 from contextlib import closing
@@ -159,33 +160,30 @@ def expected_counts(original, pre_upgrade):
     return expected
 
 
-@pytest.fixture
-def upgraded(tmp_path):
-    """The fixture upgraded at startup: (database, pre-upgrade copy, archive, input digest)."""
-    path = load_fixture(tmp_path / "openings.sqlite")
+@pytest.fixture(scope="module")
+def upgraded(tmp_path_factory):
+    """The fixture upgraded at startup, once per module and only read by the tests:
+    (database, pre-upgrade copy, archive, input digest, input counts, files beside it)."""
+    path = load_fixture(tmp_path_factory.mktemp("upgraded") / "openings.sqlite")
     before, original = digest(path), counts(path)
     Database(path)
     files = m15.files(path)
-    return path, files.pre_upgrade, files.archive, before, original
+    beside = sorted(p.name for p in path.parent.iterdir())
+    return path, files.pre_upgrade, files.archive, before, original, beside
 
 
-def test_an_upgraded_workspace_has_exactly_the_structure_of_a_new_one(tmp_path, upgraded):
-    path = upgraded[0]
+def test_an_upgraded_workspace_is_a_new_one_holding_every_row_of_the_original(tmp_path, upgraded):
+    path, pre_upgrade, archive, before, original, beside = upgraded
     Database(tmp_path / "fresh.sqlite")
     assert structure(path) == structure(tmp_path / "fresh.sqlite")
     assert query(path, "PRAGMA integrity_check") == [("ok",)]
     assert query(path, "PRAGMA foreign_key_check") == []
-
-
-def test_the_original_is_kept_byte_for_byte_and_every_row_is_copied(upgraded):
-    path, pre_upgrade, archive, before, original = upgraded
+    # The original is kept byte for byte and every row is copied.
     assert digest(pre_upgrade) == before
     assert query(pre_upgrade, "PRAGMA user_version") == [(14,)]
     assert counts(path) == expected_counts(original, pre_upgrade)
     assert query(path, "SELECT count(*) FROM jobs_fts WHERE jobs_fts MATCH 'engineer'")[0][0] > 0
-    assert sorted(p.name for p in path.parent.iterdir()) == sorted(
-        [path.name, pre_upgrade.name, archive.name]
-    )
+    assert beside == sorted([path.name, pre_upgrade.name, archive.name])
 
 
 # Data mapping: one block per change of the migration.
@@ -313,7 +311,7 @@ def test_every_shortlisted_job_has_an_open_application_after_the_upgrade(upgrade
     ) == [(0,)]
 
 
-def test_stored_ready_marks_are_archived_with_an_event_and_ready_is_computed(upgraded):
+def test_stored_ready_marks_are_archived_with_an_event_and_ready_is_computed(tmp_path, upgraded):
     path, pre_upgrade, archive_path = upgraded[:3]
     archive = json.loads(archive_path.read_text())
     marks = query(
@@ -346,7 +344,10 @@ def test_stored_ready_marks_are_archived_with_an_event_and_ready_is_computed(upg
             pre_upgrade, "SELECT id FROM applications a WHERE " + verify["COMPUTED_READY"]
         )
     }
-    listed = Workspace(path).list_applications(stage="ready", limit=200)
+    # The shared upgraded file is only read: the workspace opens a copy.
+    copy = tmp_path / "openings.sqlite"
+    shutil.copyfile(path, copy)
+    listed = Workspace(copy).list_applications(stage="ready", limit=200)
     assert {item["id"] for item in listed["items"]} == computed
     assert listed["stage_counts"]["ready"] == len(computed)
     stored = {row[0] for row in marks}
@@ -369,8 +370,8 @@ def texts(path, section):
     return [item["text"] for item in preferences(path)[section][0]]
 
 
-def test_policy_items_become_preferences_with_their_text(upgraded):
-    path, pre_upgrade = upgraded[:2]
+def test_policy_becomes_preferences_and_writing_rules_and_the_archive_keeps_it(upgraded):
+    path, pre_upgrade, archive_path = upgraded[:3]
     sections = preferences(path)
     assert set(sections) == {"looking_for", "ruled_out", "facts", "writing", "working_with_me"}
     # A decision item goes to What I rule out only when its rule dismissed jobs.
@@ -426,9 +427,7 @@ def test_policy_items_become_preferences_with_their_text(upgraded):
         for name in ("looking_for", "ruled_out", "facts", "writing", "working_with_me")
     }
 
-
-def test_writing_rules_gather_policy_instructions_and_template_statements(upgraded):
-    path, pre_upgrade = upgraded[:2]
+    # Writing rules gather the policy's instructions and the template statements.
     writing = preferences(path)["writing"][0]
     assert [item["scope"] for item in writing] == [
         "all",
@@ -456,6 +455,23 @@ def test_writing_rules_gather_policy_instructions_and_template_statements(upgrad
     assert json.loads(rules) == {"date_format": "MMM YYYY", "engine": "lualatex", "max_pages": 1}
     assert query(path, "SELECT count(*) FROM settings WHERE key='instructions'") == [(0,)]
 
+    # The archive keeps the policy whole.
+    archive = json.loads(archive_path.read_text())
+    policy = archive["policy"]
+    assert len(policy["items"]) == 15 and len(policy["sections"]) == 4
+    assert {item["id"] for item in policy["items"]} == {
+        row[0] for row in query(pre_upgrade, "SELECT id FROM policy_items")
+    }
+    assert [row["key"] for row in policy["general_instructions"]] == ["instructions"]
+    assert [row["name"] for row in policy["template_rules"]] == ["Synthetic letter"]
+    assert "statements" in json.loads(policy["template_rules"][0]["rules"])
+    dropped = archive["dropped_columns"]
+    assert len(dropped["jobs.dismissed_rule_id"]) == len(dropped["jobs.dismissed_rule_label"]) == 2
+    assert len(dropped["job_signals.rules"]) == 2
+    assert "context_inputs.policy" not in dropped and "policy_items" not in archive.get(
+        "dropped_tables", {}
+    )
+
 
 def test_rule_dismissals_are_kept_with_the_rule_as_reason(upgraded):
     path, pre_upgrade = upgraded[:2]
@@ -480,25 +496,6 @@ def test_rule_dismissals_are_kept_with_the_rule_as_reason(upgraded):
             "SELECT CASE WHEN dismissed_reason='' THEN dismissed_rule_label ELSE dismissed_reason "
             "END FROM jobs WHERE dismissed_reason<>'' OR dismissed_rule_label IS NOT NULL ORDER BY id",
         )
-    )
-
-
-def test_the_archive_keeps_the_policy_whole(upgraded):
-    pre_upgrade, archive_path = upgraded[1:3]
-    archive = json.loads(archive_path.read_text())
-    policy = archive["policy"]
-    assert len(policy["items"]) == 15 and len(policy["sections"]) == 4
-    assert {item["id"] for item in policy["items"]} == {
-        row[0] for row in query(pre_upgrade, "SELECT id FROM policy_items")
-    }
-    assert [row["key"] for row in policy["general_instructions"]] == ["instructions"]
-    assert [row["name"] for row in policy["template_rules"]] == ["Synthetic letter"]
-    assert "statements" in json.loads(policy["template_rules"][0]["rules"])
-    dropped = archive["dropped_columns"]
-    assert len(dropped["jobs.dismissed_rule_id"]) == len(dropped["jobs.dismissed_rule_label"]) == 2
-    assert len(dropped["job_signals.rules"]) == 2
-    assert "context_inputs.policy" not in dropped and "policy_items" not in archive.get(
-        "dropped_tables", {}
     )
 
 
@@ -578,7 +575,7 @@ LABEL = (
 )
 
 
-def test_every_actor_block_becomes_its_label(upgraded):
+def test_every_actor_block_becomes_its_label_and_a_former_run_one_batch(tmp_path, upgraded):
     path, pre_upgrade = upgraded[:2]
     for table, new_table, new, old in (
         ("events", "events", "actor", "actor"),
@@ -594,7 +591,7 @@ def test_every_actor_block_becomes_its_label(upgraded):
     assert labels == {"owner", "system", "agent:career-agent", "agent:synthetic-agent-probe"}
     # A token of the owner and a token from before 0.17 are the owner; no kind is no label.
     changed = load_fixture(
-        upgraded[0].parent / "kinds.sqlite",
+        tmp_path / "kinds.sqlite",
         "UPDATE events SET actor_kind='token',actor_token_kind=NULL,actor_name='script' "
         "WHERE rowid=(SELECT min(rowid) FROM events WHERE actor_kind='owner');"
         "UPDATE events SET actor_kind=NULL WHERE rowid=(SELECT min(rowid) FROM events "
@@ -606,10 +603,7 @@ def test_every_actor_block_becomes_its_label(upgraded):
     # The token columns stay in the archive.
     dropped = json.loads(m15.files(changed).archive.read_text())["dropped_columns"]
     assert any(item["value"] == "script" for item in dropped["events.actor_name"])
-
-
-def test_the_changes_of_a_former_run_share_one_batch(upgraded):
-    path, pre_upgrade = upgraded[:2]
+    # The changes of a former run share one batch.
     before = query(pre_upgrade, "SELECT id,run_id FROM events WHERE run_id IS NOT NULL ORDER BY id")
     after = query(path, "SELECT id,batch_id FROM events WHERE batch_id IS NOT NULL ORDER BY id")
     assert before and after == [(event, "run:" + run) for event, run in before]
@@ -618,7 +612,9 @@ def test_the_changes_of_a_former_run_share_one_batch(upgraded):
     ]
 
 
-def test_runs_questions_requests_and_skill_notes_are_archived_whole(upgraded):
+def test_runs_questions_requests_and_skill_notes_are_archived_and_kept_where_the_owner_looks(
+    upgraded,
+):
     path, pre_upgrade, archive_path = upgraded[:3]
     archive = json.loads(archive_path.read_text())
     for table in ("runs", "questions", "requests", "skill_notes"):
@@ -641,9 +637,7 @@ def test_runs_questions_requests_and_skill_notes_are_archived_whole(upgraded):
         "skill_notes",
     }
 
-
-def test_answers_requests_and_skill_notes_stay_where_the_owner_looks(upgraded):
-    path, pre_upgrade = upgraded[:2]
+    # Answers, requests and skill notes stay where the owner looks.
     created = query(
         path,
         "SELECT job_id,application_id,body,author,created_at FROM notes WHERE id NOT IN "
@@ -722,8 +716,8 @@ CONTEXT_OBJECTS = (
 )
 
 
-def test_no_context_object_remains_and_documents_keep_their_files(upgraded):
-    path, pre_upgrade = upgraded[:2]
+def test_no_context_object_remains_and_the_archive_keeps_contexts_by_part_hash(upgraded):
+    path, pre_upgrade, archive_path = upgraded[:3]
     assert query(path, CONTEXT_OBJECTS) == []
     for table in ("documents", "files"):
         columns = {row[1] for row in query(path, f"PRAGMA table_info({table})")}
@@ -740,9 +734,7 @@ def test_no_context_object_remains_and_documents_keep_their_files(upgraded):
     ]
     assert query(pre_upgrade, "SELECT count(*) FROM documents WHERE context_id IS NOT NULL")[0][0]
 
-
-def test_the_archive_keeps_contexts_by_part_hash(upgraded):
-    pre_upgrade, archive_path = upgraded[1:3]
+    # The archive keeps the contexts by part hash.
     archive = json.loads(archive_path.read_text())
     contexts = {row["id"]: row for row in archive["contexts"]}
     assert set(contexts) == {row[0] for row in query(pre_upgrade, "SELECT id FROM contexts")}
@@ -879,25 +871,11 @@ def test_claim_role_and_group_fold_into_metadata_and_the_archive(tmp_path):
     assert query(pre_upgrade, "SELECT count(*) FROM claims WHERE default_in_cv=1") == [(4,)]
 
 
-def test_welcome_languages_leave_the_signals_for_the_archive(upgraded):
-    path, pre_upgrade, archive_path = upgraded[:3]
-    archive = json.loads(archive_path.read_text())
-    welcome = query(
-        pre_upgrade, "SELECT job_id,welcome FROM job_signals WHERE welcome<>'[]' ORDER BY job_id"
-    )
-    assert welcome
-    assert [(row["job_id"], row["welcome"]) for row in archive["job_signals_welcome"]] == welcome
-    assert "job_signals.welcome" not in archive.get("dropped_columns", {})
-    columns = "job_id,format,language,language_confidence,required,duplicate_of,distinct_from"
-    sql = f"SELECT {columns} FROM job_signals ORDER BY job_id"
-    assert query(path, sql) == query(pre_upgrade, sql)
-
-
 # Archive.
 
 
 def test_the_archive_holds_every_dropped_value_with_the_counts_of_its_source(upgraded):
-    pre_upgrade, archive_path = upgraded[1:3]
+    path, pre_upgrade, archive_path = upgraded[:3]
     assert stat.S_IMODE(archive_path.stat().st_mode) == 0o600
     archive = json.loads(archive_path.read_text())
     assert (archive["format"], archive["from_schema"], archive["to_schema"]) == (
@@ -920,6 +898,17 @@ def test_the_archive_holds_every_dropped_value_with_the_counts_of_its_source(upg
     assert {key for key in archive["counts"] if key.startswith("dropped_columns.")} == {
         f"dropped_columns.{sub}" for sub in dropped
     }
+
+    # Welcome languages leave the signals for the archive.
+    welcome = query(
+        pre_upgrade, "SELECT job_id,welcome FROM job_signals WHERE welcome<>'[]' ORDER BY job_id"
+    )
+    assert welcome
+    assert [(row["job_id"], row["welcome"]) for row in archive["job_signals_welcome"]] == welcome
+    assert "job_signals.welcome" not in archive.get("dropped_columns", {})
+    columns = "job_id,format,language,language_confidence,required,duplicate_of,distinct_from"
+    sql = f"SELECT {columns} FROM job_signals ORDER BY job_id"
+    assert query(path, sql) == query(pre_upgrade, sql)
 
 
 def test_a_backup_of_the_previous_schema_is_restored_upgraded(tmp_path):
@@ -989,37 +978,38 @@ def unchanged_after_refusal(path, before):
     assert not files.pre_upgrade.exists()
 
 
-def test_a_failed_check_removes_the_new_file_and_keeps_the_original(tmp_path, monkeypatch):
+def test_a_refused_start_writes_nothing(tmp_path, monkeypatch):
     path = load_fixture(tmp_path / "openings.sqlite")
     before = digest(path)
-    monkeypatch.setattr(m15, "INVARIANTS", (("an impossible value", "SELECT 1", "SELECT 2"),))
-    with pytest.raises(DomainError) as refused:
-        Database(path)
+    # A failed check removes the new file and keeps the original.
+    with monkeypatch.context() as patch:
+        patch.setattr(m15, "INVARIANTS", (("an impossible value", "SELECT 1", "SELECT 2"),))
+        with pytest.raises(DomainError) as refused:
+            Database(path)
     assert refused.value.code == "upgrade_failed"
     assert "an impossible value: 1 instead of 2" in refused.value.message
     unchanged_after_refusal(path, before)
 
-
-def test_without_room_the_start_is_refused_and_nothing_is_written(tmp_path, monkeypatch):
-    path = load_fixture(tmp_path / "openings.sqlite")
-    before = digest(path)
+    # Without room the start is refused.
     usage = m15.shutil.disk_usage(tmp_path)
-    monkeypatch.setattr(m15.shutil, "disk_usage", lambda _: usage._replace(free=1024))
-    with pytest.raises(DomainError) as refused:
-        Database(path)
+    with monkeypatch.context() as patch:
+        patch.setattr(m15.shutil, "disk_usage", lambda _: usage._replace(free=1024))
+        with pytest.raises(DomainError) as refused:
+            Database(path)
     assert (refused.value.status, refused.value.code) == (507, "upgrade_room")
     assert refused.value.details["needed_bytes"] > 2.2 * path.stat().st_size
     unchanged_after_refusal(path, before)
 
-
-@pytest.mark.parametrize(
-    ("version", "words"),
-    [(13, "older than 0.23. Open it once with the 0.23 image"), (16, "newer Openings")],
-)
-def test_other_schemas_are_refused_unchanged(tmp_path, version, words):
-    path = load_fixture(tmp_path / "openings.sqlite", f"PRAGMA user_version={version};")
-    before = digest(path)
-    with pytest.raises(DomainError) as refused:
-        Database(path)
-    assert refused.value.code == "schema_version" and words in refused.value.message
-    unchanged_after_refusal(path, before)
+    # Other schemas are refused unchanged.
+    for version, words in (
+        (13, "older than 0.23. Open it once with the 0.23 image"),
+        (16, "newer Openings"),
+    ):
+        other = load_fixture(
+            tmp_path / f"schema-{version}.sqlite", f"PRAGMA user_version={version};"
+        )
+        digest_before = digest(other)
+        with pytest.raises(DomainError) as refused:
+            Database(other)
+        assert refused.value.code == "schema_version" and words in refused.value.message
+        unchanged_after_refusal(other, digest_before)

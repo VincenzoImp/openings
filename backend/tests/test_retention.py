@@ -5,11 +5,9 @@ from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
-from fastapi.testclient import TestClient
 
 from openings import operations, retention
 from openings._vendor.jobspy.model import JobPost
-from openings.app import create_app
 from openings.collectors.catalog import COMPANY_KINDS
 from openings.common import encode
 from openings.discovery import DiscoveryService, SourceCreate
@@ -27,7 +25,6 @@ from openings.workspace import Workspace
 from provider_fixtures import JOBSPY_ROW, provider_postings, released_payload
 
 MIB = 1024**2
-MCP_HEADERS = {"Accept": "application/json, text/event-stream"}
 
 
 def stamp(days_ago):
@@ -53,7 +50,9 @@ def kinds(workspace, **where):
 # Refresh events
 
 
-def test_a_refresh_is_an_event_only_when_a_visible_field_changes(tmp_path):
+def test_a_refresh_is_an_event_only_when_a_visible_field_changes_and_never_undoes_the_owner(
+    tmp_path,
+):
     workspace = open_workspace(tmp_path / "refresh.sqlite")
     posting = {
         "url": "https://example.org/jobs/1",
@@ -84,22 +83,19 @@ def test_a_refresh_is_an_event_only_when_a_visible_field_changes(tmp_path):
     assert event["payload"] == {"fields": ["title", "location"]}
     assert event["subject"]["id"] == job["id"] and event["actor"] == "system"
     assert activity.list_events({"kind": "posting_updated"})["total"] == 0
-
-
-def test_an_owner_correction_is_not_refreshed_away_or_reported(tmp_path):
-    workspace = open_workspace(tmp_path / "override.sqlite")
-    posting = {"url": "https://example.org/jobs/2", "title": "Engineer", "posting": "Build."}
-    job = workspace.ingest_job(posting)
-    workspace.update_job(job["id"], {"expected_version": job["version"], "title": "Corrected"})
-    workspace.ingest_job({**posting, "title": "Source title"})
+    # An owner correction is not refreshed away or reported.
+    current = workspace.get_job(job["id"])
+    workspace.update_job(job["id"], {"expected_version": current["version"], "title": "Corrected"})
+    workspace.ingest_job({**posting, "title": "Source title", "location": "Milan"})
     assert workspace.get_job(job["id"])["title"] == "Corrected"
-    assert "job_refreshed" not in kinds(workspace, job_id=job["id"])
+    assert kinds(workspace, job_id=job["id"]) == ["job_added", "job_refreshed", "job_edited"]
 
 
 # Observations
 
 
-def test_the_fixture_covers_every_shape_the_collectors_emit():
+def test_an_observation_stores_only_the_provider_values_in_use(tmp_path):
+    # The fixture covers every shape the collectors emit.
     assert set(JOBSPY_ROW) == set(JobPost.model_fields)
     seen = {
         (item.get("metadata") or {}).get("ats") or (item.get("metadata") or {}).get("source")
@@ -107,9 +103,6 @@ def test_the_fixture_covers_every_shape_the_collectors_emit():
     }
     assert {*COMPANY_KINDS, "lever", "ashby", "linkedin", "indeed", "glassdoor"} <= seen
     assert any(str(item.get("source_key", "")).startswith("rss:") for item in provider_postings())
-
-
-def test_an_observation_stores_only_the_provider_values_in_use(tmp_path):
     workspace = open_workspace(tmp_path / "observations.sqlite")
     for item in provider_postings():
         job = workspace.ingest_job(item)
@@ -339,18 +332,12 @@ def disk(monkeypatch, free):
     monkeypatch.setattr(operations.shutil, "disk_usage", lambda path: usage)
 
 
-def signed_in(tmp_path):
-    app = create_app(tmp_path / "data" / "live.sqlite", start_worker=False)
-    app.state.workspace.ingest_job({"title": "Synthetic engineer", "posting": "Build."})
-    client = TestClient(app, base_url="http://localhost:8080")
-    session = client.post("/api/v1/auth/setup", json={"password": "synthetic-password"})
-    client.headers["X-CSRF-Token"] = session.json()["csrf_token"]
-    return app, client
-
-
-def test_restore_is_refused_early_with_the_sizes_when_the_disk_is_too_small(tmp_path, monkeypatch):
+def test_restore_is_refused_early_with_the_sizes_when_the_disk_is_too_small(
+    tmp_path, monkeypatch, app, client
+):
     monkeypatch.delenv("OPENINGS_MAX_RESTORE_MB", raising=False)
-    app, client = signed_in(tmp_path)
+    app.state.workspace.ingest_job({"title": "Synthetic engineer", "posting": "Build."})
+    folder = app.state.workspace.db.path.parent
     backup = client.get("/api/v1/backup").content
     disk(monkeypatch, RESTORE_MARGIN + 1000)
     headers = {"Content-Type": "application/vnd.sqlite3"}
@@ -368,7 +355,7 @@ def test_restore_is_refused_early_with_the_sizes_when_the_disk_is_too_small(tmp_
         "configured_limit_bytes": None,
     }
     assert error["details"]["database_bytes"] >= size
-    assert not list((tmp_path / "data").glob(".openings-temp-*"))
+    assert not list(folder.glob(".openings-temp-*"))
     # A stream without a declared length is stopped when it passes the limit.
     disk(monkeypatch, restore_room(2000, error["details"]["database_bytes"]))
 
@@ -378,7 +365,7 @@ def test_restore_is_refused_early_with_the_sizes_when_the_disk_is_too_small(tmp_
 
     streamed = client.post("/api/v1/backup/restore", content=chunks(), headers=headers)
     assert streamed.status_code == 413 and streamed.json()["error"]["code"] == "backup_size"
-    assert not list((tmp_path / "data").glob(".openings-temp-*"))
+    assert not list(folder.glob(".openings-temp-*"))
     # The service itself checks the room before it replaces the database.
     upload = tmp_path / "upload.sqlite"
     upload.write_bytes(backup)
@@ -390,10 +377,9 @@ def test_restore_is_refused_early_with_the_sizes_when_the_disk_is_too_small(tmp_
 
 
 def test_free_space_not_a_fixed_number_decides_and_the_variable_only_lowers_it(
-    tmp_path, monkeypatch
+    monkeypatch, client, agent_token
 ):
     monkeypatch.delenv("OPENINGS_MAX_RESTORE_MB", raising=False)
-    _, client = signed_in(tmp_path)
     backup = client.get("/api/v1/backup").content
     headers = {"Content-Type": "application/vnd.sqlite3"}
     # Far more than the former fixed 2048 MiB fits when the volume has the room.
@@ -405,6 +391,10 @@ def test_free_space_not_a_fixed_number_decides_and_the_variable_only_lowers_it(
     assert storage["free_bytes"] == 40_000 * MIB
     assert storage["retention_days"] == 90
     assert storage["kept_runs_per_source"] == KEPT_RUNS_PER_SOURCE
+    # An agent reads the same storage report, with the retention setting.
+    monkeypatch.setenv("OPENINGS_RETENTION_DAYS", "45")
+    agent = client.get("/api/v1/workspace", headers=agent_token["headers"]).json()["storage"]
+    assert agent["retention_days"] == 45 and agent["free_bytes"] == 40_000 * MIB
     monkeypatch.setenv("OPENINGS_MAX_RESTORE_MB", "3000")
     assert client.get("/api/v1/workspace").json()["storage"]["restore_limit_bytes"] == 3000 * MIB
     monkeypatch.setenv("OPENINGS_MAX_RESTORE_MB", "0")
@@ -415,15 +405,3 @@ def test_free_space_not_a_fixed_number_decides_and_the_variable_only_lowers_it(
     monkeypatch.setenv("OPENINGS_MAX_RESTORE_MB", "")
     restored = client.post("/api/v1/backup/restore", content=backup, headers=headers)
     assert restored.status_code == 200, restored.text
-
-
-def test_storage_reports_retention_and_the_restore_limit(tmp_path, monkeypatch):
-    monkeypatch.setenv("OPENINGS_RETENTION_DAYS", "45")
-    app, client = signed_in(tmp_path)
-    disk(monkeypatch, 9000 * MIB)
-    token = app.state.auth.create_token("Agent", "agent")["token"]
-    headers = {"Authorization": "Bearer " + token}
-    with client:
-        rest = client.get("/api/v1/workspace", headers=headers).json()["storage"]
-    assert rest["retention_days"] == 45 and rest["database_bytes"] > 0
-    assert rest["restore_limit_bytes"] == restore_limit(9000 * MIB, rest["database_bytes"])

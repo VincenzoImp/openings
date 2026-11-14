@@ -9,18 +9,15 @@ import json
 from pathlib import Path
 
 import pytest
-from fastapi.testclient import TestClient
 
 from discovery_fixtures import patch_discovery
 from openings.actors import OWNER, acting_as, token_actor
-from openings.app import create_app
 from openings.discovery import DiscoveryService, SourceCreate
 from openings.language_signals import language_requirements, posting_language, text_signals
 from openings.workspace import Workspace
 
 FIXTURE = json.loads((Path(__file__).with_name("language_fixture.json")).read_text())["items"]
 AGENT = token_actor("agent-token", "Synthetic agent", "agent")
-MCP_HEADERS = {"Accept": "application/json, text/event-stream"}
 
 # What the detectors must reach on the labelled fixture. Measured when written:
 # language 89/89 correct where a language was given (89 of 90 labelled postings),
@@ -61,11 +58,8 @@ def test_language_requirement_detection_reaches_the_stated_precision():
     assert labelled >= 60
     assert correct / predicted >= REQUIRED_PRECISION, found
     assert correct / labelled >= REQUIRED_RECALL, found
-
-
-@pytest.mark.parametrize(
-    ("text", "required"),
-    [
+    # Phrases that state a requirement, and phrases that only mention a language.
+    for text, required in [
         ("Fluent German required, English is a plus.", [["de"]]),
         ("Deutsch C1 und Englisch B2.", [["de"], ["en"]]),
         ("La langue française est exigée.", [["fr"]]),
@@ -74,10 +68,8 @@ def test_language_requirement_detection_reaches_the_stated_precision():
         ("Keine Deutschkenntnisse erforderlich.", []),
         ("Le français n'est pas requis.", []),
         ("Wir betreuen deutsche Kunden.", []),
-    ],
-)
-def test_requirement_phrases(text, required):
-    assert language_requirements(text) == {"required": required}
+    ]:
+        assert language_requirements(text) == {"required": required}, text
 
 
 GERMAN = (
@@ -245,53 +237,3 @@ def test_a_board_that_stops_listing_a_posting_marks_it_and_dismisses_nothing(tmp
     run()
     assert not workspace.get_job(after["Engineer 3"]["id"])["signals"]["no_longer_listed"]
     assert workspace.list_jobs(signal="no_longer_listed")["total"] == 1
-
-
-def test_signal_filter_dismissal_reason_and_distinct_over_the_interfaces(tmp_path):
-    app = create_app(tmp_path / "interfaces.sqlite", start_worker=False)
-    app.state.auth.setup("synthetic-password")
-    workspace = app.state.workspace
-    first = job(workspace, "Data Engineer", ENGLISH, 1, company="Northstar Labs")
-    copy = job(workspace, "Data Engineer", ENGLISH, 2, company="Northstar Labs")
-    agent = app.state.auth.create_token("Synthetic agent", "agent")
-    headers = {"Authorization": "Bearer " + agent["token"]}
-
-    def tool(client, name, arguments):
-        response = client.post(
-            "/mcp",
-            headers={**MCP_HEADERS, **headers},
-            json={
-                "jsonrpc": "2.0",
-                "id": 1,
-                "method": "tools/call",
-                "params": {"name": name, "arguments": arguments},
-            },
-        )
-        result = response.json()["result"]
-        assert not result.get("isError"), result
-        return result.get("structuredContent") or json.loads(result["content"][0]["text"])
-
-    with TestClient(app, base_url="http://localhost:8080") as client:
-        listed = client.get(
-            "/api/v1/jobs?signal=likely_duplicate&include_counts=true", headers=headers
-        ).json()
-        assert [item["id"] for item in listed["items"]] == [copy["id"]]
-        dismissed = client.post(
-            f"/api/v1/jobs/{first['id']}/triage",
-            json={"triage": "dismissed", "expected_version": first["version"], "reason": "Seen."},
-            headers=headers,
-        ).json()
-        assert (
-            dismissed["dismissal"]["reason"] == "Seen."
-            and dismissed["dismissal"]["category"] == "agent"
-        )
-        distinct = tool(
-            client,
-            "jobs_link",
-            {"job_id": copy["id"], "other_id": first["id"], "decision": "different"},
-        )
-        assert "duplicate" not in distinct["signals"]
-        over_rest = client.post(
-            f"/api/v1/jobs/{copy['id']}/distinct", json={"other_id": first["id"]}, headers=headers
-        )
-        assert over_rest.status_code == 200 and over_rest.json()["signals"]["duplicate"] is None

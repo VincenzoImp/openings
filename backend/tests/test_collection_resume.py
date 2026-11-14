@@ -54,16 +54,6 @@ def test_company_details_continue_without_relisting_or_refetching_completed_bodi
     assert "responses" not in checkpoint
 
 
-def test_description_off_options_are_not_part_of_source_configuration():
-    import pytest
-    from pydantic import ValidationError
-
-    with pytest.raises(ValidationError):
-        company.config_model("greenhouse").model_validate({"board": "example", "max_details": 0})
-    with pytest.raises(ValidationError):
-        jobspy.JobSpyConfig(query="engineer", fetch_description=False)
-
-
 def test_empty_description_retries_are_finite_and_keep_a_partial_result():
     checkpoint, calls = {}, []
 
@@ -142,18 +132,6 @@ def test_linkedin_description_budget_resumes_metadata_checkpoint(tmp_path, monke
     assert sum("seeMore" in url for url in calls) == 2 and len(calls) == 17
 
 
-def test_remote_location_filter_does_not_expand_specific_geography():
-    filters = {"locations": ["Canada", "Remote"]}
-    for place in ("Remote - USA", "Remote EMEA", "Remote"):
-        assert not matches_filters({"title": "Engineer", "location": place}, filters)
-    for place in ("Toronto, Canada", "Remote Worldwide"):
-        assert matches_filters({"title": "Engineer", "location": place}, filters)
-    assert matches_filters(
-        {"title": "Engineer", "location": "Remote", "metadata": {"eligible_countries": ["Canada"]}},
-        filters,
-    )
-
-
 def test_workday_page_resume_reuses_prior_pages_after_provider_deferral():
     from openings.collectors.policy import ProviderDeferred
 
@@ -191,7 +169,18 @@ def test_workday_page_resume_reuses_prior_pages_after_provider_deferral():
     assert calls == [0, 20, 20]
 
 
-def test_excluded_title_terms_match_whole_words_before_role_filters():
+def test_location_and_title_filters_match_whole_terms():
+    # Remote does not widen a specific geography.
+    filters = {"locations": ["Canada", "Remote"]}
+    for place in ("Remote - USA", "Remote EMEA", "Remote"):
+        assert not matches_filters({"title": "Engineer", "location": place}, filters)
+    for place in ("Toronto, Canada", "Remote Worldwide"):
+        assert matches_filters({"title": "Engineer", "location": place}, filters)
+    assert matches_filters(
+        {"title": "Engineer", "location": "Remote", "metadata": {"eligible_countries": ["Canada"]}},
+        filters,
+    )
+    # Excluded title terms match whole words before the role filters.
     filters = {"titles": ["engineer", "analyst"], "exclude_titles": ["sales", "SAP"]}
     assert not matches_filters({"title": "Senior Sales Engineer"}, filters)
     assert not matches_filters({"title": "SAP CRM Analyst"}, filters)

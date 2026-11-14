@@ -9,14 +9,8 @@ from openings.app import create_app
 from openings.mcp_server import INSTRUCTIONS
 
 
-def test_advertised_mcp_endpoint_and_trailing_slash_support_json_rpc(tmp_path):
-    app = create_app(tmp_path / "mcp-endpoint.sqlite", start_worker=False)
-    app.state.auth.setup("synthetic-password")
-    token = app.state.auth.create_token("Synthetic MCP client")["token"]
-    headers = {
-        "Authorization": "Bearer " + token,
-        "Accept": "application/json, text/event-stream",
-    }
+def test_advertised_mcp_endpoint_and_trailing_slash_support_json_rpc(app, agent_token):
+    headers = {**agent_token["headers"], "Accept": "application/json, text/event-stream"}
     observed = []
     mount = next(route for route in app.routes if getattr(route, "path", None) == "/mcp")
     transport = mount.app
@@ -130,14 +124,8 @@ CAPABILITIES = {
 }
 
 
-def test_handshake_and_per_request_protocols_report_the_same_static_server(tmp_path):
-    app = create_app(tmp_path / "mcp-protocols.sqlite", start_worker=False)
-    app.state.auth.setup("synthetic-password")
-    token = app.state.auth.create_token("Synthetic MCP client")["token"]
-    headers = {
-        "Authorization": "Bearer " + token,
-        "Accept": "application/json, text/event-stream",
-    }
+def test_handshake_and_per_request_protocols_report_the_same_static_server(app, agent_token):
+    headers = {**agent_token["headers"], "Accept": "application/json, text/event-stream"}
     identity = {"name": "Openings", "version": __version__}
     client_info = {"name": "synthetic-client", "version": "1"}
 
@@ -197,20 +185,3 @@ def test_handshake_and_per_request_protocols_report_the_same_static_server(tmp_p
         assert listen.status_code == 404
         assert listen.headers["content-type"] == "application/json"
         assert listen.json()["error"]["code"] == -32601
-
-
-def test_context_and_staleness_tools_answer_with_their_replacement(mcp, agent_token):
-    # Frozen contexts and staleness are gone (0.24); REST answers 410 Gone.
-    for name, replacement in (
-        ("contexts_create", "workspace_context"),
-        ("contexts_get", "workspace_context"),
-        ("contexts_list", "workspace_context"),
-        ("staleness_get", "applications_get"),
-        ("staleness_list", "applications_list"),
-    ):
-        _, removed = mcp.call(name, {})
-        assert removed["code"] == "removed" and replacement in removed["message"]
-        assert removed["details"] == {"tool": name, "use": replacement}
-    for path in ("/contexts", "/contexts/any", "/staleness", "/applications/any/staleness"):
-        response = mcp.client.get("/api/v1" + path, headers=agent_token["headers"])
-        assert response.status_code == 410

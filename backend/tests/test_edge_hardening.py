@@ -9,20 +9,17 @@ import pytest
 from fastapi.testclient import TestClient
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
+from conftest import BASE_URL, PASSWORD
 from discovery_fixtures import patch_discovery
 from openings import __main__ as entrypoint
-from openings.app import create_app
 from openings.auth import COOKIE, LoginGuard
 from openings.discovery import network
 from openings.errors import DomainError
 
-PASSWORD = "synthetic-password"
-
-
 # --- SEC-3: trusted proxies and sign-in backoff -------------------------------------------
 
 
-def test_trusted_proxies_default_to_none_and_normalize_entries():
+def test_trusted_proxies_default_to_none_normalize_and_reach_uvicorn(monkeypatch, tmp_path):
     assert entrypoint.proxy_options("") == {"proxy_headers": False, "forwarded_allow_ips": ""}
     assert entrypoint.proxy_options(" , ") == {"proxy_headers": False, "forwarded_allow_ips": ""}
     assert entrypoint.proxy_options("172.18.0.5, 10.1.2.3/8 ,fd00::1") == {
@@ -34,8 +31,6 @@ def test_trusted_proxies_default_to_none_and_normalize_entries():
     with pytest.raises(SystemExit):
         entrypoint.proxy_options("*")
 
-
-def test_entrypoint_passes_proxy_trust_to_uvicorn(monkeypatch, tmp_path):
     calls = []
     monkeypatch.setattr(entrypoint, "create_app", lambda database: "app")
     monkeypatch.setattr(entrypoint.uvicorn, "run", lambda app, **kwargs: calls.append(kwargs))
@@ -49,36 +44,30 @@ def test_entrypoint_passes_proxy_trust_to_uvicorn(monkeypatch, tmp_path):
     assert calls[1]["proxy_headers"] is False
 
 
-def sign_in_client(tmp_path, peer, trusted):
-    app = create_app(tmp_path / "proxy.sqlite", start_worker=False)
-    app.state.auth.setup(PASSWORD)
-    # Keep this test about per-client buckets; the global backoff is tested below.
-    app.state.login_guard.free_failures = 1000
-    return TestClient(ProxyHeadersMiddleware(app, trusted_hosts=trusted), client=(peer, 40000))
-
-
 def login(client, password, forwarded=None):
     headers = {"X-Forwarded-For": forwarded} if forwarded else {}
     return client.post("/api/v1/auth/login", json={"password": password}, headers=headers)
 
 
-def test_trusted_proxy_gives_each_forwarded_client_its_own_bucket(tmp_path):
-    with sign_in_client(tmp_path, "192.0.2.10", "192.0.2.10") as client:
-        for _ in range(10):
-            assert login(client, "wrong-password", "203.0.113.5").status_code == 401
-        blocked = login(client, "wrong-password", "203.0.113.5")
-        assert blocked.status_code == 429
-        assert blocked.json()["error"]["code"] == "login_rate"
-        assert 1 <= int(blocked.headers["retry-after"]) <= 60
-        # The owner behind the same proxy is not locked out by the attacker.
-        assert login(client, PASSWORD, "203.0.113.6").status_code == 200
+def test_forwarded_clients_get_their_own_bucket_only_behind_a_trusted_proxy(app):
+    # Keep this test about per-client buckets; the global backoff is tested below.
+    app.state.login_guard.free_failures = 1000
+    proxied = ProxyHeadersMiddleware(app, trusted_hosts="192.0.2.10")
+    trusted = TestClient(proxied, base_url=BASE_URL, client=("192.0.2.10", 40000))
+    for _ in range(10):
+        assert login(trusted, "wrong-password", "203.0.113.5").status_code == 401
+    blocked = login(trusted, "wrong-password", "203.0.113.5")
+    assert blocked.status_code == 429
+    assert blocked.json()["error"]["code"] == "login_rate"
+    assert 1 <= int(blocked.headers["retry-after"]) <= 60
+    # The owner behind the same proxy is not locked out by the attacker.
+    assert login(trusted, PASSWORD, "203.0.113.6").status_code == 200
 
-
-def test_untrusted_peer_cannot_spoof_forwarded_addresses(tmp_path):
-    with sign_in_client(tmp_path, "198.51.100.7", "192.0.2.10") as client:
-        for index in range(10):
-            assert login(client, "wrong-password", f"203.0.113.{index}").status_code == 401
-        assert login(client, "wrong-password", "203.0.113.99").status_code == 429
+    # An untrusted peer cannot spread its attempts over spoofed addresses.
+    untrusted = TestClient(proxied, base_url=BASE_URL, client=("198.51.100.7", 40000))
+    for index in range(10):
+        assert login(untrusted, "wrong-password", f"203.0.113.{index}").status_code == 401
+    assert login(untrusted, "wrong-password", "203.0.113.99").status_code == 429
 
 
 class Clock:
@@ -120,70 +109,56 @@ def test_global_backoff_spaces_attempts_and_clears_on_success():
     assert guard.admit("192.0.2.1") == 0
 
 
-def test_global_backoff_forgets_old_failures_and_skips_setup():
+def test_global_backoff_forgets_old_failures_skips_setup_and_bounds_clients():
     clock = Clock()
-    guard = LoginGuard(free_failures=1, failure_window=60, clock=clock)
+    guard = LoginGuard(free_failures=1, failure_window=60, max_clients=3, clock=clock)
     guard.failed()
     guard.failed()
     assert guard.delay() == 1
     assert guard.admit("192.0.2.1", login=False) == 0
     clock.value += 61
     assert guard.delay() == 0
-
-
-def test_client_buckets_stay_bounded():
-    clock = Clock()
-    guard = LoginGuard(max_clients=3, clock=clock)
     for index in range(10):
         guard.admit(f"203.0.113.{index}", login=False)
     assert len(guard.clients) <= 3
 
 
-def test_failed_logins_feed_the_global_backoff(tmp_path):
-    app = create_app(tmp_path / "backoff.sqlite", start_worker=False)
-    app.state.auth.setup(PASSWORD)
+def test_failed_logins_feed_the_global_backoff(app):
     guard = app.state.login_guard
     guard.free_failures = 2
-    with TestClient(app) as client:
-        for _ in range(3):
-            assert login(client, "wrong-password").status_code == 401
-        assert guard.delay() == 1
-        assert login(client, PASSWORD).status_code == 200
-        assert guard.delay() == 0
+    client = TestClient(app, base_url=BASE_URL)
+    for _ in range(3):
+        assert login(client, "wrong-password").status_code == 401
+    assert guard.delay() == 1
+    assert login(client, PASSWORD).status_code == 200
+    assert guard.delay() == 0
 
 
 # --- SEC-5: single-use operational grants ------------------------------------------------
 
 
-def test_operational_grants_are_single_use_and_separate_from_sessions(tmp_path):
-    app = create_app(tmp_path / "grants.sqlite", start_worker=False)
+def test_operational_grants_are_single_use_and_separate_from_sessions(app):
     auth = app.state.auth
-    auth.setup(PASSWORD)
     grant = auth.operation_ticket("export")
-    with TestClient(app) as client:
-        assert client.get("/api/v1/export", headers={"X-Operational-Token": grant}).status_code == (
-            200
-        )
-        reused = client.get("/api/v1/export", headers={"X-Operational-Token": grant})
-        assert reused.status_code == 401
-        assert reused.json()["error"]["code"] == "transfer_used"
+    client = TestClient(app, base_url=BASE_URL)
+    assert client.get("/api/v1/export", headers={"X-Operational-Token": grant}).status_code == 200
+    reused = client.get("/api/v1/export", headers={"X-Operational-Token": grant})
+    assert reused.status_code == 401
+    assert reused.json()["error"]["code"] == "transfer_used"
 
-        # Grants are not sessions, and session cookies are not grants.
-        client.cookies.set(COOKIE, auth.operation_ticket("backup"))
-        assert client.get("/api/v1/auth/session").json()["authenticated"] is False
-        cookie, _ = auth.login(PASSWORD)
-        client.cookies.clear()
-        forged = client.get("/api/v1/backup", headers={"X-Operational-Token": cookie})
-        assert forged.status_code == 401
-        assert forged.json()["error"]["code"] == "transfer_expired"
+    # Grants are not sessions, and session cookies are not grants.
+    client.cookies.set(COOKIE, auth.operation_ticket("backup"))
+    assert client.get("/api/v1/auth/session").json()["authenticated"] is False
+    cookie, _ = auth.login(PASSWORD)
+    client.cookies.clear()
+    forged = client.get("/api/v1/backup", headers={"X-Operational-Token": cookie})
+    assert forged.status_code == 401
+    assert forged.json()["error"]["code"] == "transfer_expired"
 
-
-def test_used_grant_nonces_are_forgotten_after_expiry(tmp_path):
-    app = create_app(tmp_path / "nonces.sqlite", start_worker=False)
-    auth = app.state.auth
-    auth.setup(PASSWORD)
+    # Used nonces are forgotten once their grant could no longer be used.
     clock = Clock()
     auth.used_operations.clock = clock
+    auth.used_operations.expiries.clear()
     auth.authorize_operation(auth.operation_ticket("backup"), "backup")
     assert len(auth.used_operations.expiries) == 1
     clock.value += 200

@@ -8,6 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from openings.actors import OWNER, acting_as, current_actor, token_actor
+from openings.auth import Auth
 from openings.errors import DomainError
 
 PASSWORD = "synthetic-password"
@@ -53,40 +54,6 @@ def refused_over_rest(response):
     return error
 
 
-def test_an_agent_token_is_refused_owner_operations(app, client):
-    auth = app.state.auth
-    agent = auth.create_token("Synthetic agent", "agent")
-    other = auth.create_token("Second synthetic agent", "agent")
-    headers = bearer(agent)
-    for over_rest in (
-        client.post(
-            "/api/v1/auth/password", json={"password": "changed-password"}, headers=headers
-        ),
-        client.get("/api/v1/tokens", headers=headers),
-        client.post(
-            "/api/v1/tokens", json={"name": "Escalation", "kind": "owner"}, headers=headers
-        ),
-        client.delete(f"/api/v1/tokens/{other['id']}", headers=headers),
-        client.post(
-            "/api/v1/backup/restore",
-            content=b"SQLite format 3\x00",
-            headers={**headers, "Content-Type": "application/vnd.sqlite3"},
-        ),
-    ):
-        refused_over_rest(over_rest)
-    # Owner-only operations are not MCP tools; a call names the REST route.
-    for name in ("owner_password_update", "tokens_list", "tokens_revoke"):
-        _, error = tool(client, agent, name)
-        assert error["code"] == "owner_only" and "/api/v1/" in error["message"]
-    # Nothing changed: the password and both tokens are as before.
-    assert client.post("/api/v1/auth/login", json={"password": PASSWORD}).status_code == 200
-    assert {item["name"] for item in auth.list_tokens()["items"]} == {
-        "Synthetic agent",
-        "Second synthetic agent",
-    }
-    assert not app.state.events.list_events({"kind": "owner_password_changed"})["total"]
-
-
 def test_an_agent_token_keeps_the_workflow_operations(app, client):
     agent = app.state.auth.create_token("Synthetic agent", "agent")
     headers = bearer(agent)
@@ -108,7 +75,9 @@ def test_an_agent_token_keeps_the_workflow_operations(app, client):
     ]
     assert {item["actor"] for item in history} == {"agent:Synthetic agent"}
     # The records export is the owner's; the backup and permanent deletion stay available.
-    assert client.get("/api/v1/export", headers=headers).status_code == 403
+    # Every owner-only route refuses an agent token (test_interfaces.py); the refusal
+    # says which authority is missing.
+    refused_over_rest(client.get("/api/v1/export", headers=headers))
     _, error = tool(client, agent, "workspace_export")
     assert error["code"] == "owner_only" and error["details"]["use"] == "workspace_backup"
     current = client.get(f"/api/v1/jobs/{job['id']}", headers=headers).json()
@@ -212,8 +181,8 @@ def test_an_owner_token_keeps_full_access_and_chooses_the_kind(app, client):
     assert restored.status_code == 200, restored.text
 
 
-def test_the_owner_session_and_the_system_are_never_refused(app):
-    auth = app.state.auth
+def test_the_owner_session_and_the_system_are_never_refused(workspace):
+    auth = Auth(workspace)
     agent = auth.create_token("Synthetic agent", "agent")
     with acting_as(OWNER):
         assert auth.list_tokens()["total"] == 1

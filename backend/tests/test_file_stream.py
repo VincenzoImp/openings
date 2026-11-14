@@ -4,34 +4,29 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
-from fastapi.testclient import TestClient
 from starlette.requests import ClientDisconnect
 
-from openings.app import create_app
 from openings.documents import UploadReservation
 from openings.transfers import SnapshotResponse
 
 
 @pytest.mark.asyncio
-async def test_file_stream_survives_thread_changes_and_original_deletion(tmp_path, monkeypatch):
+async def test_file_stream_survives_thread_changes_and_original_deletion(app, client, monkeypatch):
     import starlette.responses
 
-    app = create_app(tmp_path / "file.sqlite", start_worker=False)
     workspace, documents = app.state.workspace, app.state.documents
     job = workspace.ingest_job({"title": "Synthetic role", "posting": "Build services."})
     content = b"Synthetic exact file bytes\n" * 10000
-    with TestClient(app) as client:
-        client.post("/api/v1/auth/setup", json={"password": "synthetic-password"})
-        grant = documents.reserve_upload(
-            UploadReservation(
-                owner_type="job",
-                owner_id=job["id"],
-                name="evidence.txt",
-                size=len(content),
-                media_type="text/plain",
-            )
+    grant = documents.reserve_upload(
+        UploadReservation(
+            owner_type="job",
+            owner_id=job["id"],
+            name="evidence.txt",
+            size=len(content),
+            media_type="text/plain",
         )
-        record = client.put(grant["url"], headers=grant["headers"], content=content).json()
+    )
+    record = client.put(grant["url"], headers=grant["headers"], content=content).json()
     executors = [ThreadPoolExecutor(max_workers=1) for _ in range(2)]
     calls = 0
 

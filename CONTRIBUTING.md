@@ -42,10 +42,10 @@ npm --prefix frontend run build && npm --prefix frontend run budget
 npm --prefix frontend run format:check && npm --prefix frontend test
 ```
 
-Add focused invariant tests and walk a complete workflow. For dashboard changes,
-check populated desktop and mobile views and keyboard access. Browser tests (`cd
-frontend && npx playwright install chromium webkit && npm run test:e2e`) use
-disposable synthetic workspaces; flaky tests fail. `nightly.yml` runs WebKit and
+Test an invariant once, at the service, with the `conftest.py` fixtures
+(`test_parity.py` covers REST versus MCP), and walk a complete workflow. Browser
+tests (`cd frontend && npx playwright install chromium webkit && npm run
+test:e2e`) use synthetic workspaces; flaky tests fail. `nightly.yml` runs WebKit and
 the time budgets (`uv run pytest -m performance`). Never raise a budget to pass.
 
 - **Types:** after changing an operation or model, run `npm --prefix frontend run
