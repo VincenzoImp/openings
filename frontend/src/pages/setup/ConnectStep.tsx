@@ -1,10 +1,9 @@
-import type { CSSProperties } from "react";
+import { useState } from "react";
 import { Banner, Button } from "../../design";
 import { dayTime } from "../../library/time";
 import { useFresh } from "../../library/useFresh";
-import { Connect } from "../settings/Connect";
-import { TWO_UP, type WorkspaceInfo } from "../settings/model";
-import { CreateToken } from "../settings/Tokens";
+import { ConnectSnippet, NewTokenDialog } from "../settings/Agents";
+import type { WorkspaceInfo } from "../settings/model";
 import { connection, type SetupToken } from "./model";
 
 /**
@@ -19,6 +18,7 @@ export function ConnectStep({
   onContinue: () => void;
 }) {
   const info = useFresh<WorkspaceInfo>("/workspace", {}, []);
+  const [creating, setCreating] = useState(false);
   const link = connection(tokens);
   return (
     <div className="stack">
@@ -48,10 +48,11 @@ export function ConnectStep({
           cannot change your password, manage tokens or restore a backup.
         </p>
       )}
-      <div className="split" style={{ "--split": TWO_UP } as CSSProperties}>
-        <CreateToken />
-        <Connect origin={info.data.origin || location.origin} />
+      <div className="row">
+        <Button onClick={() => setCreating(true)}>Create an agent token</Button>
       </div>
+      <NewTokenDialog open={creating} onClose={() => setCreating(false)} />
+      <ConnectSnippet origin={info.data.origin || location.origin} />
       <p>
         Then tell your agent: <strong>"Set up my Openings workspace."</strong>{" "}
         It reads the setup-openings skill, builds your record and asks you what

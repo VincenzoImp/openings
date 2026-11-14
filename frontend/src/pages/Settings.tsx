@@ -1,76 +1,73 @@
-import type { CSSProperties } from "react";
-import { ErrorBanner, Tabs } from "../design";
-import { PageHead } from "../library/common";
-import { useFresh } from "../library/useFresh";
-import { useShell } from "../shell/context";
-import { useUrlState } from "../state";
-import { Backup } from "./settings/Backup";
-import { Connect } from "./settings/Connect";
-import { TWO_UP, type WorkspaceInfo } from "./settings/model";
-import { Skills } from "./settings/Skills";
-import { CreateToken, Tokens } from "./settings/Tokens";
-import { Workspace } from "./settings/Workspace";
+import type { JSX } from "react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Database,
+  KeyRound,
+  UserRound,
+  Wrench,
+} from "lucide-react";
+import { href, useRoute } from "../shell/router";
+import { Icon } from "../ui/Icon";
+import { PageHeader } from "../ui/Page";
+import { Account } from "./settings/Account";
+import { Advanced } from "./settings/Advanced";
+import { Agents } from "./settings/Agents";
+import { Data } from "./settings/Data";
+import { SECTIONS, sectionOf, type SectionId } from "./settings/model";
+import "./settings/settings.css";
 
-const TABS = [
-  { id: "agents", label: "Agent access" },
-  { id: "skills", label: "Skills" },
-  { id: "backup", label: "Backup and restore" },
-  { id: "workspace", label: "Workspace" },
-];
-const tabOf = (value: string) =>
-  TABS.some((tab) => tab.id === value) ? value : "agents";
+const ICONS = {
+  account: UserRound,
+  agents: KeyRound,
+  data: Database,
+  advanced: Wrench,
+};
+const BODIES: Record<SectionId, () => JSX.Element> = {
+  account: Account,
+  agents: Agents,
+  data: Data,
+  advanced: Advanced,
+};
 
 /**
- * Who may operate this workspace, how the agent works in it and how the data
- * is kept. Parts that need owner authority are marked Owner only: an agent
- * token is refused there over REST and MCP alike.
+ * Settings, one page: Account, API & agents, Data and Advanced. On a wide
+ * screen a sub-navigation sits on the left and Account opens first; on a
+ * phone the sections are a list, and one opens as its own page.
  */
-export default function SettingsPage() {
-  const { signOut: onLogout } = useShell();
-  const [raw] = useUrlState("section", "agents");
-  const section = tabOf(raw);
-  const info = useFresh<WorkspaceInfo>("/workspace", {}, ["backup"]);
-  const show = (next: string) => {
-    history.replaceState(
-      null,
-      "",
-      next === "agents" ? "#settings" : `#settings?section=${next}`,
-    );
-    window.dispatchEvent(new PopStateEvent("popstate"));
-  };
+export default function SettingsScreen() {
+  const route = useRoute();
+  const picked = sectionOf(route.query.get("section"));
+  const section = picked ?? "account";
+  const Body = BODIES[section];
   return (
-    <>
-      <PageHead title="Settings">
-        Who may operate this workspace, how your agent works in it, and how the
-        data is kept.
-      </PageHead>
-      {info.error && <ErrorBanner message={info.error} retry={info.reload} />}
-      <Tabs
-        id="settings"
-        label="Settings sections"
-        value={section}
-        onChange={show}
-        items={TABS}
-      >
-        {section === "skills" ? (
-          <Skills release={info.data.version} />
-        ) : section === "backup" ? (
-          <Backup storage={info.data.storage} />
-        ) : section === "workspace" ? (
-          <Workspace info={info.data} onLogout={onLogout} />
-        ) : (
-          <div className="stack">
-            <Tokens />
-            <div
-              className="split"
-              style={{ "--split": TWO_UP } as CSSProperties}
-            >
-              <CreateToken />
-              <Connect origin={info.data.origin || location.origin} />
-            </div>
-          </div>
-        )}
-      </Tabs>
-    </>
+    <div className="set-screen">
+      <PageHeader title="Settings" />
+      <div className="set" data-picked={picked ? "" : undefined}>
+        <nav className="set-nav" aria-label="Settings sections">
+          <ul>
+            {SECTIONS.map((item) => (
+              <li key={item.id}>
+                <a
+                  href={href("settings", {}, { section: item.id })}
+                  aria-current={item.id === section ? "page" : undefined}
+                >
+                  <Icon icon={ICONS[item.id]} />
+                  <span>{item.label}</span>
+                  <Icon icon={ChevronRight} className="set-nav-chevron" />
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+        <div className="set-body">
+          <a className="set-back" href={href("settings")}>
+            <Icon icon={ChevronLeft} />
+            All settings
+          </a>
+          <Body key={section} />
+        </div>
+      </div>
+    </div>
   );
 }

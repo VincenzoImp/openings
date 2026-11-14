@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { Preferences, Profile } from "../../api";
 import { Button, Icon, Tag } from "../../design";
 import { confirmLeave } from "../../state";
-import { SourceEditor } from "../collection/SourceEditor";
+import { SourceEditor } from "../sources/SourceEditor";
 import { recordItems, type ItemId, type SetupFacts } from "./model";
 import { PreferenceBasics } from "./PreferenceBasics";
 import { ProfileBasics } from "./ProfileBasics";
@@ -112,7 +112,7 @@ export function RecordStep({
                       noReply={facts.noReply}
                     />
                   ) : (
-                    <SourceEditor search onClose={() => setOpen(null)} />
+                    <SourceEditor open onClose={() => setOpen(null)} />
                   )}
                 </div>
               )}

@@ -11,6 +11,7 @@ import { ApiError } from "../api/client";
 /** A REST resource: the first segment of its path under /api/v1. */
 export type Resource =
   | "applications"
+  | "backups"
   | "career"
   | "collection"
   | "documents"
@@ -21,6 +22,7 @@ export type Resource =
   | "preferences"
   | "providers"
   | "settings"
+  | "skills"
   | "sources"
   | "stats"
   | "tasks"

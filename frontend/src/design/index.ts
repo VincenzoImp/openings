@@ -17,7 +17,6 @@ export {
 } from "./Feedback";
 export { Dialog, lockPageScroll } from "./Dialog";
 export { Toast } from "./Toast";
-export { CodeBlock } from "./CodeBlock";
 export { cx, type Tone } from "./classes";
 export { StatementList, Statement, StatementValue } from "./Statement";
 export { KeyValueEditor, ValueTree } from "./KeyValue";
