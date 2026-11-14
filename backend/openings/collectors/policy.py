@@ -21,6 +21,8 @@ from .catalog import COMPANY_KINDS
 from .pinning import pin_session
 
 REQUEST_BATCH_SIZE = 40
+# The longest pause a server's Retry-After imposes; a longer one is read as a day.
+MAX_RETRY_AFTER = 86400
 
 PROVIDERS = {
     **{
@@ -100,21 +102,22 @@ def epoch(value) -> float:
 
 
 def retry_after(value: str | None, moment: float) -> float | None:
+    """When a server's ``Retry-After`` lets the next request go, at most a day ahead."""
     if not value:
         return None
     try:
         seconds = float(value)
-        if seconds >= 0 and seconds < float("inf"):
-            return moment + seconds
+        if not 0 <= seconds < float("inf"):
+            return None
     except TypeError, ValueError:
         try:
             parsed = parsedate_to_datetime(value)
             if parsed.tzinfo is None:
                 parsed = parsed.replace(tzinfo=UTC)
-            return max(moment, parsed.timestamp())
+            seconds = max(0.0, parsed.timestamp() - moment)
         except ValueError, TypeError, OverflowError:
-            pass
-    return None
+            return None
+    return moment + min(seconds, MAX_RETRY_AFTER)
 
 
 class ProviderDeferred(DomainError):
@@ -192,7 +195,8 @@ class ProviderStore:
     def list(self):
         return {"items": [self.get(provider) for provider in PROVIDERS], "total": len(PROVIDERS)}
 
-    def update(self, provider, value: ProviderPatch):
+    def update(self, provider, value: ProviderPatch, clear_cooldown=False):
+        """Change a provider's policy; ``clear_cooldown`` lifts a server-requested pause."""
         self._row(provider)
         updates = value.model_dump(exclude_unset=True, exclude={"expected_version"})
         if any(value is None for value in updates.values()):
@@ -201,9 +205,13 @@ class ProviderStore:
             row = connection.execute("SELECT * FROM providers WHERE id=?", (provider,)).fetchone()
             check_version(row, value.expected_version)
             policy = ProviderPolicy.model_validate({**json.loads(row["policy"]), **updates})
+            runtime = json.loads(row["runtime"])
+            if clear_cooldown:
+                runtime.pop("cooldown_until", None)
+                runtime["throttle_count"] = 0
             connection.execute(
-                "UPDATE providers SET policy=?,version=version+1,updated_at=? WHERE id=?",
-                (encode(policy.model_dump()), now(), provider),
+                "UPDATE providers SET policy=?,runtime=?,version=version+1,updated_at=? WHERE id=?",
+                (encode(policy.model_dump()), encode(runtime), now(), provider),
             )
         return self.get(provider)
 

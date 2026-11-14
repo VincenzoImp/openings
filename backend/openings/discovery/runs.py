@@ -79,19 +79,17 @@ class RunOperations:
     def list_providers(self):
         return self.providers.list()
 
-    def update_provider(self, provider_id, value: ProviderPatch):
-        result = self.providers.update(provider_id, value)
+    def update_provider(self, provider_id, value: ProviderPatch, clear_cooldown=False):
+        result = self.providers.update(provider_id, value, clear_cooldown)
+        fields = set(value.model_dump(exclude_unset=True, exclude={"expected_version"}))
+        if clear_cooldown:
+            fields.add("cooldown_until")
         with self.db.transaction() as connection:
             events.record(
                 connection,
                 "provider_updated",
                 ("provider", provider_id),
-                {
-                    "fields": sorted(
-                        value.model_dump(exclude_unset=True, exclude={"expected_version"})
-                    ),
-                    "version": result["version"],
-                },
+                {"fields": sorted(fields), "version": result["version"]},
             )
         if result["policy"]["enabled"]:
             # Policy changes may make a previously deferred queued request eligible.
