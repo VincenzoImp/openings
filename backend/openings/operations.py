@@ -171,7 +171,7 @@ def restore_database(workspace, source_path):
 
 
 def _restore_current(workspace, source_path):
-    with sqlite3.connect(source_path) as source:
+    with closing(sqlite3.connect(source_path)) as source:
         if source.execute("PRAGMA user_version").fetchone()[0] != SCHEMA_VERSION:
             raise DomainError(
                 422, "backup_version", "Select a database backup from this Openings schema."
@@ -248,7 +248,7 @@ def _restore_current(workspace, source_path):
                         target.commit()
                 except BaseException:
                     with (
-                        sqlite3.connect(rollback_name) as previous,
+                        closing(sqlite3.connect(rollback_name)) as previous,
                         workspace.db.connect() as target,
                     ):
                         previous.backup(target)

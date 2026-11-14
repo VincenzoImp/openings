@@ -43,6 +43,7 @@ uv = ["uv==0.13.8"]
 testpaths = ["backend/tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+filterwarnings = ["error::ResourceWarning"]
 # Performance budgets and benchmarks run weekly (weekly.yml) or with `-m performance`.
 addopts = "-m 'not performance'"
 markers = [
