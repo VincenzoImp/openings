@@ -1,9 +1,12 @@
-"""The agent's tools: batch reads and writes, per-item results, versions and refusals."""
+"""The agent's tools: batch reads and writes, per-item results, versions, refusals, errors
+and schemas."""
 
+import asyncio
 import json
 from datetime import UTC, datetime, timedelta
 
 from openings.interfaces import OPERATIONS
+from openings.outcomes import today
 
 
 def ok(result):
@@ -415,3 +418,93 @@ def test_a_provider_pause_is_lifted_over_rest_and_mcp(app, mcp):
     result = ok(mcp.call("collection_update", {"expected_version": version, "providers": [change]}))
     assert result["results"]["items"][0]["ok"]
     assert discovery.providers.get("indeed")["runtime"]["cooldown_until"] is None
+
+
+def schema_objects(value):
+    """Every JSON-schema object inside ``value``."""
+    if isinstance(value, dict):
+        yield value
+        for item in value.values():
+            yield from schema_objects(item)
+    elif isinstance(value, list):
+        for item in value:
+            yield from schema_objects(item)
+
+
+async def test_tool_schemas_have_no_titles_and_idempotency_keys_have_one_length(app):
+    tools = await app.state.mcp.list_tools()
+    for tool in tools:
+        titles = [
+            s["title"] for s in schema_objects(tool.input_schema) if isinstance(s.get("title"), str)
+        ]
+        assert not titles, tool.name
+    lengths = set()
+    for name, schema in app.openapi()["components"]["schemas"].items():
+        key = schema.get("properties", {}).get("idempotency_key")
+        if key:
+            for option in [key, *key.get("anyOf", [])]:
+                if option.get("type") == "string":
+                    lengths.add((name, option.get("maxLength")))
+    assert lengths and {length for _, length in lengths} == {200}, sorted(lengths)
+
+
+async def test_a_reply_without_a_date_is_recorded_on_today(app, client):
+    workspace = app.state.workspace
+    job = workspace.ingest_job({"title": "Synthetic analyst", "posting": "Model data."})
+    application = workspace.create_application({"job_id": job["id"]})
+    application = workspace.update_application(
+        application["id"], {"expected_version": application["version"], "stage": "applied"}
+    )
+    tools = await app.state.mcp.list_tools()
+    tool = next(item for item in tools if item.name == "applications_update")
+    value = json.dumps(tool.input_schema)
+    assert "today when omitted" in value
+    required = [schema.get("required", []) for schema in schema_objects(tool.input_schema)]
+    assert not any("date" in names for names in required)
+
+    recorded = client.patch(
+        f"/api/v1/applications/{application['id']}",
+        json={
+            "expected_version": application["version"],
+            "reply": {"kind": "interview", "note": "Call next week."},
+        },
+    )
+    assert recorded.status_code == 200, recorded.text
+    body = recorded.json()
+    assert body["stage"] == "interview" and body["replies"][0]["date"] == today()
+
+
+def test_mcp_errors_keep_code_status_details_and_current_version(app, mcp):
+    job = app.state.workspace.ingest_job({"title": "Synthetic engineer", "posting": "Build."})
+    _, missing = mcp.call("documents_get", {"document_id": "unknown"})
+    assert missing == {
+        "code": "not_found",
+        "status": 404,
+        "message": "Document revision was not found.",
+        "details": None,
+    }
+    _, stale = mcp.call(
+        "jobs_update", {"job_id": job["id"], "expected_version": 99, "title": "Changed"}
+    )
+    assert stale["code"] == "conflict" and stale["status"] == 409
+    assert stale["details"] == {"current_version": job["version"], "id": job["id"]}
+    _, invalid = mcp.call("jobs_get", {})
+    assert invalid["code"] == "validation" and invalid["status"] == 422
+    assert invalid["details"][0]["field"] == ["ids"]
+    # Sync tools run in worker threads, off the event loop.
+    workspace = app.state.workspace
+    original = workspace.get_job
+    seen = []
+
+    def record(*args, **kwargs):
+        try:
+            asyncio.get_running_loop()
+            seen.append("event loop")
+        except RuntimeError:
+            seen.append("worker thread")
+        return original(*args, **kwargs)
+
+    workspace.get_job = record
+    value, error = mcp.call("jobs_get", {"ids": [job["id"]]})
+    assert error is None and value["items"]
+    assert seen and set(seen) == {"worker thread"}, seen

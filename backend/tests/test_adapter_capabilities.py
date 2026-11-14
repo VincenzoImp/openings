@@ -4,28 +4,15 @@ import httpx
 import pytest
 from pydantic import ValidationError
 
-from discovery_fixtures import patch_discovery
+from discovery_fixtures import mock_http, patch_discovery
 from openings.discovery import DiscoveryService, SourceCreate, SourcePreview
 from openings.errors import DomainError
 from openings.workspace import Workspace
 
 
 @pytest.fixture
-def service(tmp_path, monkeypatch):
-    workspace = Workspace(tmp_path / "adapters.sqlite")
-    discovery = DiscoveryService(workspace)
-    workspace.discovery = discovery
-    patch_discovery(monkeypatch, "public_url", lambda url: url)
-    return discovery
-
-
-def transport(monkeypatch, send):
-    original = httpx.Client
-    monkeypatch.setattr(
-        httpx,
-        "Client",
-        lambda **kwargs: original(**{**kwargs, "transport": httpx.MockTransport(send)}),
-    )
+def service(collection):
+    return collection[1]
 
 
 def run(service, source):
@@ -65,7 +52,7 @@ def test_source_options_follow_actual_adapter_workflow(service):
 def test_metadata_only_source_can_be_previewed_but_not_saved_as_an_automatic_watch(
     service, monkeypatch
 ):
-    transport(
+    mock_http(
         monkeypatch,
         lambda request: httpx.Response(
             200, json=[{"id": "1", "name": "Engineer", "url": "https://example.com/1"}]
@@ -88,7 +75,7 @@ def test_ashby_unavailable_board_empty_board_and_transient_failure_are_distinct(
 ):
     patch_discovery(monkeypatch, "public_url", lambda url: url)
     responses = {}
-    transport(monkeypatch, lambda request: responses["send"](request))
+    mock_http(monkeypatch, lambda request: responses["send"](request))
     for status, body, state, code in (
         (404, None, "failed", "ashby_board_unavailable"),
         (200, {"jobs": []}, "succeeded", None),

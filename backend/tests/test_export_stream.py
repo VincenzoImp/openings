@@ -3,7 +3,6 @@
 import asyncio
 import json
 import tempfile
-from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 from fastapi.testclient import TestClient
@@ -30,52 +29,23 @@ def snapshots(monkeypatch):
         snapshot.close()
 
 
-def test_export_stream_survives_worker_thread_changes(app, client, monkeypatch, snapshots):
-    import starlette.responses
-
+def test_export_stream_survives_worker_thread_changes(app, client, alternating_threads, snapshots):
     workspace = app.state.workspace
     workspace.ingest_job(
         JobInput(title="Synthetic role", company="Example", posting="Build Python APIs.")
     )
     workspace.set_settings("workspace", {"no_reply_days": 21})
-    executors = [ThreadPoolExecutor(max_workers=1) for _ in range(2)]
-    calls = 0
-
-    def next_chunk(iterator):
-        try:
-            return True, next(iterator)
-        except StopIteration:
-            return False, None
-
-    async def alternate_threads(content):
-        nonlocal calls
-        iterator = iter(content)
-        while True:
-            executor = executors[calls % 2]
-            calls += 1
-            available, chunk = await asyncio.get_running_loop().run_in_executor(
-                executor, next_chunk, iterator
-            )
-            if not available:
-                break
-            yield chunk
-
-    monkeypatch.setattr(starlette.responses, "iterate_in_threadpool", alternate_threads)
-    try:
-        response = client.get("/api/v1/export")
-        assert response.status_code == 200
-        archive = response.json()
-        assert archive["format"] == "openings-records-v1"
-        assert archive["files_include_bytes"] is False
-        assert archive["jobs"][0]["title"] == "Synthetic role"
-        assert archive["settings"]["workspace"]["no_reply_days"] == 21
-        assert "auth" not in archive["settings"]
-        assert int(response.headers["content-length"]) == len(response.content)
-        assert snapshots and all(snapshot.closed for snapshot in snapshots)
-        assert calls >= 2
-    finally:
-        for executor in executors:
-            executor.shutdown()
+    response = client.get("/api/v1/export")
+    assert response.status_code == 200
+    archive = response.json()
+    assert archive["format"] == "openings-records-v1"
+    assert archive["files_include_bytes"] is False
+    assert archive["jobs"][0]["title"] == "Synthetic role"
+    assert archive["settings"]["workspace"]["no_reply_days"] == 21
+    assert "auth" not in archive["settings"]
+    assert int(response.headers["content-length"]) == len(response.content)
+    assert snapshots and all(snapshot.closed for snapshot in snapshots)
+    assert len(alternating_threads) >= 2
 
 
 def test_export_keeps_one_snapshot_during_concurrent_writes(app, client, monkeypatch):

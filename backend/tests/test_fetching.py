@@ -6,9 +6,9 @@ import json
 import httpx
 import pytest
 
-from discovery_fixtures import patch_discovery
-from openings.collectors.policy import ProviderPatch
-from openings.discovery import DiscoveryService
+from discovery_fixtures import mock_http, open_gate
+from openings.discovery import network
+from openings.errors import DomainError
 from openings.fetching import (
     ats_endpoint,
     ats_posting,
@@ -17,7 +17,6 @@ from openings.fetching import (
     structured_posting,
 )
 from openings.models import JobInput
-from openings.workspace import Workspace
 
 PAGE = "https://careers.example.test/jobs/1"
 
@@ -37,13 +36,10 @@ def job(**changes):
 
 
 @pytest.fixture
-def web(tmp_path, monkeypatch):
+def web(collection, monkeypatch):
     """A synthetic web behind the real provider gate; `routes` maps URL to a response."""
-    workspace = Workspace(tmp_path / "fetching.sqlite")
-    service = DiscoveryService(workspace)
-    for provider in ("manual", "greenhouse", "lever", "ashby"):
-        service.update_provider(provider, ProviderPatch(expected_version=1, min_interval_seconds=0))
-    patch_discovery(monkeypatch, "public_url", lambda url: url)
+    _, service = collection
+    open_gate(service, "manual", "greenhouse", "lever", "ashby")
     service.routes, service.calls = {}, []
 
     def send(request):
@@ -53,12 +49,7 @@ def web(tmp_path, monkeypatch):
             raise answer
         return answer
 
-    original = httpx.Client
-    monkeypatch.setattr(
-        httpx,
-        "Client",
-        lambda **kwargs: original(**{**kwargs, "transport": httpx.MockTransport(send)}),
-    )
+    mock_http(monkeypatch, send)
     return service
 
 
@@ -88,6 +79,9 @@ async def test_redirects_are_gated_per_hop_and_stop_at_another_provider_or_a_loo
     assert target in result["metadata"]["extraction_error"]
     assert web.calls == [PAGE]
     assert runtime(web, "linkedin")["total_requests"] == 0
+    # The requests/curl transport refuses the same address before sending.
+    with pytest.raises(DomainError):
+        web.http_budget("manual").request(lambda *_, **__: pytest.fail("Sent."), "GET", target)
 
     # Loops and redirects without a location stay incomplete.
     web.calls.clear()
@@ -330,3 +324,13 @@ def test_structured_data_is_found_in_nested_graphs_and_bad_blocks_are_skipped():
     assert structured_posting(page(job(jobLocation="Geneva")))["location"] == "Geneva"
     assert structured_posting(page(job(jobLocation={"name": "Head office"})))["location"] == ""
     assert structured_posting("<html><p>Verify you are human</p></html>") == {}
+
+
+def test_a_public_fetch_without_a_provider_budget_fails_closed(monkeypatch):
+    def unexpected(*args, **kwargs):
+        raise AssertionError("No connection may be attempted without a budget.")
+
+    monkeypatch.setattr(network.httpx, "Client", unexpected)
+    assert network.HTTP_BUDGET.get() is None
+    with pytest.raises(RuntimeError, match="no provider budget"):
+        network.fetch_bytes("https://example.org/jobs")

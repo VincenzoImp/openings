@@ -10,6 +10,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from fastapi.testclient import TestClient
 
+from doubles import Lane
 from openings import backups, compaction
 from openings.app import create_app
 from openings.db import SCHEMA_VERSION, Database
@@ -143,20 +144,6 @@ def test_a_backup_runs_when_due_and_not_before(tmp_path):
     assert backups.last_attempt(workspace.db) == attempt
 
 
-class OneCycle:
-    """A stop event that ends the scheduler loop after its first idle wait."""
-
-    def __init__(self):
-        self.stopped = False
-
-    def is_set(self):
-        return self.stopped
-
-    def wait(self, seconds):
-        self.stopped = True
-        return True
-
-
 class IdleDiscovery:
     def schedule_due(self, stopping):
         return None
@@ -166,11 +153,11 @@ def test_the_worker_backs_up_on_its_cycle_and_survives_a_failure(tmp_path, monke
     workspace = Workspace(tmp_path / "openings.sqlite")
     worker = Worker(workspace, IdleDiscovery())
     worker.prune_seconds = 10**9
-    worker._schedule_loop(OneCycle())
+    worker._schedule_loop(Lane())
     assert len(backups.scheduled(tmp_path / "backups")) == 1
     assert worker.heartbeat_age() is not None
     # Not due again: the next cycle leaves the one backup.
-    worker._schedule_loop(OneCycle())
+    worker._schedule_loop(Lane())
     assert len(backups.scheduled(tmp_path / "backups")) == 1
 
     def broken(*_):
@@ -179,7 +166,7 @@ def test_the_worker_backs_up_on_its_cycle_and_survives_a_failure(tmp_path, monke
     for item in (tmp_path / "backups").iterdir():
         item.unlink()
     monkeypatch.setattr(backups, "run_backup", broken)
-    worker._schedule_loop(OneCycle())
+    worker._schedule_loop(Lane())
     assert backups.last_attempt(workspace.db)["outcome"] == "failed"
 
 
