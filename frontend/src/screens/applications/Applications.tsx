@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ArrowDownUp,
   ChartNoAxesColumn,
-  Inbox,
   List as ListIcon,
   ListFilter,
   Search,
@@ -290,7 +289,7 @@ export default function ApplicationsScreen() {
       </EmptyState>
     ) : (
       <EmptyState
-        icon={Inbox}
+        icon={SearchX}
         title={`Nothing in ${
           STAGE_FILTERS.find((stage) => stage.id === filters.stage)!.label
         }`}
@@ -369,6 +368,7 @@ export default function ApplicationsScreen() {
           <IconButton
             icon={Search}
             label="Search applications"
+            tooltip="none"
             aria-pressed={searching}
             onClick={() => setSearching((value) => !value)}
           />
@@ -379,13 +379,19 @@ export default function ApplicationsScreen() {
             placement="bottom-end"
             items={filterMenu(filters, sources, set, true)}
             trigger={(props) => (
-              <IconButton {...props} icon={ListFilter} label="Filter" />
+              <IconButton
+                {...props}
+                icon={ListFilter}
+                label="Filter"
+                tooltip="none"
+              />
             )}
           />
         )}
         <IconButton
           icon={filters.stats ? ListIcon : ChartNoAxesColumn}
           label={filters.stats ? "Show the list" : "Show stats"}
+          tooltip="none"
           onClick={() => set({ stats: !filters.stats })}
         />
       </TopBarActions>

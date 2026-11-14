@@ -124,7 +124,13 @@ export function ApplicationRowView({
       title={job.title}
       sub={
         <>
-          {[job.company, job.location].filter(Boolean).join(" · ")}
+          {job.company}
+          {job.location && (
+            <span className="ap-sub-place">
+              {job.company ? " · " : ""}
+              {job.location}
+            </span>
+          )}
           <span className="ap-sub-status">
             {" · "}
             <ToneText tone={phrase.tone}>{phrase.text}</ToneText>

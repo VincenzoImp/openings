@@ -250,6 +250,9 @@
     .ap-sub-status {
       display: inline;
     }
+    .ap-sub-place {
+      display: none;
+    }
     .ap-body[data-view="stats"] {
       padding: var(--s-4) var(--s-4) var(--s-12);
     }
@@ -257,5 +260,28 @@
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: var(--s-5) var(--s-4);
     }
+  }
+}
+
+/* At rest the list shows content only: the active row (the Tab stop) shows
+   its fill and actions once the list has focus, or on hover. */
+@layer screens {
+  .ap-body .ui-list:not(:focus-within) .ui-row[data-selected]:not(:hover) {
+    background: var(--bg);
+  }
+  .ap-body .ui-list:not(:focus-within) .ui-row[data-selected]::before {
+    display: none;
+  }
+  .ap-body
+    .ui-list:not(:focus-within)
+    .ui-row[data-selected]:not(:hover)
+    .ui-row-actions {
+    display: none;
+  }
+  .ap-body
+    .ui-list:not(:focus-within)
+    .ui-row[data-selected]:not(:hover)
+    .ui-row-meta {
+    display: flex;
   }
 }

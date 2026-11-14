@@ -4,8 +4,8 @@ import {
   ExternalLink,
   MapPin,
   MoreHorizontal,
-  PartyPopper,
   SearchX,
+  Send,
 } from "lucide-react";
 import { TopBarActions, useTitle } from "../../shell/context";
 import { href, navigate, useRoute } from "../../shell/router";
@@ -76,13 +76,18 @@ function Header({
   const job = jobOf(app);
   const deadline = deadlinePhrase(app.deadline);
   const crumb = [job.title, job.company].filter(Boolean).join(" · ");
-  const more = (
+  const more = (tooltip: "below" | "none") => (
     <Menu
       label="Application actions"
       placement="bottom-end"
       items={menu}
       trigger={(props) => (
-        <IconButton {...props} icon={MoreHorizontal} label="More actions" />
+        <IconButton
+          {...props}
+          icon={MoreHorizontal}
+          label="More actions"
+          tooltip={tooltip}
+        />
       )}
     />
   );
@@ -134,7 +139,7 @@ function Header({
       <div className="apg-actions">
         {actions}
         {posting}
-        {more}
+        {more("below")}
       </div>
       <TopBarActions>
         {job.url && (
@@ -149,7 +154,7 @@ function Header({
             <Icon icon={ExternalLink} />
           </a>
         )}
-        {more}
+        {more("none")}
       </TopBarActions>
     </div>
   );
@@ -226,9 +231,8 @@ function menuOf(
 function Loading() {
   return (
     <div className="apg" role="status" aria-label="Loading the application">
+      <PageHeader title="Application" />
       <div className="apg-head apg-skeleton">
-        <Skeleton width={180} height={12} />
-        <Skeleton width={320} height={22} />
         <Skeleton width={260} height={12} />
       </div>
       <div className="apg-panes-skeleton">
@@ -239,7 +243,6 @@ function Loading() {
           </div>
         ))}
       </div>
-      <h1 className="ui-sr">Application</h1>
     </div>
   );
 }
@@ -250,9 +253,9 @@ function AllSent({ sentId }: { sentId: string }) {
   useTitle("All sent");
   return (
     <div className="apg apg-done">
-      <h1 className="ui-sr">All sent</h1>
+      <PageHeader title="All sent" />
       <EmptyState
-        icon={PartyPopper}
+        icon={Send}
         title={`All sent${sent ? ` — ${sent} application${sent === 1 ? "" : "s"} today` : ""}`}
         actions={
           <>

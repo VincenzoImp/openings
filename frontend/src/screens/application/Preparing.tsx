@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { Check, Circle, ListChecks, Minus, Upload } from "lucide-react";
+import { Check, Circle, Minus, Upload } from "lucide-react";
 import { Button } from "../../ui/Button";
 import { Icon } from "../../ui/Icon";
 import { ActionBar } from "../../ui/Split";
@@ -58,7 +58,7 @@ export function Preparing({ context }: { context: PageContext }) {
         Upload {first === "cv" ? "CV" : "letter"}
       </Button>
     ) : first === "requirement" ? (
-      <Button variant="primary" icon={ListChecks} onClick={resolve}>
+      <Button variant="primary" onClick={resolve}>
         Resolve requirements
       </Button>
     ) : null;
@@ -102,9 +102,9 @@ export function Preparing({ context }: { context: PageContext }) {
             </Section>
           </div>
           {(app.questions ?? []).length > 0 && (
-            <div className="ap-section">
+            <Section id="answers" title="Form answers">
               <Answers app={app} />
-            </div>
+            </Section>
           )}
           <Fold title="Notes and history">
             <PinnedNote app={app} />
