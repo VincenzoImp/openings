@@ -17,6 +17,7 @@ from . import __version__
 from .actors import SYSTEM, acting_as, batch
 from .auth import Auth, LoginGuard
 from .career import CareerService
+from .context import ContextService
 from .discovery import DiscoveryService
 from .documents import DocumentService
 from .errors import DomainError
@@ -24,7 +25,7 @@ from .events import EventLog
 from .interfaces import bind_mcp, bind_rest, register_prompts, register_transport
 from .interfaces.operation import request_origin
 from .limits import REQUEST_LIMIT, BodyLimit
-from .mcp_server import OpeningsMCP
+from .mcp_server import INSTRUCTIONS, OpeningsMCP
 from .openapi import build as build_openapi, errors
 from .preferences import PreferencesService
 from .skills import SkillLibrary
@@ -68,12 +69,15 @@ def create_app(database=None, start_worker=True):
         origins.append(public_url)
     # Tools, prompts and resources never change at runtime, so no notification
     # stream is offered: every exchange stays one request and one JSON response.
-    mcp = OpeningsMCP("Openings", version=__version__, subscriptions=False)
+    mcp = OpeningsMCP(
+        "Openings", version=__version__, instructions=INSTRUCTIONS, subscriptions=False
+    )
     skills = SkillLibrary()
     # Operations receive the workspace with its services (interfaces/operation.py).
     workspace.auth, workspace.career, workspace.documents = auth, career, documents
     workspace.events, workspace.preferences, workspace.stats = events, preferences, stats
     workspace.skills = skills
+    workspace.context = ContextService(workspace)
     bind_mcp(mcp, workspace)
     register_prompts(mcp, skills)
 

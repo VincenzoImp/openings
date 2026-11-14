@@ -104,21 +104,21 @@ class EventQuery(SubjectRef):
     actor: str | None = Field(
         default=None,
         max_length=200,
-        description="Only changes by owner, agent (any agent token), agent:<token name>, system or unknown (before 0.17).",
+        description="owner, agent, agent:<token name>, system or unknown.",
     )
     batch_id: str | None = Field(
         default=None,
         max_length=100,
-        description="Only the changes of one REST request or MCP tool call (b_...), or of one agent run before 0.24 (run:...).",
+        description="The changes of one call (b_...) or of an agent run before 0.24 (run:...).",
     )
     include_system: bool = Field(
         default=False,
-        description="Also list changes by the system (collection, worker, upgrade); they are left out unless actor=system.",
+        description="Also the system's changes (left out unless actor=system).",
     )
     subject_types: list[Annotated[str, Field(min_length=1, max_length=50)]] | None = Field(
         default=None,
         max_length=20,
-        description="Changes to any of these kinds of record, for example document and file.",
+        description="Changes to these kinds of record, such as document and file.",
     )
     job_id: str | None = Field(default=None, max_length=100)
     application_id: str | None = Field(default=None, max_length=100)
@@ -131,8 +131,8 @@ class EventQuery(SubjectRef):
 
 # Current names of changed records, by subject type; deleted records have none.
 _SUBJECT_LABELS = {
-    "knowledge": "SELECT id,title,organization FROM knowledge WHERE id IN ({})",
-    "claim": "SELECT c.id,k.title,k.organization FROM claims c JOIN knowledge k ON k.id=c.knowledge_id WHERE c.id IN ({})",
+    "career": "SELECT id,title,organization FROM knowledge WHERE id IN ({})",
+    "highlight": "SELECT c.id,k.title,k.organization FROM claims c JOIN knowledge k ON k.id=c.knowledge_id WHERE c.id IN ({})",
     "template": "SELECT id,name,'' FROM templates WHERE id IN ({})",
     "source": "SELECT id,name,'' FROM sources WHERE id IN ({})",
     "response": "SELECT r.id,j.title,j.company FROM responses r JOIN applications a ON a.id=r.application_id JOIN jobs j ON j.id=a.job_id WHERE r.id IN ({})",
