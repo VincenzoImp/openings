@@ -80,10 +80,10 @@ test("Account: theme, setup guide, sign out and a checked password", async ({
     });
   });
   await go(page, "settings?section=account");
-  const theme = page.getByRole("radiogroup", { name: "Theme" });
-  await theme.getByRole("radio", { name: "Dark" }).click();
+  const theme = page.getByRole("combobox", { name: "Theme" });
+  await theme.selectOption("dark");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-  await theme.getByRole("radio", { name: "Light" }).click();
+  await theme.selectOption("light");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await expect(
     page.getByRole("link", { name: "Open setup guide" }),
@@ -166,7 +166,7 @@ test("API & agents: three steps, an Agent token by default, copy, revoke", async
   await expect(snippet).toContainText(
     "claude mcp add --transport http openings",
   );
-  await page.getByRole("radio", { name: "Codex" }).click();
+  await page.getByRole("combobox", { name: "Agent" }).selectOption("codex");
   await expect(snippet).toContainText("bearer_token_env_var");
   await page.getByRole("button", { name: "Copy mcp configuration" }).click();
   await expect(toast(page)).toContainText("Configuration copied");

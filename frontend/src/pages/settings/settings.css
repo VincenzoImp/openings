@@ -270,8 +270,17 @@
     gap: var(--s-3);
     min-width: 0;
   }
-  .set-connect > .ui-segmented {
+  .set-select {
     align-self: flex-start;
+    width: auto;
+  }
+  .set-select .ui-input {
+    width: auto;
+    padding-right: 30px;
+  }
+  .set-choice input {
+    margin: 2px 0 0;
+    accent-color: var(--accent);
   }
   .set-code {
     font: 12px/16px var(--mono);
@@ -360,34 +369,6 @@
     font: var(--t-xs);
     letter-spacing: 0;
   }
-  .set-radio {
-    appearance: none;
-    flex: none;
-    position: relative;
-    width: 16px;
-    height: 16px;
-    margin: 1px 0 0;
-    border: 1px solid var(--control);
-    border-radius: 50%;
-    background: var(--bg);
-    cursor: pointer;
-  }
-  .set-radio:checked {
-    border-color: var(--accent);
-    background: var(--accent);
-  }
-  .set-radio:checked::after {
-    content: "";
-    position: absolute;
-    inset: 4px;
-    border-radius: 50%;
-    background: var(--on-accent);
-  }
-  .set-radio:focus-visible {
-    outline: none;
-    box-shadow: var(--focus-ring);
-  }
-
   /* Restore */
   .set-restore {
     display: flex;
@@ -483,8 +464,28 @@
     background: var(--warning);
   }
 
+  .set-body,
+  .set-group {
+    min-width: 0;
+  }
+  /* A narrow window: the sections in a row above the section. */
+  @container app (min-width: 720px) and (max-width: 959px) {
+    .set {
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--s-4);
+    }
+    .set-nav ul {
+      position: static;
+      flex-flow: row wrap;
+    }
+  }
+
   /* A phone: the sections are a list; a picked one is its own page. */
   @container app (max-width: 719px) {
+    /* The phone's top bar carries the title. */
+    .set-screen > .ui-page-header {
+      display: none;
+    }
     .set {
       grid-template-columns: minmax(0, 1fr);
       gap: 0;
