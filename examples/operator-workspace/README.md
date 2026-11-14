@@ -4,7 +4,7 @@ A small directory from which your AI agent runs your Openings job search. Copy
 it, point it at your server, start your agent here, and let it work: it reads
 the skills from your Openings server, onboards your career and keeps the search
 going. You answer its questions in the chat, apply to the applications it makes Ready, and mark them
-Applied or close them. See [Agent-operated job search](../../docs/user/agent-operated.md).
+Applied or close them. See [Work with an agent](../../docs/user/agents.md). This template is optional.
 
 ## Set up
 
@@ -42,7 +42,7 @@ Preferences in your words, builds your CV and letter templates, adds searches
 and companies to follow, and prepares a first application so you can see the
 result.
 
-Afterwards, ask in plain language: "empty my inbox", "prepare CV and letter
+Afterwards, ask in plain language: "go through my new jobs", "prepare CV and letter
 for every shortlisted job", "Northstar Labs replied", "update my profile from
 this CV", "follow these companies". Tell the agent how you want it to work
 under Preferences › Working with me in Openings; it reads that at the start of
