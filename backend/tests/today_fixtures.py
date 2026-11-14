@@ -67,7 +67,9 @@ def seed_today(app, client, before_agent):
                 )
 
     def last_batch():
-        return workspace.db.one("SELECT batch_id FROM events ORDER BY created_at DESC LIMIT 1")[0]
+        return workspace.db.one("SELECT batch_id FROM events ORDER BY created_at DESC LIMIT 1")[
+            "batch_id"
+        ]
 
     today = datetime.now().date()  # deadlines are the owner's calendar days
     day = lambda offset: (today + timedelta(days=offset)).isoformat()
