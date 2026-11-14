@@ -474,7 +474,8 @@
     grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
     gap: var(--s-2);
-    padding: env(safe-area-inset-top) var(--s-2) 0;
+    padding: calc(var(--s-1-5) + env(safe-area-inset-top)) var(--s-2)
+      var(--s-1-5);
     border-bottom: 1px solid var(--border);
   }
   .pf-sheet-head h2 {
@@ -574,6 +575,10 @@
   }
 
   @container app (max-width: 719px) {
+    /* The phone's top bar carries the title. */
+    .pf > .ui-page-header {
+      display: none;
+    }
     .pf-block-actions,
     .pf-block .pf-entry-dates {
       opacity: 1 !important;
