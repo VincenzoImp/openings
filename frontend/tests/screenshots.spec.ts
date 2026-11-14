@@ -13,10 +13,10 @@ type Screen = {
   name: string;
   /** The hash route, or a function of the seeded workspace that returns it. */
   route: string | ((page: Page) => Promise<string>);
+  /** Answer the screen's reads before it opens (a state the seed lacks). */
+  prepare?: (page: Page) => Promise<void>;
   /** Make the state to capture once the screen is shown. */
   open?: (page: Page) => Promise<void>;
-  /** Before the screen opens, such as a route that answers for the server. */
-  before?: (page: Page) => Promise<void>;
   /** The file name under docs/images, for an image the docs embed. */
   docs?: string;
   signedOut?: boolean;
@@ -62,11 +62,11 @@ const failingSources = async (page: Page) =>
   );
 const SOURCES_AND_SETTINGS: Screen[] = [
   { name: "sources", route: "sources", docs: "collection" },
-  { name: "sources-states", route: "sources", before: failingSources },
+  { name: "sources-states", route: "sources", prepare: failingSources },
   {
     name: "sources-empty",
     route: "sources",
-    before: (page) =>
+    prepare: (page) =>
       page.route(
         (url) => url.pathname === "/api/v1/sources",
         (route) =>
@@ -88,7 +88,7 @@ const SOURCES_AND_SETTINGS: Screen[] = [
   {
     name: "sources-editor-test",
     route: "sources",
-    before: (page) =>
+    prepare: (page) =>
       page.route("**/api/v1/sources/preview", (route) =>
         route.fulfill({
           json: {
@@ -155,14 +155,60 @@ const SOURCES_AND_SETTINGS: Screen[] = [
   },
   { name: "settings-advanced", route: "settings?section=advanced" },
 ];
+/** Today with nothing to do: no Ready, attention or waiting rows. */
+async function caughtUp(page: Page) {
+  await page.route(/\/api\/v1\/applications\?/, async (route) => {
+    const response = await route.fetch();
+    const body = await response.json();
+    return route.fulfill({ response, json: { ...body, items: [], total: 0 } });
+  });
+}
+
+/** A new workspace: no name, preferences, jobs, sources, CV or applications. */
+async function emptyWorkspace(page: Page) {
+  const empty = { items: [], total: 0, limit: 1, offset: 0, stage_counts: {} };
+  await page.route(
+    /\/api\/v1\/(applications|jobs|sources|templates|career\/(knowledge|claims))\?/,
+    (route) => route.fulfill({ json: empty }),
+  );
+  const change: Record<string, (body: any) => unknown> = {
+    "career/profile": (body) => ({ ...body, name: "" }),
+    preferences: (body) => ({
+      ...body,
+      sections: body.sections.map((section: object) => ({
+        ...section,
+        items: [],
+      })),
+    }),
+    "workspace/context": (body) => ({
+      ...body,
+      profile: { ...body.profile, name: "" },
+      preferences: {},
+      career: [],
+      templates: [],
+      counts: { ...body.counts, jobs: 0, sources: 0 },
+    }),
+  };
+  for (const [path, edit] of Object.entries(change))
+    await page.route(`**/api/v1/${path}`, async (route) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      const response = await route.fetch();
+      return route.fulfill({ response, json: edit(await response.json()) });
+    });
+}
 
 const first = async (page: Page, path: string) =>
   (await call(page, path)).items[0].id as string;
 
 const SCREENS: Screen[] = [
   { name: "sign-in", route: "today", signedOut: true },
-  { name: "setup", route: "setup?step=record", docs: "setup" },
+  { name: "setup", route: "setup", docs: "setup" },
+  { name: "setup-jobs", route: "setup?step=jobs" },
+  { name: "setup-cv", route: "setup?step=cv" },
+  { name: "setup-done", route: "setup?step=done" },
   { name: "today", route: "today", docs: "today" },
+  { name: "today-caught-up", route: "today", prepare: caughtUp },
+  { name: "today-empty", route: "today", prepare: emptyWorkspace },
   {
     name: "palette",
     route: "today",
@@ -228,11 +274,11 @@ const THEMES = ["light", "dark"] as const;
 
 async function capture(page: Page, screen: Screen, path: string) {
   if (!screen.signedOut) await page.context().addCookies(ownerSession());
-  await screen.before?.(page);
   // Open a page of the app first, so a route can read the workspace.
   await page.goto("/");
   const route =
     typeof screen.route === "string" ? screen.route : await screen.route(page);
+  await screen.prepare?.(page);
   if (screen.signedOut)
     await expect(page.locator("input[name=password]")).toBeVisible();
   else await go(page, route);

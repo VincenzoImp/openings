@@ -196,8 +196,10 @@ class ContextService:
 
     def _counts(self, conn):
         jobs = conn.execute(
-            "SELECT coalesce(sum(triage='new'),0),coalesce(sum(triage='shortlisted'),0) FROM jobs"
+            "SELECT coalesce(sum(triage='new'),0),coalesce(sum(triage='shortlisted'),0),"
+            "count(*) FROM jobs"
         ).fetchone()
+        sources = conn.execute("SELECT count(*) FROM sources").fetchone()[0]
         stages = self.workspace.list_applications(limit=1)
         failing = conn.execute(
             "SELECT count(*) FROM sources s WHERE (SELECT t.state FROM tasks t WHERE "
@@ -219,6 +221,9 @@ class ContextService:
             "offer": counts["offer"],
             "reply_overdue": stages["no_reply"]["overdue"],
             "sources_failing": failing,
+            # Setup facts: a job or a source exists.
+            "jobs": jobs[2],
+            "sources": sources,
         }
 
     @staticmethod

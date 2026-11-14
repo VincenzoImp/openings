@@ -40,8 +40,9 @@ const SCREENS = [
   "settings?section=data",
   "settings?section=advanced",
   "setup",
-  "setup?step=record",
-  "setup?step=next",
+  "setup?step=jobs",
+  "setup?step=cv",
+  "setup?step=done",
 ];
 
 const cookies: Cookies = ownerSession();
@@ -153,26 +154,21 @@ for (const theme of ["light", "dark"]) {
         expect(await findings(page, screen)).toEqual([]);
       });
 
-    test("the setup guide with its forms open has no serious accessibility finding", async ({
+    test("Today's reply form and a focused row with its actions have no serious accessibility finding", async ({
       page,
     }) => {
       await page.context().addCookies(cookies);
-      await go(page, "setup?step=record");
+      await go(page, "today");
       await settled(page);
-      const record = page.getByRole("list", { name: "Your record" });
-      for (const [button, key] of [
-        [/the profile$/, "setup-profile"],
-        [/the preferences$/, "setup-preferences"],
-        [/^Add a search$/, "setup-search"],
-      ] as const) {
-        await record.getByRole("button", { name: button }).click();
-        await expect(record.locator(".inline-form")).toBeVisible();
-        await settled(page);
-        expect(await findings(page, key)).toEqual([]);
-        await record
-          .getByRole("button", { name: /^Close/, expanded: true })
-          .click();
-      }
+      const waiting = page
+        .getByRole("region", { name: "Applications waiting for a reply" })
+        .getByRole("link")
+        .first();
+      await waiting.focus();
+      expect(await findings(page, "today-row")).toEqual([]);
+      await page.keyboard.press("r");
+      await expect(page.locator("dialog[open]")).toBeVisible();
+      expect(await findings(page, "today-reply")).toEqual([]);
     });
 
     test("a job with its details, the dismissed job, the dialogs and the selection have no serious accessibility finding", async ({
