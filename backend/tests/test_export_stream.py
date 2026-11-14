@@ -150,7 +150,18 @@ async def test_export_preserves_nullable_career_dates_and_scoped_mcp_download(ap
             "pdf": {"name": "cv.pdf", "size": 1},
         }
     )
+    source = client.post(
+        "/api/v1/sources",
+        json={
+            "name": "Synthetic API source",
+            "kind": "jobspy",
+            "config": {"query": "engineer", "providers": ["linkedin"]},
+        },
+    )
+    assert source.status_code == 201
     archive = client.get("/api/v1/export").json()
+    assert archive["sources"][0]["config"]["query"] == "engineer"
+    assert all(isinstance(provider["policy"], dict) for provider in archive["providers"])
     # The owner's export grant (workspace_export, owner only).
     ticket = grant(app.state.workspace, "export")
     client.cookies.clear()
