@@ -339,7 +339,15 @@ def test_a_backup_keeps_exact_files_and_a_restore_keeps_provider_requests(worksp
             ),
         ),
     )
+    # The installation's tokens stay as they are, with their last context read.
+    token = ("t1", "Agent", "synthetic-hash", now(), "agent", "2026-01-02T03:04:05Z")
+    workspace.db.execute(
+        "INSERT INTO api_tokens(id,name,token_hash,created_at,kind,context_read_at) "
+        "VALUES(?,?,?,?,?,?)",
+        token,
+    )
     restore_database(workspace, tmp_path / "before-requests.sqlite")
+    assert workspace.db.one("SELECT * FROM api_tokens")["context_read_at"] == token[-1]
     restored = discovery.providers.get("linkedin")
     assert restored["runtime"]["cooldown_until"] == deadline
     assert restored["runtime"]["requests_day"] == 1

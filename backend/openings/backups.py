@@ -8,9 +8,10 @@ is 24 hours old (or there is none), ``run_backup`` writes
 ``OPENINGS_BACKUP_KEEP`` (default 3; ``0`` disables scheduled backups). Without
 1.2 times the database size free on that volume the run is skipped with a
 warning. The time, outcome and error of the last attempt are stored in the
-``backup`` setting.
+``backup`` setting; after a failed or skipped attempt the next one waits
+``RETRY_HOURS``.
 
-The copies ``db.Database.copy_before_upgrade`` keeps beside the workspace are
+The copies an upgrade keeps beside the workspace (``<name>.pre-*.sqlite``) are
 listed here too: the owner can download them and delete one deliberately.
 Every copy holds the whole workspace, including the password hash, the session
 secret and token hashes, so only the owner reaches them (REST, never MCP).
@@ -33,6 +34,7 @@ LOG = logging.getLogger(__name__)
 SETTING = "backup"
 DEFAULT_KEEP = 3
 INTERVAL_HOURS = 24
+RETRY_HOURS = 1
 ROOM_FACTOR = 1.2
 NAME = re.compile(r"openings-(\d{8}T\d{6}Z)\.sqlite")
 STAMP = "%Y%m%dT%H%M%SZ"
@@ -153,8 +155,13 @@ def due(db, moment=None):
     keep = backup_keep()
     if keep == 0:
         return False
-    newest = scheduled(backup_dir(db))
     moment = moment or datetime.now(UTC)
+    last = last_attempt(db)
+    if last and last.get("outcome") != "ok":
+        tried = datetime.fromisoformat(last["attempted_at"])
+        if (moment - tried).total_seconds() < RETRY_HOURS * 3600:
+            return False
+    newest = scheduled(backup_dir(db))
     return not newest or (moment - newest[0][0]).total_seconds() >= INTERVAL_HOURS * 3600
 
 

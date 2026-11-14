@@ -1,5 +1,6 @@
 """Complete collection workflows across saved settings, resumable tasks."""
 
+import json
 from datetime import UTC, datetime
 
 import pytest
@@ -113,6 +114,51 @@ def test_frozen_options_resume_with_cumulative_unique_observations(collection, m
     assert service.list_runs(state="succeeded")["total"] == 1
 
 
+def test_a_long_collection_writes_its_observations_in_steps(collection, monkeypatch):
+    workspace, service = collection
+    source = make_source(service)
+    queued = service.queue_collection(source["id"])
+    writes, seen = [], {}
+    execute = workspace.db.execute
+
+    def counted(sql, params=()):
+        if sql.startswith("UPDATE tasks SET payload="):
+            writes.append(len(json.loads(params[0]).get("observed_identities", [])))
+        return execute(sql, params)
+
+    def collect(source):
+        source["streamed"] = True
+        for number in range(60):
+            source["on_item"](
+                {
+                    "title": f"Engineer {number}",
+                    "company": "Example",
+                    "url": f"https://example.org/jobs/{number}",
+                    "source_key": f"greenhouse:example:{number}",
+                    "posting": f"Build reliable APIs, number {number}.",
+                }
+            )
+        seen.update(
+            known="known_postings" in source,
+            text=source["known_posting"]("greenhouse:example:7"),
+            missing=source["known_posting"]("greenhouse:example:999"),
+        )
+        return []
+
+    monkeypatch.setattr(workspace.db, "execute", counted)
+    patch_discovery(monkeypatch, "fetch_postings", collect)
+    first = run_next(service)
+    assert first["result"]["received"] == first["result"]["created"] == 60
+    # Every 25 postings and once at the end, not once per posting.
+    assert writes == [25, 50, 60]
+    stored = service.get_task(queued["id"], include_checkpoint=True)
+    assert len(stored["payload"]["observed_identities"]) == 60
+    # A later run reads the archived text of a known posting only when asked.
+    service.queue_collection(source["id"])
+    run_next(service)
+    assert seen == {"known": False, "text": "Build reliable APIs, number 7.", "missing": ""}
+
+
 def test_bulk_configuration_and_filter_patches_preserve_untouched_fields(collection):
     _, service = collection
     source = make_source(service)
@@ -201,6 +247,43 @@ def test_a_stored_search_without_its_query_is_refused_not_a_server_error(collect
     with pytest.raises(DomainError, match="saved search configuration is invalid"):
         service.queue_collection(source["id"], expected_version=source["version"])
     assert service.list_runs()["total"] == 0
+
+
+def test_a_source_that_no_longer_validates_is_reported_and_the_others_still_run(collection):
+    workspace, service = collection
+    broken = service.create_source(
+        SourceCreate(
+            name="Example search",
+            kind="jobspy",
+            enabled=True,
+            config={"query": "data", "providers": ["linkedin"]},
+        )
+    )
+    feed = make_source(service, enabled=True)
+    old = "2000-01-01T00:00:00+00:00"
+    with workspace.db.transaction() as connection:
+        connection.execute(
+            "UPDATE sources SET config=? WHERE id=?",
+            (encode({"providers": ["linkedin"]}), broken["id"]),
+        )
+        connection.execute("UPDATE sources SET last_scheduled_at=?", (old,))
+    service.schedule_due()
+    assert [run["source_id"] for run in service.list_runs()["items"]] == [feed["id"]]
+    reported = service.get_source(broken["id"])
+    assert "saved search configuration is invalid" in reported["last_error"]
+    # It waits for its next slot instead of failing every scheduler cycle.
+    assert reported["last_scheduled_at"] > old
+
+
+def test_a_stored_empty_schedule_is_the_default_interval(collection):
+    workspace, service = collection
+    source = make_source(service)
+    workspace.db.execute("UPDATE sources SET schedule='{}' WHERE id=?", (source["id"],))
+    stored = service.get_source(source["id"])
+    renamed = service.update_source(
+        source["id"], SourcePatch(name="Renamed board", expected_version=stored["version"])
+    )
+    assert renamed["schedule"] == {"kind": "interval", "minutes": 1440}
 
 
 def test_pause_and_delete_preserve_run_history(collection, monkeypatch):

@@ -12,7 +12,7 @@ from pathlib import Path
 from . import events
 from .common import encode, now
 from .compaction import compact
-from .db import SCHEMA_VERSION, schema_error, utc_stamp
+from .db import SCHEMA_VERSION, file_bytes, schema_error, utc_stamp
 from .errors import DomainError
 from .migrations import CONVERSIONS, UpgradeError, m15
 from .retention import KEPT_RUNS_PER_SOURCE, retention_days
@@ -20,21 +20,6 @@ from .retention import KEPT_RUNS_PER_SOURCE, retention_days
 # Slack for sidecar files and for an upgraded copy slightly larger than its upload.
 RESTORE_MARGIN = 64 * 1024**2
 MIB = 1024**2
-
-
-def database_bytes(db):
-    """Bytes the workspace takes on the data volume: the file and its write-ahead log.
-
-    The log can disappear between two calls when the last connection closes, so a
-    missing file counts as zero bytes instead of failing the read.
-    """
-    total = 0
-    for path in (db.path, Path(str(db.path) + "-wal")):
-        try:
-            total += path.stat().st_size
-        except FileNotFoundError:
-            pass
-    return total
 
 
 def replace_room(source, database):
@@ -71,7 +56,7 @@ def configured_restore_limit():
 
 def storage_status(db):
     """Database size, free space on its volume, the restore limit and retention."""
-    size, free = database_bytes(db), shutil.disk_usage(db.path.parent).free
+    size, free = file_bytes(db.path), shutil.disk_usage(db.path.parent).free
     configured = configured_restore_limit()
     derived = restore_limit(free, size)
     return {
@@ -237,20 +222,13 @@ def _restore_current(workspace, source_path):
                                 "INSERT OR REPLACE INTO settings(key,data,version,updated_at) VALUES(?,?,?,?)",
                                 (auth["key"], auth["data"], auth["version"], auth["updated_at"]),
                             )
-                        target.executemany(
-                            "INSERT INTO api_tokens(id,name,kind,token_hash,created_at,last_used_at) VALUES(?,?,?,?,?,?)",
-                            [
-                                (
-                                    t["id"],
-                                    t["name"],
-                                    t["kind"],
-                                    t["token_hash"],
-                                    t["created_at"],
-                                    t["last_used_at"],
-                                )
-                                for t in tokens
-                            ],
-                        )
+                        if tokens:
+                            columns = list(tokens[0])
+                            target.executemany(
+                                f"INSERT INTO api_tokens({','.join(columns)}) "
+                                f"VALUES({','.join('?' for _ in columns)})",
+                                [tuple(token[key] for key in columns) for token in tokens],
+                            )
                         for provider in providers:
                             restored = target.execute(
                                 "SELECT runtime FROM providers WHERE id=?", (provider["id"],)

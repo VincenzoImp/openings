@@ -179,6 +179,28 @@ def test_closing_never_changes_triage_and_a_closed_application_is_kept(workspace
     assert dismissed["application"]["id"] == application["id"]
 
 
+def test_reopening_a_closed_application_follows_the_rules_of_a_start(workspace):
+    job = add(workspace)
+    job = workspace.set_triage(job["id"], "shortlisted", job["version"])
+    application = workspace.update_application(
+        job["application"]["id"],
+        {
+            "expected_version": workspace.get_application(job["application"]["id"])["version"],
+            "status": "closed",
+            "outcome": "not_pursued",
+        },
+    )
+    job = workspace.set_triage(job["id"], "dismissed", workspace.get_job(job["id"])["version"])
+    reopen = {"expected_version": application["version"], "status": "shortlisted"}
+    with pytest.raises(DomainError, match="Restore the dismissed job"):
+        workspace.update_application(application["id"], reopen)
+    assert workspace.get_application(application["id"])["status"] == "closed"
+    # Restored to New, reopening shortlists the job again.
+    workspace.set_triage(job["id"], "new", workspace.get_job(job["id"])["version"])
+    workspace.update_application(application["id"], reopen)
+    assert workspace.get_job(job["id"])["triage"] == "shortlisted"
+
+
 def test_merging_two_shortlisted_jobs_keeps_the_application_with_work(workspace):
     first, second = add(workspace, "First"), add(workspace, "Second")
     first = workspace.set_triage(first["id"], "shortlisted", first["version"])
