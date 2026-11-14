@@ -19,7 +19,7 @@ from ..db import SCHEMA_VERSION
 from ..errors import DomainError
 from ..operations import backup_file_for, restore_upload
 from ..removed import ROUTES
-from ..skills import read_skill
+from ..skills import SKILL_FILE, read_skill
 from ..transfers import RecordsResponse, export_records
 from .operation import API_PREFIX, capability_entries
 from .system import PasswordInput
@@ -224,11 +224,32 @@ def _gone(item):
 
 
 def register_prompts(mcp, library):
-    """One MCP prompt per shipped skill: the skill's instructions."""
+    """Each shipped skill as an MCP prompt (its instructions) and as resources.
+
+    The resources are ``openings://skills/<name>`` for ``SKILL.md`` and
+    ``openings://skills/<name>/<path>`` for a reference file, for clients that load
+    resources instead of calling skills_get.
+    """
     for item in library.list():
-        mcp.prompt(name=item["name"], description=item["description"][:1024])(
-            _prompt(library, item["name"])
-        )
+        name = item["name"]
+        mcp.prompt(name=name, description=item["description"][:1024])(_prompt(library, name))
+        for path in item["files"]:
+            uri = f"openings://skills/{name}" + ("" if path == SKILL_FILE else f"/{path}")
+            mcp.resource(
+                uri,
+                name=name if path == SKILL_FILE else f"{name}/{path}",
+                description=item["summary"] if path == SKILL_FILE else None,
+                mime_type="text/markdown",
+            )(_resource(library, name, path))
+
+
+def _resource(library, name, path):
+    """A skill file, read when a client asks, so it always matches the shipped text."""
+
+    def content() -> str:
+        return read_skill(library, name, path)["content"]
+
+    return content
 
 
 def _prompt(library, name):

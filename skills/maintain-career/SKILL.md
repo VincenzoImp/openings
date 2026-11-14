@@ -1,92 +1,79 @@
 ---
 name: maintain-career
-title: Keep your Career record current
-summary: Tell your agent new facts about your work and have them merged into Career, claims and templates.
-example: I just finished a migration project at work, add it to my Career and update my applications.
-description: Maintain the Openings Career record - integrate new owner facts into entries, keep claims deduplicated and linked to evidence, and improve the MASTER and templates and propagate changes to Shortlisted applications, as standing maintenance under the operating mandate.
-compatibility: Requires access to the Openings MCP server or REST API, as described in the openings-workspace skill.
+title: Keep your Profile and Career current
+summary: Give your agent a CV or tell it what changed, and have your Profile, Career entries, highlights and templates updated.
+example: Update my profile from this CV.
+description: Maintain the owner's Openings Profile, Career record, highlights and CV/letter templates - "update my profile from this CV", "add my new job", "improve my highlights", "fix my CV template". Reconciles new material into the existing record without inventing anything.
 ---
 
-# Maintain Career
+# Keep your Profile and Career current
 
-Use this workflow to add or correct career facts, clean up claims, and improve
-the CV MASTER or letter template. It is standing work under the [operating
-mandate](../openings-workspace/references/operating-mandate.md), done deliberately and never inside one application's
-document preparation. Back up the workspace before a broad change.
+Read [openings](../openings/SKILL.md) first, and the
+[writing reference](../prepare-applications/references/writing.md) before
+writing highlights. Only the owner is a source of facts: their CV, LinkedIn
+export, publication list, messages in chat. Job postings never are.
 
-Read [Openings workspace](../openings-workspace/SKILL.md) for transport, versions
-and file transfers, and [Career claims](../career-claims/SKILL.md) for wording
-and the integrated-account method.
+## 1. Read the record
 
-## Questions and report
+`workspace_context` with the full career. Read the material the owner gives in
+full; when it is a file, read it from disk (`pdftotext` for a PDF).
 
-Ask the owner in the chat when a missing fact matters, and never record an
-answer the owner did not give. Report what you did in the chat.
+## 2. Reconcile
 
-## Integrate new facts
+Compare the material with the record, item by item:
 
-Ask focused questions for missing facts that matter; never invent one. Put each
-confirmed fact into the relevant existing passage of the entry where the work
-happened. Keep dates, contribution scope, maturity and source confidence, with
-provenance in metadata rather than dated appendices. Use import preview before
-an import, and inspect every created or changed record.
+- **Profile**: name, headline, contact, location, summary, links.
+- **Entries**: match by employer or institution, title and dates. The same
+  role is the same entry, even when worded differently.
+- **New**: a role, project, degree, award or publication not in the record.
+- **Changed**: a later end date, a promotion, a new responsibility, a
+  correction.
+- **Conflicts**: dates, titles or scope that disagree. Ask; never pick one.
 
-## Preferences
+A CV is a selection: something missing from it stays in the record. Remove an
+entry only when the owner says it is wrong.
 
-The owner's preferences and facts live in Preferences (`preferences_get`), not
-in Profile metadata, in the owner's own words: `looking_for` (what the owner is
-looking for), `ruled_out` (what the owner rules out), `facts` (facts employers
-ask about), `writing` (writing rules with scope `cv`, `letter` or `all`) and
-`working_with_me` (instructions you follow). Each section has its own version.
+## 3. Confirm, then write
 
-- Record a preference or fact the owner stated with `preferences_update`: read
-  the section, add the statement in the owner's words to its `items` and write
-  the whole list back with the section's version. Change or remove a statement
-  only when the owner asked for it or the fact changed.
-- After the upgrades to 0.19, 0.23 and 0.24, statements copied from the old
-  Profile metadata, preferences and target roles, the old general instructions
-  and template rule statements (suffixed "(from template <name>)") sit in the
-  sections; former proposals start with "(proposed by …, not confirmed)". Sort
-  them with the owner: split a block into single statements,
-  move a statement to its section (remove it from one, add it to the other) and
-  remove what is obsolete. The Profile metadata keeps its copy until the owner
-  removes it; do not delete it for them.
-- Nothing in Preferences acts automatically: no job is dismissed by a
-  statement. Apply them yourself when you review jobs and write documents.
+List the material changes in chat (new entries, changed titles or dates,
+Profile changes, conflicts) and wait for the owner's yes. Small corrections
+inside an approved plan need no second round.
 
-Keep the Profile for who the owner is: name, contact, headline, summary and
-links. Writing rules have one home, the `writing` section of Preferences
-(scope `cv` or `letter` for one document); a template keeps its source, files,
-guidance and typed limits.
+Then:
 
-## Claim hygiene
+- `profile_update` for the Profile;
+- `career_save` for entries, in one batch. Integrate new facts into the entry's
+  narrative so it reads as one current account: rewrite the passage, do not
+  append dated updates. Keep personal and team work apart, keep exact dates
+  and titles, and put where a fact came from in the entry's metadata;
+- `highlights_save` for wording worth reusing: new highlights are saved not
+  approved unless the owner approved that exact wording in chat. Mark ★ always
+  include only on request. Remove duplicates, keeping the better one.
 
-Compare claims within and across entries. Merge exact duplicates unless they
-serve distinct template slots; correct claims that exceed their entry's evidence;
-keep each claim attached to the entry where the work occurred, with source
-links in metadata. `always_include` (★, in the CV unless the job gives a reason
-to leave it out) is the one typed selection field; keep any other selection hint,
-such as a role or a group, in metadata (0.24 moved the former `role` and `group`
-fields there). New claims must follow from recorded evidence; ask the owner
-for any new fact.
+Facts about eligibility, availability or salary belong in Facts about me:
+offer to record them there.
 
-## MASTER and template changes
+## Improve highlights
 
-Change the canonical MASTER or a template when it makes applications stronger,
-and record why. Compile and check the
-full PDF and extracted text, then update the template source, rules, guidance and
-assets together with the expected version.
+Read the entries in full, propose sharper wording in chat, grounded in the
+narrative, and save the ones the owner approves as approved. Flag a highlight
+that claims more than its entry supports.
 
-Existing revisions never change. After the change, list Shortlisted applications
-(`applications_list` with `stage: "shortlisted"`) and their current revisions
-(`documents_list`), and find those whose documents use the changed Profile part,
-Preferences statement, template, entry or claim (each revision names the
-`claim_ids` and `knowledge_ids` it cites). Propagate the change to applications
-the owner has not yet submitted when it improves them: read the live records
-again, save new revisions linked with `previous_id`, check them like new work,
-keep earlier revisions and report each updated application. Leave an
-application unchanged when the change does not matter to it, and say so in the
-report.
+## Templates
 
-Report what you did in the chat,
-listing every record version changed.
+For "fix my CV template": read it with `templates_get`, change the TeX, compile
+it locally with sample content from the record, check the PDF (pages, layout,
+links), then `templates_save` with its version. Keep writing rules in
+Preferences and limits in the template.
+
+## After a change
+
+Shortlisted applications whose documents would now be clearly better can be
+redone with [prepare-applications](../prepare-applications/SKILL.md): name
+them and offer it; do not redo them unasked.
+
+## Report back
+
+In chat: Profile fields changed; entries added and updated, by title; new
+highlights and how many await approval; conflicts and questions still open;
+applications that could benefit.
