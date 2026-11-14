@@ -54,7 +54,7 @@ sign-in succeeds. API and MCP tokens are not affected.
 
 The database is not encrypted and backups hold personal data: keep them private.
 
-**Download a backup** under **Settings › Backup and restore**, or:
+**Download backup** under **Settings › Data**, or:
 
 ```bash
 curl --fail "$OPENINGS_URL/api/v1/backup" \
@@ -70,7 +70,7 @@ file bytes and cannot be restored.
 `openings-<UTC time>.sqlite` into `OPENINGS_BACKUP_DIR` (`/data/backups`), checked
 and readable only by the server user. The newest `OPENINGS_BACKUP_KEEP` (3) stay;
 `0` turns them off. With less than 1.2 times the database size free, a backup is
-skipped with a warning. **Settings › Backup and restore › Automatic backups** (owner
+skipped with a warning. **Settings › Data › Automatic backups** (owner
 only) lists them with **Download**. Over REST: `GET /api/v1/backups`,
 `GET /api/v1/backups/{name}` and `DELETE /api/v1/backups/{name}`, for owners only.
 `GET /health` reports the newest backup's age and the worker's heartbeat, and
@@ -86,7 +86,7 @@ rsync -a "$(docker volume inspect openings_workspace --format '{{ .Mountpoint }}
 ## Restore or move hosts
 
 Install the same release on the destination and set its owner password. Under
-**Settings › Backup and restore** (owner only), choose the file and type `RESTORE`,
+**Settings › Data** (owner only), choose **Restore from backup…** and the file,
 or send it with an owner token:
 
 ```bash
@@ -138,7 +138,7 @@ Finished collection runs and their tasks are removed after 90 days
 stay. Job and application history is never pruned. A refresh that only sees a
 posting again records nothing. At start, a database with a quarter of its size
 and `OPENINGS_COMPACT_MIN_MB` free is rewritten without the free space; this needs
-about twice the new size free and may take a while once. **Settings › Workspace**
+about twice the new size free and may take a while once. **Settings › Data**
 shows the size, free space and retention.
 
 ## Security

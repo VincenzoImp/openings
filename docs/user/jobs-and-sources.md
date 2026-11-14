@@ -69,11 +69,19 @@ jobs.
 
 ## Sources
 
-**Sources** lists saved searches and company boards with their on/off switch,
-schedule and last run, plus a master switch for scheduled collection. Settings are
-stored in the workspace. New sources start paused. **Preview results** requests at
-most three results per portal and saves nothing. A source can run once while
-paused.
+**Sources** (page title *Job sources*) lists each source with what it searches,
+how its last check went ("Checked 2h ago · 4 new", or in red "Last check failed:
+… · Details") and what its jobs became. A paused source is greyed. On hover,
+**Check now** and `…` (Edit, Pause or Resume, Duplicate, Delete permanently…).
+The top line sets how often every source is checked and has **Check all now**;
+its `…` pauses every automatic check. **Recent checks**, collapsed at the
+bottom, lists the last 20 checks with Stop and Retry.
+
+**Add source** opens a form: the kind first (Search, Company careers page, RSS
+feed), then its fields. **Test** shows the first ten results through the shared
+request gate and saves nothing; **Save** adds the source, checked on the
+schedule. A source added over REST or MCP starts paused unless it says
+otherwise. A paused source can still be checked by hand.
 
 | Source | What it collects |
 |---|---|
@@ -101,7 +109,8 @@ relevance, round age filters and sometimes return incomplete results.
 
 ### Company boards
 
-Paste the board or feed URL and preview it to see the detected service. The
+Paste the careers page or feed URL; the form names the detected service, and
+**Test** confirms it. The
 result limit is 100 matching jobs per run (1 to 2000). Optional filters keep
 matching **titles** and **locations** and skip **excluded role terms** such as
 `sales`; any matching term in a group is enough, and unknown locations stay
@@ -110,40 +119,43 @@ can hold undated jobs, so the age window does not apply to them.
 
 ### Schedule
 
-Choose an **interval** (default every 1440 minutes, 15 to 43200) or **daily
-times**: one to twelve local `HH:MM` times and a time zone, such as `08:00, 16:00`
-in `Europe/Berlin`. The first interval run waits one interval after enabling; use
-**Run once** to collect now. Missed slots merge instead of queueing. The master
-switch pauses all scheduled runs without losing settings; queued runs continue
-until **Stop run**.
+The top line of Sources sets one interval for every source (1 to 24 hours).
+Over REST and MCP a source can have its own **interval** (default every 1440
+minutes, 15 to 43200) or **daily times**: one to twelve local `HH:MM` times and a
+time zone, such as `08:00, 16:00` in `Europe/Berlin`. The first interval run
+waits one interval after enabling; use **Check now** to collect now. Missed slots
+merge instead of queueing. Pausing every automatic check keeps the settings;
+checks already queued continue until **Stop** under Recent checks.
 
-**Run with options** changes the age window or result limit for one run only. Select
-several sources to enable, pause, run, change or delete them together; a change
-applies only to the chosen fields. Deleting a source keeps the jobs it found.
+Over REST and MCP a run can change the age window or result limit for that run
+only, and several sources can be enabled, paused, run, changed or deleted
+together. Deleting a source keeps the jobs it found.
 
 ### Runs and counts
 
-Under **Runs and tasks**, each run shows its state and cumulative counts:
-processed, new, already known, invalid, waiting for text and text unavailable. A
+**Recent checks** shows each check's time, source and what it found or why it
+failed; REST `GET /collection/runs` has the cumulative counts: processed, new,
+already known, invalid, waiting for text and text unavailable. A
 **Partial** run reached a limit or could not fetch some descriptions.
 
 Automatic candidates enter your jobs only when usable posting text exists. Those
 still waiting stay in the run's progress and resume by themselves.
 
-Each source row shows what it found, such as "31 found, 9 shortlisted, 3 applied,
-1 replied". A source that finds many jobs and few you keep is a candidate to
+Each source row shows what it found, such as "31 found · 9 shortlisted ·
+3 applied". A source that finds many jobs and few you keep is a candidate to
 narrow or pause.
 
 ### Request limits
 
-**Providers** shows the shared gate of each portal: on or off, and the minimum
-spacing between requests (5 seconds by default). Every request obeys it:
+**Settings › Advanced** shows the shared gate of each job site your sources use:
+its state and the minimum spacing between requests (5 seconds by default), saved
+when you leave the field. Every request obeys it:
 previews, URL imports, scheduled and manual runs, redirects and detail pages. An
 HTTP 429 pauses the provider until its retry time; the pause survives restarts.
 A login page is reported as blocked. A portal can still block requests or change
 its pages; paste the posting when a page cannot be read.
 
-![Sources with saved searches, schedule summaries and results](../images/collection.png)
+![Job sources with the schedule line, source rows and their status](../images/collection.png)
 
 Source fields and defaults are read from the running server: REST
 `GET /api/v1/sources/schemas`, or `collection_get` over MCP.

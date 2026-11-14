@@ -1,0 +1,35 @@
+@layer ui {
+  .ui-code {
+    position: relative;
+    min-width: 0;
+  }
+  .ui-code pre {
+    margin: 0;
+    padding: 10px 44px 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    background: var(--bg-subtle);
+    color: var(--text);
+    font: 12.5px/19px var(--mono);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .ui-code pre:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+  }
+  .ui-code[data-inline] pre {
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+  .ui-code-copy {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    background: var(--bg-subtle);
+  }
+  .ui-code[data-inline] .ui-code-copy {
+    top: 50%;
+    translate: 0 -50%;
+  }
+}

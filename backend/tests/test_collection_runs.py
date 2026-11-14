@@ -144,6 +144,32 @@ def test_bulk_configuration_preserves_untouched_fields_and_service(collection):
         )
 
 
+def test_a_stored_search_without_its_query_is_refused_not_a_server_error(collection):
+    workspace, service = collection
+    source = service.create_source(
+        SourceCreate(
+            name="Example search",
+            kind="jobspy",
+            config={"query": "data", "providers": ["linkedin"]},
+        )
+    )
+    # A record written before the query was required, as an old workspace holds.
+    with workspace.db.transaction() as connection:
+        connection.execute(
+            "UPDATE sources SET config=? WHERE id=?",
+            (encode({"providers": ["linkedin"]}), source["id"]),
+        )
+    item = {"id": source["id"], "expected_version": source["version"]}
+    result = service.bulk_sources(SourceBulk.model_validate({"action": "run", "items": [item]}))
+    assert result["failed"] == 1
+    error = result["items"][0]["error"]
+    assert (error["status"], error["code"]) == (422, "source_config")
+    assert list(error["details"][0]["loc"]) == ["query"]
+    with pytest.raises(DomainError, match="saved search configuration is invalid"):
+        service.queue_collection(source["id"], expected_version=source["version"])
+    assert service.list_runs()["total"] == 0
+
+
 def test_pause_and_delete_preserve_run_history(collection, monkeypatch):
     workspace, service = collection
     source = make_source(service, enabled=True)
