@@ -54,10 +54,10 @@ erDiagram
   knowledge ||--o{ claims : highlights
 ```
 
-Other tables: `settings`, `preference_sections`, `api_tokens`, `templates`,
-`providers`, `collection_runs`, `tasks`, `transfer_grants`, `idempotency_keys`.
-`knowledge` and `claims` hold career entries and highlights; visible names follow
-`docs/user/how-it-works.md`. SQLite uses WAL and SHA-256-deduplicated blobs.
+Other tables: `events`, `posting_details`, `settings`, `preference_sections`,
+`api_tokens`, `templates`, `providers`, `collection_runs`, `tasks`, `transfer_grants`,
+`idempotency_keys`. `knowledge` and `claims` hold career entries and highlights.
+SQLite uses WAL and SHA-256-deduplicated blobs.
 
 ## Operations
 
@@ -72,10 +72,10 @@ def jobs_update(ws: WS, job_id: str, body: JobPatch) -> JobSummary:
 
 - **REST:** FastAPI reads the function. The name is the `operationId`; the docstring
   is the summary and description; the return annotation is the response model.
-- **MCP:** the tool has the function's name and description (at most 250
-  characters) and flat arguments, the model's fields beside the path ids. Unknown
-  arguments are refused. Schemas and results are compacted. `mcp="<tool>"` keeps an
-  operation off MCP and names the tool that does its work.
+- **MCP:** the tool has the function's name, description (at most 250 characters)
+  and flat arguments; unknown arguments are refused, schemas and results compacted.
+  `mcp="<tool>"` keeps an operation off MCP and names its tool, which a call gets back
+  as `rest_only` with `details.use` (otherwise `owner_only` or `unknown_tool`).
 - **Access:** `READ`, `WRITE`, `DESTRUCTIVE` set annotations and documented errors.
   `OWNER` operations call `actors.require_owner`, refuse an agent token and are REST
   only. `GET /api/v1/capabilities` lists each operation's name, route and access.
@@ -83,8 +83,8 @@ def jobs_update(ws: WS, job_id: str, body: JobPatch) -> JobSummary:
   `/mcp/`) are written by hand and listed in `TRANSPORT_ONLY` with a reason.
 - **Conventions:** tools are `<resource>_<verb>`. A batch write takes `items`,
   applies each on its own and returns a `BatchResult`. Updates and deletes name
-  `expected_version`; every 409 names `details.current_version`; creates take an
-  `idempotency_key`. Every request or tool call has one `batch_id`.
+  `expected_version` (a stale one's 409 names `details.current_version`); creates
+  take an `idempotency_key`. Every request or tool call has one `batch_id`.
 
 Parity runs one way: every dashboard action is a REST operation, and every
 operation that is not owner-only is an MCP tool or names one. REST is the superset.
@@ -124,10 +124,10 @@ the owner's corrections of agent work since the token's last read.
 ## Provider gate
 
 Every provider request goes through the persisted gate (`discovery/service.py`,
-`collectors/pinning.py`): previews, URL imports, runs, redirects and detail fetches.
-It stores spacing and cooldowns, honors 429 and `Retry-After` and pins resolved
-addresses against DNS rebinding. Never use an unguarded HTTP client. Incomplete
-automatic candidates stay in the run's checkpoint until usable text exists.
+`collectors/pinning.py`): previews, URL imports, runs, redirects and detail fetches. It
+stores spacing and cooldowns, honors 429 and `Retry-After`, pins resolved addresses
+against DNS rebinding and never uses an unguarded HTTP client. Incomplete automatic
+candidates stay in the run's checkpoint until usable text exists.
 
 ## Upgrades
 
@@ -144,7 +144,7 @@ edit the migration instead of adding one.
 ## Backups and tests
 
 The worker writes a daily verified `VACUUM INTO` copy, rotated by `OPENINGS_BACKUP_KEEP`
-and skipped when room is short; an agent token's backup drops credentials, and restore
-keeps the destination's authentication. Guards: `test_parity.py` (one-way parity),
-`test_mcp_budget.py`, `test_openapi.py`, `test_migration_policy.py`, `test_upgrade.py`
-and `test_docs.py` (user docs size, links and vocabulary).
+and skipped when room is short; an agent's backup drops credentials, and restore keeps
+the destination's authentication. Guards: `test_parity.py`, `test_mcp_budget.py`,
+`test_openapi.py`, `test_migration_policy.py`, `test_upgrade.py` and `test_docs.py`
+(docs size, links, vocabulary, and the routes and tools they name).

@@ -57,8 +57,9 @@ npm --prefix frontend run format:check && npm --prefix frontend test
 - **Types:** after changing an operation or model, run `npm --prefix frontend run
   api:gen` and commit `frontend/src/api/schema.d.ts`.
 - **MCP budget:** `test_mcp_budget.py` caps the tool list; add a tool last.
-- **Docs:** `test_docs.py` caps `docs/user` at 10,000 words and checks links and
-  vocabulary. Screenshots: `npm --prefix frontend run screenshots -- --docs`.
+- **Docs:** `test_docs.py` caps `docs/user` at 10,000 words and checks links,
+  vocabulary and the routes and tools they name. Screenshots:
+  `npm --prefix frontend run screenshots -- --docs`.
 - **Schema:** change `schema.sql`, the unreleased migration and its tests together.
 
 ## Changelog
