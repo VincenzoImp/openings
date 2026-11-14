@@ -642,9 +642,11 @@ export default function Jobs() {
           else state.openJob(state.active);
           return;
         case "/":
+          // On a phone, and while the bulk bar hides the search, `/` is
+          // the shell's search.
+          if (state.phone || !searchRef.current) return;
           consume();
-          if (state.phone) setSearching(true);
-          else searchRef.current?.focus();
+          searchRef.current.focus();
           return;
         case "Escape":
           if (state.picked.ids.size) {
