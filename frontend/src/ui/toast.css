@@ -102,6 +102,13 @@
       );
       max-width: none;
     }
+    /* Above a page's sticky action bar, so its primary stays reachable. */
+    body:has(.ui-actionbar) .ui-toast-region {
+      bottom: calc(
+        var(--bar-bottom) + var(--touch) + 21px + var(--s-3) +
+          env(safe-area-inset-bottom)
+      );
+    }
     .ui-toast .ui-kbd {
       display: none;
     }
