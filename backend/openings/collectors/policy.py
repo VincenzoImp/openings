@@ -61,6 +61,7 @@ def provider_for_url(value: str) -> str:
         "ashbyhq.com": "ashby",
         "recruitee.com": "recruitee",
         "jobs.personio.de": "personio",
+        "jobs.personio.com": "personio",
         "workable.com": "workable",
         "breezy.hr": "breezy",
         "bamboohr.com": "bamboohr",

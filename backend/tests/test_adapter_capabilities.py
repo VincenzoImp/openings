@@ -78,7 +78,7 @@ def test_ashby_unavailable_board_empty_board_and_transient_failure_are_distinct(
     responses = {}
     mock_http(monkeypatch, lambda request: responses["send"](request))
     for status, body, state, code in (
-        (404, None, "failed", "ashby_board_unavailable"),
+        (404, None, "failed", "board_unavailable"),
         (200, {"jobs": []}, "succeeded", None),
         (503, None, "queued", "source_http"),
         (429, None, "queued", "provider_cooldown"),

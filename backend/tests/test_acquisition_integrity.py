@@ -128,6 +128,7 @@ def test_greenhouse_filters_metadata_before_bounded_detail_requests(collection, 
     discovery.run_task(task, "owner")
     assert calls == [
         "https://boards-api.greenhouse.io/v1/boards/example/jobs",
+        "https://boards-api.greenhouse.io/v1/boards/example/offices",
         "https://boards-api.greenhouse.io/v1/boards/example/jobs/501",
     ]
     assert workspace.list_jobs()["total"] == 1
@@ -334,7 +335,7 @@ def test_lever_and_ashby_postings_carry_their_other_locations(monkeypatch):
         },
     }
     for kind, payload in payloads.items():
-        monkeypatch.setattr(feeds, "_json", lambda url, payload=payload: payload)
+        monkeypatch.setattr(feeds, "_json", lambda url, *names, payload=payload: payload)
         source = {"kind": kind, "name": "Example", "config": {"board": "example"}}
         assert [item["location"] for item in feeds.fetch_postings(source)] == ["Paris · Zurich"]
 

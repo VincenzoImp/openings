@@ -8,13 +8,24 @@ import json
 import re
 import xml.etree.ElementTree as ET
 from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
+from functools import partial
 from html.parser import HTMLParser
 from urllib.parse import quote, urljoin, urlsplit
 
 from ..collectors import company as company_collectors, jobspy as jobspy_collector
 from ..errors import DomainError
 from ..posting import matches_filters
-from .network import HTTP_BUDGET, fetch_bytes
+from .network import HTTP_BUDGET, MAX_LISTING_BYTES, fetch_bytes
+
+# A board's employment types in JobSpy's terms, the values the job_type filter takes.
+JOB_TYPES = (
+    ("internship", r"intern(?!ation)|trainee|apprentic|praktik"),
+    ("parttime", r"parttime|workingstudent|werkstudent|teilzeit|(salaried|hourly)pt"),
+    ("fulltime", r"fulltime|vollzeit|(salaried|hourly)ft"),
+    ("contract", r"contract|freelance"),
+    ("temporary", r"temporary|fixedterm|seasonal"),
+)
 
 
 class TextParser(HTMLParser):
@@ -46,12 +57,6 @@ class TextParser(HTMLParser):
             self.parts.append(data)
 
 
-def _places(*places):
-    """Every location of a posting once, the primary first: "Paris · Zurich"."""
-    named = [str(place).strip() for place in places if place and str(place).strip()]
-    return " · ".join(dict.fromkeys(named))
-
-
 def html_text(value: str) -> str:
     parser = TextParser()
     parser.feed(html.unescape(html.unescape(value or "")))
@@ -64,9 +69,11 @@ def html_text(value: str) -> str:
     )
 
 
-def _json(url: str):
+def _json(url: str, kind: str, board: str):
     try:
-        return json.loads(fetch_bytes(url))
+        return json.loads(fetch_bytes(url, maximum=MAX_LISTING_BYTES, home_is_missing=True))
+    except DomainError as error:
+        raise company_collectors.board_error(error, kind, board) from error
     except (ValueError, UnicodeError) as error:
         # Often an error or maintenance page during an outage: tried again later.
         raise DomainError(
@@ -74,6 +81,17 @@ def _json(url: str):
             "source_unavailable",
             "The source answered with a page that is not JSON; it is tried again later.",
         ) from error
+
+
+def job_types(values) -> list[str]:
+    """fulltime, parttime, contract, internship or temporary, in the board's order."""
+    found = []
+    for value in values:
+        word = re.sub(r"[^a-z]", "", str(value).casefold())
+        if word in ("fullorparttime", "fullparttime"):
+            found.append("fulltime")
+        found.extend(name for name, pattern in JOB_TYPES if re.search(pattern, word))
+    return list(dict.fromkeys(found))
 
 
 def normalize_posting(item: dict) -> dict:
@@ -96,19 +114,25 @@ def normalize_posting(item: dict) -> dict:
             )
         except ValueError, OverflowError, OSError:
             date = None
+    elif isinstance(date, str) and not re.match(r"\d{4}-\d{2}-\d{2}", date):
+        # RSS 2.0 dates are RFC 822: "Wed, 21 Oct 2026 12:54:56 +0000".
+        try:
+            date = parsedate_to_datetime(date).date().isoformat()
+        except TypeError, ValueError:
+            date = None
     metadata["date_posted"] = (
         str(date)[:10] if date and re.match(r"\d{4}-\d{2}-\d{2}", str(date)) else None
     )
-    types = metadata.get("job_types") or metadata.get("job_type") or metadata.get("employment_type")
-    if isinstance(types, str):
-        types = [part.strip() for part in types.split(",") if part.strip()]
-    types = types if isinstance(types, list) else []
-    types = [
-        str(value).strip().casefold().replace("-", "").replace(" ", "") for value in types if value
-    ]
+    raw = metadata.get("job_types") or metadata.get("job_type") or metadata.get("employment_type")
+    values = raw.split(",") if isinstance(raw, str) else raw if isinstance(raw, list) else []
+    types = job_types(values)
+    if raw and [str(value) for value in values] != types:
+        metadata["job_type_raw"] = raw  # the board's own value; normalized values keep it
     metadata["job_type"] = types[0] if types else None
     if len(types) > 1:
         metadata["job_types"] = types
+    else:
+        metadata.pop("job_types", None)
     if "salary" not in metadata:
         metadata["salary"] = metadata.get("salary_range") or metadata.get("compensation") or None
     return {**item, "metadata": metadata}
@@ -139,7 +163,7 @@ def fetch_postings(source: dict) -> list[dict]:
         source["streamed"] = source.get("on_item") is not None
         items = company_collectors.collect(
             source,
-            fetch_bytes,
+            partial(fetch_bytes, maximum=MAX_LISTING_BYTES, home_is_missing=True),
             html_text,
             known=source.get("known"),
             preview=source.get("preview", False),
@@ -147,8 +171,11 @@ def fetch_postings(source: dict) -> list[dict]:
         )
     elif kind == "lever":
         host = "api.eu.lever.co" if config.get("region") == "eu" else "api.lever.co"
-        raw = _json(f"https://{host}/v0/postings/{slug}?mode=json")
-        for row in company_collectors.records(raw):
+        raw = company_collectors.records(
+            _json(f"https://{host}/v0/postings/{slug}?mode=json", kind, board)
+        )
+        source["listing_empty"] = not raw
+        for row in raw:
             lists = [
                 f"{item.get('text', '')}\n{html_text(item.get('content', ''))}"
                 for item in row.get("lists", [])
@@ -167,7 +194,7 @@ def fetch_postings(source: dict) -> list[dict]:
                     "source_key": f"lever:{board}:{row['id']}",
                     "title": row.get("text", "Untitled role"),
                     "company": name,
-                    "location": _places(
+                    "location": company_collectors.places(
                         (row.get("categories") or {}).get("location"),
                         *((row.get("categories") or {}).get("allLocations") or []),
                     ),
@@ -186,22 +213,16 @@ def fetch_postings(source: dict) -> list[dict]:
                 }
             )
     elif kind == "ashby":
-        try:
-            raw = _json(
-                f"https://api.ashbyhq.com/posting-api/job-board/{slug}?includeCompensation=true"
-            )
-        except DomainError as error:
-            if error.code == "source_http" and (error.details or {}).get("http_status") == 404:
-                raise DomainError(
-                    422,
-                    "ashby_board_unavailable",
-                    f"Ashby does not expose a public board for '{board}' (HTTP 404). "
-                    "Check the exact board URL and identifier. Disabled, removed or private "
-                    "boards require another public source or manual job entry.",
-                    {"http_status": 404, "board": board},
-                ) from error
-            raise
-        for row in company_collectors.records(raw, "jobs"):
+        raw = company_collectors.records(
+            _json(
+                f"https://api.ashbyhq.com/posting-api/job-board/{slug}?includeCompensation=true",
+                kind,
+                board,
+            ),
+            "jobs",
+        )
+        source["listing_empty"] = not raw
+        for row in raw:
             if row.get("isListed") is False:
                 continue
             url = row.get("jobUrl", "")
@@ -213,7 +234,7 @@ def fetch_postings(source: dict) -> list[dict]:
                     "source_key": f"ashby:{board}:{identity}",
                     "title": row.get("title", "Untitled role"),
                     "company": name,
-                    "location": _places(
+                    "location": company_collectors.places(
                         row.get("location"),
                         *(
                             item.get("location") if isinstance(item, dict) else item
@@ -297,6 +318,8 @@ def fetch_postings(source: dict) -> list[dict]:
     else:
         raise DomainError(422, "unsupported_source", "This source type is not supported.")
     filters = config.get("filters") or {}
-    return [normalize_posting(item) for item in items if matches_filters(item, filters)][
+    # Normalized first: the filters read the remote flag of a workplace type.
+    items = [normalize_posting(item) for item in items]
+    return [item for item in items if matches_filters(item, filters)][
         : min(config.get("max_results", 2000), 20 if source.get("preview") else 2000)
     ]

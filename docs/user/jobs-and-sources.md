@@ -51,7 +51,7 @@ Each job carries labels computed without a model:
 | Posting language | The language the posting is written in, when it is English, German, French, Italian, Spanish, Portuguese, Dutch, Polish, Swedish, Danish, Norwegian or Finnish. |
 | Requires | The languages it requires; one language of a group is enough. A language mentioned only as a plus is not required. |
 | Possible duplicate | It probably repeats an earlier job. |
-| No longer listed | A company careers page stopped listing it. Set only when a check read the whole page. |
+| No longer listed | A company careers page stopped listing it. Set only when a check read the whole page; a page that suddenly lists nothing must list nothing at the next check too. |
 
 Labels describe and filter; they never dismiss a job. **Filter** by language,
 label, source or who dismissed. List your languages under
@@ -165,8 +165,10 @@ scheduled and manual checks, redirects and detail pages. When a site answers
 "too many requests" (HTTP 429), Openings pauses requests to it until the time the
 site names; the pause survives restarts. REST and MCP can lift it early with
 `clear_cooldown`.
-A login page is reported as blocked. A portal can still block requests or change
-its pages; paste the posting when a page cannot be read.
+A login page is reported as blocked. A careers page that does not exist (HTTP 404,
+or a redirect to the job site's home page) fails at once and names its board; check
+its URL. A portal can still block requests or change its pages; paste the posting
+when a page cannot be read.
 
 ![Sources with the schedule line, source rows and their status](../images/sources.png)
 

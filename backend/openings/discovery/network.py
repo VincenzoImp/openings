@@ -15,6 +15,8 @@ from ..collectors.policy import ProviderBudget
 from ..errors import DomainError
 
 MAX_FEED_BYTES = 8 * 1024 * 1024
+# A board's listing can carry every description: 14 MB at a large Ashby board.
+MAX_LISTING_BYTES = 64 * 1024 * 1024
 
 
 HTTP_BUDGET: ContextVar[ProviderBudget | None] = ContextVar("collection_http_budget", default=None)
@@ -96,10 +98,13 @@ def fetch_bytes(
     budget: ProviderBudget | None = None,
     method="GET",
     body=None,
+    home_is_missing=False,
 ) -> bytes:
     """Fetch ``url`` through the provider gate: ``budget``, else the context's budget.
 
-    A public fetch with neither fails closed.
+    A public fetch with neither fails closed. With ``home_is_missing``, a redirect
+    from a deeper path to a site's home page (how some boards answer an unknown
+    board) is a 404.
     """
     budget = budget or HTTP_BUDGET.get()
     if budget is None and public:
@@ -145,7 +150,19 @@ def fetch_bytes(
                             raise DomainError(
                                 502, "source_redirect", "The source returned an invalid redirect."
                             )
-                        current = urljoin(current, target)
+                        target = urljoin(current, target)
+                        if (
+                            home_is_missing
+                            and urlsplit(target).path in ("", "/")
+                            and urlsplit(current).path not in ("", "/")
+                        ):
+                            raise DomainError(
+                                502,
+                                "source_http",
+                                "The source redirected to its home page (HTTP 404).",
+                                {"http_status": 404, "redirect": target},
+                            )
+                        current = target
                         if response.status_code == 303 or (
                             response.status_code in (301, 302) and method == "POST"
                         ):
@@ -159,7 +176,9 @@ def fetch_bytes(
                             raise DomainError(
                                 422,
                                 "source_too_large",
-                                "This feed exceeds the bounded collection size.",
+                                f"This feed exceeds the bounded collection size of "
+                                f"{maximum // (1024 * 1024)} MB.",
+                                {"maximum_bytes": maximum},
                             )
                     return bytes(content)
                 finally:

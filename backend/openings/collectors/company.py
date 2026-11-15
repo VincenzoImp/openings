@@ -57,6 +57,9 @@ def config_model(kind):
     )
 
 
+INLINE_IMAGE = re.compile(rb"data:image/[\w.+-]+;base64,(?:[A-Za-z0-9+/=]|\\/)+")
+
+
 def xml(body):
     if b"<!DOCTYPE" in body.upper() or b"<!ENTITY" in body.upper():
         raise DomainError(422, "source_format", "XML entity declarations are unsupported.")
@@ -80,6 +83,36 @@ def location(value):
     return ", ".join(
         str(item.get("name") if isinstance(item, dict) else item) for item in parts if item
     )
+
+
+def places(*values):
+    """Every location of a posting once, the primary first: "Paris · Zurich"."""
+    named = [str(place).strip() for place in values if place and str(place).strip()]
+    return " · ".join(dict.fromkeys(named))
+
+
+def board_error(error, kind, board):
+    """A board's listing that is missing or too large, named for its owner."""
+    status = (error.details or {}).get("http_status")
+    if error.code == "source_http" and status in (404, 410):
+        return DomainError(
+            422,
+            "board_unavailable",
+            f"{kind.title()} does not expose a public board for '{board}' (HTTP {status}). "
+            "Check the exact board URL and identifier. Disabled, removed or private "
+            "boards require another public source or manual job entry.",
+            {"http_status": status, "board": board},
+        )
+    if error.code == "source_too_large":
+        limit = (error.details or {}).get("maximum_bytes", 0) // (1024 * 1024)
+        return DomainError(
+            422,
+            "source_too_large",
+            f"The {kind.title()} board '{board}' is larger than the {limit} MB a collection "
+            "reads. Add its jobs by URL, or follow a smaller board of the same company.",
+            {"board": board, "maximum_bytes": (error.details or {}).get("maximum_bytes")},
+        )
+    return error
 
 
 def records(payload, key=None):
@@ -117,9 +150,12 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
     def response(url, *, body=None):
         key = json.dumps([url, body], sort_keys=True)
         if key not in cache:
-            cache[key] = (
-                request(url) if body is None else request(url, method="POST", body=body)
-            ).decode("utf-8")
+            try:
+                answer = request(url) if body is None else request(url, method="POST", body=body)
+            except DomainError as error:
+                raise board_error(error, kind, board) from error
+            # Inline images (40 MB at some Recruitee boards) are not posting text.
+            cache[key] = INLINE_IMAGE.sub(b"", answer).decode("utf-8")
             save()
         return cache[key].encode("utf-8")
 
@@ -134,13 +170,21 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
     filters = config.get("filters") or {}
     detail_checks = source["detail_checks"] = {}
 
-    def matches(title, place):
-        return matches_filters({"title": str(title or ""), "location": str(place or "")}, filters)
+    def matches(title, place, flags=None):
+        # flags: the board's remote flag and workplace type, which a Remote filter reads.
+        return matches_filters(
+            {"title": str(title or ""), "location": str(place or ""), "metadata": flags or {}},
+            filters,
+        )
 
-    def select(rows, title, place):
+    def select(rows, title, place, flags=lambda row: {}):
+        # An empty first answer of a board that had jobs is confirmed by the next run.
+        source["listing_empty"] = not rows
         if len(rows) > max_candidates:
             source["candidate_capped"] = True
-        matching = [row for row in rows[:max_candidates] if matches(title(row), place(row))]
+        matching = [
+            row for row in rows[:max_candidates] if matches(title(row), place(row), flags(row))
+        ]
         if len(matching) > maximum:
             source["result_capped"] = True
         return matching[:maximum]
@@ -195,10 +239,17 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
         return result
 
     def add(row, identity, title, url, place="", posting="", **metadata):
-        if not identity or len(items) >= maximum or not matches(title, place):
+        if not identity or len(items) >= maximum or not matches(title, place, metadata):
             return
         key = f"{kind}:{board or config.get('host', '')}:{identity}"
         previous = known.get(key, {}) if isinstance(known, dict) else {}
+        if metadata.get("job_type"):
+            # The board's current type replaces the types normalized from an earlier one.
+            previous = {
+                name: value
+                for name, value in previous.items()
+                if name not in ("job_types", "job_type_raw")
+            }
         posting = text(str(posting or ""))
         if not any(character.isalnum() for character in posting):
             posting = ""
@@ -256,7 +307,20 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
     if kind == "greenhouse":
         base = f"https://boards-api.greenhouse.io/v1/boards/{slug}/jobs"
         rows = records(get(base), "jobs")
-        rows = select(rows, lambda row: row.get("title"), lambda row: location(row.get("location")))
+        # A listing's location is often a work mode ("Hybrid"); its cities are its offices.
+        offices = get(f"https://boards-api.greenhouse.io/v1/boards/{slug}/offices")
+        cities = {}
+        for office in (offices.get("offices") if isinstance(offices, dict) else None) or []:
+            for department in office.get("departments") or []:
+                for job in department.get("jobs") or []:
+                    cities.setdefault(job.get("id"), []).append(
+                        office.get("location") or office.get("name")
+                    )
+
+        def place(row):
+            return places(location(row.get("location")), *cities.get(row.get("id"), []))
+
+        rows = select(rows, lambda row: row.get("title"), place)
         for row in ordered(rows, lambda row: f"{kind}:{board}:{row.get('id')}"):
             identity = row.get("id")
             full = detail(f"{kind}:{board}:{identity}", base + "/" + quote(str(identity), safe=""))
@@ -265,44 +329,61 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
                 identity,
                 row.get("title"),
                 row.get("absolute_url"),
-                location(row.get("location")),
+                place(row),
                 full.get("content", ""),
-                departments=row.get("departments", []),
+                departments=[
+                    item.get("name") for item in full.get("departments") or [] if item.get("name")
+                ],
+                published_at=row.get("first_published"),
             )
     elif kind == "recruitee":
         payload = get(f"https://{board}.recruitee.com/api/offers/")
-        for row in select(
-            records(payload, "offers"),
-            lambda row: row.get("title"),
-            lambda row: (
+
+        def place(row):
+            return places(
                 row.get("location")
-                or ", ".join(str(row[key]) for key in ("city", "country") if row.get(key))
-            ),
-        ):
+                or ", ".join(str(row[key]) for key in ("city", "country") if row.get(key)),
+                *(
+                    location({key: item.get(key) for key in ("city", "state", "country")})
+                    for item in row.get("locations") or []
+                    if isinstance(item, dict)
+                ),
+            )
+
+        def flags(row):
+            return {
+                "remote": row.get("remote"),
+                "workplace_type": "hybrid" if row.get("hybrid") else None,
+            }
+
+        for row in select(records(payload, "offers"), lambda row: row.get("title"), place, flags):
             add(
                 row,
                 row.get("id"),
                 row.get("title"),
                 row.get("careers_url") or row.get("careers_apply_url"),
-                row.get("location")
-                or ", ".join(str(row[key]) for key in ("city", "country") if row.get(key)),
+                place(row),
                 "\n\n".join(filter(None, (row.get("description"), row.get("requirements")))),
-                remote=row.get("remote"),
+                **flags(row),
                 job_type=row.get("employment_type_code"),
                 published_at=row.get("published_at"),
             )
     elif kind == "personio":
         base = f"https://{board}.jobs.personio.de"
-        root = xml(response(base + "/xml?language=en"))
+        # Without a language: ?language=en empties positions written only in German.
+        root = xml(response(base + "/xml"))
         if root.tag != "workzag-jobs":
             raise DomainError(
                 502, "source_format", "Personio did not return its public positions feed."
             )
-        for row in select(
-            root.findall("position"),
-            lambda row: row.findtext("name"),
-            lambda row: row.findtext("office"),
-        ):
+
+        def place(row):
+            return places(
+                row.findtext("office"),
+                *(office.text for office in row.findall("additionalOffices/office")),
+            )
+
+        for row in select(root.findall("position"), lambda row: row.findtext("name"), place):
 
             def value(tag, row=row):
                 return (row.findtext(tag) or "").strip()
@@ -316,14 +397,20 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
                 value("id"),
                 value("name"),
                 base + "/job/" + value("id"),
-                value("office"),
+                place(row),
                 description,
-                job_type=value("schedule"),
+                # employmentType first: "intern" says more than its "full-time" schedule.
+                job_type=[part for part in (value("employmentType"), value("schedule")) if part],
                 published_at=value("createdAt"),
             )
     elif kind == "workable":
         payload = get(f"https://apply.workable.com/api/v1/widget/accounts/{slug}?details=true")
-        for row in select(records(payload, "jobs"), lambda row: row.get("title"), location):
+        for row in select(
+            records(payload, "jobs"),
+            lambda row: row.get("title"),
+            location,
+            lambda row: {"remote": row.get("telecommuting")},
+        ):
             add(
                 row,
                 row.get("shortcode"),
@@ -354,39 +441,66 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
             )
     elif kind == "bamboohr":
         base = f"https://{board}.bamboohr.com"
+
+        def address(row):
+            # Both are dicts, often one of null values; the detail's names the country.
+            for value in (row.get("location"), row.get("atsLocation")):
+                value = {key: item for key, item in (value or {}).items() if item}
+                if value:
+                    return {**value, "country": value.get("country") or value.get("addressCountry")}
+            return {}
+
+        def flags(row):
+            # locationType: "0" on site, "1" remote, "2" hybrid.
+            mode = {"0": "onsite", "1": "remote", "2": "hybrid"}.get(str(row.get("locationType")))
+            return {
+                "remote": row.get("isRemote") or mode == "remote" or None,
+                "workplace_type": mode,
+            }
+
         for row in ordered(
             select(
                 records(get(base + "/careers/list"), "result"),
                 lambda row: row.get("jobOpeningName"),
-                lambda row: location(row.get("location") or row.get("atsLocation")),
+                # The listing names no country: a country filter waits for the detail.
+                lambda row: location(address(row)) if address(row).get("country") else "",
+                flags,
             ),
             lambda row: f"{kind}:{board}:{row.get('id')}",
         ):
             identity = row.get("id")
-            full = (
-                detail(f"{kind}:{board}:{identity}", f"{base}/careers/{identity}/detail").get(
-                    "result"
-                )
-                or {}
-            ).get("jobOpening") or {}
+            key = f"{kind}:{board}:{identity}"
+            full = (detail(key, f"{base}/careers/{identity}/detail").get("result") or {}).get(
+                "jobOpening"
+            ) or {}
+            country = address(full).get("country") or (
+                (known.get(key) or {}).get("country") if isinstance(known, dict) else None
+            )
             add(
                 {**row, **full},
                 identity,
                 row.get("jobOpeningName"),
                 full.get("jobOpeningShareUrl") or f"{base}/careers/{identity}",
-                location(row.get("location") or row.get("atsLocation")),
+                location({**address(row), **address(full), "country": country}),
                 full.get("description"),
-                remote=row.get("isRemote"),
+                **flags({**row, **full}),
+                country=country,
                 job_type=row.get("employmentStatusLabel"),
                 published_at=full.get("datePosted"),
             )
     elif kind == "rippling":
         base = f"https://api.rippling.com/platform/api/ats/v1/board/{slug}/jobs"
+        # The board lists a role once per location: one row per role, every location.
+        roles = {}
+        for row in records(get(base)):
+            label = (row.get("workLocation") or {}).get("label")
+            role = roles.setdefault(row.get("uuid"), {**row, "workLocations": []})
+            role["workLocations"].append(label)
         for row in ordered(
             select(
-                records(get(base)),
+                list(roles.values()),
                 lambda row: row.get("name"),
-                lambda row: (row.get("workLocation") or {}).get("label"),
+                lambda row: places(*row["workLocations"]),
             ),
             lambda row: f"{kind}:{board}:{row.get('uuid')}",
         ):
@@ -400,21 +514,22 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
                 identity,
                 row.get("name"),
                 row.get("url"),
-                (row.get("workLocation") or {}).get("label"),
+                places(*row["workLocations"]),
                 description,
+                job_type=(full.get("employmentType") or {}).get("label"),
                 published_at=full.get("createdOn"),
             )
     elif kind == "smartrecruiters":
         base = f"https://api.smartrecruiters.com/v1/companies/{slug}/postings"
-        listed = []
+        listed, total = [], None
         try:
             for offset in range(0, 100 if preview else max_candidates, 100):
-                rows = records(
-                    get(base + "?" + urlencode({"limit": 100, "offset": offset})),
-                    "content",
-                )
+                payload = get(base + "?" + urlencode({"limit": 100, "offset": offset}))
+                rows = records(payload, "content")
+                if isinstance(payload.get("totalFound"), int):
+                    total = payload["totalFound"]
                 listed.extend(rows)
-                if len(rows) < 100:
+                if len(rows) < 100 or (total is not None and offset + 100 >= total):
                     break
             else:
                 source["candidate_capped"] = True
@@ -422,8 +537,21 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
             if not listed:
                 raise
             source["collection_error"] = error
+
+        def place(row):
+            # fullLocation names the country; location's country is an ISO code ("de").
+            value = row.get("location") or {}
+            return value.get("fullLocation") or location(value)
+
+        def flags(row):
+            value = row.get("location") or {}
+            return {
+                "remote": value.get("remote"),
+                "workplace_type": "hybrid" if value.get("hybrid") else None,
+            }
+
         for row in ordered(
-            select(listed, lambda row: row.get("name"), lambda row: location(row.get("location"))),
+            select(listed, lambda row: row.get("name"), place, flags),
             lambda row: f"{kind}:{board}:{row.get('id')}",
         ):
             identity = row.get("id")
@@ -444,8 +572,9 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
                 identity,
                 row.get("name"),
                 f"https://jobs.smartrecruiters.com/{slug}/{identity}",
-                location(row.get("location")),
+                place(row),
                 posting,
+                **flags(row),
                 job_type=(row.get("typeOfEmployment") or {}).get("label"),
                 published_at=row.get("releasedDate"),
             )
@@ -494,13 +623,13 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
             if not path.startswith("/job/") or ".." in path:
                 continue
             full = detail(f"{kind}:{board}:{path}", api + path).get("jobPostingInfo") or {}
-            places = [full.get("location"), *(full.get("additionalLocations") or [])]
             add(
                 {"listing": row, "detail": full},
                 path,
                 row.get("title"),
                 full.get("externalUrl") or public + path,
-                " · ".join(str(place) for place in places if place) or row.get("locationsText"),
+                places(full.get("location"), *(full.get("additionalLocations") or []))
+                or row.get("locationsText"),
                 full.get("jobDescription"),
                 job_type=full.get("timeType"),
                 published_at=full.get("startDate"),
@@ -508,7 +637,9 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
     elif kind == "oracle":
         host, site = board.split("/", 1)
         base = f"https://{host}/hcmRestApi/resources/latest"
-        listed = []
+        # An unknown site answers with the default site's jobs: check that it exists.
+        get(base + "/recruitingCESites/" + quote(site, safe="") + "?onlyData=true")
+        listed, total = [], None
         try:
             for offset in range(0, 50 if preview else max_candidates, 50):
                 payload = get(
@@ -524,8 +655,10 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
                 )
                 envelopes = records(payload, "items")
                 rows = records(envelopes[0], "requisitionList") if envelopes else []
+                if envelopes and isinstance(envelopes[0].get("TotalJobsCount"), int):
+                    total = envelopes[0]["TotalJobsCount"]
                 listed.extend(rows)
-                if len(rows) < 50:
+                if len(rows) < 50 or (total is not None and offset + 50 >= total):
                     break
             else:
                 source["candidate_capped"] = True
@@ -533,8 +666,19 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
             if not listed:
                 raise
             source["collection_error"] = error
+
+        def place(row):
+            return places(
+                row.get("PrimaryLocation"),
+                *(
+                    item.get("Name")
+                    for item in row.get("secondaryLocations") or []
+                    if isinstance(item, dict)
+                ),
+            )
+
         for row in ordered(
-            select(listed, lambda row: row.get("Title"), lambda row: row.get("PrimaryLocation")),
+            select(listed, lambda row: row.get("Title"), place),
             lambda row: f"{kind}:{board}:{row.get('Id')}",
         ):
             identity = row.get("Id")
@@ -556,7 +700,7 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
                 identity,
                 row.get("Title"),
                 f"https://{host}/hcmUI/CandidateExperience/en/sites/{site}/job/{identity}",
-                row.get("PrimaryLocation"),
+                place(row),
                 "\n\n".join(
                     str(full.get(key) or "")
                     for key in (
@@ -595,16 +739,35 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
                     502, "source_format", "join.com returned unexpected embedded job data."
                 ) from error
 
+        # Five jobs a page; pages can overlap, so a job is kept once.
+        listed, seen = [], set()
+        try:
+            page, count = 1, 1
+            while page <= count and len(listed) < max_candidates:
+                jobs = state(base + (f"?page={page}" if page > 1 else "")).get("jobs") or {}
+                for row in records(jobs, "items"):
+                    if row.get("id") not in seen:
+                        seen.add(row.get("id"))
+                        listed.append(row)
+                pages = (jobs.get("pagination") or {}).get("pageCount")
+                count = 1 if preview or not isinstance(pages, int) else pages
+                page += 1
+            if page <= count:
+                source["candidate_capped"] = True
+        except DomainError as error:
+            if not listed:
+                raise
+            source["collection_error"] = error
+
+        def place(row):
+            # The listing's English names: the detail's are localized ("Deutschland").
+            city = row.get("city") or {}
+            return ", ".join(
+                str(city[key]) for key in ("cityName", "regionName", "countryName") if city.get(key)
+            )
+
         for row in ordered(
-            select(
-                records(state(base).get("jobs"), "items"),
-                lambda row: row.get("title"),
-                lambda row: ", ".join(
-                    str((row.get("city") or {})[key])
-                    for key in ("cityName", "regionName", "countryName")
-                    if (row.get("city") or {}).get(key)
-                ),
-            ),
+            select(listed, lambda row: row.get("title"), place),
             lambda row: f"{kind}:{board}:{row.get('id')}",
         ):
             identity = row.get("id")
@@ -615,22 +778,21 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
             if url:
                 full = detail(key, url, decode=state).get("job") or {}
             merged = {**row, **full}
-            city = merged.get("city") or {}
+            employment = merged.get("employmentType") or {}
             add(
                 merged,
                 identity,
                 merged.get("title"),
                 url,
-                ", ".join(
-                    str(city[key])
-                    for key in ("cityName", "regionName", "countryName")
-                    if city.get(key)
-                ),
+                place(row),
                 "\n\n".join(
                     str(merged.get(key) or "")
                     for key in ("intro", "tasks", "requirements", "benefits", "description")
                 ),
                 remote=merged.get("workplaceType") == "REMOTE",
+                workplace_type=str(merged.get("workplaceType") or "").casefold() or None,
+                job_type=employment.get("googleType") or employment.get("name"),
+                published_at=merged.get("createdAt"),
             )
     else:
         raise DomainError(422, "unsupported_source", "This company source type is unsupported.")

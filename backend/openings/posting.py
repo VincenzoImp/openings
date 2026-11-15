@@ -32,7 +32,12 @@ def remote_scope(item):
         return "worldwide"
     if metadata.get("eligible_countries"):
         return "countries"
-    if "remote" in place or metadata.get("remote") or metadata.get("is_remote"):
+    if (
+        "remote" in place
+        or metadata.get("remote")
+        or metadata.get("is_remote")
+        or str(metadata.get("workplace_type") or "").casefold() == "remote"
+    ):
         remainder = re.sub(r"\b(remote|fully|work|from|home|hybrid)\b|[^\w]", "", place).strip()
         return "restricted" if remainder else "unknown"
     return "onsite" if place.strip() else "unknown"
