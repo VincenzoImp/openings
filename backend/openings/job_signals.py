@@ -47,17 +47,20 @@ UNLISTED_SQL = (
 )
 DISMISSAL_COLUMNS = ("dismissed_at", "dismissed_by", "dismissed_reason")
 # Who dismissed a job (its actor label), as the Dismissed tab groups it. A job
-# dismissed without a record (before 0.21) counts as system.
+# dismissed before 0.21 has no record of who did it: unknown.
 DISMISSED_BY = {
     "agent": "j.dismissed_by LIKE 'agent:%'",
     "owner": "j.dismissed_by='owner'",
-    "system": "coalesce(j.dismissed_by,'system')='system'",
+    "system": "j.dismissed_by='system'",
+    "unknown": "j.dismissed_by IS NULL",
 }
 
 
 def dismissed_by_category(label):
-    """owner, agent or system for an actor label (None counts as system)."""
-    if label and label.startswith("agent:"):
+    """owner, agent, system or unknown (not recorded) for an actor label."""
+    if not label:
+        return "unknown"
+    if label.startswith("agent:"):
         return "agent"
     return "owner" if label == "owner" else "system"
 

@@ -14,7 +14,8 @@ next job is shown, and every decision can be undone from its toast or with `z`.
   (up to 500 characters). Dismissed jobs keep their identity and history, so
   later collection does not bring them back as new. **Dismissed** shows who
   dismissed each job and why; **Filter › Dismissed by** narrows it to **You**,
-  **An agent** or **Job sources**. **Restore** (`r`) returns a job, or a
+  **An agent**, **Job sources** or **Not recorded** (dismissed before 0.21,
+  when Openings did not record who did it). **Restore** (`r`) returns a job, or a
   selection, to New.
 - **Forget permanently…** in the job's `…` menu removes the job, its identities
   and its applications, notes and files after asking. Collection can find it

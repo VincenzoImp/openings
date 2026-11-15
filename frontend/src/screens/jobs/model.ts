@@ -182,6 +182,7 @@ export const DISMISSED_BY: Record<string, string> = {
   owner: "You",
   agent: "An agent",
   system: "Job sources",
+  unknown: "Not recorded",
 };
 
 const PROVIDERS: Record<string, string> = {

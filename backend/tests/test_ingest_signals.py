@@ -178,7 +178,14 @@ def test_triage_reasons_and_who_dismissed(services):
     assert owner["dismissal"]["category"] == "owner" and owner["dismissal"]["reason"] == "Too far."
     counts = workspace.list_jobs(include_counts=True)["counts"]
     assert counts["dismissed"] == 2 and counts["new"] == 1
-    assert counts["dismissed_by"] == {"agent": 1, "owner": 1, "system": 0}
+    assert counts["dismissed_by"] == {"agent": 1, "owner": 1, "system": 0, "unknown": 0}
+    # A dismissal recorded before 0.21 has no author: unknown, not job sources.
+    with workspace.db.transaction() as connection:
+        connection.execute("UPDATE jobs SET dismissed_by=NULL WHERE id=?", (second["id"],))
+    assert workspace.get_job(second["id"])["dismissal"]["category"] == "unknown"
+    unknown = workspace.list_jobs(dismissed_by="unknown", include_counts=True)
+    assert [job["id"] for job in unknown["items"]] == [second["id"]]
+    assert unknown["counts"]["dismissed_by"]["unknown"] == 1
     with pytest.raises(Exception, match="reason"):
         workspace.set_triage(third["id"], "shortlisted", third["version"], "Nice")
 

@@ -501,8 +501,8 @@ class JobQuery(Input):
     dismissed_by: str | None = Field(
         default=None,
         max_length=200,
-        pattern=r"^(owner|agent|system|agent:.+)$",
-        description="Dismissed by owner, agent, agent:<token name> or system.",
+        pattern=r"^(owner|agent|system|unknown|agent:.+)$",
+        description="Dismissed by owner, agent, agent:<token name>, system or unknown.",
     )
     batch_id: str | None = Field(
         default=None,

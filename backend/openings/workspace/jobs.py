@@ -193,7 +193,7 @@ class JobReads:
                 args.append(dismissed_by)
             else:
                 raise DomainError(
-                    422, "dismissed_by", "Choose owner, agent, system or agent:<token name>."
+                    422, "dismissed_by", "Choose owner, agent, system, unknown or agent:<token name>."
                 )
         if batch_id:
             # Jobs changed by one REST request or MCP tool call.
