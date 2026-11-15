@@ -4489,7 +4489,7 @@ export interface components {
       };
       /**
        * Counts
-       * @description Jobs found, shortlisted, applied and replied.
+       * @description Jobs found, ever shortlisted, applied and replied.
        * @default {}
        */
       counts: {
@@ -4623,7 +4623,7 @@ export interface components {
       };
       /**
        * Counts
-       * @description Jobs found, shortlisted, applied and replied.
+       * @description Jobs found, ever shortlisted, applied and replied.
        * @default {}
        */
       counts: {
