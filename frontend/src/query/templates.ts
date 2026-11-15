@@ -2,7 +2,14 @@
 // (fonts, images, class files, a sample PDF), read and written through the
 // generated client. Bytes go through upload grants (files_reserve_upload).
 import { useQuery } from "@tanstack/react-query";
-import { api, call, download, transfer, type Schema } from "../api/client";
+import {
+  api,
+  call,
+  download,
+  readRows,
+  transfer,
+  type Schema,
+} from "../api/client";
 import { useApiMutation, useVersionedMutation } from "./mutation";
 
 export type Template = Schema<"Template">;
@@ -19,11 +26,13 @@ export function useTemplates() {
   return useQuery({
     queryKey: templateKeys.list,
     queryFn: ({ signal }) =>
-      call(
-        api.GET("/api/v1/templates", {
-          params: { query: { summary: true, limit: 200 } },
-          signal,
-        }),
+      readRows(Number.POSITIVE_INFINITY, (limit, offset) =>
+        call(
+          api.GET("/api/v1/templates", {
+            params: { query: { summary: true, limit, offset } },
+            signal,
+          }),
+        ),
       ),
   });
 }
@@ -42,19 +51,24 @@ export function useTemplate(id: string | null) {
   });
 }
 
+/** Every file of a template, read 200 at a time. */
+const templateFiles = (id: string, signal?: AbortSignal) =>
+  readRows(Number.POSITIVE_INFINITY, (limit, offset) =>
+    call(
+      api.GET("/api/v1/files", {
+        params: {
+          query: { owner_type: "template", owner_id: id, limit, offset },
+        },
+        signal,
+      }),
+    ),
+  );
+
 export function useTemplateFiles(id: string | null) {
   return useQuery({
     queryKey: templateKeys.files(id ?? ""),
     enabled: !!id,
-    queryFn: ({ signal }) =>
-      call(
-        api.GET("/api/v1/files", {
-          params: {
-            query: { owner_type: "template", owner_id: id!, limit: 200 },
-          },
-          signal,
-        }),
-      ),
+    queryFn: ({ signal }) => templateFiles(id!, signal),
   });
 }
 
@@ -203,17 +217,7 @@ export function useDuplicateTemplate() {
           },
         }),
       );
-      const files = await call(
-        api.GET("/api/v1/files", {
-          params: {
-            query: {
-              owner_type: "template",
-              owner_id: template.id,
-              limit: 200,
-            },
-          },
-        }),
-      );
+      const files = await templateFiles(template.id);
       for (const file of files.items) {
         const { blob } = await fileBytes(file);
         await uploadTemplateFile(

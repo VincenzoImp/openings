@@ -1,6 +1,6 @@
 // Today's reads and writes, through the generated client and Query.
 import { useQuery } from "@tanstack/react-query";
-import { api, call, type Schema } from "../../api/client";
+import { api, call, MAX_ROWS, readRows, type Schema } from "../../api/client";
 import type { operations } from "../../api/schema";
 import { useApiMutation } from "../../query/mutation";
 import { POLL_MS } from "../../query/query";
@@ -12,16 +12,27 @@ type Query = NonNullable<
 
 export type Application = Schema<"ApplicationRow">;
 
+/** Rows enough for every application of a list. */
+const EVERY = 10_000;
+
 /**
- * A page of applications; keys start with the resource. Only the short
- * lists poll; the long ones are read again on focus and after a write.
+ * The first `limit` applications of a list, read 200 at a time; keys start
+ * with the resource. Only the short lists poll; the long ones are read again
+ * on focus and after a write.
  */
 function useApplications(query: Query, poll = false) {
   return useQuery({
     queryKey: ["applications", "list", query],
     refetchInterval: poll ? POLL_MS : false,
     queryFn: ({ signal }) =>
-      call(api.GET("/api/v1/applications", { params: { query }, signal })),
+      readRows(query.limit ?? MAX_ROWS, (limit, offset) =>
+        call(
+          api.GET("/api/v1/applications", {
+            params: { query: { ...query, limit, offset } },
+            signal,
+          }),
+        ),
+      ),
   });
 }
 
@@ -34,12 +45,12 @@ export function useToday() {
   const shortlisted = useApplications({
     stage: "shortlisted",
     sort: "deadline",
-    limit: 200,
+    limit: EVERY,
   });
   const waiting = useApplications({
     needs: "reply_overdue",
     sort: "applied",
-    limit: 200,
+    limit: EVERY,
   });
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);

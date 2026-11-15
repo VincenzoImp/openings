@@ -223,14 +223,16 @@ export function useTimeline(applicationId: string) {
   return useQuery({
     queryKey: ["applications", "timeline", applicationId],
     queryFn: ({ signal }) =>
-      call(
-        api.GET("/api/v1/applications/{application_id}/timeline", {
-          params: {
-            path: { application_id: applicationId },
-            query: { limit: 200 },
-          },
-          signal,
-        }),
+      readRows(Number.POSITIVE_INFINITY, (limit, offset) =>
+        call(
+          api.GET("/api/v1/applications/{application_id}/timeline", {
+            params: {
+              path: { application_id: applicationId },
+              query: { limit, offset },
+            },
+            signal,
+          }),
+        ),
       ),
   });
 }
