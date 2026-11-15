@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.27.1 — 2026-11-15
+
+**Fixes**
+
+- Glassdoor searches posted within a day or less found nothing: Glassdoor's age filter lists jobs younger than the days asked and counts today's jobs as one day old. Searches now ask for one more day and keep what the window covers, so a 12- or 24-hour Glassdoor search returns the day's jobs (#311).
+
 ## 0.27.0 — 2026-11-15
 
 Company boards read as their vendors publish them, nothing cut or mislabelled, and Openings ready for job searches in more countries and languages. No schema change.
