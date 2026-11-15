@@ -429,7 +429,7 @@ function Editor({
               maxLength={200}
               placeholder={
                 suggestedName(draft.kind, draft) ||
-                (draft.kind === "search" ? "Data engineer · Zurich" : "")
+                (draft.kind === "search" ? "Data engineer · London" : "")
               }
               onChange={(event) => set("name", event.target.value)}
             />
@@ -523,7 +523,7 @@ function SearchFields({
           <Input
             value={draft.location}
             maxLength={300}
-            placeholder="Zurich"
+            placeholder="London"
             onChange={(event) => set("location", event.target.value)}
           />
         </Field>
