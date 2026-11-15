@@ -521,3 +521,43 @@ def test_a_search_has_no_country_unless_one_is_chosen():
     for providers in (["indeed"], ["linkedin", "glassdoor"]):
         with pytest.raises(ValueError, match="search one country's site"):
             JobSpyConfig.model_validate({"query": "engineer", "providers": providers})
+
+
+def test_glassdoor_asks_for_the_window_it_keeps():
+    """fromAge N lists jobs younger than N days, and the newest have ageInDays 1."""
+    from openings._vendor.jobspy.glassdoor import Glassdoor
+    from openings._vendor.jobspy.model import Country, ScraperInput, Site
+
+    def scraper(hours):
+        glassdoor = Glassdoor()
+        glassdoor.base_url = "https://www.glassdoor.example"
+        glassdoor.scraper_input = ScraperInput(
+            site_name=[Site("glassdoor")],
+            search_term="engineer",
+            country_indeed=Country("switzerland"),
+            hours_old=hours,
+        )
+        return glassdoor
+
+    def view(age):
+        return {
+            "header": {
+                "locationName": "Zürich",
+                "locationType": "S",
+                "payCurrency": None,
+                "payPeriod": None,
+                "payPeriodAdjustedPay": None,
+                "adOrderSponsorshipLevel": "Organic",
+                "ageInDays": age,
+                "employer": {"id": 1},
+                "employerNameFromSearch": "Example",
+            },
+            "job": {"jobTitleText": "Engineer", "listingId": age},
+            "map": {"country": "Switzerland"},
+            "overview": {},
+        }
+
+    for hours, from_age, kept in ((12, "2", [1]), (24, "2", [1]), (72, "4", [1, 2, 3])):
+        glassdoor = scraper(hours)
+        assert {"filterKey": "fromAge", "values": from_age} in glassdoor._filters()
+        assert [age for age in (1, 2, 3, 4) if glassdoor._process_job(view(age))] == kept

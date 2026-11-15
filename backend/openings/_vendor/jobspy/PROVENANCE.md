@@ -36,6 +36,9 @@ Local changes:
   JSON-escaped; its upstream relevance ordering remains unchanged.
 - LinkedIn distinguishes unavailable individual postings from provider-wide access
   challenges, preserving pending details and the shared transport's cooldown state.
+- Glassdoor's age filter: `fromAge` N lists jobs younger than N days and the newest
+  have `ageInDays` 1, so the search sends whole days + 1 and keeps `ageInDays` up to
+  the whole days (upstream sent `fromAge` 1 for a day or less, which lists nothing).
 
 Future upgrades must explicitly review this seam, reproduce the transport tests
 and bounded live provider checks, and update the pinned source hash and notice.
