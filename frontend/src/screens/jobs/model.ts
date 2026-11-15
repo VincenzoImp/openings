@@ -167,7 +167,20 @@ export const LANGUAGES: Record<string, string> = {
 };
 export const languageName = (code: string) => LANGUAGES[code] || code;
 /** The languages a posting's own language is recognised in. */
-export const POSTING_LANGUAGES = ["en", "de", "fr", "it"];
+export const POSTING_LANGUAGES = [
+  "en",
+  "de",
+  "fr",
+  "it",
+  "es",
+  "pt",
+  "nl",
+  "pl",
+  "sv",
+  "da",
+  "no",
+  "fi",
+];
 const either = (codes: string[]) => codes.map(languageName).join(" or ");
 
 /* ------------------------------------------------------------ the filters */

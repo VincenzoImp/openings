@@ -24,6 +24,10 @@ export const LANGUAGES: [string, string][] = [
   ["nl", "Dutch"],
   ["pt", "Portuguese"],
   ["pl", "Polish"],
+  ["sv", "Swedish"],
+  ["da", "Danish"],
+  ["no", "Norwegian"],
+  ["fi", "Finnish"],
 ];
 
 export interface About {
