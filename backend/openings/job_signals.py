@@ -181,13 +181,16 @@ def unlist_missing(conn, source, started_at, stamp):
         return []
     filters = (source.get("config") or {}).get("filters") or {}
     rows = conn.execute(
-        "SELECT p.id,p.job_id,j.title,j.location FROM postings p JOIN jobs j ON j.id=p.job_id "
+        "SELECT p.id,p.job_id,j.title,j.location,j.company,j.metadata FROM postings p "
+        "JOIN jobs j ON j.id=p.job_id "
         "WHERE p.identity>=? AND p.identity<? AND p.unlisted_at IS NULL AND p.last_seen_at<?",
         (prefix, prefix + "￿", started_at),
     ).fetchall()
     marked = []
-    for posting_id, job_id, title, location in rows:
-        if not matches_filters({"title": title, "location": location}, filters):
+    for posting_id, job_id, title, location, company, metadata in rows:
+        # The same facts the run filtered on, remote flags included.
+        posting = {"title": title, "location": location, "company": company}
+        if not matches_filters({**posting, "metadata": json.loads(metadata or "{}")}, filters):
             continue  # the filters changed: the run could not have seen it
         conn.execute("UPDATE postings SET unlisted_at=? WHERE id=?", (stamp, posting_id))
         if job_id not in marked:
