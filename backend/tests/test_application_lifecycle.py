@@ -28,6 +28,7 @@ def test_summaries_filtering_and_merge_preserve_application_intent(workspace):
     assert reopening.value.details["application_id"] == current["id"]
     workspace.create_application({"job_id": second["id"]})
     expected = {key: current[key] for key in ("id", "stage", "outcome", "version")}
+    expected["ready"] = False
     summary = next(row for row in workspace.list_jobs()["items"] if row["id"] == first["id"])
     assert summary["application"] == workspace.get_job(first["id"])["application"] == expected
     assert summary["application_count"] == 2

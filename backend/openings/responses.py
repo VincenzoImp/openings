@@ -163,6 +163,7 @@ class Skill(Out):
 class ApplicationRef(Out):
     id: str
     stage: str
+    ready: bool = False
     outcome: str | None = None
     version: int
 

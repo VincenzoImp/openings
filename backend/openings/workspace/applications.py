@@ -159,7 +159,12 @@ class ApplicationReads:
             # Undated or unprioritized attempts follow the planned ones.
             "deadline": "app.deadline IS NULL,app.deadline,app.priority IS NULL,app.priority,app.updated_at DESC",
             "priority": "app.priority IS NULL,app.priority,app.deadline IS NULL,app.deadline,app.updated_at DESC",
+            # Ready, Shortlisted with a deadline, waiting past the no-reply period, the rest.
+            "needs": f"CASE WHEN {READY_SQL} THEN 0 WHEN app.status='shortlisted' AND app.deadline "
+            f"IS NOT NULL THEN 1 WHEN {REPLY_OVERDUE_SQL} THEN 2 ELSE 3 END,"
+            "app.deadline IS NULL,app.deadline,app.priority IS NULL,app.priority,app.updated_at DESC",
         }.get(sort, "app.updated_at DESC")
+        order_args = [cutoff] if sort == "needs" else []
         with self.db.connect() as connection:
             projection = "app.id,app.job_id,app.status,app.outcome,app.version,app.applied_at,app.created_at,app.updated_at,app.concluded_on,"
             projection += "app.priority,app.deadline,app.required_documents,app.requirements,"
@@ -176,7 +181,7 @@ class ApplicationReads:
                 + " ORDER BY "
                 + order
                 + ",app.id LIMIT ? OFFSET ?",
-                (*args, min(max(int(limit), 1), 200), max(int(offset), 0)),
+                (*args, *order_args, min(max(int(limit), 1), 200), max(int(offset), 0)),
             ).fetchall()
             total = connection.execute("SELECT count(*)" + base + where, args).fetchone()[0]
             counts = dict.fromkeys(STAGES, 0)

@@ -68,7 +68,7 @@ export function useApplicationList(params: ListParams, limit = PAGE) {
     q: params.q || undefined,
     outcome: (params.outcome || undefined) as ListQuery["outcome"],
     needs: params.waiting ? "reply_overdue" : undefined,
-    sort: params.sort === "needs" ? "deadline" : params.sort,
+    sort: params.sort,
     priority: params.priority ? Number(params.priority) : undefined,
     source: params.source || undefined,
     ...deadlineQuery(params.deadline),
@@ -102,16 +102,20 @@ export function useApplicationList(params: ListParams, limit = PAGE) {
   };
 }
 
-/** The Ready applications in Today's order: the send queue. */
+/** Every Ready application, in Today's order: the send queue. */
 export function useReadyQueue() {
   const query = useQuery({
     queryKey: ["applications", "list", { stage: "ready", sort: "deadline" }],
     queryFn: ({ signal }) =>
-      call(
-        api.GET("/api/v1/applications", {
-          params: { query: { stage: "ready", sort: "deadline", limit: PAGE } },
-          signal,
-        }),
+      readRows(Number.POSITIVE_INFINITY, (limit, offset) =>
+        call(
+          api.GET("/api/v1/applications", {
+            params: {
+              query: { stage: "ready", sort: "deadline", limit, offset },
+            },
+            signal,
+          }),
+        ),
       ),
     refetchInterval: POLL_MS,
   });

@@ -17,6 +17,7 @@ from ..job_signals import (
 )
 from ..posting import posting_complete, posting_complete_sql
 from ..preferences import spoken_languages
+from .readiness import READY_SQL
 
 # Where a job came from: its provider, its hiring platform or manual.
 JOB_SOURCE_SQL = (
@@ -65,7 +66,11 @@ class JobReads:
         columns += [
             "substr(j.posting,1,240) AS j_posting_preview",
             posting_complete_sql() + " AS j_complete",
-            "(SELECT json_object('id',id,'stage',status,'outcome',outcome,'version',version) FROM applications WHERE job_id=j.id ORDER BY (status='closed'),created_at DESC,id DESC LIMIT 1) AS j_application",
+            "(SELECT json_object('id',app.id,'stage',app.status,'ready',json(CASE WHEN "
+            + READY_SQL
+            + " THEN 'true' ELSE 'false' END),'outcome',app.outcome,'version',app.version) "
+            "FROM applications app WHERE app.job_id=j.id "
+            "ORDER BY (app.status='closed'),app.created_at DESC,app.id DESC LIMIT 1) AS j_application",
             "(SELECT count(*) FROM applications WHERE job_id=j.id) AS j_application_count",
             SIGNALS_SQL.format(alias="j") + " AS j_signals",
             UNLISTED_SQL.format(alias="j") + " AS j_unlisted_at",
@@ -102,10 +107,17 @@ class JobReads:
             ):
                 row["postings"].append(dict(posting))
             application = connection.execute(
-                "SELECT id,status AS stage,outcome,version,(SELECT count(*) FROM applications WHERE job_id=?) AS application_count FROM applications WHERE job_id=? ORDER BY (status='closed'),created_at DESC,id DESC LIMIT 1",
+                "SELECT app.id,app.status AS stage,"
+                + READY_SQL
+                + " AS ready,app.outcome,app.version,"
+                "(SELECT count(*) FROM applications WHERE job_id=?) AS application_count "
+                "FROM applications app WHERE app.job_id=? "
+                "ORDER BY (app.status='closed'),app.created_at DESC,app.id DESC LIMIT 1",
                 (row["id"], row["id"]),
             ).fetchone()
             row["application"] = dict(application) if application else None
+            if application:
+                row["application"]["ready"] = bool(application["ready"])
             row["application_count"] = (
                 row["application"].pop("application_count") if application else 0
             )
@@ -204,8 +216,9 @@ class JobReads:
             conditions.append("j.company=?")
             args.append(company)
         if location:
-            conditions.append("j.location LIKE ?")
-            args.append("%" + location + "%")
+            conditions.append("j.location LIKE ? ESCAPE '\\'")
+            escaped = location.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            args.append("%" + escaped + "%")
         if source:
             conditions.append(JOB_SOURCE_SQL + "=?")
             args.append(source)
@@ -333,15 +346,11 @@ class JobReads:
             if include_counts:
                 result["counts"] = self._job_counts(
                     connection,
-                    q,
-                    company=company,
-                    location=location,
-                    source=source,
-                    remote=remote,
-                    job_type=job_type,
-                    created_since=created_since,
-                    created_until=created_until,
-                    complete=complete,
+                    **{
+                        key: value
+                        for key, value in filters.items()
+                        if key not in ("triage", "dismissed_by")
+                    },
                     **signal_filters,
                 )
             if not include_facets:

@@ -2120,6 +2120,11 @@ export interface components {
       id: string;
       /** Outcome */
       outcome?: string | null;
+      /**
+       * Ready
+       * @default false
+       */
+      ready: boolean;
       /** Stage */
       stage: string;
       /** Version */
@@ -5467,9 +5472,10 @@ export interface operations {
           | "stage"
           | "applied"
           | "deadline"
-          | "priority";
+          | "priority"
+          | "needs";
         source?: string | null;
-        /** @description ready: Shortlisted, documents done, nothing blocking. */
+        /** @description ready: Shortlisted, documents done, unblocked. */
         stage?:
           | (
               | "shortlisted"
@@ -8621,7 +8627,7 @@ export interface operations {
         /** @description Such as fulltime or internship. */
         job_type?: string | null;
         limit?: number;
-        /** @description Exactly this location text. */
+        /** @description Location contains this text. */
         location?: string | null;
         offset?: number;
         /** @description Written in this language (ISO 639-1 code or name). */

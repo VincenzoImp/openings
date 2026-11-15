@@ -25,6 +25,7 @@ from .models import (
     SourceRunInput,
     SourcesSave,
 )
+from .runs import FAILING_SOURCES_SQL
 
 FETCH_LIMIT = 20
 
@@ -104,11 +105,7 @@ class SourceBatches:
     def read_collection(self, value: CollectionQuery | None = None):
         include = set(value.include) if value else set()
         collection = self.get_collection()
-        collection["sources_failing"] = self.db.one(
-            "SELECT count(*) AS n FROM sources s WHERE (SELECT t.state FROM tasks t WHERE "
-            "t.source_id=s.id AND t.kind='collect' ORDER BY t.created_at DESC,t.id DESC LIMIT 1)"
-            "='failed'"
-        )["n"]
+        collection["sources_failing"] = self.db.one(FAILING_SOURCES_SQL)["n"]
         if "kinds" in include:
             collection["kinds"] = self.source_schemas()
         if "providers" in include:

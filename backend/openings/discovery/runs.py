@@ -21,6 +21,16 @@ def parse_time(value: str | None) -> datetime | None:
     return datetime.fromisoformat(value) if value else None
 
 
+# Sources whose latest check failed, as the Sources screen reads a check: one of its
+# tasks failed and none is still queued or running.
+FAILING_SOURCES_SQL = (
+    "SELECT count(*) AS n FROM sources s JOIN collection_runs r ON r.id=(SELECT r2.id FROM "
+    "collection_runs r2 WHERE r2.source_id=s.id ORDER BY r2.created_at DESC,r2.id DESC LIMIT 1) "
+    "WHERE EXISTS(SELECT 1 FROM tasks t WHERE t.run_id=r.id AND t.state='failed') "
+    "AND NOT EXISTS(SELECT 1 FROM tasks t WHERE t.run_id=r.id AND t.state IN ('queued','running'))"
+)
+
+
 class RunOperations:
     """Collection settings, provider policies and logical runs of DiscoveryService."""
 

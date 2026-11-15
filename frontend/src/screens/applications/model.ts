@@ -142,17 +142,20 @@ export function statusPhrase(
   if (waited <= 0) return { text: "Applied today" };
   return toned(
     `${sent} · no reply ${plural(waited, "day")}`,
-    waited > noReplyDays ? "warning" : undefined,
+    overdue(app, noReplyDays, now) ? "warning" : undefined,
   );
 }
 
+const DAY_MS = 86_400_000;
+
 /** Whether a sent application has waited longer than the no-reply period. */
 export function overdue(app: AppFacts, noReplyDays: number, now = new Date()) {
+  // As the server counts: more than the period's hours since it was sent.
   return (
     app.stage === "applied" &&
     !app.last_reply &&
     !!app.applied_at &&
-    daysBetween(app.applied_at, now) > noReplyDays
+    now.getTime() - new Date(app.applied_at).getTime() > noReplyDays * DAY_MS
   );
 }
 
@@ -362,7 +365,7 @@ export function followUpLine(
     ? { text: "Applied today" }
     : toned(
         `${sent} · no reply for ${plural(waited, "day")}`,
-        waited > noReplyDays ? "warning" : undefined,
+        overdue(app, noReplyDays, now) ? "warning" : undefined,
       );
 }
 

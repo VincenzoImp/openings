@@ -242,7 +242,8 @@ export type JobPatch = Schema<"JobPatch">;
 /** Correct a job's details, with the version that was read. */
 export function useCorrect(id: string, onReload?: () => void) {
   return useVersionedMutation({
-    touches: ["jobs"],
+    // Applications show the job's title and company.
+    touches: ["jobs", "applications"],
     onReload,
     mutationFn: (patch: JobPatch) =>
       call(

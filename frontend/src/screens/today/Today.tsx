@@ -109,6 +109,7 @@ export default function Today() {
             {waiting && waiting.total > 0 && (
               <Waiting
                 rows={waiting.items}
+                total={waiting.total}
                 days={waiting.no_reply?.days ?? NO_REPLY_DAYS}
               />
             )}

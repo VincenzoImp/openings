@@ -101,8 +101,9 @@ export async function call<Data>(
 export const MAX_ROWS = 200;
 
 /**
- * The first `limit` rows of a list, read MAX_ROWS at a time. The first page
- * gives the total and counts; a row that moved between pages appears once.
+ * The first `limit` rows of a list (every row with Infinity), read MAX_ROWS
+ * at a time. The first page gives the total and counts; a row that moved
+ * between pages appears once.
  */
 export async function readRows<Page extends { items: { id: string }[] }>(
   limit: number,

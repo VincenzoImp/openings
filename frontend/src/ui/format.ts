@@ -40,6 +40,15 @@ export function dayOf(value: Date | string | number) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
+/**
+ * The moment a local calendar day starts, as the API takes times: a bare
+ * date would be read as midnight UTC.
+ */
+export function dayStart(day: string) {
+  const [year, month, date] = day.split("-").map(Number);
+  return new Date(year, month - 1, date).toISOString();
+}
+
 /** "2026-11-14": the local calendar day, as the API takes dates. */
 export function isoDay(date = new Date()) {
   return [

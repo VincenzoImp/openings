@@ -4,7 +4,7 @@ import { api, call, type Schema } from "../../api/client";
 import type { operations } from "../../api/schema";
 import { useApiMutation } from "../../query/mutation";
 import { POLL_MS } from "../../query/query";
-import { isoDay } from "../../ui/format";
+import { dayStart, isoDay } from "../../ui/format";
 
 type Query = NonNullable<
   operations["applications_list"]["parameters"]["query"]
@@ -43,7 +43,7 @@ export function useToday() {
   });
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
-  const since = isoDay(yesterday);
+  const since = dayStart(isoDay(yesterday));
   const newJobs = useQuery({
     queryKey: ["jobs", "list", { triage: "new", limit: 3, sort: "newest" }],
     refetchInterval: POLL_MS,
@@ -117,7 +117,7 @@ type Bulk = Schema<"ApplicationBulk">;
 /** Close or reopen applications; one call, each item on its own. */
 export function useBulkApplications() {
   return useApiMutation({
-    touches: ["applications", "stats"],
+    touches: ["applications", "stats", "jobs"],
     mutationFn: (body: Bulk) =>
       call(api.POST("/api/v1/applications/bulk", { body })),
   });
@@ -128,7 +128,7 @@ export type ReplyKind = "interview" | "rejection" | "offer" | "other";
 /** Record the employer's reply; the server moves the stage. */
 export function useRecordReply() {
   return useApiMutation({
-    touches: ["applications", "stats"],
+    touches: ["applications", "stats", "jobs"],
     mutationFn: ({
       id,
       version,

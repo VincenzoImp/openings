@@ -460,7 +460,7 @@ class JobQuery(Input):
         default=None, max_length=300, description="Exactly this company name."
     )
     location: str | None = Field(
-        default=None, max_length=500, description="Exactly this location text."
+        default=None, max_length=500, description="Location contains this text."
     )
     source: str | None = Field(
         default=None,
@@ -543,7 +543,7 @@ class ApplicationQuery(Input):
     stage: Literal["shortlisted", "ready", "applied", "interview", "offer", "closed"] | None = (
         Field(
             default=None,
-            description="ready: Shortlisted, documents done, nothing blocking.",
+            description="ready: Shortlisted, documents done, unblocked.",
         )
     )
     needs: Literal["documents", "reply_overdue"] | None = Field(
@@ -569,6 +569,7 @@ class ApplicationQuery(Input):
         "applied",
         "deadline",
         "priority",
+        "needs",
     ] = "updated"
     limit: int = Field(default=100, ge=1, le=200)
     offset: int = Field(default=0, ge=0)
