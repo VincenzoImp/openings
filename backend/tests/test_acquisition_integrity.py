@@ -368,3 +368,32 @@ def test_workday_reads_one_region_with_facets_from_its_board_url():
             "searchText": "",
         }
     ]
+
+
+def test_workday_keeps_a_known_multi_location_role_whose_detail_is_skipped():
+    """A detail read in the last day is not read again: the archive's locations match."""
+    key = "workday:example.wd5.myworkdayjobs.com/Careers:/job/1"
+    source = {
+        "kind": "workday",
+        "name": "Example",
+        "config": {
+            "board": "example.wd5.myworkdayjobs.com/Careers",
+            "filters": {"locations": ["Zurich"]},
+        },
+        "detail_checked": {key: company.now()},
+    }
+
+    def request(url, *, body=None, **kwargs):
+        assert body is not None, "the detail is not read again"
+        return json.dumps(
+            {
+                "total": 1,
+                "jobPostings": [
+                    {"externalPath": "/job/1", "title": "Engineer", "locationsText": "2 Locations"}
+                ],
+            }
+        ).encode()
+
+    known = {key: {"locations": "Bern · Zurich"}}
+    rows = company.collect(source, request, feeds.html_text, known=known)
+    assert [row["location"] for row in rows] == ["Bern · Zurich"]
