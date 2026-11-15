@@ -266,3 +266,74 @@ def test_workday_filters_later_metadata_pages_and_reports_candidate_cap():
     assert listing_calls == list(range(0, 200, 20)) and len(details) == 1
     assert rows[0]["source_key"].endswith("/job/150")
     assert source["candidate_capped"] is True
+
+
+def test_workday_stops_at_its_total_and_matches_every_location_of_a_role():
+    source = {
+        "kind": "workday",
+        "name": "Example",
+        "config": {
+            "board": "example.wd5.myworkdayjobs.com/Careers",
+            "max_candidates": 200,
+            "filters": {"locations": ["Zurich"]},
+        },
+    }
+    listing_calls = []
+
+    def request(url, *, body=None, **kwargs):
+        if body is not None:
+            listing_calls.append(body["offset"])
+            # 40 roles; past the end Workday answers with the first page again.
+            start = body["offset"] if body["offset"] < 40 else 0
+            return json.dumps(
+                {
+                    **({"total": 40} if body["offset"] == 0 else {}),
+                    "jobPostings": [
+                        {
+                            "externalPath": f"/job/{i}",
+                            "title": "Engineer",
+                            "locationsText": "2 Locations" if i == 1 else "Paris",
+                        }
+                        for i in range(start, start + 20)
+                    ],
+                }
+            ).encode()
+        return json.dumps(
+            {
+                "jobPostingInfo": {
+                    "jobDescription": "Build APIs",
+                    "location": "Paris",
+                    "additionalLocations": ["Zurich"],
+                }
+            }
+        ).encode()
+
+    rows = company.collect(source, request, feeds.html_text)
+    assert listing_calls == [0, 20]
+    assert [row["location"] for row in rows] == ["Paris · Zurich"]
+
+
+def test_lever_and_ashby_postings_carry_their_other_locations(monkeypatch):
+    payloads = {
+        "lever": [
+            {
+                "id": "1",
+                "text": "Engineer",
+                "categories": {"location": "Paris", "allLocations": ["Paris", "Zurich"]},
+            }
+        ],
+        "ashby": {
+            "jobs": [
+                {
+                    "id": "2",
+                    "title": "Engineer",
+                    "location": "Paris",
+                    "secondaryLocations": [{"location": "Zurich"}, {"location": "Paris"}],
+                }
+            ]
+        },
+    }
+    for kind, payload in payloads.items():
+        monkeypatch.setattr(feeds, "_json", lambda url, payload=payload: payload)
+        source = {"kind": kind, "name": "Example", "config": {"board": "example"}}
+        assert [item["location"] for item in feeds.fetch_postings(source)] == ["Paris · Zurich"]

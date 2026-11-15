@@ -46,6 +46,12 @@ class TextParser(HTMLParser):
             self.parts.append(data)
 
 
+def _places(*places):
+    """Every location of a posting once, the primary first: "Paris · Zurich"."""
+    named = [str(place).strip() for place in places if place and str(place).strip()]
+    return " · ".join(dict.fromkeys(named))
+
+
 def html_text(value: str) -> str:
     parser = TextParser()
     parser.feed(html.unescape(html.unescape(value or "")))
@@ -62,7 +68,12 @@ def _json(url: str):
     try:
         return json.loads(fetch_bytes(url))
     except (ValueError, UnicodeError) as error:
-        raise DomainError(502, "source_format", "The source returned invalid JSON.") from error
+        # Often an error or maintenance page during an outage: tried again later.
+        raise DomainError(
+            503,
+            "source_unavailable",
+            "The source answered with a page that is not JSON; it is tried again later.",
+        ) from error
 
 
 def normalize_posting(item: dict) -> dict:
@@ -156,7 +167,10 @@ def fetch_postings(source: dict) -> list[dict]:
                     "source_key": f"lever:{board}:{row['id']}",
                     "title": row.get("text", "Untitled role"),
                     "company": name,
-                    "location": (row.get("categories") or {}).get("location", ""),
+                    "location": _places(
+                        (row.get("categories") or {}).get("location"),
+                        *((row.get("categories") or {}).get("allLocations") or []),
+                    ),
                     "url": row.get("hostedUrl", ""),
                     "posting": posting,
                     "metadata": {
@@ -199,7 +213,13 @@ def fetch_postings(source: dict) -> list[dict]:
                     "source_key": f"ashby:{board}:{identity}",
                     "title": row.get("title", "Untitled role"),
                     "company": name,
-                    "location": row.get("location", ""),
+                    "location": _places(
+                        row.get("location"),
+                        *(
+                            item.get("location") if isinstance(item, dict) else item
+                            for item in row.get("secondaryLocations") or []
+                        ),
+                    ),
                     "url": url,
                     "posting": row.get("descriptionPlain")
                     or html_text(row.get("descriptionHtml", "")),
