@@ -479,7 +479,8 @@ def seed_demo(app, client):
 
     def collect(key, title, company, location, source, days, **extra):
         board = "greenhouse" if source == "voltline" else None
-        kind = "feed" if source == "feed" else "search"
+        # A search's jobs come from a job site, as real ones do.
+        kind = "rss" if source == "feed" else "linkedin"
         url = (
             f"https://boards.greenhouse.io/voltline/jobs/{key}"
             if board
