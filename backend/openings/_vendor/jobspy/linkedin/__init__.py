@@ -160,7 +160,6 @@ class LinkedIn(Scraper):
             "keywords": scraper_input.search_term,
             "location": scraper_input.location,
             "distance": scraper_input.distance,
-            "sortBy": "DD",
         }
         if scraper_input.easy_apply:
             params["f_AL"] = "true"

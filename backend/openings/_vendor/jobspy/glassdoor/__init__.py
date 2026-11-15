@@ -202,8 +202,7 @@ class Glassdoor(Scraper):
         if self.scraper_input.location and self.scraper_input.distance is not None:
             filters["radius"] = self.scraper_input.distance
         if hours_old := self.scraper_input.hours_old:
-            # fromAge N lists jobs younger than N days, and the newest are 1 day old:
-            # fromAge 1 always answers an empty list.
+            # fromAge N lists jobs younger than N days, and a day-old job is 1.
             filters["fromAge"] = math.ceil(hours_old / 24) + 1
         job_type = self.scraper_input.job_type
         if job_type in job_type_codes:
@@ -221,7 +220,7 @@ class Glassdoor(Scraper):
         header = job.header
         age = header.ageInDays
         hours_old = self.scraper_input.hours_old
-        # ageInDays counts today's jobs as 1: keep what the requested window covers.
+        # A day-old job has ageInDays 1: keep what the requested window covers.
         if hours_old and age > math.ceil(hours_old / 24):
             return None
 

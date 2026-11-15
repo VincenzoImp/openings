@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.27.2 — 2026-11-16
+
+**Fixes**
+
+- LinkedIn searches no longer send `sortBy`, which LinkedIn's guest search ignores; the notes on the vendored JobSpy code match what the sites do. The Glassdoor age fix of 0.27.1 is reported upstream.
+
 ## 0.27.1 — 2026-11-15
 
 **Fixes**
