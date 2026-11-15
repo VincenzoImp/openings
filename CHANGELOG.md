@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased
+
+Counts, filters and lists that agree with each other past the first 200 rows. No schema change.
+
+**Fixes**
+
+- **Show more** works beyond 200 jobs or applications; lists are read 200 rows at a time.
+- Applications: the Shortlisted tab, the Priority, Deadline and Source filters and **Most urgent first** cover every application, not only the rows loaded, so tab counts, groups and Show more match the list. The Source filter offers every source.
+- Jobs: the Company, Location and Source filters offer the values of the jobs the other filters leave, most frequent first, instead of the first 200 alphabetically. Location matches text containing what you choose. All shows **Ready** for a ready application.
+- Today: Waiting for a reply counts every overdue application and its link opens them; Needs attention opens all applications by urgency. "Since yesterday" and the Found filter start at your local midnight.
+- An application waits for a reply "too long" by the same rule everywhere. The Ready page counts every Ready application and has one link to the employer's site.
+- The setup checklist, Jobs and applications refresh after the writes that change them.
+
+**REST and MCP**
+
+- `applications_list` takes `ready`, `source`, `priority`, `has_deadline`, `deadline_since`, `deadline_until` and `sort=needs`, and returns the `sources` of the matching applications.
+- `jobs_list` facets follow the other filters; its counts follow `batch_id` and `dismissed_since`. A job's application says whether it is `ready`.
+- `workspace_context` counts `shortlisted` as open Shortlisted applications not yet Ready (it counted shortlisted jobs). `sources_failing` counts a source whose latest check failed on any site.
+
 ## 0.25.0 — 2026-11-14
 
 A stable Openings: a full review of the code, the interfaces, the dashboard, the tests and the docs, with every finding fixed. No schema change; your data is untouched. **REST and MCP change: update scripts and agent prompts that use the names below.**
