@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.27.3 — 2026-11-16
+
+**Fixes**
+
+- Workday: a known role with several locations stays listed when its detail is not read again; the run uses the locations it stored (#315). A role marked no longer listed by mistake is listed again on the next check.
+
 ## 0.27.2 — 2026-11-16
 
 **Fixes**

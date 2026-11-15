@@ -622,17 +622,22 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
             path = row.get("externalPath") or ""
             if not path.startswith("/job/") or ".." in path:
                 continue
-            full = detail(f"{kind}:{board}:{path}", api + path).get("jobPostingInfo") or {}
+            key = f"{kind}:{board}:{path}"
+            full = detail(key, api + path).get("jobPostingInfo") or {}
+            located = places(full.get("location"), *(full.get("additionalLocations") or []))
+            # A detail read in the last day is skipped: its locations come from the archive.
+            previous = known.get(key, {}) if isinstance(known, dict) else {}
+            located = located or previous.get("locations") or ""
             add(
                 {"listing": row, "detail": full},
                 path,
                 row.get("title"),
                 full.get("externalUrl") or public + path,
-                places(full.get("location"), *(full.get("additionalLocations") or []))
-                or row.get("locationsText"),
+                located or listed_place(row),
                 full.get("jobDescription"),
                 job_type=full.get("timeType"),
                 published_at=full.get("startDate"),
+                locations=located,
             )
     elif kind == "oracle":
         host, site = board.split("/", 1)
