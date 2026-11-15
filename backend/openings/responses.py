@@ -739,7 +739,7 @@ class Source(Record):
     filters: Json
     schedule: Json
     counts: dict[str, int] = Field(
-        default={}, description="Jobs found, shortlisted, applied and replied."
+        default={}, description="Jobs found, ever shortlisted, applied and replied."
     )
     last_run: Json | None = None
     last_outcome: str | None = None

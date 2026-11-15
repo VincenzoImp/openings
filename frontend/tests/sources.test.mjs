@@ -24,7 +24,7 @@ test("a source row counts what its jobs became, without zeros", () => {
   const line = sources.countsLine;
   assert.equal(
     line({ found: 31, shortlisted: 9, applied: 3, replied: 1 }),
-    "31 found · 9 shortlisted · 3 applied",
+    "31 found · 9 ever shortlisted · 3 applied",
   );
   assert.equal(
     line({ found: 12, shortlisted: 0, applied: 2 }),

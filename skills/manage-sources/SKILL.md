@@ -27,8 +27,9 @@ One query and one place per search; split "Zurich or Basel" into two.
 
 ## Tune a noisy source
 
-1. `sources_list` gives each source's counts: found, shortlisted, applied,
-   replied. Judge a source only after it has found enough jobs.
+1. `sources_list` gives each source's cumulative counts, closed applications
+   included: found, shortlisted, applied, replied. Judge a source only after it
+   has found enough jobs.
 2. Read why its jobs were dismissed: `jobs_list` of dismissed jobs, narrowed
    to its site or company, shows each dismissal reason. A recurring, clear
    mismatch (another field, a ruled out title or language) is worth a filter;

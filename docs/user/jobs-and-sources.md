@@ -151,8 +151,9 @@ already known, invalid, waiting for text and text unavailable. A
 Automatic candidates enter your jobs only when usable posting text exists. Those
 still waiting stay in the check's progress and resume by themselves.
 
-Each source row shows what it found, such as "31 found · 9 shortlisted ·
-3 applied". A source that finds many jobs and few you keep is a candidate to
+Each source row shows what it found, such as "31 found · 9 ever shortlisted ·
+3 applied". The counts add up over time: a job stays counted as shortlisted
+after its application is closed. A source that finds many jobs and few you keep is a candidate to
 narrow or pause.
 
 ### Request limits
