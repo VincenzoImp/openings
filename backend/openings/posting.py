@@ -39,7 +39,7 @@ def remote_scope(item):
 
 
 def excluded_title(title, terms):
-    """Match whole words so "SAP" does not exclude "Sapling"."""
+    """Match whole words so "SAP" does not exclude "Sapling" (titles and company names)."""
     title = str(title or "").casefold()
     return any(
         re.search(r"(?<!\w)" + re.escape(term.casefold()) + r"(?!\w)", title) for term in terms
@@ -48,6 +48,11 @@ def excluded_title(title, terms):
 
 def matches_filters(item, filters):
     if excluded_title(item.get("title"), filters.get("exclude_titles") or []):
+        return False
+    # Aggregators and agencies that re-post other companies' jobs.
+    if item.get("company") and excluded_title(
+        item.get("company"), filters.get("exclude_companies") or []
+    ):
         return False
     titles = filters.get("titles") or []
     if titles and not any(

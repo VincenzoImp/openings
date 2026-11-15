@@ -41,6 +41,7 @@ interface Draft {
   hours: number;
   include: string;
   exclude: string;
+  companies: string;
   url: string;
 }
 
@@ -68,6 +69,7 @@ function draftOf(
     hours: Number(config.hours_old) || 72,
     include: words(source?.filters.titles),
     exclude: words(source?.filters.exclude_titles),
+    companies: words(source?.filters.exclude_companies),
     url: source?.url || text(config.url),
   };
 }
@@ -209,6 +211,7 @@ function Editor({
       ...(source?.filters ?? template?.filters ?? {}),
       titles: terms(draft.include),
       exclude_titles: terms(draft.exclude),
+      exclude_companies: terms(draft.companies),
     };
     if (draft.kind === "search") {
       const config: Record<string, unknown> = {
@@ -455,6 +458,19 @@ function Editor({
               />
             </Field>
           </div>
+          {draft.kind === "search" && (
+            <Field
+              label="Skip companies"
+              optional
+              hint="Aggregators or agencies that re-post other companies' jobs, separated by commas."
+            >
+              <Input
+                value={draft.companies}
+                placeholder="Example Jobs Aggregator"
+                onChange={(event) => set("companies", event.target.value)}
+              />
+            </Field>
+          )}
           {(preview || previewError || test.isPending) && (
             <TestResults
               preview={preview}

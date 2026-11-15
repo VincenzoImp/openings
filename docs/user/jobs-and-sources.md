@@ -117,8 +117,10 @@ Paste the careers page or feed URL; the form names the detected service, and
 `max_results` over REST and MCP). **Title must include** keeps matching titles and
 **Title must not include** skips terms such as `sales`; any matching term is
 enough. Over REST and MCP, `filters.locations` also keeps matching places, and
-unknown locations stay visible for review. Lever pages have a region (`global` or
-`eu`). Careers pages and feeds can hold undated jobs, so **Posted within** does not
+unknown locations stay visible for review. A search's **Skip companies**
+(`filters.exclude_companies`) leaves out aggregators and agencies that re-post
+other companies' jobs, matching whole words of the company name. Lever pages have
+a region (`global` or `eu`). Careers pages and feeds can hold undated jobs, so **Posted within** does not
 apply to them.
 
 ### Schedule

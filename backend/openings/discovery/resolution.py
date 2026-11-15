@@ -201,6 +201,6 @@ def resolve_source(value: dict) -> dict:
     config["filters"] = (
         value.get("filters")
         or config.get("filters")
-        or {"titles": [], "locations": [], "exclude_titles": []}
+        or {"titles": [], "locations": [], "exclude_titles": [], "exclude_companies": []}
     )
     return {"kind": kind, "config": config, "url": url}
