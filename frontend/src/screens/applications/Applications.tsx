@@ -47,6 +47,7 @@ import {
   reopenStage,
   sortApplications,
 } from "./model";
+import { sourceName } from "../jobs/model";
 import { rememberList } from "./back";
 import { ApplicationRowView, pageHref } from "./Row";
 import { PERIODS, StatsView } from "./Stats";
@@ -133,9 +134,9 @@ function filterMenu(
     ...(sources.length > 1
       ? [
           group(
-            "Source",
+            "Job site",
             "source",
-            Object.fromEntries(sources.map((name) => [name, name])),
+            Object.fromEntries(sources.map((name) => [name, sourceName(name)])),
           ),
         ]
       : []),

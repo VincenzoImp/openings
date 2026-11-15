@@ -14,7 +14,8 @@ next job is shown, and every decision can be undone from its toast or with `z`.
   (up to 500 characters). Dismissed jobs keep their identity and history, so
   later collection does not bring them back as new. **Dismissed** shows who
   dismissed each job and why; **Filter › Dismissed by** narrows it to **You**,
-  **An agent** or **Job sources**. **Restore** (`r`) returns a job, or a
+  **An agent**, **Job sources** or **Not recorded** (dismissed before 0.21,
+  when Openings did not record who did it). **Restore** (`r`) returns a job, or a
   selection, to New.
 - **Forget permanently…** in the job's `…` menu removes the job, its identities
   and its applications, notes and files after asking. Collection can find it
@@ -47,10 +48,10 @@ Each job carries labels computed without a model:
 
 | Label | Meaning |
 |---|---|
-| Posting language | The language the posting is written in. |
+| Posting language | The language the posting is written in, when it is English, German, French, Italian, Spanish, Portuguese, Dutch, Polish, Swedish, Danish, Norwegian or Finnish. |
 | Requires | The languages it requires; one language of a group is enough. A language mentioned only as a plus is not required. |
 | Possible duplicate | It probably repeats an earlier job. |
-| No longer listed | A company careers page stopped listing it. Set only when a check read the whole page. |
+| No longer listed | A company careers page stopped listing it. Set only when a check read the whole page; a page that suddenly lists nothing must list nothing at the next check too. |
 
 Labels describe and filter; they never dismiss a job. **Filter** by language,
 label, source or who dismissed. List your languages under
@@ -100,7 +101,7 @@ by hand.
 |---|---|
 | Keywords | Required. One search per query and place. |
 | Location | Empty. Use a place the portal knows. |
-| Country | Empty. Indeed and Glassdoor need one, such as `switzerland` or `uk`; LinkedIn uses the location alone. |
+| Country | Empty. Indeed and Glassdoor need one, such as `germany` or `uk`; LinkedIn uses the location alone. |
 | Job sites | All three; choose the ones you want. |
 | Posted within | 72 hours, 1 to 8760. |
 | Result limit (REST and MCP: `results_wanted`) | 20 per portal per check, 1 to 50. Known jobs count. |
@@ -116,8 +117,14 @@ Paste the careers page or feed URL; the form names the detected service, and
 `max_results` over REST and MCP). **Title must include** keeps matching titles and
 **Title must not include** skips terms such as `sales`; any matching term is
 enough. Over REST and MCP, `filters.locations` also keeps matching places, and
-unknown locations stay visible for review. Lever pages have a region (`global` or
-`eu`). Careers pages and feeds can hold undated jobs, so **Posted within** does not
+unknown locations stay visible for review. A search's **Skip companies**
+(`filters.exclude_companies`) leaves out aggregators and agencies that re-post
+other companies' jobs, matching whole words of the company name. Lever pages have
+a region (`global` or `eu`). A Workday board lists at most about 2,000 roles; to
+follow one region of a large board, filter the board on its own site (for
+example by location) and paste that URL: its facets (such as
+`?locationHierarchy1=…`) are kept in `config.facets`, so only those roles are
+read. Careers pages and feeds can hold undated jobs, so **Posted within** does not
 apply to them.
 
 ### Schedule
@@ -144,8 +151,9 @@ already known, invalid, waiting for text and text unavailable. A
 Automatic candidates enter your jobs only when usable posting text exists. Those
 still waiting stay in the check's progress and resume by themselves.
 
-Each source row shows what it found, such as "31 found · 9 shortlisted ·
-3 applied". A source that finds many jobs and few you keep is a candidate to
+Each source row shows what it found, such as "31 found · 9 ever shortlisted ·
+3 applied". The counts add up over time: a job stays counted as shortlisted
+after its application is closed. A source that finds many jobs and few you keep is a candidate to
 narrow or pause.
 
 ### Request limits
@@ -157,8 +165,10 @@ scheduled and manual checks, redirects and detail pages. When a site answers
 "too many requests" (HTTP 429), Openings pauses requests to it until the time the
 site names; the pause survives restarts. REST and MCP can lift it early with
 `clear_cooldown`.
-A login page is reported as blocked. A portal can still block requests or change
-its pages; paste the posting when a page cannot be read.
+A login page is reported as blocked. A careers page that does not exist (HTTP 404,
+or a redirect to the job site's home page) fails at once and names its board; check
+its URL. A portal can still block requests or change its pages; paste the posting
+when a page cannot be read.
 
 ![Sources with the schedule line, source rows and their status](../images/sources.png)
 

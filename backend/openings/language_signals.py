@@ -1,7 +1,8 @@
 """The language a posting is written in and the languages it says a candidate needs.
 
 Both are deterministic: fixed word lists and phrase rules in English, German,
-French and Italian, without a model, a dictionary download or the network.
+French, Italian, Spanish, Portuguese, Dutch, Polish, Swedish, Danish, Norwegian and
+Finnish, without a model, a dictionary download or the network.
 
 **Posting language.** Very frequent function words of each language are counted
 in the first words of the text; a word that several languages share counts for
@@ -10,13 +11,13 @@ has enough evidence and clearly leads the second; otherwise the language is
 unknown (``None``). The confidence is the winner's share of the two best scores.
 
 **Stated requirements.** A requirement is a language name bound to a cue next to
-it: a prefix such as "fluent", "fließend", "maîtrise du" or "ottima conoscenza
-della", or a suffix such as "skills", "C1", "Kenntnisse", "courant", "exigé" or
-"richiesto". Names joined by "and", commas or slashes form one list sharing its
+it: a prefix such as "fluent", "fließend", "maîtrise du", "dominio del" or "biegła
+znajomość", or a suffix such as "skills", "C1", "Kenntnisse", "exigé", "vereist" or
+"krävs". Names joined by "and", commas or slashes form one list sharing its
 cues; names joined by "or" are alternatives, one of which is enough. A cue such
-as "a plus", "von Vorteil", "un atout" or "titolo preferenziale" makes the list
-an advantage, which is not a requirement, and a negation ("no", "keine", "pas", "non")
-nearby cancels it. A name that only describes something else ("German market",
+as "a plus", "von Vorteil", "un atout", "se valorará", "pluspunt" or "meriterande"
+makes the list an advantage, which is not a requirement, and a negation ("no",
+"keine", "pas", "niet", "ikke", "ei") nearby cancels it. A name that only describes something else ("German market",
 "entreprise française", "deutsche Kunden") is not a language mention.
 """
 
@@ -24,7 +25,7 @@ import re
 import unicodedata
 
 # Bump when the rules change: stored signals of another format are computed again.
-FORMAT = 1
+FORMAT = 2
 
 # The posting's first words are enough to tell its language.
 _LANGUAGE_WORDS = 1500
@@ -56,26 +57,62 @@ _FUNCTION_WORDS = {
         "conoscenza lavoro sei siamo offriamo cerchiamo requisiti tuoi"
     ),
     "es": (
-        "el la los las de del y en un una para con por que es son nuestro nuestra tu su sus "
-        "se al como mas experiencia equipo ofrecemos buscamos trabajo conocimientos"
+        "el la los las lo de del y en a un una para con por que es son nuestro nuestra "
+        "nuestros nuestras tu tus su sus se al como mas muy tambien eres tienes hay donde "
+        "cuando experiencia equipo ofrecemos buscamos trabajo conocimientos puesto desarrollo"
+    ),
+    "pt": (
+        "o a os as de do da dos das e em no na nos um uma ao aos pelo pela para com por que "
+        "sao nao nosso nossa nossos nossas voce seu sua seus suas mais muito tambem onde "
+        "experiencia equipe conhecimento trabalho oferecemos procuramos vaga desenvolvimento"
     ),
     "nl": (
         "de het een en van voor met je jij wij we ons onze zijn is op te aan bij of als ook "
-        "niet dat die wat naar om ervaring werken jouw bent hebt heb kennis"
+        "niet dat die wat naar om ervaring werken jouw bent hebt heb kennis wordt worden "
+        "hebben deze dit kunnen er nog bieden zoeken functie werkzaamheden binnen"
     ),
-    "pt": (
-        "o a os as de do da dos das e em no na um uma para com por que e sao nosso nossa "
-        "voce seu sua experiencia equipe conhecimento trabalho oferecemos"
+    "pl": (
+        "i w z na do sie nie jest sa oraz dla od po przez lub ze jak ktory ktora ktore "
+        "nasz nasza nasze naszego naszej naszym twoje twoj twoja bedziesz oferujemy szukamy "
+        "wymagania doswiadczenie pracy praca znajomosc zespole obowiazki jezyka"
+    ),
+    # Swedish, Danish and Norwegian share many words; each also has its own spellings
+    # ("och", "og"; "af", "av"; "meget", "mye") that tell them apart.
+    "sv": (
+        "och att det som en ett i av med till pa ar har vi kan ska eller om hos din ditt "
+        "dina dig oss var vara inte ocksa fran efter mellan nar sa samt vid bli blir mycket "
+        "nagot nagra vad dar inom genom arbete erfarenhet tjanst erbjuder soker ansvar "
+        "utvecklare kunderna arbetsmiljo jobba"
+    ),
+    "da": (
+        "og det som en i af med til pa er har vi kan skal eller om hos din dit dine dig os "
+        "vores jer ikke ogsa fra efter mellem nar sa samt ved blive bliver meget noget nogle "
+        "hvad hvor inden gennem arbejde erfaring stilling tilbyder soger ansvar opgaver "
+        "udvikler udviklere kunderne arbejdsmiljo"
+    ),
+    "no": (
+        "og det som en i av med til pa er har vi kan skal eller om hos din ditt dine deg oss "
+        "var vart vare dere ikke ogsa fra etter mellom nar sa samt ved bli blir mye noe noen "
+        "hva hvor innen gjennom arbeid erfaring stilling tilbyr soker ansvar oppgaver "
+        "utvikler utviklere kundene arbeidsmiljo jobbe"
+    ),
+    "fi": (
+        "ja on ei tai etta se kanssa sinulla meilla sinun meidan olet olemme haemme "
+        "tarjoamme tyo tyota tehtavat kokemusta osaamista hyva myos joka jotka kuten voit "
+        "sinua meille tiimi tiimissa seka"
     ),
 }
 
 
-# Bullets end a clause; typographic apostrophes are apostrophes.
-_FOLD = str.maketrans({"ß": "ss", "’": "'", "`": "'", **dict.fromkeys("•·▪◦●", "\n")})
+# Bullets end a clause; typographic apostrophes are apostrophes. Letters that have
+# no accent to strip are spelled out: "biegła", "påkrævet", "nødvendig".
+_FOLD = str.maketrans(
+    {"ß": "ss", "ł": "l", "ø": "o", "æ": "ae", "’": "'", "`": "'", **dict.fromkeys("•·▪◦●", "\n")}
+)
 
 
 def fold(text):
-    """Lower case ASCII without accents: ß as ss, bullets as line breaks; other letters go."""
+    """Lower case ASCII without accents: ß as ss, ø as o, bullets as line breaks; other letters go."""
     text = (text or "").lower().translate(_FOLD)
     if text.isascii():
         return text
@@ -120,33 +157,239 @@ def posting_language(text):
     return best, round(score / (score + second), 2)
 
 
-# Language names (folded) in the four languages read, each with its ISO 639-1 code,
-# in the order: English, German, French, Italian.
+# Language names (folded) in the languages read, each with its ISO 639-1 code, in
+# the order of _COLUMNS. Swedish, Danish and Norwegian share a column: their names
+# differ by an ending at most ("engelska", "engelsk").
+_COLUMNS = ("en", "de", "fr", "it", "es", "pt", "nl", "pl", "nordic", "fi")
 _NAME_TABLE = {
-    "en": ("english", "englisch", "anglais anglaise", "inglese"),
-    "de": ("german", "deutsch schweizerdeutsch", "allemand allemande", "tedesco tedesca"),
-    "fr": ("french", "franzosisch", "francais francaise", "francese"),
-    "it": ("italian", "italienisch", "italien italienne", "italiano italiana"),
-    "es": ("spanish", "spanisch", "espagnol espagnole", "spagnolo spagnola castellano"),
+    "en": (
+        "english",
+        "englisch",
+        "anglais anglaise",
+        "inglese",
+        "ingles inglesa",
+        "ingles inglesa",
+        "engels",
+        "angielski angielskiego angielskim",
+        "engelsk engelska",
+        "englanti englantia englannin",
+    ),
+    "de": (
+        "german",
+        "deutsch schweizerdeutsch",
+        "allemand allemande",
+        "tedesco tedesca",
+        "aleman alemana",
+        "alemao alema",
+        "duits",
+        "niemiecki niemieckiego niemieckim",
+        "tysk tyska",
+        "saksa saksaa saksan",
+    ),
+    "fr": (
+        "french",
+        "franzosisch",
+        "francais francaise",
+        "francese",
+        "frances francesa",
+        "frances francesa",
+        "frans",
+        "francuski francuskiego francuskim",
+        "fransk franska",
+        "ranska ranskaa ranskan",
+    ),
+    "it": (
+        "italian",
+        "italienisch",
+        "italien italienne",
+        "italiano italiana",
+        "italiano italiana",
+        "italiano italiana",
+        "italiaans",
+        "wloski wloskiego wloskim",
+        "italiensk italienska",
+        "italiaa italian",
+    ),
+    "es": (
+        "spanish",
+        "spanisch",
+        "espagnol espagnole",
+        "spagnolo spagnola castellano",
+        "espanol espanola castellano",
+        "espanhol",
+        "spaans",
+        "hiszpanski hiszpanskiego hiszpanskim",
+        "spansk spanska",
+        "espanja espanjaa espanjan",
+    ),
     "nl": (
         "dutch flemish",
         "niederlandisch hollandisch flamisch",
         "neerlandais neerlandaise",
         "olandese",
+        "neerlandes holandes",
+        "neerlandes holandes",
+        "nederlands vlaams",
+        "niderlandzki niderlandzkiego holenderski holenderskiego",
+        "nederlandsk nederlandska hollandska",
+        "hollanti hollantia hollannin",
     ),
-    "pt": ("portuguese", "portugiesisch", "portugais portugaise", "portoghese"),
-    "pl": ("polish", "polnisch", "polonais", "polacco"),
-    "sv": ("swedish", "schwedisch", "suedois", "svedese"),
-    "da": ("danish", "danisch", "danois", "danese"),
-    "no": ("norwegian", "norwegisch", "norvegien norvegienne", "norvegese"),
-    "fi": ("finnish", "finnisch", "finnois", "finlandese"),
-    "cs": ("czech", "tschechisch", "tcheque", "ceco"),
-    "ru": ("russian", "russisch", "russe", "russo"),
-    "ja": ("japanese", "japanisch", "japonais", "giapponese"),
-    "zh": ("chinese mandarin", "chinesisch", "chinois", "cinese"),
-    "ar": ("arabic", "arabisch", "arabe", "arabo"),
-    "tr": ("turkish", "turkisch", "turc", "turco"),
-    "ko": ("korean", "koreanisch", "coreen", "coreano"),
+    "pt": (
+        "portuguese",
+        "portugiesisch",
+        "portugais portugaise",
+        "portoghese",
+        "portugues portuguesa",
+        "portugues portuguesa",
+        "portugees",
+        "portugalski portugalskiego portugalskim",
+        "portugisisk portugisiska",
+        "portugali portugalia portugalin",
+    ),
+    "pl": (
+        "polish",
+        "polnisch",
+        "polonais",
+        "polacco",
+        "polaco",
+        "polones",
+        "pools",
+        "polski polskiego polskim",
+        "polsk polska",
+        "puola puolaa puolan",
+    ),
+    "sv": (
+        "swedish",
+        "schwedisch",
+        "suedois",
+        "svedese",
+        "sueco",
+        "sueco",
+        "zweeds",
+        "szwedzki szwedzkiego szwedzkim",
+        "svensk svenska",
+        "ruotsi ruotsia ruotsin",
+    ),
+    "da": (
+        "danish",
+        "danisch",
+        "danois",
+        "danese",
+        "danes",
+        "dinamarques",
+        "deens",
+        "dunski dunskiego dunskim",
+        "dansk danska",
+        "tanska tanskaa tanskan",
+    ),
+    "no": (
+        "norwegian",
+        "norwegisch",
+        "norvegien norvegienne",
+        "norvegese",
+        "noruego",
+        "noruegues",
+        "noors",
+        "norweski norweskiego norweskim",
+        "norsk norska",
+        "norja norjaa norjan",
+    ),
+    "fi": (
+        "finnish",
+        "finnisch",
+        "finnois",
+        "finlandese",
+        "finlandes",
+        "finlandes",
+        "fins",
+        "finski finskiego finskim",
+        "finsk finska",
+        "suomi suomea suomen",
+    ),
+    "cs": (
+        "czech",
+        "tschechisch",
+        "tcheque",
+        "ceco",
+        "checo",
+        "tcheco",
+        "tsjechisch",
+        "czeski czeskiego",
+        "tjekkisk tsjekkisk tjeckiska",
+        "tsekki tsekkia tsekin",
+    ),
+    "ru": (
+        "russian",
+        "russisch",
+        "russe",
+        "russo",
+        "ruso",
+        "russo",
+        "russisch",
+        "rosyjski rosyjskiego",
+        "russisk ryska",
+        "venaja venajaa venajan",
+    ),
+    "ja": (
+        "japanese",
+        "japanisch",
+        "japonais",
+        "giapponese",
+        "japones",
+        "japones",
+        "japans",
+        "japonski japonskiego",
+        "japansk japanska",
+        "japani japania japanin",
+    ),
+    "zh": (
+        "chinese mandarin",
+        "chinesisch",
+        "chinois",
+        "cinese",
+        "chino",
+        "chines mandarim",
+        "chinees mandarijn",
+        "chinski chinskiego",
+        "kinesisk kinesiska",
+        "kiina kiinaa kiinan",
+    ),
+    "ar": (
+        "arabic",
+        "arabisch",
+        "arabe",
+        "arabo",
+        "arabe",
+        "arabe",
+        "arabisch",
+        "arabski arabskiego",
+        "arabisk arabiska",
+        "arabiaa arabian",
+    ),
+    "tr": (
+        "turkish",
+        "turkisch",
+        "turc",
+        "turco",
+        "turco",
+        "turco",
+        "turks",
+        "turecki tureckiego",
+        "tyrkisk turkiska",
+        "turkki turkkia turkin",
+    ),
+    "ko": (
+        "korean",
+        "koreanisch",
+        "coreen",
+        "coreano",
+        "coreano",
+        "coreano",
+        "koreaans",
+        "koreanski koreanskiego",
+        "koreansk koreanska",
+        "koreaa korean",
+    ),
 }
 NAMES = {
     name: code
@@ -154,11 +397,23 @@ NAMES = {
     for names in columns
     for name in names.split()
 }
-# English names are adjectives before a noun; French and Italian ones follow the noun.
-_ENGLISH_NAMES = {name for columns in _NAME_TABLE.values() for name in columns[0].split()}
-_ROMANCE_NAMES = {
-    name for columns in _NAME_TABLE.values() for names in columns[2:] for name in names.split()
-}
+
+
+def _column(*languages):
+    return {
+        name
+        for columns in _NAME_TABLE.values()
+        for language in languages
+        for name in columns[_COLUMNS.index(language)].split()
+    }
+
+
+# English and Scandinavian names are adjectives before a noun ("German market",
+# "svenska kunder"), and so is a Finnish genitive ("Suomen markkinat"); French,
+# Italian, Spanish, Portuguese and Polish ones follow the noun ("entreprise
+# française", "rynek niemiecki"). Dutch "pools" and "fins" are also English words.
+_ADJECTIVE_NAMES = _column("en", "nordic") | {name for name in _column("fi") if name.endswith("n")}
+_NOUN_FIRST_NAMES = _column("fr", "it", "es", "pt", "pl") | {"pools", "fins"}
 # German noun stems: "Deutschkenntnisse", "Englischkenntnissen", "deutschsprachig".
 _GERMAN_STEMS = {name: code for code, columns in _NAME_TABLE.items() for name in columns[1].split()}
 _COMPOUND = re.compile(
@@ -170,21 +425,48 @@ _COMPOUND = re.compile(
 _GERMAN_ADJECTIVE = re.compile(
     r"^(" + "|".join(sorted(_GERMAN_STEMS, key=len, reverse=True)) + r")(e|en|er|es)$"
 )
+# Dutch and Danish or Norwegian adjectives name a language only before the word for
+# language: "de Nederlandse taal", "det danske sprog", "Nederlandse en Engelse taal".
+_ADJECTIVES = {
+    adjective: code
+    for code, adjectives in {
+        "en": "engelse engelske",
+        "de": "duitse tyske",
+        "fr": "franse franske",
+        "it": "italiaanse italienske",
+        "es": "spaanse spanske",
+        "pt": "portugese portugisiske",
+        "nl": "nederlandse nederlandske",
+        "pl": "poolse polske",
+        "sv": "zweedse svenske",
+        "da": "deense danske",
+        "no": "noorse norske",
+        "fi": "finse finske",
+    }.items()
+    for adjective in adjectives.split()
+}
+_LANGUAGE_NOUNS = _words("taal sprog sproget sprak spraket")
 
-# A name followed (English) or preceded (French, Italian) by one of these words is
+# A name followed (adjectives) or preceded (nouns first) by one of these words is
 # still a language; any other word means the name describes something else.
-_ENGLISH_FOLLOWERS = _words(
+_FOLLOWING_WORDS = _words(
     """language languages skills skill proficiency fluency knowledge speaker speakers is are
     and or required mandatory essential necessary needed a an as would will should must at
     on to in level c1 c2 b1 b2 a1 a2 native written spoken plus nice preferred desirable
     beneficial fluent communication both preferably also an asset advantage welcome
-    certificate is would be either"""
+    certificate is would be either
+    sprak spraket sprog sproget som i pa ar er kunskaper kundskaber kunnskaper
+    kieli kielen kielta kielella kielinen kielisen taito taitoa"""
 )
-_ROMANCE_PRECEDERS = _words(
+_PRECEDING_WORDS = _words(
     """langue langues lingua lingue l la le les de du des en et ou e o il in della dell del
     di dello degli maitrise connaissance connaissances conoscenza conoscenze parle parler
     parlez parlare parli parliamo et ou y padronanza courant bilingue madrelingua ecrit
-    parlato scritto anche aussi ainsi que nonche oltre all alla"""
+    parlato scritto anche aussi ainsi que nonche oltre all alla
+    el lengua idioma idiomas dominio nivel conocimiento conocimientos hablar hablas habla
+    do da o em ao fluencia conhecimento conhecimentos falar fala
+    jezyk jezyka jezykiem jezyku znajomosc znajomosci i oraz lub albo
+    het van vloeiend spreekt"""
 )
 
 _CONNECTORS = {
@@ -194,6 +476,14 @@ _CONNECTORS = {
     "e": "and",
     "ed": "and",
     "y": "and",
+    "en": "and",
+    "i": "and",
+    "oraz": "and",
+    "och": "and",
+    "og": "and",
+    "ja": "and",
+    "seka": "and",
+    "samt": "and",
     "&": "and",
     ",": "and",
     "/": "and",
@@ -204,13 +494,21 @@ _CONNECTORS = {
     "ou": "or",
     "o": "or",
     "oppure": "or",
+    "of": "or",
+    "lub": "or",
+    "albo": "or",
+    "eller": "or",
+    "tai": "or",
 }
 # Inside a list: "German (C1), English (B2)", "German and/or French".
-_TRANSPARENT = _words("( ) - a1 a2 b1 b2 c1 c2 level niveau livello also auch")
+_TRANSPARENT = _words(
+    "( ) - a1 a2 b1 b2 c1 c2 level niveau livello nivel niva also auch ook tambien tambem "
+    "ocksa ogsa kieli kielen"
+)
 _LEVELS = {"a1", "a2", "b1", "b2", "c1", "c2"}
 # Articles and prepositions after a connector: "dell'italiano e del francese",
-# "du français et de l'anglais".
-_LINKS = _words("del dell della dello dei degli de du des l la le the of")
+# "du français et de l'anglais", "języka angielskiego i języka niemieckiego".
+_LINKS = _words("del dell della dello dei degli de du des l la le the of el do da het jezyka")
 
 
 def _phrases(text):
@@ -237,7 +535,22 @@ _BEFORE = _phrases(
     "conoscenza|conoscenza della|conoscenza della lingua|conoscenza dell|conoscenza del|"
     "ottima|ottima conoscenza|buona|buona conoscenza|eccellente|padronanza|"
     "padronanza della|padronanza dell|perfetta|lingue|parlare|parli|madrelingua|correntemente|"
-    "fluentemente|couramment|parler couramment|parlez couramment"
+    "fluentemente|couramment|parler couramment|parlez couramment|"
+    "dominio|dominio del|dominio de|buen dominio del|buen dominio de|conocimientos de|"
+    "conocimiento de|nivel alto de|nivel avanzado de|nivel de|hablar|hablas|"
+    "dominio do|dominio de|bom dominio do|bom dominio de|conhecimento de|conhecimentos de|"
+    "conhecimento em|conhecimentos em|fluencia em|fluente em|nivel avancado de|falar|"
+    "vloeiend|vloeiende|goede|uitstekende|zeer goede|perfecte|beheersing van|"
+    "beheersing van het|beheersing van de|kennis van|kennis van het|kennis van de|"
+    "je spreekt|spreekt|je beheerst|beheerst|"
+    "biegla|biegly|biegle|bieglej|biegla znajomosc|bardzo dobra znajomosc|dobra znajomosc|"
+    "znajomosc|znajomosci|znajomosc jezyka|znajomosci jezyka|bieglej znajomosci jezyka|"
+    "jezyk|jezyka|jezykiem|poslugujesz sie|poslugiwanie sie|"
+    "flytande|goda kunskaper i|mycket goda kunskaper i|kunskaper i|du talar|talar|"
+    "du beharskar|beharskar|flydende|godt kendskab til|kendskab til|du taler|taler|"
+    "du mestrer|mestrer|beherskelse af|flytende|gode kunnskaper i|kunnskaper i|"
+    "du snakker|snakker|du behersker|behersker|beherske|"
+    "sujuva|sujuvaa|erinomainen|erinomaista|hyva|hyvaa|vahva|vahvaa|kiitettava|kiitettavaa"
 )
 _AFTER = _phrases(
     "skills|skill|proficiency|fluency|knowledge|speaker|speakers|is required|are required|"
@@ -258,12 +571,35 @@ _AFTER = _phrases(
     "fluente|richiesto|richiesta|richiesti|richieste|e richiesto|e richiesta|"
     "indispensabile|obbligatorio|obbligatoria|madrelingua|parlato e scritto|"
     "scritto e parlato|necessario|necessaria|livello c1|livello b2|"
-    "working language|is our working language|is the working language|company language"
+    "working language|is our working language|is the working language|company language|"
+    "fluido|fluida|avanzado|avanzada|nativo|nativa|imprescindible|es imprescindible|"
+    "requerido|requerida|obligatorio|obligatoria|es obligatorio|necesario|es necesario|"
+    "a nivel profesional|nivel c1|nivel b2|hablado y escrito|escrito y hablado|"
+    "lengua materna|avancado|avancada|obrigatorio|obrigatoria|e obrigatorio|"
+    "imprescindivel|e imprescindivel|indispensavel|exigido|exigida|e exigido|"
+    "falado e escrito|escrito e falado|lingua materna|"
+    "is vereist|vereist|is een vereiste|een vereiste|vereiste|noodzakelijk|"
+    "is noodzakelijk|verplicht|is verplicht|is een must|een must|in woord en geschrift|"
+    "woord en geschrift|moedertaal|op moedertaalniveau|op hoog niveau|op c1 niveau|"
+    "op b2 niveau|op c1|op b2|"
+    "wymagany|wymagana|wymagane|jest wymagana|jest wymagany|obowiazkowy|obowiazkowa|"
+    "obowiazkowo|niezbedna|niezbedny|konieczna|konieczny|na poziomie|w mowie i pismie|"
+    "kravs|ar ett krav|ett krav|krav|i tal och skrift|tal och skrift|pa modersmalsniva|"
+    "modersmal|obligatoriskt|nodvandigt|er et krav|et krav|i skrift og tale|"
+    "skrift og tale|i tale og skrift|tale og skrift|pakraevet|nodvendigt|"
+    "pa modersmalsniveau|pa hojt niveau|kreves|pakrevd|nodvendig|muntlig og skriftlig|"
+    "skriftlig og muntlig|pa hoyt niva|kunskaper|kundskaber|kunnskaper|"
+    "kielen taito|kielen taitoa|kielen taidot|taito|taitoa|kielitaito|on edellytys|"
+    "edellytys|vaaditaan|on vaatimus|vaatimus|pakollinen|on pakollinen"
 )
 _EITHER = _phrases(
     "required|requires|require|requirement|must|must have|must speak|mandatory|essential|"
     "need|needs|we need|erforderlich|voraussetzung|zwingend|exige|exigee|requis|requise|"
-    "indispensable|obligatoire|richiesto|richiesta|richiesti|indispensabile|obbligatorio"
+    "indispensable|obligatoire|richiesto|richiesta|richiesti|indispensabile|obbligatorio|"
+    "imprescindible|requisito|se requiere|requerimos|es necesario|obrigatorio|"
+    "imprescindivel|exigimos|e necessario|vereist|vereiste|noodzakelijk|verplicht|"
+    "wymagamy|wymagana|wymagany|wymagane|niezbedna|krav|kravs|maste|kreves|"
+    "edellytamme|edellytys|vaaditaan|vaadimme"
 )
 _ADVANTAGE = _phrases(
     "a plus|is a plus|an asset|asset|advantage|advantageous|an advantage|nice to have|"
@@ -274,21 +610,35 @@ _ADVANTAGE = _phrases(
     "un atout|atout|un plus|apprecie|appreciee|apprecies|appreciees|souhaite|souhaitee|"
     "souhaitable|avantage|un avantage|idealement|bienvenu|bienvenue|serait un plus|"
     "titolo preferenziale|preferenziale|gradito|gradita|graditi|preferibile|"
-    "preferibilmente|apprezzato|apprezzata|vantaggio|un vantaggio|costituisce un plus"
+    "preferibilmente|apprezzato|apprezzata|vantaggio|un vantaggio|costituisce un plus|"
+    "se valorara|valorable|se valora|valoraremos|valoramos|deseable|sera un plus|"
+    "es un plus|seria un plus|valorado|valorada|"
+    "diferencial|um diferencial|e um diferencial|sera um diferencial|desejavel|"
+    "e desejavel|valorizado|valorizada|sera valorizado|mais valia|uma mais valia|"
+    "pluspunt|een pluspunt|is een pluspunt|een pre|is een pre|strekt tot aanbeveling|"
+    "een plus|voordeel|een voordeel|is een voordeel|gewenst|wenselijk|meegenomen|"
+    "mile widziana|mile widziany|mile widziane|atut|atutem|dodatkowym atutem|"
+    "bedzie atutem|plusem|dodatkowym plusem|"
+    "meriterande|ar meriterande|meriterende|en fordel|ar en fordel|er en fordel|fordel|"
+    "ett plus|et plus|er et plus|pluss|et pluss|er et pluss|"
+    "eduksi|on eduksi|katsotaan eduksi|plussaa|on plussaa|etu|on etu|toivottavaa|"
+    "hyodyksi"
 )
 _NEGATION = _phrases(
     "no|not|without|not required|keine|kein|keinerlei|nicht|ohne|pas|sans|aucune|aucun|"
-    "non|nessuna|nessun|senza|not necessary|not needed"
+    "non|nessuna|nessun|senza|not necessary|not needed|"
+    "sin|no es necesario|no se requiere|nao|sem|nao e necessario|nao e obrigatorio|"
+    "geen|niet|zonder|niet vereist|niet nodig|nie|bez|nie jest wymagana|"
+    "inte|ej|utan|inget krav|inga|ikke|uden|uten|ingen|intet|ikke et krav|ei|ilman|"
+    "ei vaadita"
 )
 _TITLE_AFTER = _phrases("speaking|- speaking")
 _CLAUSE = re.compile(r"[.!?;\n\r•·▪◦●|]+")
 _TOKEN = re.compile(r"[a-z0-9]+|[,/&()-]")
-# A name followed (English) or preceded (French, Italian) by one of these words is
-# still a language; any other word means the name describes something else.
-_FOLLOWERS = _ENGLISH_FOLLOWERS | {
+_FOLLOWERS = _FOLLOWING_WORDS | {
     phrase[0] for phrase in _AFTER + _EITHER + _ADVANTAGE + _NEGATION + _TITLE_AFTER
 }
-_PRECEDERS = _ROMANCE_PRECEDERS | {phrase[-1] for phrase in _BEFORE + _EITHER}
+_PRECEDERS = _PRECEDING_WORDS | {phrase[-1] for phrase in _BEFORE + _EITHER}
 _AFTER_IN_TITLE = _AFTER + _TITLE_AFTER
 
 
@@ -330,17 +680,25 @@ def _mention(tokens, index):
     adjective = _GERMAN_ADJECTIVE.match(token)
     if adjective and after and after.startswith("sprach"):
         return _GERMAN_STEMS[adjective.group(1)], False
+    if token in _ADJECTIVES:
+        probe = index + 1
+        while probe < len(tokens) and (
+            tokens[probe] in _ADJECTIVES or tokens[probe] in _CONNECTORS
+        ):
+            probe += 1
+        named = probe < len(tokens) and tokens[probe] in _LANGUAGE_NOUNS
+        return (_ADJECTIVES[token] if named else None), False
     code = NAMES.get(token)
     if code is None:
         return None, False
     if (
-        token in _ENGLISH_NAMES
+        token in _ADJECTIVE_NAMES
         and after is not None
         and not (after in _FOLLOWERS or after in NAMES or after in _CONNECTORS or after in "()-,/")
     ):
         return None, False
     if (
-        token in _ROMANCE_NAMES
+        token in _NOUN_FIRST_NAMES
         and before is not None
         and not (
             before in _PRECEDERS or before in NAMES or before in _CONNECTORS or before in "()-,/"
@@ -480,14 +838,18 @@ def _clause_requirements(clause, title=False):
 
 
 # Every word that can name a language, to skip the clauses that name none quickly.
-_NAME_WORDS = set(NAMES) | {
-    stem + suffix
-    for stem in _GERMAN_STEMS
-    for suffix in _words(
-        "sprachkenntnissen sprachkenntnisse kenntnissen kenntnisse sprachig sprachige "
-        "sprachigen sprachiger muttersprachler muttersprachlerin e en er es"
-    )
-}
+_NAME_WORDS = (
+    set(NAMES)
+    | set(_ADJECTIVES)
+    | {
+        stem + suffix
+        for stem in _GERMAN_STEMS
+        for suffix in _words(
+            "sprachkenntnissen sprachkenntnisse kenntnissen kenntnisse sprachig sprachige "
+            "sprachigen sprachiger muttersprachler muttersprachlerin e en er es"
+        )
+    }
+)
 
 
 def language_requirements(text, title=""):

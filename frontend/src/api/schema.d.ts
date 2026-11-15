@@ -3133,6 +3133,8 @@ export interface components {
     };
     /** Filters */
     Filters: {
+      /** Exclude Companies */
+      exclude_companies?: string[];
       /** Exclude Titles */
       exclude_titles?: string[];
       /** Locations */
@@ -4487,7 +4489,7 @@ export interface components {
       };
       /**
        * Counts
-       * @description Jobs found, shortlisted, applied and replied.
+       * @description Jobs found, ever shortlisted, applied and replied.
        * @default {}
        */
       counts: {
@@ -4621,7 +4623,7 @@ export interface components {
       };
       /**
        * Counts
-       * @description Jobs found, shortlisted, applied and replied.
+       * @description Jobs found, ever shortlisted, applied and replied.
        * @default {}
        */
       counts: {
@@ -8614,7 +8616,7 @@ export interface operations {
         created_since?: string | null;
         /** @description Added at or before this time. */
         created_until?: string | null;
-        /** @description Dismissed by owner, agent, agent:<token name> or system. */
+        /** @description Dismissed by owner, agent, agent:<token name>, system or unknown. */
         dismissed_by?: string | null;
         /** @description Dismissed at or after this time. */
         dismissed_since?: string | null;

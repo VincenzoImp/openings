@@ -131,17 +131,19 @@ export function useDuplicate(jobId: string, otherId: string | null) {
   return { other: other.data, reasons: item?.reasons ?? members?.reasons };
 }
 
-/** Notes and recorded changes of a job, pinned note first. */
+/** Every note and recorded change of a job, pinned note first. */
 export function useTimeline(jobId: string, enabled: boolean) {
   return useQuery({
     queryKey: jobKeys.timeline(jobId),
     enabled,
     queryFn: ({ signal }) =>
-      call(
-        api.GET("/api/v1/jobs/{job_id}/timeline", {
-          params: { path: { job_id: jobId }, query: { limit: 50 } },
-          signal,
-        }),
+      readRows(Number.POSITIVE_INFINITY, (limit, offset) =>
+        call(
+          api.GET("/api/v1/jobs/{job_id}/timeline", {
+            params: { path: { job_id: jobId }, query: { limit, offset } },
+            signal,
+          }),
+        ),
       ),
   });
 }

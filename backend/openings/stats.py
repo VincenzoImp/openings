@@ -28,7 +28,8 @@ from .models import Input
 PERIODS = {"90d": 90, "12m": 365, "all": None}
 MIN_SOURCES = 2
 MIN_PER_SOURCE = 5
-OTHER_SOURCE = "Added by hand or removed source"
+# A job without a saved source was added by hand, or came from a source since removed.
+BY_HAND, REMOVED_SOURCE = "Added by hand", "Removed source"
 
 _SENT = """
 SELECT a.id,a.status,a.outcome,a.applied_at,
@@ -39,7 +40,9 @@ SELECT a.id,a.status,a.outcome,a.applied_at,
  (SELECT group_concat(DISTINCT json_extract(e.payload,'$.to')) FROM events e
   WHERE e.application_id=a.id AND e.kind='application_updated') AS stages,
  (SELECT s.name FROM postings p JOIN sources s ON s.id=p.source_id WHERE p.job_id=a.job_id
-  ORDER BY p.first_seen_at,p.id LIMIT 1) AS source
+  ORDER BY p.first_seen_at,p.id LIMIT 1) AS source,
+ (SELECT coalesce(json_extract(j.metadata,'$.source'),json_extract(j.metadata,'$.ats'),'manual')
+  FROM jobs j WHERE j.id=a.job_id) AS site
 FROM applications a
 WHERE (a.applied_at IS NOT NULL OR a.status IN ('applied','interview','offer')
  OR EXISTS(SELECT 1 FROM replies r WHERE r.application_id=a.id)) {period}
@@ -109,7 +112,8 @@ class StatsService:
         waits = [wait for wait in map(_days, rows) if wait is not None]
         by_source = {}
         for row in rows:
-            counts = by_source.setdefault(row["source"] or OTHER_SOURCE, [0, 0])
+            source = row["source"] or (BY_HAND if row["site"] == "manual" else REMOVED_SOURCE)
+            counts = by_source.setdefault(source, [0, 0])
             counts[0] += 1
             counts[1] += _replied(row)
         enough = {name: counts for name, counts in by_source.items() if counts[0] >= MIN_PER_SOURCE}

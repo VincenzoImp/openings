@@ -341,10 +341,15 @@ test("each source says what its jobs became, without zeros", async ({
     name: string;
     counts: Record<string, number>;
   }[];
+  const words: Record<string, string> = {
+    found: "found",
+    shortlisted: "ever shortlisted",
+    applied: "applied",
+  };
   const line = (counts: Record<string, number>) =>
-    ["found", "shortlisted", "applied"]
+    Object.keys(words)
       .filter((key) => counts[key] > 0)
-      .map((key) => `${counts[key]} ${key}`)
+      .map((key) => `${counts[key]} ${words[key]}`)
       .join(" · ");
   expect(sources.some((source) => line(source.counts))).toBe(true);
   for (const source of sources) {

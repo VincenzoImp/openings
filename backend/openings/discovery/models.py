@@ -21,8 +21,9 @@ class Filters(Input):
     titles: list[str] = Field(default_factory=list, max_length=30)
     locations: list[str] = Field(default_factory=list, max_length=30)
     exclude_titles: list[str] = Field(default_factory=list, max_length=50)
+    exclude_companies: list[str] = Field(default_factory=list, max_length=50)
 
-    @field_validator("titles", "locations", "exclude_titles")
+    @field_validator("titles", "locations", "exclude_titles", "exclude_companies")
     @classmethod
     def clean_terms(cls, values):
         return list(dict.fromkeys(v.strip()[:150] for v in values if v.strip()))

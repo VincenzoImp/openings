@@ -1,5 +1,7 @@
 """Application reads: computed Ready, preparation summaries, lists and history."""
 
+import re
+
 from ..common import decode_record
 from ..errors import DomainError, missing
 from ..models import OUTCOMES
@@ -129,12 +131,17 @@ class ApplicationReads:
             args.append(priority)
         if has_deadline is not None:
             conditions.append("app.deadline IS " + ("NOT NULL" if has_deadline else "NULL"))
-        if q.strip():
+        terms = re.findall(r"\w+", q)
+        if terms:
+            # As jobs are searched: words that start with each term, in the job's title,
+            # company or posting, or in the application's pinned note.
+            match = " AND ".join('"' + term + '"*' for term in terms[:15])
             conditions.append(
-                "(j.title LIKE ? OR j.company LIKE ? OR EXISTS(SELECT 1 FROM notes n "
-                "WHERE n.application_id=app.id AND n.pinned_at IS NOT NULL AND n.body LIKE ?))"
+                "(j.rowid IN (SELECT rowid FROM jobs_fts WHERE jobs_fts MATCH ?) OR EXISTS("
+                "SELECT 1 FROM notes n WHERE n.application_id=app.id AND n.pinned_at IS NOT NULL "
+                "AND " + " AND ".join("(' '||lower(n.body)) LIKE ?" for _ in terms[:15]) + "))"
             )
-            args.extend(["%" + q.strip() + "%"] * 3)
+            args.extend([match, *("% " + term.lower() + "%" for term in terms[:15])])
         # Stage counts follow every filter but the stage itself.
         counted = " WHERE " + " AND ".join(conditions) if conditions else ""
         counted_args = list(args)

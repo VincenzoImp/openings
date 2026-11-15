@@ -1,8 +1,9 @@
 """Ingest signals, their precision, and the filters they give: never a dismissal.
 
 The labelled fixture (language_fixture.json) is synthetic: postings in English,
-German, French and Italian (and a few in Spanish, Dutch and Portuguese) with the
-language they are written in and the languages they require.
+German, French and Italian, and fewer in Spanish, Portuguese, Dutch, Polish,
+Swedish, Danish, Norwegian and Finnish, with the language they are written in and
+the languages they require.
 """
 
 import json
@@ -18,12 +19,16 @@ from openings.workspace import Workspace
 
 FIXTURE = json.loads((Path(__file__).with_name("language_fixture.json")).read_text())["items"]
 AGENT = token_actor("agent-token", "Synthetic agent", "agent")
+# Every language whose postings are recognised.
+READ = ("en", "de", "fr", "it", "es", "pt", "nl", "pl", "sv", "da", "no", "fi")
 
 # What the detectors must reach on the labelled fixture. Measured when written:
 # language 89/89 correct where a language was given (89 of 90 labelled postings),
 # required 83/83 correct with 83/83 found. A held-out round of 26 postings written
 # before the detectors saw them scored language 25/25 and required 19/20 (recall
-# 19/25) on the first run. A language stated only as an advantage is not required.
+# 19/25) on the first run. Sixteen postings in the eight languages added later (two
+# each) scored language 16/16 and required 16/16 when written. A language stated
+# only as an advantage is not required.
 LANGUAGE_PRECISION = 0.95
 LANGUAGE_COVERAGE = 0.9
 REQUIRED_PRECISION = 0.9
@@ -38,7 +43,7 @@ def test_language_detection_reaches_the_stated_precision():
         if language is not None:
             predicted += 1
             correct += language == item["language"]
-    assert labelled >= 80 and {item["language"] for item in FIXTURE} >= {"en", "de", "fr", "it"}
+    assert labelled >= 80 and {item["language"] for item in FIXTURE} >= set(READ)
     assert correct / predicted >= LANGUAGE_PRECISION, (correct, predicted)
     assert predicted / labelled >= LANGUAGE_COVERAGE, (predicted, labelled)
     # Too little text says nothing.
@@ -68,8 +73,102 @@ def test_language_requirement_detection_reaches_the_stated_precision():
         ("Keine Deutschkenntnisse erforderlich.", []),
         ("Le français n'est pas requis.", []),
         ("Wir betreuen deutsche Kunden.", []),
+        # A requirement, an advantage, a negation and alternatives in each language
+        # added later, and a name that only describes something else.
+        ("Inglés fluido imprescindible.", [["en"]]),
+        ("Se valorará el conocimiento de alemán.", []),
+        ("No es necesario hablar francés.", []),
+        ("Dominio del inglés o del francés.", [["en", "fr"]]),
+        ("Trabajamos para el mercado alemán.", []),
+        ("Inglês fluente é obrigatório.", [["en"]]),
+        ("Espanhol será um diferencial.", []),
+        ("Não é necessário falar alemão.", []),
+        ("Inglês ou espanhol avançado.", [["en", "es"]]),
+        ("Je spreekt vloeiend Nederlands.", [["nl"]]),
+        ("Duits is een pluspunt.", []),
+        ("Frans is niet vereist.", []),
+        ("Engels of Duits is vereist.", [["de", "en"]]),
+        ("Uitstekende beheersing van de Nederlandse taal.", [["nl"]]),
+        ("Ervaring met connection pools is vereist.", []),
+        ("Biegła znajomość języka angielskiego.", [["en"]]),
+        ("Mile widziana znajomość języka niemieckiego.", []),
+        ("Znajomość języka francuskiego nie jest wymagana.", []),
+        ("Język angielski lub niemiecki na poziomie B2.", [["de", "en"]]),
+        ("Obsługujemy rynek niemiecki.", []),
+        ("Flytande svenska krävs.", [["sv"]]),
+        ("Kunskaper i finska är meriterande.", []),
+        ("Det är inget krav att kunna norska.", []),
+        ("Svenska eller engelska krävs.", [["en", "sv"]]),
+        ("Vi har svenska kunder.", []),
+        ("Du taler flydende dansk.", [["da"]]),
+        ("Kendskab til tysk er en fordel.", []),
+        ("Svensk er ikke et krav.", []),
+        ("Dansk eller engelsk er et krav.", [["da", "en"]]),
+        ("Du snakker flytende norsk.", [["no"]]),
+        ("Kunnskaper i svensk er et pluss.", []),
+        ("Dansk kreves ikke.", []),
+        ("Norsk eller engelsk kreves.", [["en", "no"]]),
+        ("Sujuva englannin kielen taito.", [["en"]]),
+        ("Ruotsin kielen taito katsotaan eduksi.", []),
+        ("Saksan kielen taitoa ei vaadita.", []),
+        ("Englanti tai ruotsi on edellytys.", [["en", "sv"]]),
+        ("Tunnet Suomen markkinat hyvin.", []),
     ]:
         assert language_requirements(text) == {"required": required}, text
+
+
+def test_each_added_language_is_told_apart_from_its_neighbours():
+    # Every labelled posting in a language added later is read exactly.
+    added = [item for item in FIXTURE if item["language"] in READ[4:]]
+    assert {item["language"] for item in added} == set(READ[4:])
+    for item in added:
+        signals = text_signals(item["title"], item["posting"])
+        assert signals["language"] == item["language"], item["id"]
+        assert sorted(signals["required"]) == sorted(item["required"]), item["id"]
+    # The same short posting in languages that share most of their words.
+    for language, text in [
+        (
+            "es",
+            (
+                "Buscamos una persona para nuestro equipo de datos. Tendrás experiencia con "
+                "Python y trabajarás con los analistas en la calidad de los datos. Ofrecemos "
+                "un contrato indefinido y un buen ambiente de trabajo."
+            ),
+        ),
+        (
+            "pt",
+            (
+                "Procuramos uma pessoa para a nossa equipe de dados. Você terá experiência com "
+                "Python e vai trabalhar com os analistas na qualidade dos dados. Oferecemos um "
+                "contrato efetivo e um bom ambiente de trabalho."
+            ),
+        ),
+        (
+            "sv",
+            (
+                "Vi söker en utvecklare till vårt team. Du har erfarenhet av Python och arbetar "
+                "nära våra analytiker med kvaliteten på data. Vi erbjuder en fast anställning "
+                "och en trevlig arbetsmiljö där du kan växa."
+            ),
+        ),
+        (
+            "da",
+            (
+                "Vi søger en udvikler til vores team. Du har erfaring med Python og arbejder tæt "
+                "sammen med vores analytikere om kvaliteten af data. Vi tilbyder en fast "
+                "stilling og et godt arbejdsmiljø, hvor du kan udvikle dig."
+            ),
+        ),
+        (
+            "no",
+            (
+                "Vi søker en utvikler til vårt team. Du har erfaring med Python og jobber tett "
+                "med analytikerne våre om kvaliteten av data. Vi tilbyr en fast stilling og et "
+                "godt arbeidsmiljø der du kan utvikle deg."
+            ),
+        ),
+    ]:
+        assert posting_language(text)[0] == language, text
 
 
 GERMAN = (
@@ -178,7 +277,14 @@ def test_triage_reasons_and_who_dismissed(services):
     assert owner["dismissal"]["category"] == "owner" and owner["dismissal"]["reason"] == "Too far."
     counts = workspace.list_jobs(include_counts=True)["counts"]
     assert counts["dismissed"] == 2 and counts["new"] == 1
-    assert counts["dismissed_by"] == {"agent": 1, "owner": 1, "system": 0}
+    assert counts["dismissed_by"] == {"agent": 1, "owner": 1, "system": 0, "unknown": 0}
+    # A dismissal recorded before 0.21 has no author: unknown, not job sources.
+    with workspace.db.transaction() as connection:
+        connection.execute("UPDATE jobs SET dismissed_by=NULL WHERE id=?", (second["id"],))
+    assert workspace.get_job(second["id"])["dismissal"]["category"] == "unknown"
+    unknown = workspace.list_jobs(dismissed_by="unknown", include_counts=True)
+    assert [job["id"] for job in unknown["items"]] == [second["id"]]
+    assert unknown["counts"]["dismissed_by"]["unknown"] == 1
     with pytest.raises(Exception, match="reason"):
         workspace.set_triage(third["id"], "shortlisted", third["version"], "Nice")
 

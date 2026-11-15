@@ -15,7 +15,7 @@ export const SECTIONS: SectionInfo[] = [
     title: "What I'm looking for",
     examples: [
       { text: "Backend or data engineering roles, senior or staff." },
-      { text: "Zurich or Basel, or remote within Europe." },
+      { text: "Berlin or Amsterdam, or remote within the EU." },
     ],
   },
   {
@@ -23,14 +23,14 @@ export const SECTIONS: SectionInfo[] = [
     title: "What I rule out",
     examples: [
       { text: "No defence or gambling companies." },
-      { text: "No relocation outside Switzerland." },
+      { text: "No relocation outside my country." },
     ],
   },
   {
     name: "facts",
     title: "Facts about me",
     examples: [
-      { text: "EU citizen with a Swiss B permit." },
+      { text: "Needs visa sponsorship to work in the UK." },
       { text: "Notice period: three months to the end of a month." },
     ],
   },

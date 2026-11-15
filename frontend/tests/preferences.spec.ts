@@ -60,7 +60,7 @@ test("statements are added, edited, tagged, reordered, moved and deleted", async
     .poll(() => texts(page, "looking_for"))
     .toEqual([
       "Data, backend and platform engineering roles at mid to senior level.",
-      "On site in Zurich or Basel, or remote within Europe.",
+      "Hybrid in Amsterdam, Berlin, Lisbon, Dublin or Barcelona, or remote within Europe.",
       "Synthetic: climate tech",
       "Synthetic: second line",
     ]);
@@ -113,9 +113,9 @@ test("statements are added, edited, tagged, reordered, moved and deleted", async
   await expect
     .poll(async () => (await texts(page, "ruled_out")).at(-1))
     .toBe("Synthetic: climate and energy tech");
-  expect(await texts(page, "looking_for")).not.toContain(
-    "Synthetic: climate and energy tech",
-  );
+  await expect
+    .poll(() => texts(page, "looking_for"))
+    .not.toContain("Synthetic: climate and energy tech");
 
   // Delete runs at once with Undo; the menu's Delete too.
   await line(
@@ -156,7 +156,7 @@ test("a line is reordered by dragging its handle", async ({ page }) => {
     .poll(() => texts(page, "ruled_out"))
     .toEqual([
       "Pure frontend roles and agencies that hire for clients.",
-      "Roles that need me on site outside Zurich, Basel or remote Europe.",
+      "Roles that need me on site five days a week.",
     ]);
 });
 

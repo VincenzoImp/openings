@@ -263,6 +263,12 @@ def test_location_and_title_filters_match_whole_terms():
     assert matches_filters({"title": "Sapling Research Engineer"}, filters)
     assert not matches_filters({"title": "Sales Director"}, {"exclude_titles": ["sales"]})
     assert matches_filters({"title": "Backend Engineer"}, {"exclude_titles": []})
+    # Excluded companies (aggregators, agencies) match whole words of the company name.
+    agencies = {"exclude_companies": ["Jobgether", "Rocken"]}
+    assert not matches_filters({"title": "Engineer", "company": "Jobgether"}, agencies)
+    assert not matches_filters({"title": "Engineer", "company": "ROCKEN AG"}, agencies)
+    assert matches_filters({"title": "Engineer", "company": "Rockenfeller GmbH"}, agencies)
+    assert matches_filters({"title": "Engineer"}, agencies)
 
 
 def test_company_clients_fetch_all_details_and_reuse_complete_cached_bodies():

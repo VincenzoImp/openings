@@ -187,13 +187,14 @@ def compact_schema(schema):
 
     No ``title``; ``$defs`` inlined; a nullable ``anyOf`` becomes its other type
     (leaving the argument out means null); defaults that equal leaving it out, text
-    lengths and patterns, the description of an array's items and nested ``additionalProperties``
-    are dropped. The server still
-    validates every argument and names the limit an argument broke.
+    lengths and patterns, ``additionalProperties``, the description of an array's items,
+    ``minItems`` of 1, list limits of 100 or more and minimums of 0 or 1 (versions,
+    limits, offsets) are dropped. The server still
+    validates every argument, rejects unknown ones and names the limit an argument broke.
     """
     definitions = schema.get("$defs", {})
 
-    def visit(node, top=False):
+    def visit(node):
         if isinstance(node, list):
             return [visit(item) for item in node]
         if not isinstance(node, dict):
@@ -206,7 +207,11 @@ def compact_schema(schema):
         for key, value in node.items():
             if key in ("title", "$defs", "discriminator", "minLength", "maxLength", "pattern"):
                 continue
-            if key == "additionalProperties" and (value is True or not top):
+            if key == "additionalProperties":
+                continue
+            if (key, value) == ("minItems", 1) or (key == "maxItems" and value >= 100):
+                continue
+            if key == "minimum" and value in (0, 1):
                 continue
             if key == "default" and _empty_default(value):
                 continue
@@ -225,7 +230,7 @@ def compact_schema(schema):
             result = {**options[0], **result} if len(options) == 1 else {"anyOf": options, **result}
         return result
 
-    return visit(schema, top=True)
+    return visit(schema)
 
 
 def _dropped(value):

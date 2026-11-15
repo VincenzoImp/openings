@@ -35,7 +35,7 @@ def detect_source(url: str) -> dict:
     host = (parsed.hostname or "").lower()
     parts = [part for part in parsed.path.split("/") if part]
     query = parse_qs(parsed.query)
-    kind, board, region = None, None, "global"
+    kind, board, region, facets = None, None, "global", {}
     if host in ("boards.greenhouse.io", "job-boards.greenhouse.io"):
         kind = "greenhouse"
         board = query.get("for", [None])[0] if "embed" in parts else (parts[0] if parts else None)
@@ -59,8 +59,8 @@ def detect_source(url: str) -> dict:
         kind, board = "ashby", parts[2]
     elif host.endswith(".recruitee.com"):
         kind, board = "recruitee", host.removesuffix(".recruitee.com")
-    elif host.endswith(".jobs.personio.de"):
-        kind, board = "personio", host.removesuffix(".jobs.personio.de")
+    elif host.endswith((".jobs.personio.de", ".jobs.personio.com")):
+        kind, board = "personio", host.split(".jobs.personio.")[0]
     elif host == "apply.workable.com" and parts:
         kind, board = "workable", parts[0]
     elif host.endswith(".breezy.hr"):
@@ -80,6 +80,13 @@ def detect_source(url: str) -> dict:
             else parts[0]
         )
         kind, board = "workday", host + "/" + site
+        # A board URL filtered on the site carries its facets: ?locationHierarchy1=<id>.
+        facets = {
+            key: values
+            for key, values in query.items()
+            if re.fullmatch(r"[A-Za-z0-9_]{1,80}", key)
+            and all(re.fullmatch(r"[A-Za-z0-9_-]{1,120}", value) for value in values)
+        }
     elif host.endswith(".oraclecloud.com") and "sites" in parts:
         index = parts.index("sites") + 1
         if len(parts) > index:
@@ -94,6 +101,8 @@ def detect_source(url: str) -> dict:
     config = {"board": board}
     if COMPANY_ADAPTERS[kind].region:
         config["region"] = region
+    if kind == "workday" and facets:
+        config["facets"] = facets
     return {"kind": kind, "config": config, "url": url}
 
 
@@ -201,6 +210,6 @@ def resolve_source(value: dict) -> dict:
     config["filters"] = (
         value.get("filters")
         or config.get("filters")
-        or {"titles": [], "locations": [], "exclude_titles": []}
+        or {"titles": [], "locations": [], "exclude_titles": [], "exclude_companies": []}
     )
     return {"kind": kind, "config": config, "url": url}

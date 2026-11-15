@@ -24,7 +24,7 @@ def test_company_details_continue_without_relisting_or_refetching_completed_bodi
     }
 
     def request(url):
-        if not url.endswith("/jobs"):
+        if not url.endswith(("/jobs", "/offices")):
             if not remaining[0]:
                 raise ProviderDeferred("greenhouse", "collection_batch")
             remaining[0] -= 1
@@ -49,7 +49,7 @@ def test_company_details_continue_without_relisting_or_refetching_completed_bodi
     remaining[0] = 1
     final = company.collect(source, request, html_text)
     assert all(row["posting"] for row in final) and checkpoint["complete"]
-    assert len(requests) == 4 and len(set(requests)) == 4
+    assert len(requests) == 5 and len(set(requests)) == 5
     assert "responses" not in checkpoint
 
 
@@ -69,7 +69,7 @@ def test_empty_description_retries_are_finite_and_keep_a_partial_result():
     for _ in range(3):
         rows = company.collect(source, request, html_text)
     assert checkpoint["complete"] and checkpoint["unavailable_descriptions"] == 1
-    assert len(calls) == 4 and rows[0]["metadata"]["description_status"] == "unavailable"
+    assert len(calls) == 5 and rows[0]["metadata"]["description_status"] == "unavailable"
 
 
 def test_linkedin_description_budget_resumes_metadata_checkpoint(tmp_path, monkeypatch):

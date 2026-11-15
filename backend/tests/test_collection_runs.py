@@ -196,6 +196,7 @@ def test_bulk_configuration_and_filter_patches_preserve_untouched_fields(collect
         "titles": ["developer"],
         "locations": ["Canada"],
         "exclude_titles": ["sales"],
+        "exclude_companies": [],
     }
     cleared = service.update_source(
         source["id"],
@@ -207,6 +208,7 @@ def test_bulk_configuration_and_filter_patches_preserve_untouched_fields(collect
         "titles": ["developer"],
         "locations": [],
         "exclude_titles": ["sales"],
+        "exclude_companies": [],
     }
 
 

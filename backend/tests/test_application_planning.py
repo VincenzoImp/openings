@@ -308,3 +308,25 @@ def test_question_edits_retain_compatible_answers_and_reject_invalid_changes_ato
             workspace.update_application(
                 application["id"], {"expected_version": application["version"], **invalid}
             )
+
+
+def test_jobs_and_applications_are_searched_by_the_same_rule(app, client):
+    workspace = app.state.workspace
+    job = workspace.ingest_job(
+        {"title": "Platform Engineer", "company": "Example", "posting": "Run Kubernetes clusters."}
+    )
+    application = workspace.create_application({"job_id": job["id"]})
+
+    def found(q):
+        jobs = {item["id"] for item in workspace.list_jobs(q=q)["items"]}
+        applications = {item["id"] for item in workspace.list_applications(q=q)["items"]}
+        return job["id"] in jobs, application["id"] in applications
+
+    # Words that start with what is typed, in the title, the company or the posting.
+    assert found("engin") == found("kubern") == found("platform example") == (True, True)
+    assert found("gineer") == (False, False)
+    workspace.add_note(
+        job["id"],
+        {"application_id": application["id"], "body": "Referral from Dana", "pinned": True},
+    )
+    assert workspace.list_applications(q="referr")["total"] == 1

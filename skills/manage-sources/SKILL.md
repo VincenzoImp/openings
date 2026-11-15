@@ -2,7 +2,7 @@
 name: manage-sources
 title: Manage job sources
 summary: Have searches, company boards and feeds added, previewed, tuned or paused so new jobs fit what you want.
-example: Follow Northstar Labs' job board and add a search for data engineer jobs in Zurich.
+example: Follow Northstar Labs' job board and add a search for data engineer jobs in Berlin.
 description: Add, tune, pause and review Openings job sources - "add a search for...", "follow company X", "why so much noise from Y?", "which sources work?". Previews every new source before saving and measures sources by what they bring.
 ---
 
@@ -23,18 +23,20 @@ What I'm looking for and What I rule out define a useful job.
    says otherwise. Add several in one batch and check every item.
 4. Run it once with `sources_run` when the owner wants results now.
 
-One query and one place per search; split "Zurich or Basel" into two.
+One query and one place per search; split "Berlin or Munich" into two.
 
 ## Tune a noisy source
 
-1. `sources_list` gives each source's counts: found, shortlisted, applied,
-   replied. Judge a source only after it has found enough jobs.
+1. `sources_list` gives each source's cumulative counts, closed applications
+   included: found, shortlisted, applied, replied. Judge a source only after it
+   has found enough jobs.
 2. Read why its jobs were dismissed: `jobs_list` of dismissed jobs, narrowed
    to its site or company, shows each dismissal reason. A recurring, clear
    mismatch (another field, a ruled out title or language) is worth a filter;
    a varied mix is triage's job.
-3. Prefer the narrowest fix: a more specific query or place, or excluded
-   title words checked against the shortlisted jobs so none would be lost.
+3. Prefer the narrowest fix: a more specific query or place, excluded title
+   words, or excluded companies for aggregators and agencies, each checked
+   against the shortlisted jobs so none would be lost.
    Preview the change before saving.
 4. Pause a source that brings nothing useful; delete one only when the owner
    asks.

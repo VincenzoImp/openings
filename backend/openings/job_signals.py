@@ -47,17 +47,20 @@ UNLISTED_SQL = (
 )
 DISMISSAL_COLUMNS = ("dismissed_at", "dismissed_by", "dismissed_reason")
 # Who dismissed a job (its actor label), as the Dismissed tab groups it. A job
-# dismissed without a record (before 0.21) counts as system.
+# dismissed before 0.21 has no record of who did it: unknown.
 DISMISSED_BY = {
     "agent": "j.dismissed_by LIKE 'agent:%'",
     "owner": "j.dismissed_by='owner'",
-    "system": "coalesce(j.dismissed_by,'system')='system'",
+    "system": "j.dismissed_by='system'",
+    "unknown": "j.dismissed_by IS NULL",
 }
 
 
 def dismissed_by_category(label):
-    """owner, agent or system for an actor label (None counts as system)."""
-    if label and label.startswith("agent:"):
+    """owner, agent, system or unknown (not recorded) for an actor label."""
+    if not label:
+        return "unknown"
+    if label.startswith("agent:"):
         return "agent"
     return "owner" if label == "owner" else "system"
 
@@ -178,13 +181,16 @@ def unlist_missing(conn, source, started_at, stamp):
         return []
     filters = (source.get("config") or {}).get("filters") or {}
     rows = conn.execute(
-        "SELECT p.id,p.job_id,j.title,j.location FROM postings p JOIN jobs j ON j.id=p.job_id "
+        "SELECT p.id,p.job_id,j.title,j.location,j.company,j.metadata FROM postings p "
+        "JOIN jobs j ON j.id=p.job_id "
         "WHERE p.identity>=? AND p.identity<? AND p.unlisted_at IS NULL AND p.last_seen_at<?",
         (prefix, prefix + "￿", started_at),
     ).fetchall()
     marked = []
-    for posting_id, job_id, title, location in rows:
-        if not matches_filters({"title": title, "location": location}, filters):
+    for posting_id, job_id, title, location, company, metadata in rows:
+        # The same facts the run filtered on, remote flags included.
+        posting = {"title": title, "location": location, "company": company}
+        if not matches_filters({**posting, "metadata": json.loads(metadata or "{}")}, filters):
             continue  # the filters changed: the run could not have seen it
         conn.execute("UPDATE postings SET unlisted_at=? WHERE id=?", (stamp, posting_id))
         if job_id not in marked:

@@ -387,13 +387,31 @@ class TaskOperations:
             result["continuing"] = True
         else:
             result.pop("continuing", None)
-            if not source.get("candidate_capped") and not source.get("result_capped"):
+            if source.get("listing_empty"):
+                result["listing_empty"] = True
+            if source.get("listing_empty") and not self._listed_empty_before(source, task):
+                # A board that answers empty once (an outage, an unknown company that
+                # answers 200) keeps its jobs listed until the next run confirms it.
+                diagnostic.setdefault("warnings", []).append(
+                    "The board listed no jobs. Its jobs are marked no longer listed "
+                    "only if the next run finds it empty too."
+                )
+            elif not source.get("candidate_capped") and not source.get("result_capped"):
                 # The whole board was read: what it no longer lists is gone.
                 with self.db.transaction() as connection:
                     unlisted = unlist_missing(connection, source, result["started_at"], now())
                 if unlisted:
                     result["unlisted"] = result.get("unlisted", 0) + len(unlisted)
         return result
+
+    def _listed_empty_before(self, source, task):
+        """Whether the source's previous successful collection found its board empty."""
+        row = self.db.one(
+            "SELECT result FROM tasks WHERE source_id=? AND kind='collect' AND state='succeeded' "
+            "AND id<>? ORDER BY updated_at DESC LIMIT 1",
+            (source["id"], task["id"]),
+        )
+        return bool(row and json.loads(row["result"]).get("listing_empty"))
 
     def run_task(self, task, owner):
         if not self._active(task["id"], owner):

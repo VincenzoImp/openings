@@ -137,7 +137,7 @@ def test_an_agent_triage_of_fifty_jobs_is_one_batch_the_owner_restores(app, mcp,
     since = min(item["dismissal"]["at"] for item in listed["items"])
     assert client.get("/api/v1/jobs", params={"dismissed_since": since}).json()["total"] == 50
     counts = client.get("/api/v1/jobs", params={"include_counts": True}).json()["counts"]
-    assert counts["dismissed_by"] == {"agent": 50, "owner": 1, "system": 0}
+    assert counts["dismissed_by"] == {"agent": 50, "owner": 1, "system": 0, "unknown": 0}
     refused = client.get("/api/v1/jobs", params={"dismissed_by": "someone"})
     assert refused.status_code == 422
     # One action restores the batch to New.

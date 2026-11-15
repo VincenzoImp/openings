@@ -133,12 +133,21 @@ export function describeSource(
   return [label, where].filter(Boolean).join(" · ");
 }
 
-/** "31 found · 9 shortlisted · 3 applied", without zeros. */
+const COUNT_WORDS = {
+  found: "found",
+  shortlisted: "ever shortlisted",
+  applied: "applied",
+} as const;
+/** What the counts add up: every job the source found, closed ones included. */
+export const COUNTS_HINT =
+  "Every job this source found, what you ever shortlisted (closed applications included) and applied to.";
+
+/** "31 found · 9 ever shortlisted · 3 applied", without zeros. */
 export function countsLine(counts?: Record<string, number> | null) {
   if (!counts) return "";
-  return (["found", "shortlisted", "applied"] as const)
+  return (Object.keys(COUNT_WORDS) as (keyof typeof COUNT_WORDS)[])
     .filter((key) => (counts[key] ?? 0) > 0)
-    .map((key) => `${counts[key]} ${key}`)
+    .map((key) => `${counts[key]} ${COUNT_WORDS[key]}`)
     .join(" · ");
 }
 

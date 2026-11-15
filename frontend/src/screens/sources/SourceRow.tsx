@@ -15,6 +15,7 @@ import { IconButton } from "../../ui/Button";
 import { Icon } from "../../ui/Icon";
 import { Menu, type MenuEntry } from "../../ui/Menu";
 import {
+  COUNTS_HINT,
   countsLine,
   describeSource,
   kindOf,
@@ -163,7 +164,11 @@ export function SourceRow({
           </>
         )}
       </span>
-      {counts && <span className="src-row-counts">{counts}</span>}
+      {counts && (
+        <span className="src-row-counts" title={COUNTS_HINT}>
+          {counts}
+        </span>
+      )}
       <span className="src-row-actions">
         {!status.running && source.automatic_collection && (
           <IconButton

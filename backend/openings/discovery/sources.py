@@ -149,6 +149,7 @@ class SourceOperations:
                 "titles": [],
                 "locations": [],
                 "exclude_titles": [],
+                "exclude_companies": [],
                 **row["config"].get("filters", {}),
             }
             run = latest.get(row["id"])
