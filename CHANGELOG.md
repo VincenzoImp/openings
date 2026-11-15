@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.26.0 — 2026-11-15
 
-Counts, filters and lists that agree with each other past the first 200 rows. No schema change.
+Counts, filters and lists that agree with each other past the first 200 rows, and company boards that deliver every role in the places you follow. No schema change.
 
 **Fixes**
 
