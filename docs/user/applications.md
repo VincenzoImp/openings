@@ -9,8 +9,9 @@ open application and can keep earlier closed ones.
 Shortlisting a job starts its application in **Shortlisted**. From there:
 **Applied**, **Interview**, **Offer** and **Closed**. **Applications** has one chip
 per stage, with its count, and **Ready**, the Shortlisted applications that are
-ready to send. Search by role or company and **Filter** by priority, deadline,
-source or outcome. The default order, **Needs action**, puts Ready ones first (by
+ready to send. Search finds words that start with what you type in the role,
+the company, the posting or the pinned note, as the Jobs search does; **Filter** by
+priority, deadline, job site or outcome. The default order, **Most urgent first**, puts Ready ones first (by
 deadline), then Shortlisted ones with a deadline, then sent ones waiting longer
 than the no-reply period, then the rest; you can also sort by deadline, last
 change or the day it was sent.
