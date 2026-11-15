@@ -209,12 +209,12 @@ const SOURCES_AND_SETTINGS: Screen[] = [
             total: 14,
             preview_limit: 20,
             items: [
-              ["Backend Engineer", "Cobalt Telecom", "Zurich"],
-              ["Senior Python Developer", "Fernhill Mobility", "Zurich"],
-              ["Platform Engineer", "Meridian Insurance Group", "Zurich"],
-              ["Backend Engineer, Data", "Kelpie Labs", "Zurich · Hybrid"],
-              ["Software Engineer, APIs", "Tessellate Maps", "Zurich"],
-              ["Python Backend Engineer", "Freightwise", "Zurich"],
+              ["Backend Engineer", "Cobalt Telecom", "Amsterdam"],
+              ["Senior Python Developer", "Fernhill Mobility", "Amsterdam"],
+              ["Platform Engineer", "Meridian Insurance Group", "Amstelveen"],
+              ["Backend Engineer, Data", "Kelpie Labs", "Amsterdam · Hybrid"],
+              ["Software Engineer, APIs", "Tessellate Maps", "Utrecht"],
+              ["Python Backend Engineer", "Freightwise", "Amsterdam"],
             ].map(([title, company, location]) => ({
               title,
               company,
@@ -233,8 +233,8 @@ const SOURCES_AND_SETTINGS: Screen[] = [
       await page.getByRole("button", { name: "Add source" }).first().click();
       const editor = page.getByRole("dialog", { name: "Add a source" });
       await editor.getByLabel("Keywords").fill("backend engineer");
-      await editor.getByLabel(/^Location/).fill("Zurich");
-      await editor.getByLabel("Country").selectOption("switzerland");
+      await editor.getByLabel(/^Location/).fill("Amsterdam");
+      await editor.getByLabel("Country").selectOption("netherlands");
       await editor.getByRole("button", { name: "Test" }).click();
       await expect(editor.getByText("14 jobs found")).toBeVisible();
     },

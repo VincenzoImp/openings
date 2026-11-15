@@ -1,8 +1,10 @@
 """A curated demo workspace: one fictional person's job search, for screenshots.
 
 Alex Example, the backend engineer of examples/cv.tex and examples/career.json,
-with the example Preferences, three templates, three collection sources, an
-agent token named "Claude Code" and fifteen jobs at fictional companies: new
+who lives in Amsterdam and looks for backend and data roles in Europe or remote,
+with the example Preferences, three templates, four collection sources, an
+agent token named "Claude Code" and fifteen jobs at fictional companies in
+several countries, paid in EUR, GBP and CAD: new
 jobs (one a likely duplicate of a job with an application, one that requires
 German), two dismissals (by the owner and by the agent) and applications in
 every stage. The CVs and the Ready application's letter are real PDFs built
@@ -56,7 +58,7 @@ POSTINGS = {
         "Voltline Grid Analytics turns measurements from electricity networks into forecasts "
         "that grid operators use to plan their day. Our grid data team of seven engineers runs "
         "the services that receive meter and substation readings, check them and serve them "
-        "to forecasting models and to our customers' control rooms. We work from Zurich, with "
+        "to forecasting models and to our customers' control rooms. We work from Amsterdam, with "
         "two office days a week.\n\n"
         "As a senior backend engineer you will design and run Python services and APIs for "
         "measurement data, improve the reliability and latency of our ingestion path, and "
@@ -81,7 +83,7 @@ POSTINGS = {
     ),
     "tessellate": (
         "Tessellate Maps builds geospatial software for public transport companies and city "
-        "planners in Switzerland and Italy. Our backend team in Lugano maintains the APIs "
+        "planners in Spain and Italy. Our backend team in Barcelona maintains the APIs "
         "that serve routes, stops and timetables to web and mobile applications used by "
         "around two million travelers each month.\n\n"
         "As a backend engineer you will develop new endpoints for our geospatial APIs, "
@@ -90,24 +92,24 @@ POSTINGS = {
         "Python and SQL, practical knowledge of Docker and Linux, and care for API design. "
         "Experience with PostGIS is a plus. Fluent Italian and English are required, as "
         "many of our customers work in Italian. We offer a hybrid model with three office "
-        "days a week in Lugano."
+        "days a week in Barcelona."
     ),
     "lumacare": (
-        "Lumacare Health makes software that helps hospitals in Switzerland and Germany plan "
+        "Lumacare Health makes software that helps hospitals in Ireland and the United Kingdom plan "
         "patient care across wards. Our patient platform team owns the services that store "
         "care plans and synchronize them with hospital systems. The team has six engineers "
-        "and a product manager and works from Basel, with flexible office days.\n\n"
+        "and a product manager and works from Dublin, with flexible office days.\n\n"
         "You will build and operate backend services in Python, design APIs used by our "
         "web application and by hospital integrations, and help us improve observability "
         "across the platform. You have at least four years of backend experience, are "
         "comfortable with SQL and asynchronous workers, and you write tests and "
         "documentation as part of your work. Experience with healthcare data standards is a "
-        "plus. Fluent English is required; German is an advantage."
+        "plus. Fluent English is required."
     ),
     "larchmont": (
         "The data platform team of Larchmont Bank builds the shared services that our "
         "analysts and risk teams use to load, check and query data. We are twelve engineers "
-        "in Zurich and work closely with the bank's security and compliance teams.\n\n"
+        "in Lisbon and work closely with the bank's security and compliance teams.\n\n"
         "As a data platform engineer you will develop Python services that move data "
         "between our core systems and the analytics platform, build self-service APIs for "
         "data access, and automate deployments. You will also help analysts write efficient "
@@ -130,36 +132,36 @@ POSTINGS = {
         "office budget and four weeks of paid holiday plus public holidays."
     ),
     "quayside": (
-        "Quayside Payments provides payment processing for online shops in Switzerland and "
-        "Austria. Our payments API team builds the endpoints that merchants integrate "
+        "Quayside Payments provides payment processing for online shops in the United Kingdom "
+        "and Ireland. Our payments API team builds the endpoints that merchants integrate "
         "with and keeps them fast and available around the clock.\n\n"
         "You will develop new API features, improve error handling and idempotency, and "
         "take part in incident reviews. We look for four or more years of backend "
         "experience, strong SQL, experience with REST APIs and an interest in payments. "
         "Experience with Kotlin or Java is a plus. Fluent English is required. The role is "
-        "based in Zurich with two days of remote work a week."
+        "based in London with two days of remote work a week, and we sponsor work visas."
     ),
     "kelpie": (
         "Kelpie Labs builds developer tools for teams that run Python services: a deployment "
         "dashboard, health checks and release notes generated from commits. We are a fully "
-        "remote company of 40 people across Europe.\n\n"
+        "remote company of 40 people, based in Toronto, with colleagues across Canada and Europe.\n\n"
         "As a senior Python engineer you will work on our deployment workflow product, from "
         "the API to the background workers that run checks and rollbacks. You will help "
         "shape our technical direction and mentor colleagues. We look for strong Python "
         "experience, a good understanding of Linux and containers, and experience designing "
         "reliable deployment or release processes. Experience with TypeScript is a plus. "
-        "Fluent English is required. We offer a remote contract, flexible hours and a "
-        "learning budget."
+        "Fluent English is required. We hire as contractors outside Canada and offer "
+        "flexible hours and a learning budget."
     ),
     "meridian": (
         "Meridian Insurance Group is modernizing how its brokers and customers access policy "
-        "data. Our new data APIs team in Basel replaces nightly file exports with APIs that "
+        "data. Our new data APIs team in Berlin replaces nightly file exports with APIs that "
         "partners can call directly.\n\n"
         "You will design and build those APIs in Python, model data in SQL and work with "
         "architects on security and access control. You will also help colleagues from "
         "other teams adopt the new APIs. We look for experience with Python, SQL and REST "
         "APIs and an interest in clear documentation. Experience in insurance is not needed. "
-        "Fluent English is required. The role is hybrid, with two office days a week in Basel."
+        "Fluent English is required. The role is hybrid, with two office days a week in Berlin."
     ),
     "fernhill": (
         "Fernhill Mobility runs a booking platform for shared electric vans in eight European "
@@ -173,29 +175,29 @@ POSTINGS = {
     ),
     "cobalt": (
         "Cobalt Telecom provides mobile and internet plans to small businesses in "
-        "Switzerland. The billing team builds the services that rate usage and produce "
+        "Ireland. The billing team builds the services that rate usage and produce "
         "monthly invoices for 60,000 customers.\n\n"
         "As a software engineer you will develop billing services in Python, improve the "
         "accuracy of our rating rules and work with finance on reports. We look for two or "
         "more years of experience with Python and SQL, care for correctness, and good "
-        "communication. Fluent English is required. The role is based in Zurich, with "
+        "communication. Fluent English is required. The role is based in Dublin, with "
         "flexible hours and one remote day a week."
     ),
-    "rheintal": (
-        "Die Rheintal Energie AG versorgt über 200'000 Haushalte mit Strom und Wärme. Für "
-        "unser Team Digitale Dienste in Zürich suchen wir eine Backend-Entwicklerin oder "
-        "einen Backend-Entwickler.\n\n"
+    "spreeland": (
+        "Die Spreeland Energie GmbH versorgt über 200.000 Haushalte in Berlin und Brandenburg "
+        "mit Strom und Wärme. Für unser Team Digitale Dienste in Berlin suchen wir eine "
+        "Backend-Entwicklerin oder einen Backend-Entwickler.\n\n"
         "Deine Aufgaben: Du entwickelst Dienste in Python für unser Kundenportal, du "
         "betreust Schnittstellen zu unseren Abrechnungssystemen und du arbeitest eng mit "
         "dem Betrieb zusammen. Dein Profil: mehrjährige Erfahrung mit Python und SQL, "
         "Erfahrung mit Docker und Linux, fließend Deutsch (C1) und gute Englischkenntnisse. "
         "Wir bieten flexible Arbeitszeiten, zwei Tage Homeoffice pro Woche und ein "
-        "Generalabonnement."
+        "Jobticket für den Nahverkehr."
     ),
     "pixelwright": (
         "Pixelwright Studio is a digital agency that builds websites and web applications "
         "for clients in retail and tourism. We are looking for a frontend engineer to join "
-        "our client delivery team in Zurich.\n\n"
+        "our client delivery team in Amsterdam.\n\n"
         "You will build user interfaces in React and TypeScript for client projects, work "
         "with our designers on component libraries and present your work to clients. We "
         "look for three years of experience with React, strong CSS skills and experience "
@@ -279,9 +281,9 @@ def seed_demo(app, client):
                 expected_version=career.get_profile()["version"],
                 name="Alex Example",
                 headline="Backend Engineer",
-                location="Zurich, Switzerland",
+                location="Amsterdam, Netherlands",
                 email="alex@example.test",
-                phone="+41 44 000 00 00",
+                phone="+31 20 000 0000",
                 summary=(
                     "Backend engineer with five years of Python APIs and asynchronous "
                     "workers in production. Cares about reliable deployments, measured "
@@ -308,7 +310,11 @@ def seed_demo(app, client):
                 skills=["Distributed systems", "Python"],
             )
         )
-        for language, level in (("Italian", "Native"), ("English", "Fluent (C1)")):
+        for language, level in (
+            ("Italian", "Native"),
+            ("English", "Fluent (C1)"),
+            ("Dutch", "Basic (A2)"),
+        ):
             career.create_entry(EntryCreate(kind="language", title=language, narrative=level))
         for title, text, approved, always in (
             (
@@ -382,26 +388,51 @@ def seed_demo(app, client):
                 preferences.update_preferences(section, {"expected_version": 0, "items": items})
             preferences.update_settings({"expected_version": 0, **example["settings"]})
 
-    # Three sources, stored as the dashboard saves them.
+    # Four sources, stored as the dashboard saves them.
     sources = {}
     with moment(days=45), acting_as(OWNER):
         for key, value in (
             (
                 "search",
                 SourceCreate(
-                    name="Backend roles, Zurich",
+                    name="Backend roles, Amsterdam",
                     kind="jobspy",
                     config={
                         "query": "backend engineer python",
-                        "location": "Zurich",
-                        "country": "switzerland",
+                        "location": "Amsterdam",
+                        "country": "netherlands",
                         "providers": ["linkedin", "indeed"],
                         "results_wanted": 30,
                         "hours_old": 72,
                     },
                     filters={"exclude_titles": ["intern", "working student"]},
                     enabled=True,
-                    schedule={"kind": "daily", "times": ["07:00"], "timezone": "Europe/Zurich"},
+                    schedule={
+                        "kind": "daily",
+                        "times": ["07:00"],
+                        "timezone": "Europe/Amsterdam",
+                    },
+                ),
+            ),
+            (
+                "europe",
+                SourceCreate(
+                    name="Data and backend roles, Europe",
+                    kind="jobspy",
+                    config={
+                        "query": "data platform engineer python",
+                        "location": "Europe",
+                        "providers": ["linkedin"],
+                        "results_wanted": 40,
+                        "hours_old": 72,
+                    },
+                    filters={"exclude_titles": ["intern", "working student"]},
+                    enabled=True,
+                    schedule={
+                        "kind": "daily",
+                        "times": ["07:30"],
+                        "timezone": "Europe/Amsterdam",
+                    },
                 ),
             ),
             (
@@ -448,11 +479,20 @@ def seed_demo(app, client):
 
     def collect(key, title, company, location, source, days, **extra):
         board = "greenhouse" if source == "voltline" else None
+        kind = "feed" if source == "feed" else "search"
         url = (
             f"https://boards.greenhouse.io/voltline/jobs/{key}"
             if board
             else f"https://jobs.example.test/{source}/{key}"
         )
+        if "salary" in extra:
+            currency, low, high = extra["salary"]
+            extra["salary"] = {
+                "currency": currency,
+                "min_amount": low,
+                "max_amount": high,
+                "interval": "yearly",
+            }
         with moment(days=days):
             return workspace.ingest_job(
                 {
@@ -462,7 +502,7 @@ def seed_demo(app, client):
                     "url": url,
                     "posting": POSTINGS[extra.pop("posting", key)],
                     "source_id": sources[source],
-                    "metadata": {"source": board or source, **extra},
+                    "metadata": {"source": board or kind, **extra},
                     **({"source_key": f"greenhouse:voltline:{key}"} if board else {}),
                 }
             )
@@ -500,18 +540,20 @@ def seed_demo(app, client):
         "quayside-payments-api",
         "Backend Engineer, Payments API",
         "Quayside Payments",
-        "Zurich, Switzerland (hybrid)",
-        "search",
+        "London, United Kingdom (hybrid)",
+        "europe",
         44,
+        salary=("GBP", 80000, 95000),
         posting="quayside",
     )
     larchmont = collect(
         "larchmont-data-platform",
         "Data Platform Engineer",
         "Larchmont Bank",
-        "Zurich, Switzerland (hybrid)",
-        "search",
+        "Lisbon, Portugal (hybrid)",
+        "europe",
         58,
+        salary=("EUR", 60000, 75000),
         posting="larchmont",
     )
     freightwise = collect(
@@ -521,15 +563,17 @@ def seed_demo(app, client):
         "Remote, Europe",
         "feed",
         30,
+        salary=("EUR", 70000, 85000),
         posting="freightwise",
     )
     lumacare = collect(
         "lumacare-patient-platform",
         "Backend Engineer, Patient Platform",
         "Lumacare Health",
-        "Basel, Switzerland",
-        "search",
+        "Dublin, Ireland",
+        "europe",
         12,
+        salary=("EUR", 75000, 90000),
         posting="lumacare",
     )
     for job, found, sent, reply in (
@@ -583,9 +627,10 @@ def seed_demo(app, client):
         "senior-backend-grid-data",
         "Senior Backend Engineer, Grid Data",
         "Voltline Grid Analytics",
-        "Zurich, Switzerland (hybrid)",
+        "Amsterdam, Netherlands (hybrid)",
         "voltline",
         6,
+        salary=("EUR", 80000, 95000),
         posting="voltline",
         ats="greenhouse",
     )
@@ -614,6 +659,7 @@ def seed_demo(app, client):
         "Remote, Europe",
         "feed",
         4,
+        salary=("EUR", 65000, 75000),
         posting="carbon",
     )
     with moment(days=3), acting_as(agent), batch():
@@ -650,9 +696,10 @@ def seed_demo(app, client):
         "tessellate-geospatial-api",
         "Backend Engineer, Geospatial APIs",
         "Tessellate Maps",
-        "Lugano, Switzerland (hybrid)",
-        "search",
+        "Barcelona, Spain (hybrid)",
+        "europe",
         3,
+        salary=("EUR", 55000, 65000),
         posting="tessellate",
     )
     with moment(days=2), acting_as(OWNER):
@@ -677,7 +724,7 @@ def seed_demo(app, client):
             "voltline-grid-data",
             "Senior Backend Engineer - Grid Data",
             "Voltline Grid Analytics",
-            "Zurich, Switzerland",
+            "Amsterdam, Netherlands",
             "search",
             2,
             posting="voltline",
@@ -686,28 +733,30 @@ def seed_demo(app, client):
             "kelpie-senior-python",
             "Senior Python Engineer, Developer Tools",
             "Kelpie Labs",
-            "Remote, Europe",
+            "Toronto, Canada (remote)",
             "feed",
             2,
+            salary=("CAD", 140000, 165000),
             posting="kelpie",
         ),
         collect(
             "meridian-data-apis",
             "Backend Engineer, Data APIs",
             "Meridian Insurance Group",
-            "Basel, Switzerland (hybrid)",
-            "search",
+            "Berlin, Germany (hybrid)",
+            "europe",
             1,
+            salary=("EUR", 75000, 85000),
             posting="meridian",
         ),
         collect(
-            "rheintal-backend",
+            "spreeland-backend",
             "Backend-Entwickler/in Python (m/w/d)",
-            "Rheintal Energie AG",
-            "Zurich, Switzerland",
-            "search",
+            "Spreeland Energie GmbH",
+            "Berlin, Germany",
+            "europe",
             1,
-            posting="rheintal",
+            posting="spreeland",
         ),
         collect(
             "fernhill-platform",
@@ -722,9 +771,10 @@ def seed_demo(app, client):
             "cobalt-billing",
             "Software Engineer, Billing",
             "Cobalt Telecom",
-            "Zurich, Switzerland",
-            "search",
+            "Dublin, Ireland",
+            "europe",
             0.1,
+            salary=("EUR", 55000, 65000),
             posting="cobalt",
         ),
     ]
@@ -744,7 +794,7 @@ def seed_demo(app, client):
         "pixelwright-frontend",
         "Frontend Engineer (React)",
         "Pixelwright Studio",
-        "Zurich, Switzerland",
+        "Amsterdam, Netherlands",
         "search",
         3,
         posting="pixelwright",
@@ -754,8 +804,9 @@ def seed_demo(app, client):
         "Staff Backend Engineer",
         "Northpeak Trading",
         "London, United Kingdom",
-        "feed",
+        "europe",
         5,
+        salary=("GBP", 120000, 140000),
         posting="northpeak",
     )
     with moment(days=2, hours=20), acting_as(agent), batch():
@@ -776,8 +827,9 @@ def seed_demo(app, client):
     # Collection history: each source ran this morning, the search also yesterday.
     with workspace.db.transaction() as conn:
         for source, name, received, created, hours in (
-            ("search", "Backend roles, Zurich", 24, 3, 28),
-            ("search", "Backend roles, Zurich", 27, 2, 4),
+            ("search", "Backend roles, Amsterdam", 24, 3, 28),
+            ("search", "Backend roles, Amsterdam", 27, 2, 4),
+            ("europe", "Data and backend roles, Europe", 38, 4, 3),
             ("voltline", "Voltline Grid Analytics careers", 9, 0, 3),
             ("feed", "Remote Python jobs feed", 18, 2, 2),
         ):
@@ -797,7 +849,9 @@ def seed_demo(app, client):
                     sources[source],
                     run_id,
                     "succeeded",
-                    json.dumps({"provider": "linkedin" if source == "search" else source}),
+                    json.dumps(
+                        {"provider": "linkedin" if source in ("search", "europe") else source}
+                    ),
                     json.dumps(
                         {
                             "received": received,

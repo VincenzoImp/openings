@@ -101,7 +101,7 @@ by hand.
 |---|---|
 | Keywords | Required. One search per query and place. |
 | Location | Empty. Use a place the portal knows. |
-| Country | Empty. Indeed and Glassdoor need one, such as `switzerland` or `uk`; LinkedIn uses the location alone. |
+| Country | Empty. Indeed and Glassdoor need one, such as `germany` or `uk`; LinkedIn uses the location alone. |
 | Job sites | All three; choose the ones you want. |
 | Posted within | 72 hours, 1 to 8760. |
 | Result limit (REST and MCP: `results_wanted`) | 20 per portal per check, 1 to 50. Known jobs count. |

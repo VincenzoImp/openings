@@ -63,9 +63,9 @@ not cover a case.
 
 | Section | Holds | Example |
 |---|---|---|
-| **What I'm looking for** | Roles, places, companies and conditions worth a look | "Data and platform roles, on site in Zurich or Basel, or remote within Europe." |
+| **What I'm looking for** | Roles, places, companies and conditions worth a look | "Data and platform roles, hybrid in Berlin or Lisbon, or remote within the EU." |
 | **What I rule out** | What makes a job not worth applying to | "Agencies that hire for clients." |
-| **Facts about me** | What employers ask about: eligibility, availability, notice, salary | "EU citizen with a Swiss B permit, valid until 2028-06-30." |
+| **Facts about me** | What employers ask about: eligibility, availability, notice, salary | "Needs visa sponsorship to work in the UK." |
 | **Writing rules** | How CVs and letters are written | "Never volunteer weaknesses or missing skills." |
 | **Working with me** | Instructions the agent follows | "Never contact an employer for me." |
 
