@@ -4,7 +4,13 @@
 // React and no requests: tested directly (tests/jobs.test.mjs).
 import type { Schema } from "../../api/client";
 import type { operations } from "../../api/schema";
-import { EMPTY, daysBetween, formatDay, isoDay } from "../../ui/format.ts";
+import {
+  EMPTY,
+  dayStart,
+  daysBetween,
+  formatDay,
+  isoDay,
+} from "../../ui/format.ts";
 
 export type JobSummary = Schema<"JobSummary">;
 export type Job = Schema<"Job">;
@@ -121,9 +127,13 @@ export function listQuery(view: View, limit: number): ListQuery {
     "location",
     "posting_language",
     "requires",
-    "created_since",
   ] as const)
     if (filters[key]) query[key] = filters[key];
+  // A day of the address starts at local midnight.
+  if (filters.created_since)
+    query.created_since = /^\d{4}-\d{2}-\d{2}$/.test(filters.created_since)
+      ? dayStart(filters.created_since)
+      : filters.created_since;
   if (filters.signal === "incomplete") query.complete = false;
   else if (filters.signal)
     query.signal = filters.signal as NonNullable<ListQuery["signal"]>;

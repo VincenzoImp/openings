@@ -4,6 +4,7 @@ from ..common import decode_record
 from ..errors import DomainError, missing
 from ..models import OUTCOMES
 from ..outcomes import last_replies, no_reply_cutoff, no_reply_period, replies_of
+from .jobs import JOB_SOURCE_SQL
 from .readiness import MISSING_DOCUMENTS_SQL, READY_SQL, readiness
 
 STAGES = ("shortlisted", "applied", "interview", "offer", "closed")
@@ -82,6 +83,12 @@ class ApplicationReads:
         needs=None,
         applied_since=None,
         applied_until=None,
+        ready=None,
+        source=None,
+        priority=None,
+        has_deadline=None,
+        deadline_since=None,
+        deadline_until=None,
     ):
         conditions, args = [], []
         with self.db.connect() as connection:
@@ -97,6 +104,8 @@ class ApplicationReads:
         for column, value, operator in (
             ("applied_at", applied_since, ">="),
             ("applied_at", applied_until, "<="),
+            ("deadline", deadline_since, ">="),
+            ("deadline", deadline_until, "<="),
         ):
             if value:
                 conditions.append("app." + column + operator + "?")
@@ -112,6 +121,14 @@ class ApplicationReads:
         if company:
             conditions.append("j.company=?")
             args.append(company)
+        if source:
+            conditions.append(JOB_SOURCE_SQL + "=?")
+            args.append(source)
+        if priority is not None:
+            conditions.append("app.priority=?")
+            args.append(priority)
+        if has_deadline is not None:
+            conditions.append("app.deadline IS " + ("NOT NULL" if has_deadline else "NULL"))
         if q.strip():
             conditions.append(
                 "(j.title LIKE ? OR j.company LIKE ? OR EXISTS(SELECT 1 FROM notes n "
@@ -121,6 +138,8 @@ class ApplicationReads:
         # Stage counts follow every filter but the stage itself.
         counted = " WHERE " + " AND ".join(conditions) if conditions else ""
         counted_args = list(args)
+        if ready is not None:
+            conditions.append(("" if ready else "NOT ") + READY_SQL)
         if stage:
             if stage == "ready":
                 conditions.append(READY_SQL)
@@ -140,7 +159,12 @@ class ApplicationReads:
             # Undated or unprioritized attempts follow the planned ones.
             "deadline": "app.deadline IS NULL,app.deadline,app.priority IS NULL,app.priority,app.updated_at DESC",
             "priority": "app.priority IS NULL,app.priority,app.deadline IS NULL,app.deadline,app.updated_at DESC",
+            # Ready, Shortlisted with a deadline, waiting past the no-reply period, the rest.
+            "needs": f"CASE WHEN {READY_SQL} THEN 0 WHEN app.status='shortlisted' AND app.deadline "
+            f"IS NOT NULL THEN 1 WHEN {REPLY_OVERDUE_SQL} THEN 2 ELSE 3 END,"
+            "app.deadline IS NULL,app.deadline,app.priority IS NULL,app.priority,app.updated_at DESC",
         }.get(sort, "app.updated_at DESC")
+        order_args = [cutoff] if sort == "needs" else []
         with self.db.connect() as connection:
             projection = "app.id,app.job_id,app.status,app.outcome,app.version,app.applied_at,app.created_at,app.updated_at,app.concluded_on,"
             projection += "app.priority,app.deadline,app.required_documents,app.requirements,"
@@ -157,7 +181,7 @@ class ApplicationReads:
                 + " ORDER BY "
                 + order
                 + ",app.id LIMIT ? OFFSET ?",
-                (*args, min(max(int(limit), 1), 200), max(int(offset), 0)),
+                (*args, *order_args, min(max(int(limit), 1), 200), max(int(offset), 0)),
             ).fetchall()
             total = connection.execute("SELECT count(*)" + base + where, args).fetchone()[0]
             counts = dict.fromkeys(STAGES, 0)
@@ -173,6 +197,12 @@ class ApplicationReads:
                 + READY_SQL,
                 counted_args,
             ).fetchone()[0]
+            sources = [
+                row[0]
+                for row in connection.execute(
+                    f"SELECT DISTINCT {JOB_SOURCE_SQL}{base}{counted} ORDER BY 1", counted_args
+                )
+            ]
             identifiers = [row["id"] for row in rows]
             ready = readiness(connection, rows)
             preparation = self._application_preparation(connection, identifiers)
@@ -200,4 +230,5 @@ class ApplicationReads:
             "offset": offset,
             "stage_counts": counts,
             "no_reply": no_reply,
+            "sources": sources,
         }

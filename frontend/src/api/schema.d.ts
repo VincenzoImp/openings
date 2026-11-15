@@ -10,8 +10,8 @@ export interface paths {
       cookie?: never;
     };
     /**
-     * Search application summaries with stage counts.
-     * @description Each with ready, missing and last_reply. Filter by stage (ready: Shortlisted and Ready), needs (documents, reply_overdue), job_id, q, outcome, company, applied dates.
+     * Search applications, with stage counts and sources.
+     * @description Each with ready, missing and last_reply. Shortlisted has Ready unless ready=false.
      */
     get: operations["applications_list"];
     put?: never;
@@ -2051,6 +2051,8 @@ export interface components {
       no_reply?: components["schemas"]["NoReply"] | null;
       /** Offset */
       offset?: number | null;
+      /** Sources */
+      sources?: string[] | null;
       /** Stage Counts */
       stage_counts: {
         [key: string]: number;
@@ -2118,6 +2120,11 @@ export interface components {
       id: string;
       /** Outcome */
       outcome?: string | null;
+      /**
+       * Ready
+       * @default false
+       */
+      ready: boolean;
       /** Stage */
       stage: string;
       /** Version */
@@ -5441,19 +5448,22 @@ export interface operations {
   applications_list: {
     parameters: {
       query?: {
-        /** @description Applied at or after this time. */
         applied_since?: string | null;
-        /** @description Applied at or before this time. */
         applied_until?: string | null;
         company?: string | null;
+        deadline_since?: string | null;
+        deadline_until?: string | null;
+        has_deadline?: boolean | null;
         job_id?: string | null;
         limit?: number;
-        /** @description documents: Shortlisted, missing a document; reply_overdue: Applied, no reply past no_reply_days. */
+        /** @description documents: Shortlisted, missing a document; reply_overdue: no reply past no_reply_days. */
         needs?: ("documents" | "reply_overdue") | null;
         offset?: number;
         outcome?:
           ("accepted" | "rejected" | "not_pursued" | "no_response") | null;
+        priority?: number | null;
         q?: string;
+        ready?: boolean | null;
         sort?:
           | "updated"
           | "newest"
@@ -5462,8 +5472,10 @@ export interface operations {
           | "stage"
           | "applied"
           | "deadline"
-          | "priority";
-        /** @description ready: Shortlisted with every required document complete and nothing blocking. */
+          | "priority"
+          | "needs";
+        source?: string | null;
+        /** @description ready: Shortlisted, documents done, unblocked. */
         stage?:
           | (
               | "shortlisted"
@@ -8615,7 +8627,7 @@ export interface operations {
         /** @description Such as fulltime or internship. */
         job_type?: string | null;
         limit?: number;
-        /** @description Exactly this location text. */
+        /** @description Location contains this text. */
         location?: string | null;
         offset?: number;
         /** @description Written in this language (ISO 639-1 code or name). */

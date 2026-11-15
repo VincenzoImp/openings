@@ -188,7 +188,7 @@ export function Attention({ rows }: { rows: Row[] }) {
         })}
       </Rows>
       {rows.length > SHOWN && (
-        <a className="today-more" href={stageHref("shortlisted")}>
+        <a className="today-more" href={href("applications")}>
           All {rows.length}
           <ArrowRight aria-hidden="true" size={14} strokeWidth={1.75} />
         </a>
@@ -204,7 +204,16 @@ type BatchResult = Schema<"BatchResult">;
  * records the reply or closes as no reply (r, c); the header closes them all.
  * Both closes are undone from the toast.
  */
-export function Waiting({ rows, days }: { rows: Application[]; days: number }) {
+export function Waiting({
+  rows,
+  total,
+  days,
+}: {
+  rows: Application[];
+  /** All the waiting applications; `rows` are the first ones. */
+  total: number;
+  days: number;
+}) {
   const bulk = useBulkApplications();
   const toast = useToast();
   const [replying, setReplying] = useState<Application | null>(null);
@@ -276,7 +285,7 @@ export function Waiting({ rows, days }: { rows: Application[]; days: number }) {
   return (
     <Section
       title="Waiting for a reply"
-      count={rows.length}
+      count={total}
       action={
         <Button
           size="sm"
@@ -330,12 +339,12 @@ export function Waiting({ rows, days }: { rows: Application[]; days: number }) {
           );
         })}
       </Rows>
-      {rows.length > SHOWN && (
+      {total > SHOWN && (
         <a
           className="today-more"
-          href={href("applications", {}, { stage: "applied" })}
+          href={href("applications", {}, { stage: "applied", waiting: "1" })}
         >
-          All {rows.length} waiting
+          All {total} waiting
           <ArrowRight aria-hidden="true" size={14} strokeWidth={1.75} />
         </a>
       )}

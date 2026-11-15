@@ -77,6 +77,11 @@ def test_lists_and_mutations_default_to_compact_records_with_full_opt_in(app, cl
     faceted = client.get("/api/v1/jobs?include_facets=true").json()
     assert faceted["facets"]["companies"] == ["Example 0", "Example 1"]
     assert faceted["items"] == rest["items"]
+    # A facet follows the other filters but not its own: the other companies stay choosable.
+    narrowed = client.get("/api/v1/jobs?include_facets=true&company=Example 1").json()
+    assert {item["company"] for item in narrowed["items"]} == {"Example 1"}
+    assert set(narrowed["facets"]["companies"]) == {"Example 0", "Example 1"}
+    assert narrowed["facets"]["sources"] == [narrowed["items"][0]["source"]]
 
     documents = client.get("/api/v1/documents").json()
     assert documents["items"][0]["file_count"] == 0

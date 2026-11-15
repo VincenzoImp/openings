@@ -33,7 +33,11 @@ export function useApiMutation<Data, Vars = void>({
     ...options,
     onSettled: async (...args) => {
       const [, error, vars] = args;
-      await invalidate(touches, !error && drops ? drops(vars) : []);
+      // The workspace context (the setup checklist) sums up every resource.
+      await invalidate(
+        [...new Set<Resource>([...touches, "workspace"])],
+        !error && drops ? drops(vars) : [],
+      );
       await onSettled?.(...args);
     },
   });

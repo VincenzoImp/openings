@@ -429,6 +429,20 @@ def test_a_failing_source_leaves_the_others_running(collection, monkeypatch):
     assert service.get_source(first["id"])["last_run"]["tasks"][0]["error"]
     assert service.get_source(second["id"])["last_error"] is None
     assert workspace.list_jobs()["total"] == 1
+    # A failure that will be retried is not a failed check yet.
+    assert service.read_collection()["sources_failing"] == 0
+    # One site of a check failed, another succeeded at the same moment: the check failed.
+    with workspace.db.transaction() as connection:
+        task = connection.execute(
+            "SELECT * FROM tasks WHERE source_id=?", (first["id"],)
+        ).fetchone()
+        connection.execute("UPDATE tasks SET state='failed' WHERE id=?", (task["id"],))
+        connection.execute(
+            "INSERT INTO tasks(id,kind,source_id,run_id,state,next_run_at,created_at,updated_at)"
+            " VALUES('zzz','collect',?,?,'succeeded',?,?,?)",
+            (first["id"], task["run_id"], *[task["created_at"]] * 3),
+        )
+    assert service.read_collection()["sources_failing"] == 1
 
 
 def test_cancel_between_claim_and_collection_does_not_touch_source(collection, monkeypatch):

@@ -20,6 +20,7 @@ from pydantic import Field
 from . import __version__
 from .actors import current_actor
 from .common import now
+from .discovery.runs import FAILING_SOURCES_SQL
 from .events import label
 from .models import Input, Since
 from .outcomes import today
@@ -188,17 +189,10 @@ class ContextService:
         return row["at"] if row else None
 
     def _counts(self, conn):
-        jobs = conn.execute(
-            "SELECT coalesce(sum(triage='new'),0),coalesce(sum(triage='shortlisted'),0),"
-            "count(*) FROM jobs"
-        ).fetchone()
+        jobs = conn.execute("SELECT coalesce(sum(triage='new'),0),count(*) FROM jobs").fetchone()
         sources = conn.execute("SELECT count(*) FROM sources").fetchone()[0]
         stages = self.workspace.list_applications(limit=1)
-        failing = conn.execute(
-            "SELECT count(*) FROM sources s WHERE (SELECT t.state FROM tasks t WHERE "
-            "t.source_id=s.id AND t.kind='collect' ORDER BY t.created_at DESC,t.id DESC LIMIT 1)"
-            "='failed'"
-        ).fetchone()[0]
+        failing = conn.execute(FAILING_SOURCES_SQL).fetchone()[0]
         missing = conn.execute(
             "SELECT count(*) FROM applications app WHERE app.status='shortlisted' AND "
             + MISSING_DOCUMENTS_SQL
@@ -206,7 +200,8 @@ class ContextService:
         counts = stages["stage_counts"]
         return {
             "new": jobs[0],
-            "shortlisted": jobs[1],
+            # As the dashboard counts it: open Shortlisted applications not yet Ready.
+            "shortlisted": counts["shortlisted"] - counts["ready"],
             "ready": counts["ready"],
             "missing_documents": missing,
             "applied": counts["applied"],
@@ -215,7 +210,7 @@ class ContextService:
             "reply_overdue": stages["no_reply"]["overdue"],
             "sources_failing": failing,
             # Setup facts: a job or a source exists.
-            "jobs": jobs[2],
+            "jobs": jobs[1],
             "sources": sources,
         }
 

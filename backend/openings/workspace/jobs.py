@@ -17,6 +17,19 @@ from ..job_signals import (
 )
 from ..posting import posting_complete, posting_complete_sql
 from ..preferences import spoken_languages
+from .readiness import READY_SQL
+
+# Where a job came from: its provider, its hiring platform or manual.
+JOB_SOURCE_SQL = (
+    "coalesce(json_extract(j.metadata,'$.source'),json_extract(j.metadata,'$.ats'),'manual')"
+)
+# The fields a facet lists the values of, by facet.
+FACETS = {
+    "companies": ("company", "j.company"),
+    "locations": ("location", "j.location"),
+    "sources": ("source", JOB_SOURCE_SQL),
+    "job_types": ("job_type", "json_extract(j.metadata,'$.job_type')"),
+}
 
 
 def unspoken_sql(spoken):
@@ -53,7 +66,11 @@ class JobReads:
         columns += [
             "substr(j.posting,1,240) AS j_posting_preview",
             posting_complete_sql() + " AS j_complete",
-            "(SELECT json_object('id',id,'stage',status,'outcome',outcome,'version',version) FROM applications WHERE job_id=j.id ORDER BY (status='closed'),created_at DESC,id DESC LIMIT 1) AS j_application",
+            "(SELECT json_object('id',app.id,'stage',app.status,'ready',json(CASE WHEN "
+            + READY_SQL
+            + " THEN 'true' ELSE 'false' END),'outcome',app.outcome,'version',app.version) "
+            "FROM applications app WHERE app.job_id=j.id "
+            "ORDER BY (app.status='closed'),app.created_at DESC,app.id DESC LIMIT 1) AS j_application",
             "(SELECT count(*) FROM applications WHERE job_id=j.id) AS j_application_count",
             SIGNALS_SQL.format(alias="j") + " AS j_signals",
             UNLISTED_SQL.format(alias="j") + " AS j_unlisted_at",
@@ -90,10 +107,17 @@ class JobReads:
             ):
                 row["postings"].append(dict(posting))
             application = connection.execute(
-                "SELECT id,status AS stage,outcome,version,(SELECT count(*) FROM applications WHERE job_id=?) AS application_count FROM applications WHERE job_id=? ORDER BY (status='closed'),created_at DESC,id DESC LIMIT 1",
+                "SELECT app.id,app.status AS stage,"
+                + READY_SQL
+                + " AS ready,app.outcome,app.version,"
+                "(SELECT count(*) FROM applications WHERE job_id=?) AS application_count "
+                "FROM applications app WHERE app.job_id=? "
+                "ORDER BY (app.status='closed'),app.created_at DESC,app.id DESC LIMIT 1",
                 (row["id"], row["id"]),
             ).fetchone()
             row["application"] = dict(application) if application else None
+            if application:
+                row["application"]["ready"] = bool(application["ready"])
             row["application_count"] = (
                 row["application"].pop("application_count") if application else 0
             )
@@ -192,11 +216,11 @@ class JobReads:
             conditions.append("j.company=?")
             args.append(company)
         if location:
-            conditions.append("j.location LIKE ?")
-            args.append("%" + location + "%")
-        source_sql = "coalesce(json_extract(j.metadata,'$.source'),json_extract(j.metadata,'$.ats'),'manual')"
+            conditions.append("j.location LIKE ? ESCAPE '\\'")
+            escaped = location.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            args.append("%" + escaped + "%")
         if source:
-            conditions.append(source_sql + "=?")
+            conditions.append(JOB_SOURCE_SQL + "=?")
             args.append(source)
         if remote is not None:
             conditions.append("json_extract(j.metadata,'$.is_remote')=?")
@@ -259,22 +283,22 @@ class JobReads:
             spoken = spoken_languages(connection) if hide_unspoken_required is not None else []
             hide = bool(hide_unspoken_required and spoken)
             signal_filters["unspoken"] = spoken if hide else None
-            where, args = self._job_filters(
-                q,
-                triage,
-                company,
-                location,
-                source,
-                remote,
-                job_type,
-                created_since,
-                created_until,
-                complete,
-                dismissed_by=dismissed_by,
-                batch_id=batch_id,
-                since=dismissed_since,
-                **signal_filters,
-            )
+            filters = {
+                "q": q,
+                "triage": triage,
+                "company": company,
+                "location": location,
+                "source": source,
+                "remote": remote,
+                "job_type": job_type,
+                "created_since": created_since,
+                "created_until": created_until,
+                "complete": complete,
+                "dismissed_by": dismissed_by,
+                "batch_id": batch_id,
+                "since": dismissed_since,
+            }
+            where, args = self._job_filters(**filters, **signal_filters)
             base = " FROM jobs j"
             order = {
                 "oldest": "j.created_at ASC",
@@ -322,37 +346,25 @@ class JobReads:
             if include_counts:
                 result["counts"] = self._job_counts(
                     connection,
-                    q,
-                    company=company,
-                    location=location,
-                    source=source,
-                    remote=remote,
-                    job_type=job_type,
-                    created_since=created_since,
-                    created_until=created_until,
-                    complete=complete,
+                    **{
+                        key: value
+                        for key, value in filters.items()
+                        if key not in ("triage", "dismissed_by")
+                    },
                     **signal_filters,
                 )
             if not include_facets:
                 return result
+            # Each facet follows every filter but its own, most frequent value first.
             facets = {}
-            for name, expression in (
-                ("companies", "j.company"),
-                ("locations", "j.location"),
-                (
-                    "sources",
-                    "coalesce(json_extract(j.metadata,'$.source'),json_extract(j.metadata,'$.ats'),'manual')",
-                ),
-                ("job_types", "json_extract(j.metadata,'$.job_type')"),
-            ):
+            for name, (field, expression) in FACETS.items():
+                facet_where, facet_args = self._job_filters(
+                    **{**filters, field: None}, **signal_filters
+                )
                 facet_rows = connection.execute(
-                    "SELECT DISTINCT "
-                    + expression
-                    + " value"
-                    + base
-                    + where
-                    + " ORDER BY value LIMIT 200",
-                    args,
+                    f"SELECT {expression} value,count(*) n{base}{facet_where} "
+                    "GROUP BY value ORDER BY n DESC,value LIMIT 500",
+                    facet_args,
                 )
                 facets[name] = [r[0] for r in facet_rows if r[0] not in (None, "")]
         return {**result, "facets": facets}

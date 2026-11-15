@@ -331,10 +331,9 @@ def notes_delete(ws: WS, note_id: str, expected_version: Version) -> Deleted:
 
 @operation("GET /applications", tags=["applications"])
 def applications_list(ws: WS, query: Q[ApplicationQuery]) -> ApplicationPage:
-    """Search application summaries with stage counts.
+    """Search applications, with stage counts and sources.
 
-    Each with ready, missing and last_reply. Filter by stage (ready: Shortlisted and Ready),
-    needs (documents, reply_overdue), job_id, q, outcome, company, applied dates.
+    Each with ready, missing and last_reply. Shortlisted has Ready unless ready=false.
     """
     return ws.list_applications(**query.model_dump())
 

@@ -106,18 +106,20 @@ function Header({
       )}
     />
   );
-  const posting = job.url ? (
-    <a
-      className="ui-btn"
-      data-variant="ghost"
-      href={job.url}
-      target="_blank"
-      rel="noreferrer noopener"
-    >
-      <Icon icon={ExternalLink} />
-      <span className="ui-btn-label">Open posting</span>
-    </a>
-  ) : null;
+  // Ready has its own "Apply on employer's site" beside the PDFs.
+  const posting =
+    job.url && stageOf(app) !== "ready" ? (
+      <a
+        className="ui-btn"
+        data-variant="ghost"
+        href={job.url}
+        target="_blank"
+        rel="noreferrer noopener"
+      >
+        <Icon icon={ExternalLink} />
+        <span className="ui-btn-label">Open posting</span>
+      </a>
+    ) : null;
   return (
     <div className="apg-head">
       <BackLink />
@@ -158,7 +160,7 @@ function Header({
         {more("below")}
       </div>
       <TopBarActions>
-        {job.url && (
+        {posting && (
           <a
             className="ui-btn ui-icon-btn"
             data-variant="ghost"

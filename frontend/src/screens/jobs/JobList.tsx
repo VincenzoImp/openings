@@ -51,7 +51,7 @@ const LABELS = {
 };
 
 const stageOf = (job: JobSummary): Stage | null => {
-  const status = job.application?.stage;
+  const status = job.application?.ready ? "ready" : job.application?.stage;
   return status && status in STAGES ? (status as Stage) : null;
 };
 

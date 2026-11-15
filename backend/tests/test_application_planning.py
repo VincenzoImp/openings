@@ -181,6 +181,43 @@ def test_applications_filter_by_the_time_they_were_applied(app, client):
     assert invalid.status_code == 422
 
 
+def test_applications_filter_by_plan_and_source_and_count_what_they_show(app, client):
+    workspace = app.state.workspace
+
+    def started(title, source, **plan):
+        job = workspace.ingest_job(
+            {
+                "title": title,
+                "company": "Example",
+                "posting": "Build.",
+                "metadata": {"source": source},
+            }
+        )
+        created = workspace.create_application({"job_id": job["id"]})
+        if not plan:
+            return created["id"]
+        return workspace.update_application(
+            created["id"], {"expected_version": created["version"], **plan}
+        )["id"]
+
+    soon = started("Soon", "lever", priority=1, deadline="2026-11-20")
+    late = started("Late", "lever", priority=2, deadline="2026-12-20")
+    open_ended = started("Open", "greenhouse")
+
+    def ids(**query):
+        return {item["id"] for item in workspace.list_applications(**query)["items"]}
+
+    assert ids(priority=1) == {soon}
+    assert ids(has_deadline=True) == {soon, late} and ids(has_deadline=False) == {open_ended}
+    assert ids(deadline_since="2026-11-15", deadline_until="2026-11-22") == {soon}
+    assert ids(source="greenhouse") == {open_ended}
+    page = workspace.list_applications(source="lever", limit=1)
+    # The counts and the total follow the filters; the sources ignore only the stage.
+    assert (page["total"], page["stage_counts"]["shortlisted"]) == (2, 2)
+    assert workspace.list_applications(stage="closed")["sources"] == ["greenhouse", "lever"]
+    assert client.get("/api/v1/applications?priority=6").status_code == 422
+
+
 def test_preparation_counts_current_revisions_and_complete_ones(app, client):
     workspace, documents = app.state.workspace, app.state.documents
     job = workspace.ingest_job({"title": "Synthetic engineer", "posting": "Build services."})

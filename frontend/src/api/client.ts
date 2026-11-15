@@ -97,6 +97,33 @@ export async function call<Data>(
   throw new ApiError(body ?? {}, response.status);
 }
 
+/** The most rows one list request returns. */
+export const MAX_ROWS = 200;
+
+/**
+ * The first `limit` rows of a list (every row with Infinity), read MAX_ROWS
+ * at a time. The first page gives the total and counts; a row that moved
+ * between pages appears once.
+ */
+export async function readRows<Page extends { items: { id: string }[] }>(
+  limit: number,
+  read: (limit: number, offset: number) => Promise<Page>,
+): Promise<Page> {
+  const first = await read(Math.min(limit, MAX_ROWS), 0);
+  const items = [...first.items];
+  const seen = new Set(items.map((item) => item.id));
+  for (let offset = MAX_ROWS; offset < limit; offset += MAX_ROWS) {
+    const page = await read(Math.min(limit - offset, MAX_ROWS), offset);
+    for (const item of page.items) {
+      if (seen.has(item.id)) continue;
+      seen.add(item.id);
+      items.push(item);
+    }
+    if (page.items.length < MAX_ROWS) break;
+  }
+  return { ...first, items };
+}
+
 async function failure(response: Response) {
   const body = await response.json().catch(() => ({}));
   return new ApiError(body?.error ?? {}, response.status);

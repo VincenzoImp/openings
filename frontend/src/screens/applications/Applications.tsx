@@ -33,7 +33,6 @@ import {
   PRIORITIES,
   cleared,
   filterChips,
-  passes,
   readFilters,
   writeFilters,
   type Filters,
@@ -191,22 +190,15 @@ export default function ApplicationsScreen() {
       outcome: filters.outcome,
       waiting: filters.waiting,
       sort: filters.sort,
+      priority: filters.priority,
+      deadline: filters.deadline,
+      source: filters.source,
     },
     limit,
   );
   const days = list.noReplyDays;
-  const rows = sortApplications(
-    list.items.filter((app) => passes(app, filters)),
-    filters.sort,
-    days,
-  );
-  const sources = useMemo(
-    () =>
-      [
-        ...new Set(list.items.map((app) => jobOf(app).source).filter(Boolean)),
-      ].sort(),
-    [list.items],
-  );
+  const rows = sortApplications(list.items, filters.sort, days);
+  const sources = list.sources;
 
   const selection = useSelection();
   const [active, setActive] = useState<string | null>(null);

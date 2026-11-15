@@ -1,13 +1,8 @@
 // The list's state in its address: `#applications?stage=ready&sort=deadline`.
-// Filters the server reads (search, outcome, waiting) and the ones applied to
-// the rows read (priority, deadline, source). No React: tested directly.
-import { daysBetween } from "../../ui/format.ts";
-import {
-  OUTCOMES,
-  type AppFacts,
-  type SortKey,
-  type StageFilter,
-} from "./model.ts";
+// The server reads every filter, so counts and Show more agree with the rows.
+// No React: tested directly.
+import { isoDay } from "../../ui/format.ts";
+import { OUTCOMES, type SortKey, type StageFilter } from "./model.ts";
 
 export interface Filters {
   stage: StageFilter;
@@ -80,29 +75,24 @@ export const PRIORITIES: Record<string, string> = {
   "5": "5 · Lowest",
 };
 
-/** Whether a row passes the filters the dashboard applies itself. */
-export function passes(
-  app: AppFacts & { job: unknown },
-  filters: Filters,
-  now = new Date(),
-) {
-  if (filters.priority && String(app.priority ?? "") !== filters.priority)
-    return false;
-  if (filters.source) {
-    const job = (app.job ?? {}) as { source?: unknown };
-    if (String(job.source ?? "") !== filters.source) return false;
-  }
-  if (filters.deadline) {
-    const days = app.deadline ? daysBetween(now, app.deadline) : null;
-    const ok = {
-      week: days != null && days >= 0 && days <= 7,
-      overdue: days != null && days < 0,
-      set: days != null,
-      none: days == null,
-    }[filters.deadline];
-    if (!ok) return false;
-  }
-  return true;
+/**
+ * The days a deadline filter covers, counted from today where the dashboard
+ * is: Due within 7 days is today to a week from today.
+ */
+export function deadlineQuery(deadline: string, now = new Date()) {
+  const day = (offset: number) => {
+    const date = new Date(now);
+    date.setDate(date.getDate() + offset);
+    return isoDay(date);
+  };
+  return (
+    {
+      week: { deadline_since: day(0), deadline_until: day(7) },
+      overdue: { deadline_until: day(-1) },
+      set: { has_deadline: true },
+      none: { has_deadline: false },
+    }[deadline] ?? {}
+  );
 }
 
 /** The active filters as chips: field and value. */
