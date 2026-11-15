@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.27.0 — 2026-11-15
+
+Company boards read as their vendors publish them, nothing cut or mislabelled, and Openings ready for job searches in more countries and languages. No schema change.
+
+**Company boards**
+
+- Location filters see each board's remote flag and workplace type, so remote roles listed in a city are kept by a **Remote** filter (Workable, SmartRecruiters, Recruitee, Lever, JOIN, BambooHR).
+- Greenhouse matches a role's offices (a listing that says only "Hybrid" or "Distributed" keeps its cities) and maps departments and the first published date.
+- Personio keeps descriptions written only in German, adds other offices and employment types, and accepts `.jobs.personio.com` addresses.
+- SmartRecruiters matches country names instead of ISO codes; join.com reads every page, not the first five jobs; Rippling gives one job per role with all its locations; Oracle matches secondary locations and checks its site; Recruitee joins its locations and drops inline images; BambooHR waits for the detail's country.
+- Workday can read one region of a large board: paste the board's URL filtered on its own site and its facets are kept (`config.facets`).
+- Board listings up to 64 MB are read (a larger board names its size); a missing board fails once as `board_unavailable` instead of being retried; a board that answers empty once keeps its jobs listed until the next run confirms it.
+- RSS dates are read, and job types share one vocabulary (the board's own value is kept as `job_type_raw`).
+- A search can skip companies (**Skip companies**, `filters.exclude_companies`), such as aggregators and agencies that re-post other companies' jobs.
+
+**Fixes**
+
+- Jobs dismissed before 0.21 have no recorded author: they are **Not recorded**, no longer counted as dismissed by job sources.
+- A job's history, an application's history, templates and their files, and Today's lists read every row instead of stopping at 50 or 200.
+- Applications are searched like jobs: words that start with what you type, in the role, the company, the posting or the pinned note.
+- **Saved source** (Stats) and **Job site** (the Applications filter) are named apart, job sites by name; Stats splits **Added by hand** from **Removed source**.
+- Source rows say their counts are cumulative: "9 ever shortlisted".
+- The setup checklist refreshes after every write.
+
+**Worldwide**
+
+- Posting language and required languages are recognised in Spanish, Portuguese, Dutch, Polish, Swedish, Danish, Norwegian and Finnish too, besides English, German, French and Italian; stored signals are computed again.
+- Examples, placeholders, the demo workspace and the screenshots describe a job search across several countries and currencies.
+
+**REST and MCP**
+
+- `dismissed_by` takes `unknown`; job counts include it. Source filters take `exclude_companies`; a Workday config takes `facets`.
+- `tools/list` no longer repeats limits the server enforces anyway (it is 2,000 characters shorter).
+
 ## 0.26.0 — 2026-11-15
 
 Counts, filters and lists that agree with each other past the first 200 rows, and company boards that deliver every role in the places you follow. No schema change.
