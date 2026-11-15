@@ -112,6 +112,9 @@ def test_ready_truth_table(workspace):
             "items"
         ]
     }
+    preparing = workspace.list_applications(stage="shortlisted", ready=False, limit=200)
+    assert {item["id"] for item in preparing["items"]} == shortlisted - ready
+    assert preparing["total"] == len(shortlisted - ready)
     needs = {
         identifier
         for identifier, (_, missing) in cases.items()

@@ -543,20 +543,23 @@ class ApplicationQuery(Input):
     stage: Literal["shortlisted", "ready", "applied", "interview", "offer", "closed"] | None = (
         Field(
             default=None,
-            description="ready: Shortlisted with every required document complete and nothing blocking.",
+            description="ready: Shortlisted, documents done, nothing blocking.",
         )
     )
     needs: Literal["documents", "reply_overdue"] | None = Field(
         default=None,
-        description="documents: Shortlisted, missing a document; reply_overdue: Applied, no reply past no_reply_days.",
+        description="documents: Shortlisted, missing a document; reply_overdue: no reply past no_reply_days.",
     )
+    ready: bool | None = None
     outcome: Outcome | None = None
     company: str | None = Field(default=None, max_length=300)
-    applied_since: Since | None = Field(default=None, description="Applied at or after this time.")
-    applied_until: Until | None = Field(
-        default=None,
-        description="Applied at or before this time.",
-    )
+    source: str | None = Field(default=None, max_length=100)
+    priority: int | None = Field(default=None, ge=1, le=5)
+    has_deadline: bool | None = None
+    deadline_since: Day | None = None
+    deadline_until: Day | None = None
+    applied_since: Since | None = None
+    applied_until: Until | None = None
     sort: Literal[
         "updated",
         "newest",

@@ -2,12 +2,13 @@
 // generated client. Keys start with the resource (src/query/query.ts); a
 // write names what it touches and those queries are read again.
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { api, call, transfer, type Schema } from "../../api/client";
+import { api, call, readRows, transfer, type Schema } from "../../api/client";
 import type { operations } from "../../api/schema";
 import { useApiMutation, useVersionedMutation } from "../../query/mutation";
 import { POLL_MS, type Resource } from "../../query/query";
 import { isoDay } from "../../ui/format";
 import { NO_REPLY_DAYS } from "./days";
+import { deadlineQuery } from "./filters";
 import { type SortKey, type StageFilter } from "./model";
 
 export type ApplicationRow = Schema<"ApplicationRow">;
@@ -45,6 +46,9 @@ export interface ListParams {
   outcome: string;
   waiting: boolean;
   sort: SortKey;
+  priority: string;
+  deadline: string;
+  source: string;
 }
 /** Rows read at a time; Show more reads the next ones. */
 export const PAGE = 200;
@@ -53,36 +57,47 @@ type ListQuery = NonNullable<
 >;
 
 /**
- * The first `limit` applications of a stage and search, read again while
- * the list is open. Shortlisted leaves out the Ready ones (the server counts
- * them in Shortlisted).
+ * The first `limit` applications of a stage and its filters, read again
+ * while the list is open. Shortlisted leaves out the Ready ones, which the
+ * server counts in Shortlisted.
  */
 export function useApplicationList(params: ListParams, limit = PAGE) {
   const query: ListQuery = {
     stage: params.stage === "all" ? undefined : params.stage,
+    ready: params.stage === "shortlisted" ? false : undefined,
     q: params.q || undefined,
     outcome: (params.outcome || undefined) as ListQuery["outcome"],
     needs: params.waiting ? "reply_overdue" : undefined,
     sort: params.sort === "needs" ? "deadline" : params.sort,
+    priority: params.priority ? Number(params.priority) : undefined,
+    source: params.source || undefined,
+    ...deadlineQuery(params.deadline),
     limit,
   };
   const list = useQuery({
     queryKey: ["applications", "list", query],
     queryFn: ({ signal }) =>
-      call(api.GET("/api/v1/applications", { params: { query }, signal })),
+      readRows(limit, (size, offset) =>
+        call(
+          api.GET("/api/v1/applications", {
+            params: { query: { ...query, limit: size, offset } },
+            signal,
+          }),
+        ),
+      ),
     placeholderData: keepPreviousData,
     refetchInterval: POLL_MS,
   });
   const page = list.data;
-  let items = page?.items ?? [];
-  if (params.stage === "shortlisted") items = items.filter((app) => !app.ready);
+  const items = page?.items ?? [];
   return {
     ...list,
     items,
     total: page?.total ?? 0,
     /** Rows the server has beyond the ones read. */
-    more: Math.max(0, (page?.total ?? 0) - (page?.items.length ?? 0)),
+    more: Math.max(0, (page?.total ?? 0) - items.length),
     counts: page?.stage_counts ?? {},
+    sources: page?.sources ?? [],
     noReplyDays: page?.no_reply?.days ?? NO_REPLY_DAYS,
   };
 }

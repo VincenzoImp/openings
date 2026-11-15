@@ -2,7 +2,7 @@
 // with the resource: ["jobs", "list", query], ["jobs", "one", id]. Every
 // write touches jobs and applications (shortlisting starts one) and stats.
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { api, call, type Schema } from "../../api/client";
+import { api, call, MAX_ROWS, readRows, type Schema } from "../../api/client";
 import { useApiMutation, useVersionedMutation } from "../../query/mutation";
 import { POLL_MS, queryClient, type Resource } from "../../query/query";
 import type { Job, JobSummary, ListQuery } from "./model";
@@ -18,12 +18,27 @@ export const jobKeys = {
   search: (q: string) => ["jobs", "search", "merge", q] as const,
 };
 
-/** One page of a tab, with the counts of every tab for the same filters. */
+/** The first rows of a tab, with the counts of every tab for the same filters. */
 export function useJobList(query: ListQuery) {
   return useQuery({
     queryKey: jobKeys.list(query),
     queryFn: ({ signal }) =>
-      call(api.GET("/api/v1/jobs", { params: { query }, signal })),
+      readRows(query.limit ?? MAX_ROWS, (limit, offset) =>
+        call(
+          api.GET("/api/v1/jobs", {
+            params: {
+              // The counts come with the first page.
+              query: {
+                ...query,
+                limit,
+                offset,
+                include_counts: !offset && query.include_counts,
+              },
+            },
+            signal,
+          }),
+        ),
+      ),
     refetchInterval: POLL_MS,
     placeholderData: keepPreviousData,
   });
@@ -70,11 +85,15 @@ export function prefetchJob(id: string) {
   });
 }
 
-/** The values the filters can take: companies, places, sources. */
+/**
+ * The values the filters can take among the jobs of the other filters:
+ * companies, places, sources, most frequent first.
+ */
 export function useFacets(query: ListQuery, enabled: boolean) {
   const facets = {
-    triage: query.triage,
+    ...query,
     limit: 1,
+    include_counts: false,
     include_facets: true,
   } satisfies ListQuery;
   return useQuery({

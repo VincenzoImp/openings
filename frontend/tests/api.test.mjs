@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 
 // The browser's window: the client signals sign-in and changes on it.
 globalThis.window = new EventTarget();
-const { api, call, setCsrf, ApiError } = await import("../src/api/client.ts");
+const { api, call, readRows, setCsrf, ApiError } =
+  await import("../src/api/client.ts");
 
 function respond(status, body) {
   const requests = [];
@@ -60,4 +61,25 @@ test("a failed request throws the backend's error and a 401 asks to sign in", as
   });
   await assert.rejects(call(api.GET("/api/v1/auth/session")));
   assert.equal(unauthorized, 1);
+});
+
+test("a long list is read 200 rows at a time, each row once", async () => {
+  const all = Array.from({ length: 450 }, (_, index) => ({ id: `j_${index}` }));
+  const asked = [];
+  const page = await readRows(500, async (limit, offset) => {
+    asked.push([limit, offset]);
+    // A row that moved up between reads shows again on the next page.
+    const start = offset ? offset - 1 : 0;
+    return { items: all.slice(start, offset + limit), total: all.length };
+  });
+  assert.deepEqual(asked, [
+    [200, 0],
+    [200, 200],
+    [100, 400],
+  ]);
+  assert.equal(page.total, 450);
+  assert.deepEqual(
+    page.items.map((item) => item.id),
+    all.map((item) => item.id),
+  );
 });

@@ -416,6 +416,7 @@ class ApplicationPage(Page):
     items: list[ApplicationRow]
     stage_counts: dict[str, int]
     no_reply: NoReply | None = None
+    sources: list[str] | None = None
 
 
 class Stats(Out):

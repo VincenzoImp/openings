@@ -18,6 +18,18 @@ from ..job_signals import (
 from ..posting import posting_complete, posting_complete_sql
 from ..preferences import spoken_languages
 
+# Where a job came from: its provider, its hiring platform or manual.
+JOB_SOURCE_SQL = (
+    "coalesce(json_extract(j.metadata,'$.source'),json_extract(j.metadata,'$.ats'),'manual')"
+)
+# The fields a facet lists the values of, by facet.
+FACETS = {
+    "companies": ("company", "j.company"),
+    "locations": ("location", "j.location"),
+    "sources": ("source", JOB_SOURCE_SQL),
+    "job_types": ("job_type", "json_extract(j.metadata,'$.job_type')"),
+}
+
 
 def unspoken_sql(spoken):
     """Jobs that require a language outside ``spoken``: a group none of whose languages is spoken."""
@@ -194,9 +206,8 @@ class JobReads:
         if location:
             conditions.append("j.location LIKE ?")
             args.append("%" + location + "%")
-        source_sql = "coalesce(json_extract(j.metadata,'$.source'),json_extract(j.metadata,'$.ats'),'manual')"
         if source:
-            conditions.append(source_sql + "=?")
+            conditions.append(JOB_SOURCE_SQL + "=?")
             args.append(source)
         if remote is not None:
             conditions.append("json_extract(j.metadata,'$.is_remote')=?")
@@ -259,22 +270,22 @@ class JobReads:
             spoken = spoken_languages(connection) if hide_unspoken_required is not None else []
             hide = bool(hide_unspoken_required and spoken)
             signal_filters["unspoken"] = spoken if hide else None
-            where, args = self._job_filters(
-                q,
-                triage,
-                company,
-                location,
-                source,
-                remote,
-                job_type,
-                created_since,
-                created_until,
-                complete,
-                dismissed_by=dismissed_by,
-                batch_id=batch_id,
-                since=dismissed_since,
-                **signal_filters,
-            )
+            filters = {
+                "q": q,
+                "triage": triage,
+                "company": company,
+                "location": location,
+                "source": source,
+                "remote": remote,
+                "job_type": job_type,
+                "created_since": created_since,
+                "created_until": created_until,
+                "complete": complete,
+                "dismissed_by": dismissed_by,
+                "batch_id": batch_id,
+                "since": dismissed_since,
+            }
+            where, args = self._job_filters(**filters, **signal_filters)
             base = " FROM jobs j"
             order = {
                 "oldest": "j.created_at ASC",
@@ -335,24 +346,16 @@ class JobReads:
                 )
             if not include_facets:
                 return result
+            # Each facet follows every filter but its own, most frequent value first.
             facets = {}
-            for name, expression in (
-                ("companies", "j.company"),
-                ("locations", "j.location"),
-                (
-                    "sources",
-                    "coalesce(json_extract(j.metadata,'$.source'),json_extract(j.metadata,'$.ats'),'manual')",
-                ),
-                ("job_types", "json_extract(j.metadata,'$.job_type')"),
-            ):
+            for name, (field, expression) in FACETS.items():
+                facet_where, facet_args = self._job_filters(
+                    **{**filters, field: None}, **signal_filters
+                )
                 facet_rows = connection.execute(
-                    "SELECT DISTINCT "
-                    + expression
-                    + " value"
-                    + base
-                    + where
-                    + " ORDER BY value LIMIT 200",
-                    args,
+                    f"SELECT {expression} value,count(*) n{base}{facet_where} "
+                    "GROUP BY value ORDER BY n DESC,value LIMIT 500",
+                    facet_args,
                 )
                 facets[name] = [r[0] for r in facet_rows if r[0] not in (None, "")]
         return {**result, "facets": facets}

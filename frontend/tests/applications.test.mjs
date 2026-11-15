@@ -267,16 +267,15 @@ test("the list's filters live in its address, defaults left out", () => {
   assert.deepEqual(filters.writeFilters(filters.cleared(value)), {
     stage: "applied",
   });
-  const row = (fields) => ({ ...app(fields), job: { source: "LinkedIn" } });
-  assert.equal(
-    filters.passes(row({ deadline: "2026-11-18" }), read("deadline=week"), now),
-    true,
-  );
-  assert.equal(
-    filters.passes(row({ deadline: "2026-11-10" }), read("deadline=week"), now),
-    false,
-  );
-  assert.equal(filters.passes(row({}), read("source=Indeed"), now), false);
+  assert.deepEqual(filters.deadlineQuery("week", new Date(2026, 10, 14)), {
+    deadline_since: "2026-11-14",
+    deadline_until: "2026-11-21",
+  });
+  assert.deepEqual(filters.deadlineQuery("overdue", new Date(2026, 10, 1)), {
+    deadline_until: "2026-10-31",
+  });
+  assert.deepEqual(filters.deadlineQuery("none"), { has_deadline: false });
+  assert.deepEqual(filters.deadlineQuery(""), {});
   assert.deepEqual(
     filters
       .filterChips(read("waiting=1&outcome=rejected"), 45)
