@@ -94,6 +94,18 @@ def test_replies_by_source_need_two_sources_with_five_applications(workspace):
         {"source": "Data roles", "applied": 5, "replied": 2, "reply_rate": 0.4},
         {"source": "Example board", "applied": 5, "replied": 1, "reply_rate": 0.2},
     ]
+    # Without a saved source: added by hand, or found by a source since removed.
+    for _ in range(4):
+        sent(workspace)
+    for _ in range(5):
+        job, _ = sent(workspace)
+        with workspace.db.transaction() as conn:
+            conn.execute(
+                "UPDATE jobs SET metadata=json_set(metadata,'$.source','linkedin') WHERE id=?",
+                (job["id"],),
+            )
+    rows = {row["source"]: row["applied"] for row in stats.stats()["by_source"]}
+    assert (rows["Added by hand"], rows["Removed source"]) == (5, 5)
 
 
 def test_sources_list_counts_what_each_source_found(app, client):

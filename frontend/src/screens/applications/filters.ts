@@ -2,6 +2,7 @@
 // The server reads every filter, so counts and Show more agree with the rows.
 // No React: tested directly.
 import { isoDay } from "../../ui/format.ts";
+import { sourceName } from "../jobs/model.ts";
 import { OUTCOMES, type SortKey, type StageFilter } from "./model.ts";
 
 export interface Filters {
@@ -117,7 +118,11 @@ export function filterChips(filters: Filters, noReplyDays: number) {
       value: DEADLINES[filters.deadline],
     });
   if (filters.source)
-    chips.push({ key: "source", field: "Source", value: filters.source });
+    chips.push({
+      key: "source",
+      field: "Job site",
+      value: sourceName(filters.source),
+    });
   if (filters.outcome)
     chips.push({
       key: "outcome",

@@ -154,8 +154,8 @@ change, including the job's.
 
 **Applications › Stats** (beside **List**) counts the applications you sent in the last 90 days, 12
 months or all time: the share that got a reply or led to an interview, the median
-days to a reply, the funnel, and replies by source once two sources each have five
-sent applications.
+days to a reply, the funnel, and replies by saved source once two sources each have
+five sent applications (**Added by hand** and **Removed source** group the rest).
 
 ## Delete
 

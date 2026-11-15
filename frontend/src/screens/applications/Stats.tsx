@@ -23,7 +23,7 @@ const FUNNEL: Record<string, string> = {
 
 /**
  * How employers answered the applications sent in a period: four numbers,
- * the funnel from Applied to Offer, and replies by source when the server
+ * the funnel from Applied to Offer, and replies by saved source when the server
  * has enough of them. Nothing is withheld cell by cell.
  */
 export function StatsView({ period }: { period: Period }) {
@@ -121,10 +121,10 @@ export function StatsView({ period }: { period: Period }) {
       {sources.length > 0 && (
         <section aria-labelledby="ap-sources-title">
           <h2 className="ap-section-title" id="ap-sources-title">
-            Replies by source
+            Replies by saved source
           </h2>
           <Table
-            caption="Replies by source"
+            caption="Replies by saved source"
             rowKey={(row) => row.source}
             rows={sources}
             columns={[
