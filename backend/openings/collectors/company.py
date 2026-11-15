@@ -146,10 +146,11 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
         except (ValueError, UnicodeError) as error:
             cache.pop(json.dumps([url, body], sort_keys=True), None)
             save()
+            # Often an error or maintenance page during an outage: tried again later.
             raise DomainError(
-                502,
-                "source_format",
-                f"{kind} returned invalid JSON; its public endpoint may have changed.",
+                503,
+                "source_unavailable",
+                f"{kind} answered with a page that is not JSON; it is tried again later.",
             ) from error
 
     def detail(key, url, *, body=None, decode=None):
@@ -442,23 +443,21 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
         host, site = board.split("/", 1)
         tenant = host.split(".")[0]
         api, public = f"https://{host}/wday/cxs/{tenant}/{site}", f"https://{host}/{site}"
-        listed = []
+        listed, paths, total = [], set(), None
         try:
             for offset in range(0, 20 if preview else max_candidates, 20):
-                rows = records(
-                    get(
-                        api + "/jobs",
-                        body={
-                            "appliedFacets": {},
-                            "limit": 20,
-                            "offset": offset,
-                            "searchText": "",
-                        },
-                    ),
-                    "jobPostings",
+                payload = get(
+                    api + "/jobs",
+                    body={"appliedFacets": {}, "limit": 20, "offset": offset, "searchText": ""},
                 )
-                listed.extend(rows)
-                if len(rows) < 20:
+                rows = records(payload, "jobPostings")
+                # Only the first page states the total; past the end Workday repeats page one.
+                if total is None and isinstance(payload.get("total"), int):
+                    total = payload["total"]
+                fresh = [row for row in rows if row.get("externalPath") not in paths]
+                paths.update(row.get("externalPath") for row in fresh)
+                listed.extend(fresh)
+                if len(rows) < 20 or not fresh or (total is not None and offset + 20 >= total):
                     break
             else:
                 source["candidate_capped"] = True
@@ -466,20 +465,27 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
             if not listed:
                 raise
             source["collection_error"] = error
+
+        def listed_place(row):
+            # "2 Locations" names none of them: the detail's locations are matched instead.
+            place = str(row.get("locationsText") or "")
+            return "" if re.fullmatch(r"\d+ Locations", place) else place
+
         for row in ordered(
-            select(listed, lambda row: row.get("title"), lambda row: row.get("locationsText")),
+            select(listed, lambda row: row.get("title"), listed_place),
             lambda row: f"{kind}:{board}:{row.get('externalPath')}",
         ):
             path = row.get("externalPath") or ""
             if not path.startswith("/job/") or ".." in path:
                 continue
             full = detail(f"{kind}:{board}:{path}", api + path).get("jobPostingInfo") or {}
+            places = [full.get("location"), *(full.get("additionalLocations") or [])]
             add(
                 {"listing": row, "detail": full},
                 path,
                 row.get("title"),
                 full.get("externalUrl") or public + path,
-                full.get("location") or row.get("locationsText"),
+                " · ".join(str(place) for place in places if place) or row.get("locationsText"),
                 full.get("jobDescription"),
                 job_type=full.get("timeType"),
                 published_at=full.get("startDate"),

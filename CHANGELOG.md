@@ -12,6 +12,8 @@ Counts, filters and lists that agree with each other past the first 200 rows. No
 - Today: Waiting for a reply counts every overdue application and its link opens them; Needs attention opens all applications by urgency. "Since yesterday" and the Found filter start at your local midnight.
 - An application waits for a reply "too long" by the same rule everywhere. The Ready page counts every Ready application and has one link to the employer's site.
 - The setup checklist, Jobs and applications refresh after the writes that change them.
+- Company boards: Workday stops at the board's total instead of reading its first page again until `max_candidates`, and a Workday role listed as "2 Locations" is matched on all of its locations instead of being dropped. Lever and Ashby postings carry their other locations, so a location filter matches any of them.
+- A source that answers with a page that is not JSON (often during an outage) is tried again later, not reported as a changed endpoint.
 
 **REST and MCP**
 
