@@ -120,7 +120,11 @@ enough. Over REST and MCP, `filters.locations` also keeps matching places, and
 unknown locations stay visible for review. A search's **Skip companies**
 (`filters.exclude_companies`) leaves out aggregators and agencies that re-post
 other companies' jobs, matching whole words of the company name. Lever pages have
-a region (`global` or `eu`). Careers pages and feeds can hold undated jobs, so **Posted within** does not
+a region (`global` or `eu`). A Workday board lists at most about 2,000 roles; to
+follow one region of a large board, filter the board on its own site (for
+example by location) and paste that URL: its facets (such as
+`?locationHierarchy1=…`) are kept in `config.facets`, so only those roles are
+read. Careers pages and feeds can hold undated jobs, so **Posted within** does not
 apply to them.
 
 ### Schedule

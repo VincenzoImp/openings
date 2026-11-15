@@ -5,7 +5,7 @@ from urllib.parse import parse_qs, urlsplit
 
 from discovery_fixtures import patch_discovery
 from openings.collectors import company
-from openings.discovery import Filters, SourceCreate, feeds
+from openings.discovery import Filters, SourceCreate, feeds, resolution
 from openings.errors import DomainError
 
 
@@ -337,3 +337,33 @@ def test_lever_and_ashby_postings_carry_their_other_locations(monkeypatch):
         monkeypatch.setattr(feeds, "_json", lambda url, payload=payload: payload)
         source = {"kind": kind, "name": "Example", "config": {"board": "example"}}
         assert [item["location"] for item in feeds.fetch_postings(source)] == ["Paris · Zurich"]
+
+
+def test_workday_reads_one_region_with_facets_from_its_board_url():
+    resolved = resolution.detect_source(
+        "https://example.wd5.myworkdayjobs.com/Careers?locationHierarchy1=2fcb99c4"
+    )
+    assert resolved["config"] == {
+        "board": "example.wd5.myworkdayjobs.com/Careers",
+        "facets": {"locationHierarchy1": ["2fcb99c4"]},
+    }
+    source = {"kind": "workday", "name": "Example", "config": resolved["config"]}
+    bodies = []
+
+    def request(url, *, body=None, **kwargs):
+        if body is not None:
+            bodies.append(body)
+            return json.dumps(
+                {"total": 1, "jobPostings": [{"externalPath": "/job/1", "title": "Engineer"}]}
+            ).encode()
+        return json.dumps({"jobPostingInfo": {"jobDescription": "Build APIs"}}).encode()
+
+    assert len(company.collect(source, request, feeds.html_text)) == 1
+    assert bodies == [
+        {
+            "appliedFacets": {"locationHierarchy1": ["2fcb99c4"]},
+            "limit": 20,
+            "offset": 0,
+            "searchText": "",
+        }
+    ]

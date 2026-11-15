@@ -9,6 +9,7 @@ class CompanyAdapter:
     description_mode: Literal["inline", "separate", "metadata"]
     candidates: bool = True
     region: bool = False
+    facets: bool = False
 
     @property
     def fields(self):
@@ -17,6 +18,8 @@ class CompanyAdapter:
             fields.append("max_candidates")
         if self.region:
             fields.append("region")
+        if self.facets:
+            fields.append("facets")
         return fields
 
 
@@ -31,7 +34,7 @@ COMPANY_ADAPTERS = {
     "smartrecruiters": CompanyAdapter("separate"),
     "bamboohr": CompanyAdapter("separate"),
     "rippling": CompanyAdapter("separate"),
-    "workday": CompanyAdapter("separate"),
+    "workday": CompanyAdapter("separate", facets=True),
     "oracle": CompanyAdapter("separate"),
     "joincom": CompanyAdapter("separate"),
 }

@@ -12,9 +12,10 @@ import xml.etree.ElementTree as ET
 from copy import deepcopy
 from datetime import datetime, timedelta
 from functools import cache
+from typing import Annotated
 from urllib.parse import quote, urlencode
 
-from pydantic import BaseModel, ConfigDict, Field, create_model
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, create_model
 
 from ..common import now
 from ..errors import DomainError
@@ -29,6 +30,15 @@ class BoardConfig(BaseModel):
     region: str = "global"
     max_results: int = Field(default=100, ge=1, le=2000)
     max_candidates: int = Field(default=2000, ge=20, le=10000)
+    # Workday search facets, such as {"locationHierarchy1": ["<id>"]}: one region of a
+    # large board, read past the listing's cap of about 2,000 roles.
+    facets: dict[
+        Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9_]{1,80}$")],
+        Annotated[
+            list[Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9_-]{1,120}$")]],
+            Field(min_length=1, max_length=20),
+        ],
+    ] = Field(default_factory=dict, max_length=5)
 
 
 @cache
@@ -448,7 +458,12 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
             for offset in range(0, 20 if preview else max_candidates, 20):
                 payload = get(
                     api + "/jobs",
-                    body={"appliedFacets": {}, "limit": 20, "offset": offset, "searchText": ""},
+                    body={
+                        "appliedFacets": config.get("facets") or {},
+                        "limit": 20,
+                        "offset": offset,
+                        "searchText": "",
+                    },
                 )
                 rows = records(payload, "jobPostings")
                 # Only the first page states the total; past the end Workday repeats page one.

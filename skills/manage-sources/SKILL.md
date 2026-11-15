@@ -34,8 +34,8 @@ One query and one place per search; split "Zurich or Basel" into two.
    mismatch (another field, a ruled out title or language) is worth a filter;
    a varied mix is triage's job.
 3. Prefer the narrowest fix: a more specific query or place, excluded title
-   words, or excluded companies (`exclude_companies`) for aggregators and
-   agencies, each checked against the shortlisted jobs so none would be lost.
+   words, or excluded companies for aggregators and agencies, each checked
+   against the shortlisted jobs so none would be lost.
    Preview the change before saving.
 4. Pause a source that brings nothing useful; delete one only when the owner
    asks.
