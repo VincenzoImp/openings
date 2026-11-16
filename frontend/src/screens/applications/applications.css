@@ -25,17 +25,10 @@
     letter-spacing: 0;
   }
 
-  /* Toolbar: the stage tabs scroll, with a fade where they do not fit; the
-     tools keep their room. */
+  /* Toolbar: every stage tab shows; where the tools do not fit beside
+     them, the tools take a line of their own (ui/tabs.css). */
   .ap-stages {
-    flex: 0 1 auto;
-    min-width: 0;
-    padding-right: var(--s-8);
-    mask-image: linear-gradient(
-      to right,
-      black calc(100% - var(--s-8)),
-      transparent
-    );
+    flex: none;
   }
   .ap-search-row {
     display: none;
@@ -175,6 +168,17 @@
   }
 
   @container app (max-width: 719px) {
+    /* The phone's chips scroll, with a fade where they do not fit. */
+    .ap-stages {
+      flex: 1 1 auto;
+      min-width: 0;
+      padding-right: var(--s-8);
+      mask-image: linear-gradient(
+        to right,
+        black calc(100% - var(--s-8)),
+        transparent
+      );
+    }
     .ap-search-row {
       display: block;
       padding: var(--s-2) var(--s-4);

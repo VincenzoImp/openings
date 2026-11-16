@@ -102,11 +102,16 @@
   .ui-toolbar-spacer {
     flex: 1;
   }
+  /* Tools that do not fit beside the tabs wrap to a line of their own. */
+  .ui-toolbar {
+    flex-wrap: wrap;
+  }
   .ui-toolbar-tools {
     display: flex;
     align-items: center;
     gap: var(--s-1);
     flex: none;
+    margin-left: auto;
   }
   .ui-toolbar-tools .ui-search {
     width: 220px;

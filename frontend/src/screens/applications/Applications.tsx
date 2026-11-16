@@ -322,6 +322,7 @@ export default function ApplicationsScreen() {
     );
     body = (
       <List
+        pageKeys
         label="Applications"
         activeId={active ?? rows[0].id}
         onActiveChange={setActive}

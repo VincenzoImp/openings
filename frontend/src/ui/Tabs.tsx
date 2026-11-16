@@ -1,4 +1,4 @@
-import { useRef, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useRef, type KeyboardEvent, type ReactNode } from "react";
 import { X } from "lucide-react";
 import { cx } from "./cx";
 import { formatNumber } from "./format";
@@ -61,6 +61,19 @@ export function Tabs({
     value,
     onChange,
   );
+  // Where the tabs scroll (a phone's chips), the selected one is in view.
+  const list = keys.ref;
+  useEffect(() => {
+    const tab = list.current?.querySelector<HTMLElement>(
+      '[role="tab"][aria-selected="true"]',
+    );
+    const box = list.current;
+    if (!tab || !box || box.scrollWidth <= box.clientWidth) return;
+    box.scrollLeft = Math.max(
+      0,
+      tab.offsetLeft - (box.clientWidth - tab.offsetWidth) / 2,
+    );
+  }, [value, list]);
   return (
     <div
       ref={keys.ref}

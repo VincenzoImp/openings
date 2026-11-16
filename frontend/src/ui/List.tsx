@@ -2,6 +2,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useId,
   useMemo,
   useRef,
@@ -66,6 +67,9 @@ interface ListState {
 }
 const ListContext = createContext<ListState | null>(null);
 
+/** The keys a main list takes while focus is on the page. */
+const PAGE_KEYS = new Set(["j", "k", "ArrowDown", "ArrowUp", "x", "Enter"]);
+
 const rowIds = (from: Element | null) =>
   [
     ...(from
@@ -79,7 +83,8 @@ const rowIds = (from: Element | null) =>
  * the row shortcuts (`s` shortlist, `d` dismiss…) on the selected row. Only
  * the selected row is a Tab stop; its actions follow it. With a `selection`,
  * `x` and ⌘-click pick rows, Shift+J/K and shift-click pick a range and Esc
- * clears.
+ * clears. The screen's main list (`pageKeys`) takes j, k, x and Enter also
+ * while focus is on the page itself, as after opening the screen.
  */
 export function List({
   label,
@@ -88,6 +93,7 @@ export function List({
   onOpen,
   shortcuts = {},
   selection,
+  pageKeys = false,
   children,
   className,
 }: {
@@ -98,9 +104,43 @@ export function List({
   onOpen?: (id: string) => void;
   shortcuts?: Record<string, (id: string) => void>;
   selection?: Selection;
+  /** The screen's main list: its keys work before a row has focus. */
+  pageKeys?: boolean;
   children: ReactNode;
   className?: string;
 }) {
+  const box = useRef<HTMLDivElement>(null);
+  const latest = useRef({ activeId, onActiveChange, onOpen, selection });
+  latest.current = { activeId, onActiveChange, onOpen, selection };
+  useEffect(() => {
+    if (!pageKeys) return;
+    function onPageKey(event: globalThis.KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      const onPage =
+        !target || target === document.body || target.id === "content";
+      if (!onPage || event.defaultPrevented) return;
+      if (document.querySelector("dialog[open]")) return;
+      const key = plainKey(event);
+      if (!key || !PAGE_KEYS.has(key)) return;
+      const rows = [
+        ...(box.current?.querySelectorAll<HTMLElement>("[data-row-id]") ?? []),
+      ];
+      const { activeId, onActiveChange, onOpen, selection } = latest.current;
+      const row =
+        rows.find((item) => item.dataset.rowId === activeId) ?? rows[0];
+      if (!row) return;
+      event.preventDefault();
+      const id = row.dataset.rowId!;
+      // The first key brings the list in: the selected row takes focus.
+      onActiveChange(id);
+      row.focus();
+      row.scrollIntoView({ block: "nearest" });
+      if (key === "x") selection?.toggle(id);
+      else if (key === "Enter") onOpen?.(id);
+    }
+    document.addEventListener("keydown", onPageKey);
+    return () => document.removeEventListener("keydown", onPageKey);
+  }, [pageKeys]);
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     const key = plainKey(event.nativeEvent);
     // A row's open menu keeps its own keys.
@@ -162,6 +202,7 @@ export function List({
   return (
     <ListContext.Provider value={{ activeId, onActiveChange, selection }}>
       <div
+        ref={box}
         className={cx("ui-list", className)}
         role="region"
         aria-label={label}
