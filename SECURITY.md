@@ -30,7 +30,9 @@ and slowed globally after repeated failures; behind a proxy, set
 `OPENINGS_TRUSTED_PROXIES` so limits apply per client. Job links, careers pages
 and feeds are fetched only from the public addresses checked for each request and
 redirect. The dashboard shell and the health and schema endpoints are public;
-personal data requires authentication.
+personal data requires authentication. The dashboard runs only its own scripts
+under a Content-Security-Policy, and stored files are served sandboxed. A restore
+keeps the installation's own triggers and views, never the backup's.
 
 SQLite and backups are not encrypted. Protect their host files and backups.
 External agents have the access you grant them and use their own AI services;

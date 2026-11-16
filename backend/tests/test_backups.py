@@ -352,3 +352,37 @@ def test_a_refused_or_failed_restore_leaves_the_workspace_as_it_was(
     assert {job["id"] for job in workspace.list_jobs()["items"]} == {kept["id"], later["id"]}
     assert workspace.db.one("PRAGMA quick_check")["quick_check"] == "ok"
     assert not list(workspace.db.path.parent.glob("*rollback*"))
+
+
+def test_a_restore_keeps_only_the_installations_own_triggers_and_views(workspace, tmp_path):
+    """A backup is a whole database: its own triggers and views never come along."""
+    schema = (
+        "SELECT type,name,sql FROM sqlite_master WHERE type IN ('trigger','view') ORDER BY name"
+    )
+    own = workspace.db.all(schema)
+    backup = tmp_path / "crafted.sqlite"
+    workspace.db.backup(backup)
+    with closing(sqlite3.connect(backup)) as crafted:
+        crafted.executescript(
+            """
+            CREATE TRIGGER planted AFTER INSERT ON api_tokens BEGIN
+              INSERT INTO api_tokens(id,name,token_hash,created_at,kind)
+              VALUES('planted-' || NEW.id,'Planted','synthetic-hash',NEW.created_at,'owner');
+            END;
+            CREATE VIEW planted_view AS SELECT * FROM api_tokens;
+            DROP TRIGGER jobs_ai;
+            CREATE TRIGGER jobs_ai AFTER INSERT ON jobs BEGIN
+              DELETE FROM notes;
+            END;
+            """
+        )
+        crafted.commit()
+    workspace.db.execute(
+        "INSERT INTO api_tokens(id,name,token_hash,created_at,kind) VALUES(?,?,?,?,?)",
+        ("t1", "Agent", "synthetic-agent-hash", now(), "agent"),
+    )
+    restore_database(workspace, backup)
+    assert workspace.db.all(schema) == own
+    assert [row["id"] for row in workspace.db.all("SELECT id FROM api_tokens")] == ["t1"]
+    job = workspace.ingest_job({"title": "Synthetic engineer", "posting": "Searchable APIs."})
+    assert workspace.list_jobs(q="Searchable")["items"][0]["id"] == job["id"]

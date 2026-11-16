@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import secrets
@@ -233,8 +234,13 @@ class FileOperations:
         # The text of a PDF is read before the write transaction; it is kept only for
         # a revision without a TeX source.
         pdf = document and is_pdf(scope["name"], scope["media_type"])
-        # A PDF naming its source gets its text from that source instead.
-        text = pdf_text(bytes(data)) if pdf and not scope.get("source_sha256") else None
+        # A PDF naming its source gets its text from that source instead. Parsing an
+        # uploaded PDF takes a worker thread, so a slow file never stalls other requests.
+        text = (
+            await asyncio.to_thread(pdf_text, bytes(data))
+            if pdf and not scope.get("source_sha256")
+            else None
+        )
         with self.db.transaction() as conn:
             grant, current = self._grant(token, "PUT", conn)
             self._owner(conn, current["owner_type"], current["owner_id"], writable=False)
