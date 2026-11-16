@@ -23,7 +23,11 @@ class ImportOperations:
             item = EntryCreate(kind="other", title=value.title, narrative=value.text)
             return {
                 "entries": [item.model_dump()],
-                "warnings": ["Text is preserved as one narrative. Review before importing."],
+                # Said in words: the whole text is one entry, and an agent can split it.
+                "warnings": [
+                    "Kept as one entry. Your agent can split it into roles and education "
+                    "(“Split my CV into career entries”)."
+                ],
             }
         if isinstance(data, list):
             data = {"entries": data}

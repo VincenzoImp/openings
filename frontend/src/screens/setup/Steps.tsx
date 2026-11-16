@@ -38,8 +38,7 @@ import {
 } from "../sources/model";
 import { useKindLabels, useSourceTest } from "../sources/queries";
 import { StepFrame } from "./Frame";
-import { LanguagePicker } from "../preferences/LanguagePicker";
-import { KEPT_WHOLE, keptWhole } from "../profile/model";
+import { LanguagePicker } from "../../ui/LanguagePicker";
 import { aboutFrom, otherLines, type About } from "./model";
 
 type Profile = Schema<"Profile">;
@@ -493,8 +492,10 @@ export function CvStep({
     title?: string;
     organization?: string;
   }[];
-  // Text the reader could not split is kept whole, as one entry.
-  const whole = !!preview && keptWhole(preview);
+  // Text the reader could not split is kept whole, as one entry, and the
+  // preview says so (with what to ask an agent).
+  const whole =
+    entries.length === 1 ? (preview?.warnings?.[0] as string | undefined) : "";
 
   async function importIt() {
     if (!preview) return;
@@ -548,11 +549,10 @@ export function CvStep({
           {preview && (
             <div className="setup-preview" role="status">
               <p>
-                {whole
-                  ? KEPT_WHOLE
-                  : entries.length
+                {whole ||
+                  (entries.length
                     ? `Found ${plural(entries.length, "entry", "entries")}`
-                    : "No entry found in this text."}
+                    : "No entry found in this text.")}
               </p>
               {entries.length > 0 && !whole && (
                 <ul>

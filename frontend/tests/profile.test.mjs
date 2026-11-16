@@ -203,15 +203,3 @@ LANGUAGES
     "Built the weekly sales dashboard.",
   ]);
 });
-
-test("a pasted CV kept whole says so, not 1 entry", () => {
-  const entries = [{ kind: "other", title: "My CV", narrative: "Two roles" }];
-  const warnings = ["Text is preserved as one narrative."];
-  assert.equal(model.keptWhole({ entries, warnings }), true);
-  assert.match(model.KEPT_WHOLE, /^Kept as one entry\. Your agent can split/);
-  assert.equal(model.keptWhole({ entries, warnings: [] }), false);
-  assert.equal(
-    model.keptWhole({ entries: [...entries, ...entries], warnings }),
-    false,
-  );
-});
