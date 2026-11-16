@@ -156,6 +156,15 @@ def create_app(database=None, start_worker=True):
             if request.scope["path"] == "/mcp":
                 request.scope["path"] = "/mcp/"
                 request.scope["raw_path"] = request.scope.get("raw_path", b"/mcp") + b"/"
+            # JSON-RPC is the only body MCP takes: a hand-typed `curl -d` (sent as a
+            # form) is read as the JSON it is instead of being refused with a 400.
+            if path == "/mcp" and request.method == "POST":
+                kept = [
+                    (key, value)
+                    for key, value in request.scope["headers"]
+                    if key != b"content-type"
+                ]
+                request.scope["headers"] = [*kept, (b"content-type", b"application/json")]
             # Handlers, offloaded threads and MCP tools inherit the actor from this context.
             # Every change of one request shares one batch id.
             origin = request_origin.set(str(request.base_url).rstrip("/"))

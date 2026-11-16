@@ -92,6 +92,13 @@ def test_both_mcp_paths_preserve_auth_origin_host_and_maintenance_checks(tmp_pat
                 == 401
             )
             assert client.post(endpoint, json=message, headers=headers).status_code == 200
+            # A hand-typed request without the JSON content type is read all the same.
+            typed = client.post(
+                endpoint,
+                content=json.dumps(message),
+                headers={**headers, "Content-Type": "application/x-www-form-urlencoded"},
+            )
+            assert typed.status_code == 200 and typed.json()["result"]["tools"]
             assert (
                 client.post(
                     endpoint, json=message, headers={**headers, "Origin": "https://other.example"}
