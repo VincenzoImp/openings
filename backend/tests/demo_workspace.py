@@ -637,7 +637,12 @@ def seed_demo(app, client):
     )
     with moment(days=5), acting_as(OWNER):
         ready = workspace.create_application(
-            {"job_id": voltline["id"], "priority": 1, "deadline": day(12)}
+            {
+                "job_id": voltline["id"],
+                "priority": 1,
+                "deadline": day(12),
+                "salary": "EUR 88,000–92,000 a year",
+            }
         )
     revisions(ready, voltline["company"], 1, letter=True)
     with moment(hours=20), acting_as(agent):

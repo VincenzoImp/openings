@@ -472,6 +472,17 @@
   .apg-check-part {
     grid-column: 1 / -1;
   }
+  .apg-salary {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--s-2);
+    margin: 0;
+    font: var(--t-sm);
+    white-space: pre-wrap;
+  }
+  .apg-salary .ui-icon-btn {
+    margin-top: -5px;
+  }
   /* On a phone the check is a tab of its own: say when it has nothing. */
   .apg-check-none {
     grid-column: 1 / -1;
