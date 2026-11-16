@@ -6,7 +6,7 @@ import type { Schema } from "../../api/client";
 import { ConflictNotice } from "../../query/ConflictNotice";
 import { Button, IconButton } from "../../ui/Button";
 import { Checkbox, Input, Textarea, Field } from "../../ui/Field";
-import { formatDate, formatFull } from "../../ui/format";
+import { formatDay, formatFull } from "../../ui/format";
 import { copyText } from "../../ui/CodeBlock";
 import { Icon } from "../../ui/Icon";
 import { SectionHeader, Skeleton } from "../../ui/Page";
@@ -414,7 +414,7 @@ export function HistoryList({ app }: { app: Application }) {
                     dateTime={item.created_at}
                     title={formatFull(item.created_at)}
                   >
-                    {formatDate(item.created_at)}
+                    {formatDay(item.created_at)}
                   </time>
                   {actorPhrase(item.actor) && ` · ${actorPhrase(item.actor)}`}
                 </p>

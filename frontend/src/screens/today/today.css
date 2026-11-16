@@ -33,11 +33,6 @@
     color: var(--text);
     font-weight: var(--w-medium);
   }
-  .today-greeting:not(:last-child)::after {
-    content: " ·";
-    color: var(--text-3);
-    font-weight: var(--w-regular);
-  }
 
   .today-caught-up {
     display: flex;
@@ -234,9 +229,6 @@
     .today-summary {
       flex-direction: column;
       margin-top: 0;
-    }
-    .today-greeting:not(:last-child)::after {
-      content: none;
     }
     .today-list {
       --ui-row-pad: var(--s-4);

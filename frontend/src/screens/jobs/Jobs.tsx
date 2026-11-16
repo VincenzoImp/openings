@@ -944,10 +944,12 @@ export default function Jobs() {
         onClose={() => setForgetting(null)}
         onConfirm={() => forgetting && void decide(forgetting, "forget")}
       >
-        {forgetting?.length === 1 ? "The job is" : "The jobs are"} deleted with
-        their applications, notes and files, and cannot be restored. If a source
-        finds one again, it comes back as a new job. To stop seeing a job and
-        keep its history, dismiss it instead.
+        {forgetting?.length === 1
+          ? "The job is deleted with its"
+          : "The jobs are deleted with their"}{" "}
+        applications, notes and files, and cannot be restored. If a source finds
+        one again, it comes back as a new job. To stop seeing a job and keep its
+        history, dismiss it instead.
       </ConfirmDialog>
     </div>
   );

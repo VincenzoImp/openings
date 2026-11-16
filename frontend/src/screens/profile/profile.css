@@ -153,11 +153,6 @@
   .pf-add-inline {
     color: var(--text-3);
   }
-  .pf-count {
-    margin-left: var(--s-2);
-    color: var(--text-3);
-    font: var(--t-sm);
-  }
   .pf-none {
     color: var(--text-3);
     font: var(--t-sm);
@@ -214,6 +209,9 @@
   }
   .pf-highlights li::marker {
     color: var(--text-3);
+  }
+  .pf-nowrap {
+    white-space: nowrap;
   }
   .pf-star-mark {
     display: inline-flex;

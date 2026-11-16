@@ -26,7 +26,8 @@ import {
 import { ToastProvider } from "../ui/Toast";
 import { ShellContext, type ShellApi } from "./context";
 import { DemoBanner } from "./DemoBanner";
-import { BOTTOM, NAV, NEEDS_LABEL, type NavDef } from "./nav";
+import { BOTTOM, NAV, type NavDef } from "./nav";
+import { needsLabel } from "./needs";
 import { href, navigate, useRoute } from "./router";
 import { ROUTES } from "./routes";
 import { Screen, preload } from "./Screens";
@@ -157,7 +158,9 @@ export function Shell({
     icon: nav.icon,
     href: href(nav.id),
     needs: nav.needs ? counts[nav.needs] : undefined,
-    needsLabel: nav.needs ? NEEDS_LABEL[nav.needs] : undefined,
+    needsLabel: nav.needs
+      ? needsLabel(nav.needs, counts[nav.needs])
+      : undefined,
   });
   // Until server facts say setup is done, the last group offers to finish it.
   const finish: NavDef = {

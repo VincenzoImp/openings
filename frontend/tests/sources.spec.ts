@@ -274,7 +274,7 @@ test("the schedule line sets one interval and pauses every check", async ({
     schedule: { minutes?: number };
   }[];
   expect(items.every((item) => item.schedule.minutes === 360)).toBe(true);
-  await expect(page.locator(".src-topline")).toContainText("next check");
+  await expect(page.locator(".src-topline")).toContainText("Next check");
   // The switch of every automatic check is in `…`.
   await page
     .getByRole("button", { name: "More about automatic checks" })

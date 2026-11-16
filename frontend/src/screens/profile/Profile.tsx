@@ -7,7 +7,7 @@ import { List, Plus, Upload, UserRound } from "lucide-react";
 import { Button, IconButton } from "../../ui/Button";
 import { Menu } from "../../ui/Menu";
 import { EmptyState, PageHeader, SectionHeader, Skeleton } from "../../ui/Page";
-import { Tag } from "../../ui/Badge";
+import { Count, Tag } from "../../ui/Badge";
 import { TopBarActions } from "../../shell/context";
 import { EditingProvider, useEditing } from "./Block";
 import {
@@ -280,7 +280,7 @@ function Section({
         id={`pf-${id}-h`}
         className="pf-section-head"
         title={title}
-        count={!!count && <span className="pf-count">{count}</span>}
+        count={!!count && <Count value={count} />}
         action={action}
         focusable
       />

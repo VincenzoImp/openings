@@ -88,10 +88,12 @@ test("the needs-you counts come from the workspace", async ({ page }) => {
   await expect(
     links.getByRole("link", { name: /Applications/ }),
   ).toHaveAccessibleName(
-    ready ? new RegExp(`${ready} ready applications`) : /^Applications$/,
+    ready
+      ? new RegExp(`${ready} ready application${ready === 1 ? "" : "s"}`)
+      : /^Applications$/,
   );
   await expect(links.getByRole("link", { name: /Jobs/ })).toHaveAccessibleName(
-    fresh ? new RegExp(`${fresh} new jobs`) : /^Jobs$/,
+    fresh ? new RegExp(`${fresh} new job${fresh === 1 ? "" : "s"}`) : /^Jobs$/,
   );
   // A new job counts at once: the shell reads again after a write.
   await page.keyboard.press("n");

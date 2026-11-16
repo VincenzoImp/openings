@@ -207,7 +207,7 @@ export function useDocumentUpload(
       hidden
       multiple
       accept=".pdf,application/pdf,.tex,.ltx"
-      aria-label={`Upload PDF of the ${KIND_LABEL[kind]}`}
+      aria-label={`Upload PDF of the ${kind === "cv" ? "CV" : "letter"}`}
       onChange={(event) => {
         if (event.target.files?.length) send(event.target.files);
         event.target.value = "";

@@ -145,3 +145,11 @@ test("the page declares the cascade layers before any stylesheet", () => {
     assert.ok(layers < html.indexOf("<script"), page);
   }
 });
+
+test("a needs count reads one new job, or n new jobs", async () => {
+  const { needsLabel } = await import("../src/shell/needs.ts");
+  assert.equal(needsLabel("newJobs", 1), "new job");
+  assert.equal(needsLabel("newJobs", 3), "new jobs");
+  assert.equal(needsLabel("readyApplications", 1), "ready application");
+  assert.equal(needsLabel("readyApplications", 0), "ready applications");
+});

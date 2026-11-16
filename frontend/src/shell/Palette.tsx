@@ -250,7 +250,7 @@ export function Palette({
                 flat.length ? `${id}-${current}` : undefined
               }
               aria-autocomplete="list"
-              placeholder="Search jobs, applications and commands"
+              placeholder="Search or type a command"
               value={q}
               onChange={(event) => setQ(event.target.value)}
               onKeyDown={onKeyDown}

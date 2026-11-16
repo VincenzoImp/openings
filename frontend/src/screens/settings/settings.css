@@ -382,10 +382,32 @@
   .set-restore dd {
     margin: 0;
   }
+  /* A file picker drawn as the other uploads: a button and the name. The
+     field's own input stays the labelled control, out of sight. */
   .set-file {
-    height: auto;
-    padding: 6px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    min-width: 0;
+  }
+  .set-file-input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+  }
+  .set-file-input:focus-visible + .ui-btn {
+    box-shadow: var(--focus-ring);
+  }
+  .set-file-name {
+    overflow: hidden;
+    color: var(--text-2);
     font: var(--t-sm);
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   /* Advanced: request limits */
