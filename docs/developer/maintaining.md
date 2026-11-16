@@ -1,12 +1,13 @@
 # Maintaining
 
-Notes for the maintainer: releases, the demo reel and repository settings.
+Cut a release, keep the archives and set up the repository here, as the maintainer.
 
 ## Release
 
-Check that the latest run of the weekly workflow (`weekly.yml`) on `main` passed.
-Rename `## Unreleased` in [CHANGELOG.md](../../CHANGELOG.md) to `## X.Y.Z — date`,
-set every version at once and check the locks:
+1. Check that the latest run of the weekly workflow (`weekly.yml`) on `main` passed.
+2. Rename `## Unreleased` in [CHANGELOG.md](../../CHANGELOG.md) to the form the
+   earlier sections use, `## X.Y.Z — date`.
+3. Set every version at once and check the locks:
 
 ```bash
 python3 scripts/bump_version.py X.Y.Z && uv lock --check
@@ -19,21 +20,26 @@ listed`. The release is titled `Openings X.Y.Z: <headline>`, and the rest of the
 section, with a fixed upgrade line, is its notes. The release workflow fails before
 building anything if the section or its headline is missing.
 
-Merge that change, then tag `vX.Y.Z` on `main`. The release workflow
-(`images.yml`) waits for the CI run of the tagged commit and requires it to pass,
-audits the dependencies, builds both images, smoke-tests each pushed digest
-(`scripts/smoke_image.sh`, including the OCI labels), and publishes one multi-arch
-index tagged `X.Y.Z` and `X.Y` on Docker Hub (`vincenzoimp/openings`) and on the
-GHCR mirror (`ghcr.io/vincenzoimp/openings`), with the same digest on both. A final
-release also moves `latest`, unless a newer final release exists, and smoke-tests
-`latest` as pulled. A prerelease (`X.Y.Z-rc.1`) moves neither `X.Y` nor `latest`.
-Then it creates the GitHub Release.
+Merge that change, then tag `vX.Y.Z` on `main`. The release workflow (`images.yml`)
+then does these steps in order:
+
+1. **Waits** for the CI run of the tagged commit and requires it to pass.
+2. **Audits** the dependencies and builds both images.
+3. **Smoke-tests** each pushed digest (`scripts/smoke_image.sh`, including the OCI
+   labels).
+4. **Publishes** one multi-arch index tagged `X.Y.Z` and `X.Y` on Docker Hub
+   (`vincenzoimp/openings`) and on the GHCR mirror (`ghcr.io/vincenzoimp/openings`),
+   with the same digest on both.
+5. **Moves `latest`** for a final release, unless a newer final release exists, and
+   smoke-tests `latest` as pulled. A prerelease (`X.Y.Z-rc.1`) moves neither `X.Y`
+   nor `latest`.
+6. **Creates** the GitHub Release.
 
 To point `latest` at an already published release without a local login, run the
-`latest.yml` workflow: `gh workflow run latest.yml -f version=X.Y.Z`. It checks that
-both architectures are there, moves `latest` on Docker Hub (and on GHCR when that
-version is mirrored), compares the digests and checks that `latest` reports the
-version on `/health`.
+`latest.yml` workflow with `gh workflow run latest.yml -f version=X.Y.Z`. The
+workflow checks that both architectures are there and moves `latest` on Docker Hub,
+and on GHCR when that version is mirrored. Then it compares the digests and checks
+that `latest` reports the version on `/health`.
 
 A release that changes the schema ships its migration. Once it is tagged, write
 the fixture the next migration upgrades from:
@@ -54,12 +60,15 @@ synthetic seed.
 
 ## Traffic archive
 
-GitHub keeps traffic for 14 days only. `scripts/traffic_archive.py` appends one
-dated JSON line a day (views, clones, referrers, popular paths, stars, forks,
-issues by author and the Docker Hub pull count with its daily change) to a file
-outside the checkout; a second run on the same day writes nothing. It addresses
-the repository by its numeric id and reads the token from `GITHUB_TOKEN`,
-`GH_TOKEN` or `gh auth token`, without writing it. Run it daily from cron:
+GitHub keeps traffic for 14 days only, so archive it daily. `scripts/traffic_archive.py`
+appends one dated JSON line a day to a file outside the checkout, and a second run
+on the same day writes nothing. The line holds views, clones, referrers, popular
+paths, stars, forks, issues by author and the Docker Hub pull count with its daily
+change.
+
+The script addresses the repository by its numeric id. It reads the token from
+`GITHUB_TOKEN`, `GH_TOKEN` or `gh auth token`, and never writes it. Run it daily
+from cron, for example:
 
 ```bash
 15 6 * * * cd /path/to/openings && python3 scripts/traffic_archive.py --output "$HOME/openings-traffic/traffic.jsonl"
@@ -105,7 +114,7 @@ recorder both specs share is `frontend/tests/reel.ts`.
 ## Dependencies
 
 Dependabot proposes updates weekly, each version at least seven days old
-(`cooldown`). Two are made by hand:
+(`cooldown`). Two updates are made by hand:
 
 - **Playwright:** `@playwright/test` and the Playwright image in `ci.yml`,
   `weekly.yml` and `screenshots.yml` move together; CI checks that they match.
@@ -115,17 +124,22 @@ Dependabot proposes updates weekly, each version at least seven days old
 ## Static analysis
 
 `codeql.yml` analyzes the Python and TypeScript on pull requests, on `main` and
-weekly; its findings are code scanning alerts. `zizmor.yml` audits the workflows
-and the Dependabot configuration on every change under `.github/` and fails on
-any finding. Neither is a required check. Pin every action by commit SHA with
-its version in a comment.
+weekly, and its findings are code scanning alerts. `zizmor.yml` audits the
+workflows and the Dependabot configuration on every change under `.github/`, and
+fails on any finding. Neither is a required check. Pin every action by commit SHA,
+with its version in a comment.
 
 ## Repository settings
 
-`main` is protected by a ruleset: pull requests only, required checks `backend`,
-`frontend`, `e2e` and `container (amd64)` passing on a branch up to date with
-`main`, no force-push, deletion or bypass; no review is required. A change that
-renames those jobs updates the ruleset (`gh api repos/VincenzoImp/openings-job-search/rulesets`).
+A ruleset protects `main`:
+
+- pull requests only, with no review required;
+- the checks `backend`, `frontend`, `e2e` and `container (amd64)` passing on a
+  branch up to date with `main`;
+- no force-push, deletion or bypass.
+
+A change that renames those jobs updates the ruleset
+(`gh api repos/VincenzoImp/openings-job-search/rulesets`).
 
 The project description is the same in `pyproject.toml`, the Dockerfile label,
 the `images.yml` index annotation and `frontend/index.html`;
@@ -133,8 +147,10 @@ the `images.yml` index annotation and `frontend/index.html`;
 equal to it.
 
 The `ghcr.io/vincenzoimp/openings` package is public. The release jobs push to
-Docker Hub with the `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` secrets and to GHCR
+Docker Hub with the `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` secrets, and to GHCR
 with the workflow's own token (`packages: write` on the publishing jobs only).
-The Docker Hub overview is edited by hand from `docs/dockerhub.md`; set the
-repository variable `DOCKERHUB_DESCRIPTION_SYNC` to `true` and add a Read, Write,
-Delete token as `DOCKERHUB_DESCRIPTION_TOKEN` to sync it on every final release.
+
+The Docker Hub overview is edited by hand from `docs/dockerhub.md`. To sync it on
+every final release instead, set the repository variable
+`DOCKERHUB_DESCRIPTION_SYNC` to `true` and add a Read, Write, Delete token as
+`DOCKERHUB_DESCRIPTION_TOKEN`.

@@ -1,16 +1,18 @@
 # Dashboard QA checklist
 
-A manual pass over every screen and every action before a release that changes
-the dashboard. Repeat it on the synthetic workspaces only. Never use a real
-workspace or a live installation.
+Walk every screen and every action by hand here, before a release that changes the
+dashboard. Use the synthetic workspaces only, never a real workspace or a live
+installation.
 
-The automated tests cover what stays put (layout fit, axe, keys of Jobs and
-gestures). This pass catches what they don't: what a person sees, reads and
-expects. File each defect as its own issue in the release's milestone, labelled
-`bug` or `ui` (plus `product` when the behavior needs a decision). Give repro
-steps, the expected and the actual result, and a screenshot of the demo
-workspace. Add a Playwright test when it is cheap. A test for a defect that is
-not fixed yet uses `test.fail` and names its issue (see `frontend/tests/qa.spec.ts`).
+The automated tests cover what stays put: layout fit, axe, the keys of Jobs and
+gestures. This pass catches what a person sees, reads and expects. File each defect
+as its own issue in the release's milestone, labeled `bug` or `ui`, plus `product`
+when the behavior needs a decision.
+
+- **Report** the repro steps, the expected and the actual result, and a screenshot
+  of the demo workspace.
+- **Add** a Playwright test when it is cheap. A test for a defect that is not fixed
+  yet uses `test.fail` and names its issue (see `frontend/tests/qa.spec.ts`).
 
 ## Set up
 
@@ -27,17 +29,16 @@ uv run python backend/tests/dashboard_server.py --snapshot $D/empty/snap.sqlite 
 ```
 
 Each seed prints a JSON line with an owner session cookie. Add it to the browser
-for `127.0.0.1`, or sign in with the synthetic password in
-`dashboard_server.py`. These servers collect nothing, and their reset endpoint
-(`/__e2e__/reset`) restores the seed between runs. Stop both servers and remove
-`$D` afterwards.
+for `127.0.0.1`, or sign in with the synthetic password in `dashboard_server.py`.
+These servers collect nothing, and their reset endpoint (`/__e2e__/reset`) restores
+the seed between runs. Stop both servers and remove `$D` afterwards.
 
 `npm --prefix frontend run screenshots` writes the light and dark images of
 every screen at 1440 and 390 px to `frontend/screenshots/` for a first look.
 
 ## The matrix
 
-Every screen below is checked across:
+Check every screen below across these axes:
 
 | Axis | Values |
 |---|---|
@@ -71,9 +72,10 @@ At each width and theme, check that:
 
 ## Today
 
-- [ ] Each section: Ready to apply (Start applying), Needs attention, Waiting
-      for a reply (Close as no reply, the row's Record reply and close, then
-      Undo), New jobs (Go through them), the stage links (including a stage with 0).
+- [ ] Each section: Ready to apply (Start applying, best first), Needs attention,
+      Waiting for a reply (Close as no reply, the row's Record reply and close,
+      then Undo), New jobs (Go through them), the stage links (including a stage
+      with 0).
 - [ ] Empty workspace: the setup checklist and its three buttons.
 - [ ] Caught up: nothing to do.
 
@@ -94,14 +96,15 @@ At each width and theme, check that:
 ## Applications
 
 - [ ] Every stage tab and All, at every width; search; Filter; Sort; List and
-      Stats (90 days, 12 months, All time).
+      Stats (90 days, 12 months, All time). Ready rows show their rank and
+      "Priority n", best first.
 - [ ] Keys: `j`/`k`, Enter, `x`, Esc; bulk Close and Set priority.
 - [ ] Application page, one per stage:
   - Shortlisted: upload CV and letter (button and drop), requirements (add,
     check, remove, a very long one), Notes and history, More.
-  - Ready: the ready queue (`[` `]`), Mark applied (⇧↵), Sent today › change
-    the day, the Check, Posting, CV and Letter panes (PDF and Text), the
-    "All sent" end page, Undo.
+  - Ready: the ready queue (`[` `]`, "1 of 3 ready · best first"), Apply (opens
+    a new tab), Mark applied (⇧↵), Sent today › change the day, the Check,
+    Posting, CV and Letter panes (PDF and Text), the "All sent" end page, Undo.
   - Applied and Interview: Record reply (R), notes (Edit), Show all changes,
     sent documents (open, download).
   - Closed: outcome, reopen from More.

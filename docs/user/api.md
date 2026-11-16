@@ -1,21 +1,22 @@
 # REST API
 
-Base path: `/api/v1`. The server describes every operation, field and error: read
-`/api/docs` (interactive) and `/api/openapi.json` (the schema) on your own
-installation. They are the reference; this page covers only what they do not.
-Without a server, `uv run python -m openings.openapi` prints the schema.
+Drive Openings from your own scripts here, with the same operations as the
+dashboard and MCP. The base path is `/api/v1`. Your installation describes every
+operation, field and error at `/api/docs` (interactive) and `/api/openapi.json`
+(the schema). They are the reference, and this page covers only what they do
+not. Without a server, `uv run python -m openings.openapi` prints the schema.
 
-The dashboard, REST and MCP use the same operations. Each operation's `summary`
-is the first line of its description. For an operation that is also an MCP tool,
-the `operationId` is the tool's name; a REST-only operation names the tool that
-does its work in `x-openings-mcp`. `x-openings-access: owner` marks the
-owner-only operations, which are not MCP tools. `GET /api/v1/capabilities`
-(authenticated) lists each operation's name, route and access.
+Each operation's `summary` is the first line of its description. For an operation
+that is also an MCP tool, the `operationId` is the tool's name. A REST-only
+operation names the tool that does its work in `x-openings-mcp`, and
+`x-openings-access: owner` marks the owner-only operations, which are not MCP
+tools. `GET /api/v1/capabilities` (authenticated) lists each operation's name,
+route and access.
 
 ## Authentication
 
 Create a token in **Settings › API & agents** and keep it outside source control.
-Send it as `Authorization: Bearer <token>`. Revoke it independently of any other.
+Send it as `Authorization: Bearer <token>`. Each token can be revoked on its own.
 
 | Kind | Can do |
 |---|---|
@@ -23,9 +24,10 @@ Send it as `Authorization: Bearer <token>`. Revoke it independently of any other
 | `owner` | Everything, like your dashboard session |
 
 An agent token is refused with `403 forbidden` for the owner password, API tokens,
-restore, the career import and kept backups. `POST /tokens`
-takes `{"name": "...", "kind": "agent"}`. Browser sessions are for the dashboard:
-their writes need the `X-CSRF-Token` from `GET /auth/session`; scripts use a token.
+restore, the career import and kept backups. `POST /tokens` takes
+`{"name": "...", "kind": "agent"}`. Browser sessions are for the dashboard, and
+their writes need the `X-CSRF-Token` from `GET /auth/session`. Scripts use a
+token.
 
 ```bash
 export OPENINGS_URL=http://127.0.0.1:8080
@@ -44,16 +46,16 @@ answers `"needs_text": true`: send the posting with `PATCH /jobs/{job_id}`.
 ## Lists and summaries
 
 A paged list takes `limit` and `offset` and returns `items`, `total`, `limit` and
-`offset`. Lists return summaries (previews, counts) by default; read one record, or
-pass `summary=false`, for full text.
+`offset`. Lists return summaries (previews, counts) by default. For full text,
+read one record or pass `summary=false`.
 
 ## Versions and idempotency
 
 Every record that can change has a `version`. A change names the version you read
-as `expected_version`, and every permanent delete does too, as a query parameter:
-`DELETE /notes/{id}?expected_version=3`. A stale version fails with `409 conflict`
-and `details.current_version`; read again and apply your change to the new record.
-Files never change: their version is always 1.
+as `expected_version`, and so does every permanent delete, as a query parameter
+(`DELETE /notes/{id}?expected_version=3`). A stale version fails with
+`409 conflict` and `details.current_version`; read again and apply your change to
+the new record. Files never change, so their version is always 1.
 
 Every create accepts an `idempotency_key` (up to 200 characters). A retry with the
 same key and request returns the record the first one created; the same key with a
@@ -61,14 +63,14 @@ different request returns `409 conflict`.
 
 ## Errors
 
-Every error has one shape, the `Error` model:
+Every error has one shape, the `Error` model, for example:
 
 ```json
 {"error": {"code": "conflict", "status": 409, "message": "...", "details": {"current_version": 4, "id": "..."}}}
 ```
 
-`code` is stable; `message` is for people. MCP tool errors carry the same body as
-text. Common codes:
+`code` is stable, and `message` is for people. MCP tool errors carry the same body
+as text. The common codes are:
 
 | Status | Code | Meaning |
 |---|---|---|
@@ -84,14 +86,14 @@ text. Common codes:
 
 Others name a specific rule, for example `application_not_sent` or `reply_exists`.
 A transfer grant answers `401` with `transfer_token`, `transfer_expired` or
-`transfer_used`. Over MCP, a tool that does not exist fails with `404`: `rest_only`
-(the REST-only operation's tools are in `details.use`), `owner_only` or
+`transfer_used`. Over MCP, a tool that does not exist fails with `404` and
+`rest_only` (with the tools to use in `details.use`), `owner_only` or
 `unknown_tool`. An argument a tool does not take is refused with `validation`.
 
 ## Batches
 
-Operations that change many records take `items` and apply each on its own: there
-is no transaction across items. A call returns one `BatchResult`:
+Operations that change many records take `items` and apply each on its own, with
+no transaction across items. A call returns one `BatchResult`, for example:
 
 ```json
 {"batch_id": "b_...", "total": 2, "succeeded": 1, "failed": 1,
@@ -102,10 +104,12 @@ is no transaction across items. A call returns one `BatchResult`:
 Check every item's `ok`. A batch read takes `ids` and returns `items` and the ids
 it did not find. Each batch operation states its item limit in OpenAPI (for
 example 200 jobs to triage). Every change one call writes shares its `batch_id`,
-which `GET /changes` can filter on. Triage, stage changes and replies take no
-version: they are reversible and guarded by rules, and a conflict names the rule.
-Any other field of `PATCH /applications/batch` (priority, deadline, documents,
-requirements, questions, answers) needs the item's `expected_version`.
+which `GET /changes` can filter on.
+
+Triage, stage changes and replies take no version, because they are reversible
+and guarded by rules; a conflict names the rule. Any other field of
+`PATCH /applications/batch` (priority, deadline, documents, requirements,
+questions, answers) needs the item's `expected_version`.
 
 ## Upload a PDF
 
@@ -133,18 +137,20 @@ curl -fsS -X PUT -H 'X-Transfer-Token: ...' --data-binary @cv.pdf "$GRANT_URL"
 curl -fsS "$OPENINGS_URL/api/v1/documents/d_01" -H "Authorization: Bearer $OPENINGS_TOKEN"
 ```
 
-An upload grant accepts one file and expires after ten minutes; sending the same
+An upload grant accepts one file and expires after ten minutes. Sending the same
 bytes again is safe, and other bytes are refused with `transfer_used`. Files are
 limited to 20 MiB. The revision is complete when its PDF is stored, and a complete
-revision never changes. A download works the same way: `POST /files/{id}/download`
-returns a grant to `GET` with its header; it works once, within ten minutes.
+revision never changes.
 
-The origin of the grant's `url` and `curl` line is `OPENINGS_PUBLIC_URL` (else the origin
-the request reached), so it must be reachable from the machine that runs it.
+A download works the same way. `POST /files/{id}/download` returns a grant to
+`GET` with its header, which works once, within ten minutes.
+
+The origin of the grant's `url` and `curl` line is `OPENINGS_PUBLIC_URL`, or else
+the origin the request reached. The machine that runs the line must reach it.
 
 ## Names
 
-Values and fields behind the words of the dashboard:
+The values and fields behind the words of the dashboard are:
 
 | Word | In REST and MCP |
 |---|---|

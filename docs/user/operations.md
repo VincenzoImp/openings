@@ -1,11 +1,14 @@
 # Operations
 
+Keep your installation running here: update it, reach it from other devices,
+back it up, restore it and fix what goes wrong.
+
 ## Update
 
-Read the [changelog](../../CHANGELOG.md) and take a backup (**Settings › Data ›
-Download backup**). Then update the way you installed:
+Read the [changelog](../../CHANGELOG.md) and take a backup with **Settings › Data
+› Download backup**. Then update the way you installed:
 
-- **`docker run`**: pull the image and replace the container, then run the
+- **`docker run`:** pull the image and replace the container, then run the
   same `docker run` line as at install, with your own options such as
   `OPENINGS_PUBLIC_URL`. The `openings` volume keeps your workspace.
 
@@ -14,12 +17,12 @@ Download backup**). Then update the way you installed:
   docker run -d --name openings -p 127.0.0.1:8080:8080 -v openings:/data --read-only --tmpfs /tmp --restart unless-stopped vincenzoimp/openings:latest
   ```
 
-- **Docker Compose**: `docker compose pull && docker compose up -d` in the
+- **Docker Compose:** run `docker compose pull && docker compose up -d` in the
   folder of `docker-compose.yml`. The file pins a minor release, such as `0.28`,
   so this brings its patch releases. For a new minor release, download
   `docker-compose.yml` again ([Getting started](getting-started.md#use-it)), or
   set `OPENINGS_IMAGE` in `.env`.
-- **From a clone**: `git pull`, then the same two Compose commands.
+- **From a clone:** run `git pull`, then the same two Compose commands.
 
 Other Compose commands:
 
@@ -30,10 +33,10 @@ docker compose restart openings
 docker compose down
 ```
 
-`down` keeps the volume. **`down --volumes` deletes the workspace**, and so does
-`docker volume rm openings`. To change `.env`, run `docker compose up -d` so the
-container is recreated; `OPENINGS_PASSWORD` never resets an existing owner. See
-[Configuration](configuration.md).
+`down` keeps the volume, but `down --volumes` deletes the workspace, and so does
+`docker volume rm openings`. After you change `.env`, run `docker compose up -d`
+so the container is recreated. `OPENINGS_PASSWORD` never resets an existing
+owner; [Configuration](configuration.md) lists every variable.
 
 ### Supported versions
 
@@ -43,17 +46,16 @@ container is recreated; `OPENINGS_PASSWORD` never resets an existing owner. See
 - An older workspace is refused with the release to open it with first, and a
   newer one is refused too. When you skip releases, the changelog says which one
   to pass through. Opening any older format directly is planned for 1.0.0.
-
-Releases come at most once a week unless a fix unblocks someone. No 0.28.x
-release changes the data format.
+- Releases come at most once a week, unless a fix unblocks someone. No 0.28.x
+  release changes the data format.
 
 ### Upgrades
 
 When a release changes the format, the upgrade builds a new file with the data
 copied in, so an upgraded workspace has exactly the layout of a new one.
 
-- **Space:** it needs free space of about 2.2 times the database; if there is not
-  enough, the server does not start and changes nothing.
+- **Space:** the upgrade needs free space of about 2.2 times the database.
+  Without enough, the server does not start and changes nothing.
 - **The original** is kept byte for byte beside the database as
   `openings.pre-<release>.sqlite` and is never deleted automatically; delete it
   under **Settings › Data › Automatic backups** when you no longer need to go back.
@@ -65,11 +67,11 @@ copied in, so an upgraded workspace has exactly the layout of a new one.
 
 ### Roll back
 
-A release that kept the format: run the previous release's tag,
+After a release that kept the format, run the previous release's tag,
 `vincenzoimp/openings:X.Y.Z`, instead of `latest`, as in Update.
 
-A release that changed the format, here 0.28: stop the container, put the
-pre-upgrade copy back in place, and start the previous release. With
+After a release that changed the format, here 0.28, stop the container, put the
+pre-upgrade copy back in place and start the previous release. With
 `docker run`:
 
 ```bash
@@ -89,8 +91,9 @@ and run `docker compose up -d`. Changes made after the upgrade are not in the co
 
 ## Reach it from other devices
 
-Getting started has the short form:
-[On a server or NAS](getting-started.md#on-a-server-or-nas). In `.env`:
+Open Openings to the other devices on your network, then put HTTPS in front.
+[Run it on a server or NAS](getting-started.md#run-it-on-a-server-or-nas) has the
+short form. In `.env`:
 
 ```dotenv
 OPENINGS_BIND=0.0.0.0
@@ -105,16 +108,16 @@ OPENINGS_PUBLIC_URL=http://openings.example:8080
   clients use. MCP refuses another host with `421 mcp_host`, in a message that
   names this variable; the dashboard opened at another address shows a notice
   with the value to set. With Compose, its default follows `OPENINGS_PORT`.
-- Claim the workspace before anyone else can reach it: the one-time setup code is
-  in the log (`docker logs openings`), or set `OPENINGS_PASSWORD` before the
-  first start.
+- Claim the workspace before anyone else can reach it, with the one-time setup
+  code from the log (`docker logs openings`). Or set `OPENINGS_PASSWORD` before
+  the first start.
 
-### HTTPS through a reverse proxy
+### Put HTTPS in front with a reverse proxy
 
-Use HTTPS on any network you do not trust. Put a reverse proxy in front, set
-`OPENINGS_PUBLIC_URL` to its `https://` address (cookies then become secure) and
+Use HTTPS on any network you do not trust. Put a reverse proxy in front, and set
+`OPENINGS_PUBLIC_URL` to its `https://` address, which makes cookies secure. Set
 `OPENINGS_TRUSTED_PROXIES` to the proxy's address as the container sees it, so
-sign-in limits apply to each browser's real address. Without it every client
+sign-in limits apply to each browser's real address. Without it, every client
 shares the proxy's limit.
 
 **Caddy** obtains and renews a certificate by itself. Beside
@@ -151,18 +154,19 @@ networks:
     external: true
 ```
 
-Then, in `.env`, with the proxy's network range (`docker network inspect
-openings_default` for Caddy, `proxy` for Traefik, shows it under `Subnet`):
+Then add the proxy's network range to `.env`. `docker network inspect
+openings_default` (Caddy) or `docker network inspect proxy` (Traefik) shows it
+under `Subnet`. For example:
 
 ```dotenv
 OPENINGS_PUBLIC_URL=https://openings.example.com
 OPENINGS_TRUSTED_PROXIES=172.18.0.0/16
 ```
 
-and run `docker compose up -d`. Keep `OPENINGS_BIND` at `127.0.0.1`: the proxy
+Run `docker compose up -d`. Keep `OPENINGS_BIND` at `127.0.0.1`, since the proxy
 reaches Openings over the Docker network. A name that resolves only on your home
-network gets no public certificate; add `--internal-certs` to the Caddy command
-and trust Caddy's root certificate on your devices.
+network gets no public certificate. In that case, add `--internal-certs` to the Caddy
+command and trust Caddy's root certificate on your devices.
 
 Sign-in allows 10 attempts per client address per minute; after more than 10
 failures across all clients within 15 minutes, attempts are spaced out until a
@@ -170,7 +174,9 @@ sign-in succeeds. API and MCP tokens are not affected.
 
 ## Backups
 
-The database is not encrypted and backups hold personal data: keep them private.
+Take a backup before every update, and copy the automatic ones off the machine.
+The database is not encrypted and backups hold personal data, so keep them
+private.
 
 **Download backup** under **Settings › Data**, or:
 
@@ -184,15 +190,17 @@ service runs. A backup taken with an agent token leaves out the password hash,
 session secret and tokens. **Export records** gives JSON for reading; it has no
 file bytes and cannot be restored.
 
-**Automatic backups.** About once a day the server writes
+**Automatic backups.** About once a day Openings writes
 `openings-<UTC time>.sqlite` into `OPENINGS_BACKUP_DIR` (`/data/backups`), checked
-and readable only by the server user. The newest `OPENINGS_BACKUP_KEEP` (3) stay;
-`0` turns them off. With less than 1.2 times the database size free, a backup is
-skipped with a warning. **Settings › Data › Automatic backups** (owner
-only) lists them with **Download**. Over REST: `GET /api/v1/backups`,
-`GET /api/v1/backups/{name}` and `DELETE /api/v1/backups/{name}`, for owners only.
-`GET /health` reports the newest backup's age and the worker's heartbeat, and
-answers 503 if the worker stopped.
+and readable only by the server user. The newest `OPENINGS_BACKUP_KEEP` (3) stay,
+and `0` turns them off. With less than 1.2 times the database size free, a backup
+is skipped with a warning.
+
+**Settings › Data › Automatic backups** (owner only) lists them with
+**Download**. Owners can also use REST: `GET /api/v1/backups`,
+`GET /api/v1/backups/{name}` and `DELETE /api/v1/backups/{name}`. `GET /health`
+reports the newest backup's age and the worker's heartbeat, and answers 503 if
+the worker stopped.
 
 These copies sit on the same disk. Copy them elsewhere yourself, for example:
 
@@ -214,31 +222,31 @@ curl --fail "$OPENINGS_URL/api/v1/backup/restore" \
 ```
 
 Restore checks integrity, keeps the destination's owner credentials and tokens,
-and clears pending upload and download links. `.env` stays host-local. Check the enabled
-sources after moving. The restore limit follows the free space of the data volume
-(about four times the backup's size when restoring over itself); Settings shows it,
-and a larger upload is refused with `413 backup_size`.
+and clears pending upload and download links. `.env` stays host-local, so check
+the enabled sources after moving. The restore limit follows the free space of the
+data volume (about four times the backup's size when restoring over itself).
+Settings shows it, and a larger upload is refused with `413 backup_size`.
 
 ## Storage and retention
 
 Finished collection runs and their tasks are removed after 90 days
-(`OPENINGS_RETENTION_DAYS`; `0` keeps all); the 20 newest runs of every source
-stay. Job and application history is never pruned. A refresh that only sees a
-posting again records nothing. At start, a database with a quarter of its size
-and `OPENINGS_COMPACT_MIN_MB` free is rewritten without the free space; this needs
-about twice the new size free and may take a while once. **Settings › Data**
-shows the size, free space and retention.
+(`OPENINGS_RETENTION_DAYS`; `0` keeps all), and the 20 newest runs of every
+source stay. Job and application history is never pruned, and a refresh that only
+sees a posting again records nothing. **Settings › Data** shows the size, free
+space and retention.
+
+At start, a database with a quarter of its size and `OPENINGS_COMPACT_MIN_MB`
+free is rewritten without the free space. This needs about twice the new size
+free, and may take a while once.
 
 ## Security
 
-- Claim the workspace with the setup code, or set `OPENINGS_PASSWORD`, before
-  binding beyond localhost.
-- Revoke a token in Settings to end its access on its next request. Changing the
-  password asks for the current one, signs out browsers and keeps tokens.
-- Upload and download links work once. File links expire after ten minutes,
-  backup and export links after 120 seconds.
-- What tokens and agents can do: [the security model](agents.md#security-model).
-  Report vulnerabilities as described in [SECURITY.md](../../SECURITY.md).
+- **Claim the workspace** before binding beyond localhost.
+- **Revoke a token** in Settings to end its access on its next request. Changing
+  the password signs out browsers and keeps tokens.
+- **Read the [security model](agents.md#security-model)** for what tokens and
+  agents can do, and [SECURITY.md](../../SECURITY.md) for how to report a
+  vulnerability.
 
 ## Troubleshooting
 
@@ -260,17 +268,19 @@ shows the size, free space and retention.
 ### A job site refused requests
 
 LinkedIn, Indeed and Glassdoor searches use the sites' public guest pages. When a
-site answers "too many requests", the source reads, for example: "LinkedIn refused
-this request from your network; Openings waits until 14:30 UTC and tries again.
-Careers pages are not affected." Openings pauses requests to that site until then,
-across restarts; nothing needs doing. If it happens every day, check fewer
-searches, less often, or space the requests further under **Settings ›
-Advanced**.
+site answers "too many requests", the source says so, for example:
+
+> LinkedIn refused this request from your network; Openings waits until 14:30
+> UTC and tries again. Careers pages are not affected.
+
+Openings pauses requests to that site until then, across restarts, and nothing
+needs doing. If a refusal comes every day, check fewer searches, less often, or
+space the requests further under **Settings › Advanced**.
 
 Servers in a data center or at a VPS provider are refused far more often than a
 home connection, and some sites refuse them outright. Company careers pages are
-public job-board APIs and are rarely affected: on a server, follow the companies
-you want there first.
+public job-board APIs and are rarely affected, so on a server, follow the
+companies you want there first.
 
 ### Other symptoms
 
@@ -279,7 +289,7 @@ you want there first.
 | The setup page asks for a code | It is in the log: `docker logs openings` (Compose: `docker compose logs openings`). Each restart prints a new one until the workspace is claimed. |
 | Sign-in returns 429 for everyone behind a proxy | Set `OPENINGS_TRUSTED_PROXIES` and recreate the container. |
 | MCP refuses the host, or links point to the wrong machine | Set `OPENINGS_PUBLIC_URL` to the origin clients use, and recreate the container. |
-| The agent cannot upload or download a file | The `curl` line goes to `OPENINGS_PUBLIC_URL`, which the agent's machine must reach; `127.0.0.1` there is its own machine. A link works once and expires after ten minutes: ask for a new one. |
+| Your agent cannot upload or download a file | The `curl` line goes to `OPENINGS_PUBLIC_URL`, which the agent's machine must reach; `127.0.0.1` there is the agent's own machine. A link works once and expires after ten minutes, so ask for a new one. |
 | An upload fails | Check the size (20 MiB) and that the revision is still incomplete. |
 | A job has incomplete text | Open the job's `…` › **Correct details** and paste the posting. |
 | Starting an application returns 409 | Open the existing open attempt named in the error. |
@@ -288,11 +298,12 @@ you want there first.
 
 ## Container details
 
-The image is `vincenzoimp/openings` on Docker Hub for linux/amd64 and arm64:
+The image is `vincenzoimp/openings` on Docker Hub, for linux/amd64 and arm64.
 `X.Y.Z` is one release, `X.Y` the newest patch of a minor and `latest` the newest
-release. From 0.28.0 the same image, with the same tags and digest, is at
-`ghcr.io/vincenzoimp/openings`, for when Docker Hub's anonymous pull limit gets in
-the way; to use it, set `OPENINGS_IMAGE=ghcr.io/vincenzoimp/openings:X.Y.Z` in `.env`.
+release. The same image, with the same tags and digest, is at
+`ghcr.io/vincenzoimp/openings` for when Docker Hub's anonymous pull limit gets in
+the way. To use it, set `OPENINGS_IMAGE=ghcr.io/vincenzoimp/openings:X.Y.Z` in
+`.env`.
 
 The single `openings` container has a Compose budget of 0.5 CPU and 512 MiB; leave
 room for the host. The `workspace` volume holds `/data/openings.sqlite`, its
