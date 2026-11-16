@@ -349,9 +349,4 @@ def validate_rules(value):
             or not low <= value[key] <= high
         ):
             raise ValueError(f"{key} must be an integer between {low} and {high}.")
-    if "statements" in value:
-        raise ValueError(
-            "Templates hold no rule statements since 0.24: write them as Writing rules in "
-            "Preferences (preferences_update with section writing)."
-        )
     return value
