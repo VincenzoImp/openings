@@ -10,19 +10,28 @@ from openings.skills import SkillLibrary
 
 ROOT = Path(__file__).resolve().parents[2] / "skills"
 CORE = "openings"
-# Bytes per skill, its SKILL.md alone; references have their own budget.
+# Bytes per skill, its SKILL.md alone; references have their own budget. 0.28 raised
+# the core skill for standing instructions, critical actions and runs without the
+# owner, and the task skills for the enforced rules and workflows they lacked.
 BUDGETS = {
-    "openings": 5_000,
-    "triage-jobs": 5_000,
-    "prepare-applications": 6_000,
-    "track-applications": 3_000,
+    "openings": 6_500,
+    "triage-jobs": 6_000,
+    "prepare-applications": 7_000,
+    "review-applications": 5_000,
+    "track-applications": 4_500,
     "maintain-career": 5_000,
-    "manage-sources": 3_000,
+    "manage-sources": 4_000,
     "prepare-interview": 3_000,
-    "setup-openings": 4_000,
+    "setup-openings": 5_000,
+    "run-job-search": 5_000,
+    "maintain-workspace": 4_000,
 }
-REFERENCES = {"prepare-applications/references/writing.md": 5_000}
-TOTAL = 40_000
+REFERENCES = {
+    "openings/references/server-rules.md": 3_000,
+    "prepare-applications/references/writing.md": 5_000,
+}
+# Eleven skills and two references; 0.28 added three skills and the server rules.
+TOTAL = 60_000
 # What one workflow reads: the core skill, its own skill and at most one reference.
 WORKFLOW = 16_000
 TOOL_NAME = re.compile(r"`([a-z]+(?:_[a-z]+)+)`")
@@ -39,7 +48,7 @@ def files():
     return sorted(path for path in ROOT.rglob("*") if path.is_file())
 
 
-def test_exactly_the_eight_skills_and_one_reference_are_shipped_within_budget():
+def test_exactly_the_shipped_skills_and_references_are_within_budget():
     assert {path.relative_to(ROOT).as_posix() for path in files()} == {
         f"{name}/SKILL.md" for name in BUDGETS
     } | set(REFERENCES)
@@ -51,7 +60,8 @@ def test_exactly_the_eight_skills_and_one_reference_are_shipped_within_budget():
     assert sum(sizes.values()) <= TOTAL, sum(sizes.values())
     for name in BUDGETS:
         references = [size for path, size in sizes.items() if path.startswith(f"{name}/ref")]
-        read = sizes[f"{CORE}/SKILL.md"] + sizes[f"{name}/SKILL.md"] + max(references, default=0)
+        own = sizes[f"{name}/SKILL.md"] if name != CORE else 0
+        read = sizes[f"{CORE}/SKILL.md"] + own + max(references, default=0)
         assert read <= WORKFLOW, (name, read)
     # Every skill has the frontmatter the dashboard lists.
     items = {item["name"]: item for item in SkillLibrary(ROOT).list()}
@@ -60,6 +70,7 @@ def test_exactly_the_eight_skills_and_one_reference_are_shipped_within_budget():
         for field in FRONTMATTER:
             assert item.get(field), (name, field)
     assert items["prepare-applications"]["files"] == ["SKILL.md", "references/writing.md"]
+    assert items["openings"]["files"] == ["SKILL.md", "references/server-rules.md"]
 
 
 def test_every_workflow_reads_the_core_skill_and_reports_back():
@@ -72,6 +83,10 @@ def test_every_workflow_reads_the_core_skill_and_reports_back():
     core = (ROOT / CORE / "SKILL.md").read_text()
     for limit in ("Never submit", "Never invent career facts", "Applied only when the owner"):
         assert limit in core
+    # Standing instructions lift a default, never a hard limit; runs never wait.
+    for section in ("## Standing instructions", "## Critical actions", "## Runs without the owner"):
+        assert section in core
+    assert "](references/server-rules.md)" in core
 
 
 def test_skills_name_only_live_tools_and_no_removed_concepts(mcp):
@@ -136,5 +151,6 @@ def test_skills_over_mcp_as_tool_prompts_and_resources(mcp):
     resources = {item["uri"] for item in mcp.rpc("resources/list")["resources"]}
     assert {f"openings://skills/{name}" for name in BUDGETS} <= resources
     assert "openings://skills/prepare-applications/references/writing.md" in resources
+    assert "openings://skills/openings/references/server-rules.md" in resources
     read = mcp.rpc("resources/read", {"uri": "openings://skills/openings"})
     assert read["contents"][0]["text"].startswith("---\nname: openings")
