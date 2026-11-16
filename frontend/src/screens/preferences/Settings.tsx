@@ -8,7 +8,7 @@ import {
   useUnspokenNewJobs,
   type Settings,
 } from "../../query/preferences";
-import { LanguagePicker } from "./LanguagePicker";
+import { LanguagePicker } from "../../ui/LanguagePicker";
 import { hiddenLine, replyDays } from "./model";
 
 /** Say what failed in a settings write; a conflict has already reloaded. */

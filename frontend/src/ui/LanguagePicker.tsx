@@ -1,6 +1,8 @@
 import { useState, type KeyboardEvent, type ReactNode } from "react";
-import { Button, Chip, Field, Input, Select } from "../../ui";
-import { LANGUAGES, languageCode, languageName } from "../../ui/languages";
+import { Button } from "./Button";
+import { Field, Input, Select } from "./Field";
+import { Chip } from "./Tabs";
+import { LANGUAGES, languageCode, languageName } from "./languages";
 import "./languages.css";
 
 const OTHER = "other";
@@ -43,9 +45,9 @@ export function LanguagePicker({
     }
   }
   return (
-    <div className="lang-picker">
+    <div className="ui-lang-picker">
       {value.length > 0 && (
-        <ul className="lang-chips" aria-label="Languages you speak">
+        <ul className="ui-lang-chips" aria-label="Languages you speak">
           {value.map((code) => (
             <li key={code}>
               <Chip
@@ -60,7 +62,7 @@ export function LanguagePicker({
         </ul>
       )}
       {other == null ? (
-        <div className="lang-add">
+        <div className="ui-lang-add">
           <Select
             aria-label="Add a language"
             value=""
@@ -82,7 +84,7 @@ export function LanguagePicker({
           {children}
         </div>
       ) : (
-        <div className="lang-other">
+        <div className="ui-lang-other">
           <Field
             label="Other language"
             hint="Its English name or its two-letter ISO code, such as Yoruba or yo."
@@ -104,7 +106,7 @@ export function LanguagePicker({
               onKeyDown={onKey}
             />
           </Field>
-          <div className="lang-add">
+          <div className="ui-lang-add">
             <Button
               size="sm"
               disabled={disabled || !other.trim()}

@@ -12,7 +12,7 @@ const pages = (mode: string): Record<string, string> =>
 // Fewer, larger chunks compress better. The barrel (ui/index.ts) stays out,
 // or it would pull every primitive into the first chunk.
 const LATER =
-  /\/src\/ui\/(Dialog|ActionSheet|ReadEdit|CodeView|CodeBlock|Table|Choice|Disclosure|Field|Tabs|Split)\./;
+  /\/src\/ui\/(Dialog|ActionSheet|ReadEdit|CodeView|CodeBlock|Table|Choice|Disclosure|Field|Tabs|Split|LanguagePicker)\./;
 const FIRST = /\/src\/ui\/(?!index\.)/;
 
 export default defineConfig(({ mode }) => ({

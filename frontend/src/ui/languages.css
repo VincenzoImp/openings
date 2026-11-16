@@ -1,11 +1,11 @@
-@layer screens {
+@layer ui {
   /* The languages someone speaks: Setup › About you and Preferences. */
-  .lang-picker {
+  .ui-lang-picker {
     display: flex;
     flex-direction: column;
     gap: var(--s-3);
   }
-  .lang-chips {
+  .ui-lang-chips {
     display: flex;
     flex-wrap: wrap;
     gap: var(--s-1-5);
@@ -13,17 +13,17 @@
     padding: 0;
     list-style: none;
   }
-  .lang-add {
+  .ui-lang-add {
     display: flex;
     flex-wrap: wrap;
     gap: var(--s-2);
     align-items: center;
   }
-  .lang-add .ui-select {
+  .ui-lang-add .ui-select {
     width: 220px;
     max-width: 100%;
   }
-  .lang-other {
+  .ui-lang-other {
     display: flex;
     flex-direction: column;
     gap: var(--s-2);
