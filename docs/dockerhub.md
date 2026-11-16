@@ -1,25 +1,44 @@
 # Openings
 
-**Every new job, filtered, prepared and ranked. You just apply.**
+**Set up your job search once. Your AI agent works it by your rules. You just apply.**
 
-A self-hosted job-search app. New jobs arrive every day from the searches and
-companies you choose, without duplicates. Your own AI agent (Claude Code, Codex,
-any MCP client) shortlists them, writes a tailored CV and letter, and ranks them.
-You apply, best first. Everything also works by hand in the dashboard and over a
-REST API.
+Openings is a self-hosted app that holds your job search: your career, your rules
+in your own words, your CV and letter templates, the sources you watch and every
+application. Your own AI agent reads all of it to bring in fresh jobs, decide each
+one with a reason, write a tailored CV and letter as PDFs and rank them, and you
+apply.
 
-![Openings: new jobs arrive, the agent prepares the applications, you apply best first](https://raw.githubusercontent.com/VincenzoImp/openings-job-search/main/docs/images/demo.gif)
+![Openings on the demo workspace: a Ready application with its PDFs, a Preferences line, Claude Code running the search, a dismissal that quotes the rule, Ready ranked best first, Mark applied](https://raw.githubusercontent.com/VincenzoImp/openings-job-search/main/docs/images/demo.gif)
 
-1. **Fresh jobs, no duplicates.** From LinkedIn, Indeed and Glassdoor searches
-   (no login), company careers pages on 12 hiring platforms, the Hacker News "Who
-   is hiring?" thread, RSS feeds and job links.
-2. **Your agent prepares.** It shortlists by fit and writes a tailored CV and
-   letter for each application.
-3. **You apply, best first.** Ready applications are ranked by priority and
-   deadline. Openings never sends anything to an employer.
+## What Openings holds
 
-One container, one SQLite file, no account, no telemetry. Source, documentation
-and issues: [github.com/VincenzoImp/openings-job-search](https://github.com/VincenzoImp/openings-job-search).
+- **Your career.** Your Profile holds your career entries and highlights; a ★
+  means always in your CV, and only approved highlights are used.
+- **Your rules.** Preferences hold what you look for, what you rule out, facts
+  about you, writing rules and what your agent may do on its own.
+- **Your templates.** Templates hold your own TeX for the CV and the letter, with
+  a Preview and Limits on pages and bullets.
+- **Your sources.** Sources hold LinkedIn, Indeed and Glassdoor searches (no
+  login), careers pages on 12 hiring platforms, the Hacker News "Who is hiring?"
+  thread, RSS feeds and job links. Each shows found · ever shortlisted · applied.
+- **Your applications.** Openings tracks replies, follow-ups and deadlines, and
+  your agent saves a brief on the application before each interview.
+
+## How a day goes
+
+**Every new job, filtered, prepared and ranked.**
+
+1. **Openings brings in fresh jobs** from your searches and watched companies, on
+   your schedule. Repeats are left out and likely copies are flagged.
+2. **Your agent decides and prepares.** Your agent reads each job by your rules,
+   dismisses with a reason and writes a CV and letter for the rest.
+3. **You apply, best first.** Ready is ranked by priority, then deadline. You send
+   each application yourself.
+
+Change a line in your Preferences, and your agent's next decisions change with it.
+Everything also works by hand in the dashboard and over a REST API. Source,
+documentation and issues:
+[github.com/VincenzoImp/openings-job-search](https://github.com/VincenzoImp/openings-job-search).
 
 ## Try the demo
 
@@ -54,7 +73,7 @@ docker logs openings
 With Compose, use `docker compose logs openings`. Setting `OPENINGS_PASSWORD`
 skips the code. `curl -fsS http://127.0.0.1:8080/health` tells you it runs.
 
-## Connect your agent
+## Use with your agent
 
 In **Settings › API & agents**, create an agent token and put it in your shell:
 `export OPENINGS_TOKEN=<your agent token>`. Then install the Claude Code plugin,
@@ -73,6 +92,17 @@ claude mcp add --transport http openings http://127.0.0.1:8080/mcp/ \
 ```
 
 Codex and other clients: [Work with an agent](https://github.com/VincenzoImp/openings-job-search/blob/main/docs/user/agents.md).
+
+## What stays yours
+
+- **No submission.** Nothing in Openings can submit an application or contact an
+  employer.
+- **Attributed writes.** Every agent change carries its token's name, and
+  non-destructive changes can be undone.
+- **One SQLite file.** Your workspace lives in the `/data` volume, with a verified
+  backup every day.
+- **No account and no telemetry.** Openings contacts only the job sites your
+  sources name.
 
 ## Tags
 
