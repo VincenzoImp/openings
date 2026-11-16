@@ -1,22 +1,64 @@
-"""Smoke an installed wheel outside the checkout, using the current dev dependencies."""
+"""Check that the project description is the same everywhere, then smoke an
+installed wheel outside the checkout, using the current dev dependencies.
+
+    python3 scripts/check_package.py              # the description only
+    python3 scripts/check_package.py dist/*.whl   # and the wheel
+"""
 
 import argparse
+import html
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
+import tomllib
 import zipfile
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parents[1]
+
+# Each copy of the description: the file and a pattern whose group holds it.
+DESCRIPTIONS = [
+    ("Dockerfile", r'org\.opencontainers\.image\.description="([^"]*)"'),
+    (
+        ".github/workflows/images.yml",
+        r"'index:org\.opencontainers\.image\.description=([^']*)'",
+    ),
+    ("frontend/index.html", r'<meta\s+name="description"\s+content="([^"]*)"'),
+]
+
+
+def check_descriptions(root=ROOT):
+    """Fail unless every copy equals the description in pyproject.toml."""
+    with open(root / "pyproject.toml", "rb") as file:
+        expected = tomllib.load(file)["project"]["description"]
+    for path, pattern in DESCRIPTIONS:
+        found = re.findall(pattern, (root / path).read_text(encoding="utf-8"))
+        if len(found) != 1:
+            raise SystemExit(f"{path}: expected one description, found {len(found)}")
+        if html.unescape(found[0]) != expected:
+            raise SystemExit(
+                f"{path}: the description differs from pyproject.toml's:\n"
+                f"  {found[0]}\n  {expected}"
+            )
+    return expected
+
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("wheel", type=Path)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument("wheel", type=Path, nargs="?")
     parser.add_argument("--uv", default="uv")
     args = parser.parse_args()
+    check_descriptions()
+    if args.wheel is None:
+        print("The description matches in every file.")
+        return
     wheel = args.wheel.resolve()
-    repository = Path(__file__).resolve().parents[1]
+    repository = ROOT
     tracked = subprocess.check_output(
         ["git", "ls-files", "-z", "backend/openings"], cwd=repository, text=True
     ).split("\0")

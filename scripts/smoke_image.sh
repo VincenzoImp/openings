@@ -5,7 +5,7 @@
 #   scripts/smoke_image.sh openings:ci amd64
 #
 # It starts the image with the Compose limits, as UID 10001, and checks health
-# and the version, that personal data needs a session, the first-run setup, the
+# and the version, the image labels, that personal data needs a session, the first-run setup, the
 # served skills and dashboard (without the gallery), and that the installed
 # package is the checkout's.
 set -euo pipefail
@@ -17,7 +17,8 @@ port=18080
 url="http://127.0.0.1:$port"
 work="$(mktemp -d)"
 version="$(sed -n 's/^version = "\(.*\)"$/\1/p' pyproject.toml)"
-export VERSION="$version" WORK="$work"
+description="$(sed -n 's/^description = "\(.*\)"$/\1/p' pyproject.toml)"
+export VERSION="$version" DESCRIPTION="$description" WORK="$work"
 
 docker volume create "$name" > /dev/null
 trap 'docker logs "$name"; docker rm -f "$name"; docker volume rm "$name"; rm -rf "$work"' EXIT
@@ -28,6 +29,22 @@ for _ in {1..60}; do
   sleep 1
 done
 python3 -c "import json,os; h=json.load(open(os.environ['WORK']+'/health.json')); assert h['status']=='ok' and h['version']==os.environ['VERSION'], h"
+# Every OCI label is set; the version and the description are the checkout's.
+docker image inspect "$image" --format '{{json .Config.Labels}}' > "$work/labels.json"
+python3 - <<'PY'
+import json, os
+
+labels = json.load(open(os.environ["WORK"] + "/labels.json")) or {}
+oci = "org.opencontainers.image."
+keys = [oci + key for key in (
+    "title", "description", "url", "documentation", "source", "authors", "vendor",
+    "licenses", "base.name", "version", "revision", "created",
+)] + ["io.modelcontextprotocol.server.name"]
+missing = [key for key in keys if not labels.get(key)]
+assert not missing, f"Missing image labels: {missing}"
+assert labels[oci + "version"] == os.environ["VERSION"], labels[oci + "version"]
+assert labels[oci + "description"] == os.environ["DESCRIPTION"], labels[oci + "description"]
+PY
 test "$(docker exec "$name" id -u)" = 10001
 docker exec "$name" test -f /data/openings.sqlite
 
