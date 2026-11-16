@@ -1,9 +1,10 @@
 # Configuration
 
 Openings reads a few environment variables at start. With Docker Compose, set them
-in `.env` next to `docker-compose.yml` (copy [`.env.example`](../../.env.example),
-which lists them) and recreate the container with `docker compose up -d`; a restart alone keeps the
-old values. From source, export them before `uv run openings`, or use the matching
+in `.env` next to `docker-compose.yml` ([`.env.example`](../../.env.example) lists
+them) and recreate the container with `docker compose up -d`; a restart alone keeps
+the old values. With `docker run`, pass each as `-e NAME=value` and create the
+container again. From source, export them before `uv run openings`, or use the matching
 command-line option where one exists.
 
 Every other setting lives in the workspace and is changed in the dashboard, REST or

@@ -1,50 +1,104 @@
 # Getting started
 
 This page takes you from nothing to your first application, by hand, without an
-agent. [How it works](how-it-works.md) explains the words used here.
+agent. [How it works](how-it-works.md) explains the words used here. You need
+Docker; the host needs no Python, Node or TeX.
 
-## Try the demo
+<!-- quick-start: the README and docs/dockerhub.md repeat these commands (test_docs.py) -->
 
-To look around first, start a disposable workspace of fictional data:
+## Look first
+
+A disposable workspace of fictional data that contacts no job site and is
+deleted when it stops (Ctrl+C):
 
 ```bash
 docker run --rm -p 127.0.0.1:8080:8080 vincenzoimp/openings demo
 ```
 
-It prints a sign-in link that works once, an agent token and the
-`claude mcp add` line. It contacts no job site, and everything is deleted when
-it stops. From a clone, `uv run openings demo` does the same.
+It prints a sign-in link that works once, an agent token with its `export` line,
+and the lines that connect Claude Code and Codex. From a clone,
+`uv run openings demo` does the same.
 
-## Install
+## Use it
 
-You need Docker with Compose v2. The host needs no Python, Node or TeX.
-
-```bash
-git clone https://github.com/VincenzoImp/openings-job-search.git
-cd openings-job-search
-docker compose up -d
-```
-
-Check that it runs:
+One command keeps your workspace in the `openings` volume:
 
 ```bash
-docker compose ps
-curl --fail http://127.0.0.1:8080/health
+docker run -d --name openings -p 127.0.0.1:8080:8080 -v openings:/data --read-only --tmpfs /tmp --restart unless-stopped vincenzoimp/openings:latest
 ```
 
-Port 8080 taken? `OPENINGS_PORT=18080 docker compose up -d`; agent links follow
-the port. Every setting has a default. To change one, copy `.env.example` to `.env` first
-(see [Configuration](configuration.md)). To reach Openings from other devices,
-see [Operations](operations.md#reach-it-from-other-devices).
+Or with Docker Compose v2, in a folder of its own. The Compose file adds CPU and
+memory limits and log rotation, and pins the minor release (such as `0.28`), so
+updates bring its fixes:
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/VincenzoImp/openings-job-search/main/docker-compose.yml && docker compose up -d
+```
+
+Settings go in a `.env` file beside it (see [Configuration](configuration.md)).
+Check that it runs with `curl --fail http://127.0.0.1:8080/health`.
+
+## The setup code
+
+Until an owner password exists, each start prints a one-time **setup code** in
+the log. The setup page asks for it, so nobody else on your network can claim the
+workspace first:
+
+```bash
+docker logs openings            # with docker run
+docker compose logs openings    # with Docker Compose
+```
+
+The demo needs no code, and with `OPENINGS_PASSWORD` set before the first start
+none is printed: that password is the owner's.
+
+## Port 8080 taken?
+
+Map another host port, and tell Openings the address that agents and upload
+links use:
+
+```bash
+docker run -d --name openings -p 127.0.0.1:18080:8080 -v openings:/data \
+  -e OPENINGS_PUBLIC_URL=http://127.0.0.1:18080 \
+  --read-only --tmpfs /tmp --restart unless-stopped vincenzoimp/openings:latest
+```
+
+With Compose, the address follows the port:
+
+```bash
+OPENINGS_PORT=18080 docker compose up -d
+```
+
+## On a server or NAS
+
+Publish the port on the network and set the address other devices use, here
+`http://nas.local:8080`:
+
+```bash
+docker run -d --name openings -p 8080:8080 -v openings:/data \
+  -e OPENINGS_PUBLIC_URL=http://nas.local:8080 \
+  --read-only --tmpfs /tmp --restart unless-stopped vincenzoimp/openings:latest
+```
+
+With Compose, put these lines in `.env`, then run `docker compose up -d`:
+
+```dotenv
+OPENINGS_BIND=0.0.0.0
+OPENINGS_PUBLIC_URL=http://nas.local:8080
+```
+
+Opened from an address the public URL does not cover, the dashboard names the
+value to set. Claim the workspace with the setup code right away, and put HTTPS
+in front before you reach it from outside your home network:
+[Operations](operations.md#reach-it-from-other-devices) has a Caddy and a
+Traefik example.
+
+<!-- /quick-start -->
 
 ## Set up your workspace
 
-Open **http://127.0.0.1:8080**, enter the **setup code** and choose an owner
-password of at least 10 characters. The code is printed to the server's log at
-each start until the workspace has an owner, so nobody else on your network can
-claim it first: `docker compose logs openings` (or `docker logs openings` after
-`docker run`) shows `Setup code: XXXX-XXXX`. With
-`OPENINGS_PASSWORD` set in `.env` before the first start, no code is needed. A new
+Open **http://127.0.0.1:8080**, enter the setup code and choose an owner password
+of at least 10 characters (or set `OPENINGS_PASSWORD` before the first start). A new
 installation then opens the **setup guide**, four short steps about you:
 
 1. **About you.** Your name, the roles you are after and where (saved as
@@ -138,6 +192,7 @@ each. Synthetic examples are in the [`examples/`](../../examples/README.md) fold
 
 ## Optional: an agent
 
-If you want an agent to triage jobs and write documents, follow
-[Work with an agent](agents.md). Back up before you upgrade: see
-[Operations](operations.md).
+If you want an agent to triage jobs and write documents,
+[Your agent in five minutes](agents.md#your-agent-in-five-minutes) connects one,
+starting on the demo. Back up before you upgrade: see
+[Operations](operations.md#update).

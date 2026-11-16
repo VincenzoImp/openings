@@ -167,6 +167,11 @@ scheduled and manual checks, redirects and detail pages. When a site answers
 "too many requests" (HTTP 429), Openings pauses requests to it until the time the
 site names; the pause survives restarts. REST and MCP can lift it early with
 `clear_cooldown`.
+A refusal reads, for example, "LinkedIn refused this request from your network;
+Openings waits until 14:30 UTC and tries again. Careers pages are not affected."
+Servers in a data centre or at a VPS provider are refused far more often than a home
+connection; there, follow company careers pages first. See
+[Troubleshooting](operations.md#a-job-site-refused-requests).
 A login page is reported as blocked. A careers page that does not exist (HTTP 404,
 or a redirect to the job site's home page) fails at once and names its board; check
 its URL. A portal can still block requests or change its pages; paste the posting

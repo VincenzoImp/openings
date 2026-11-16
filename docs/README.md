@@ -16,6 +16,7 @@ work on the same workspace. New here? Read the [README](../README.md), then
 | Back up, restore, upgrade or open Openings to other devices | [Operations](user/operations.md) |
 | Set environment variables | [Configuration](user/configuration.md) |
 | Run from source or contribute | [Contributing](../CONTRIBUTING.md) and [Architecture](developer/architecture.md) |
+| Compare Openings with other tools | [Openings compared](comparison.md) |
 | Report a vulnerability | [Security policy](../SECURITY.md) |
 | See what changed | [Changelog](../CHANGELOG.md) |
 

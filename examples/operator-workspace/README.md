@@ -37,6 +37,19 @@ For a server behind a private certificate authority, put its CA certificate at
 disk read them through the `.claude/skills` link: run
 `python3 .agents/scripts/fetch_skills.py` from a launched shell to fetch them.
 
+## Permissions and schedule
+
+`.claude/settings.json` lets Claude Code use the Openings tools, `curl` to
+Openings, Tectonic and the ignored `.local/` folder without asking, and asks
+before anything else. Change its address if your server is elsewhere, and start
+Claude Code here once to trust the folder.
+
+`schedule/` runs "Run my job search" unattended from this folder: a crontab, a
+launchd plist, a systemd timer and the script they call, which writes each report
+to `.local/reports/`. Give each schedule its own Agent token in the scheduler's
+environment. See
+[Run it on a schedule](../../docs/user/agents.md#run-it-on-a-schedule).
+
 ## First session
 
 Ask the agent to set up your workspace. It follows the `setup-openings` skill:
