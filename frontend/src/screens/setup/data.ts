@@ -1,9 +1,10 @@
 // The first-run guide's writes, each an existing operation: profile_update,
-// preferences_update, settings_update, sources_preview (through the shared
-// provider gate) and sources_create, jobs_create, the career import and
-// templates_create.
+// preferences_update, settings_update, sources_create, jobs_create, the career
+// import and templates_create. Tests go through sources_preview and the shared
+// provider gate (useSourceTest).
 import { api, call, download, type Schema } from "../../api/client";
 import { useApiMutation } from "../../query/mutation";
+import { capitalize, detectBoard, shortUrl, terms } from "../sources/model";
 import { aboutChanges, type About } from "./model";
 
 type Profile = Schema<"Profile">;
@@ -54,7 +55,7 @@ export interface Search {
   location: string;
   country: string;
 }
-const searchSource = (search: Search) => ({
+export const searchSource = (search: Search) => ({
   kind: "jobspy" as const,
   name: [search.query, search.location].filter(Boolean).join(" in "),
   url: "",
@@ -68,16 +69,37 @@ const searchSource = (search: Search) => ({
   },
 });
 
-/** Test a search without saving it: its first results. */
-export function useTestSearch() {
+/** A company's careers page and the words a title must include. */
+export interface Board {
+  url: string;
+  titles: string;
+}
+export const boardSource = (board: Board) => {
+  const url = board.url.trim();
+  const detected = detectBoard(url);
+  return {
+    kind: "auto" as const,
+    name: detected?.board ? capitalize(detected.board) : shortUrl(url),
+    url,
+    config: {},
+    filters: { titles: terms(board.titles) },
+  };
+};
+
+/** Follow the careers page; its first check starts at once. */
+export function useSaveBoard() {
   return useApiMutation({
-    touches: [],
-    mutationFn: (search: Search) =>
-      call(api.POST("/api/v1/sources/preview", { body: searchSource(search) })),
+    touches: ["sources", "collection", "workspace"],
+    mutationFn: (board: Board) =>
+      call(
+        api.POST("/api/v1/sources", {
+          body: { ...boardSource(board), enabled: true },
+        }),
+      ),
   });
 }
 
-/** Save the search; it then runs on its schedule. */
+/** Save the search; its first check starts at once, then it runs on its schedule. */
 export function useSaveSearch() {
   return useApiMutation({
     touches: ["sources", "collection", "workspace"],

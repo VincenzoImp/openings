@@ -49,6 +49,27 @@ def error_response(error):
     )
 
 
+def host_allowed(host, allowed):
+    """Whether MCP answers at ``host``, as the transport's own check reads ``allowed``."""
+    return any(
+        host == pattern
+        or (pattern.endswith(":*") and (host == pattern[:-2] or host.startswith(pattern[:-1])))
+        for pattern in allowed
+    )
+
+
+def refused_host(host, scheme, public_url):
+    """Why an agent's request to a host Openings does not answer at is refused, in words."""
+    reached = public_url or "http://127.0.0.1:8080"
+    return DomainError(
+        421,
+        "mcp_host",
+        f"Agents reach Openings at {reached}, not at {host}. To use this address, set "
+        f"OPENINGS_PUBLIC_URL={scheme}://{host} and restart Openings.",
+        {"host": host, "public_url": public_url or None, "variable": "OPENINGS_PUBLIC_URL"},
+    )
+
+
 def create_app(database=None, start_worker=True, demo=False):
     """The application of one workspace.
 
@@ -148,8 +169,14 @@ def create_app(database=None, start_worker=True, demo=False):
                 else:
                     actor = auth.authorize(request)
             if path.startswith("/mcp"):
+                host = request.headers.get("host", "")
+                if not host_allowed(host, allowed_hosts):
+                    raise refused_host(host, request.url.scheme, public_url)
                 actor = auth.authorize(request, mcp=True)
-            sign_in = path == "/api/v1/auth/login" and request.method == "POST"
+            # A setup code is limited like a password: both are guessed by the same means.
+            sign_in = path in {"/api/v1/auth/login", "/api/v1/auth/setup"} and (
+                request.method == "POST"
+            )
             if path.startswith("/api/v1/auth/") and request.method == "POST" and path in public:
                 if not request.headers.get("content-type", "").startswith("application/json"):
                     raise DomainError(415, "content_type", "Send JSON request data.")
@@ -165,6 +192,15 @@ def create_app(database=None, start_worker=True, demo=False):
             if request.scope["path"] == "/mcp":
                 request.scope["path"] = "/mcp/"
                 request.scope["raw_path"] = request.scope.get("raw_path", b"/mcp") + b"/"
+            # JSON-RPC is the only body MCP takes: a hand-typed `curl -d` (sent as a
+            # form) is read as the JSON it is instead of being refused with a 400.
+            if path == "/mcp" and request.method == "POST":
+                kept = [
+                    (key, value)
+                    for key, value in request.scope["headers"]
+                    if key != b"content-type"
+                ]
+                request.scope["headers"] = [*kept, (b"content-type", b"application/json")]
             # Handlers, offloaded threads and MCP tools inherit the actor from this context.
             # Every change of one request shares one batch id.
             origin = request_origin.set(str(request.base_url).rstrip("/"))
@@ -175,7 +211,7 @@ def create_app(database=None, start_worker=True, demo=False):
             finally:
                 request_origin.reset(origin)
             if sign_in:
-                if response.status_code == 401:
+                if response.status_code in (401, 403):
                     login_guard.failed()
                 elif response.status_code == 200:
                     login_guard.succeeded()

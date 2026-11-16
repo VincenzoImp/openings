@@ -140,6 +140,8 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
     pending = set()
     unavailable = set()
     max_candidates = min(config.get("max_candidates", 2000), 3 if preview else 10000)
+    # A Test's first answer: the listing alone, without one request per posting.
+    listing_only = preview and not source.get("details", True)
 
     def save():
         checkpoint["complete"] = False
@@ -180,6 +182,10 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
     def select(rows, title, place, flags=lambda row: {}):
         # An empty first answer of a board that had jobs is confirmed by the next run.
         source["listing_empty"] = not rows
+        # How many jobs of what the board listed match: "Fetched N of M" while a check runs.
+        source["listed"] = checkpoint["listed"] = sum(
+            bool(matches(title(row), place(row), flags(row))) for row in rows
+        )
         if len(rows) > max_candidates:
             source["candidate_capped"] = True
         matching = [
@@ -208,7 +214,7 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
             ) from error
 
     def detail(key, url, *, body=None, decode=None):
-        if not preview and key in known and checked.get(key, "") > cutoff:
+        if listing_only or (not preview and key in known and checked.get(key, "") > cutoff):
             return {}
         request_key = json.dumps([url, body], sort_keys=True)
         load = (lambda: decode(url)) if decode else (lambda: get(url, body=body))
@@ -308,7 +314,11 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
         base = f"https://boards-api.greenhouse.io/v1/boards/{slug}/jobs"
         rows = records(get(base), "jobs")
         # A listing's location is often a work mode ("Hybrid"); its cities are its offices.
-        offices = get(f"https://boards-api.greenhouse.io/v1/boards/{slug}/offices")
+        offices = (
+            {}
+            if listing_only
+            else get(f"https://boards-api.greenhouse.io/v1/boards/{slug}/offices")
+        )
         cities = {}
         for office in (offices.get("offices") if isinstance(offices, dict) else None) or []:
             for department in office.get("departments") or []:

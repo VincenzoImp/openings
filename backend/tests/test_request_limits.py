@@ -24,7 +24,10 @@ def test_chunked_bodies_without_length_are_cut_off(tmp_path):
         assert login.status_code == 413
         assert login.json()["error"]["code"] == "request_size"
 
-        setup = client.post("/api/v1/auth/setup", json={"password": "synthetic-password"})
+        setup = client.post(
+            "/api/v1/auth/setup",
+            json={"password": "synthetic-password", "setup_code": app.state.auth.setup_code},
+        )
         assert setup.status_code == 200
         client.headers["X-CSRF-Token"] = setup.json()["csrf_token"]
 

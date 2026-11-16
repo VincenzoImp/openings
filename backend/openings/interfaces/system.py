@@ -20,6 +20,14 @@ class PasswordInput(Input):
     password: str = Field(min_length=1, max_length=1024)
 
 
+class SetupInput(PasswordInput):
+    setup_code: str | None = Field(
+        default=None,
+        max_length=50,
+        description="The one-time code the server prints to its log until an owner exists.",
+    )
+
+
 class PasswordChange(PasswordInput):
     current_password: str = Field(min_length=1, max_length=1024)
 

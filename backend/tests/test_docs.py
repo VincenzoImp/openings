@@ -68,6 +68,12 @@ def test_every_quick_start_carries_the_same_commands():
     reference = quick_start(ROOT / "docs/user/getting-started.md")
     assert reference and any(block.endswith(" demo\n") for block in reference)
     assert not any("clone" in block for block in reference)
+    # The Docker Hub page carries the demo, run and Compose lines byte for byte
+    # (smoke_image.sh runs its copy).
+    hub = (ROOT / "docs/dockerhub.md").read_text().splitlines()
+    for line in ("--rm -p", "docker run -d", "curl -fsSLO"):
+        command = next(c for block in reference for c in block.splitlines() if line in c)
+        assert command in hub, command
     # The README and the Docker Hub page carry the same blocks once they mark theirs.
     for page in (ROOT / "README.md", ROOT / "docs/dockerhub.md"):
         if page.exists() and quick_start(page):

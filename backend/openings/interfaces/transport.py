@@ -18,7 +18,7 @@ from ..operations import backup_file_for, restore_upload
 from ..skills import SKILL_FILE, read_skill
 from ..snapshots import RecordsResponse, export_records
 from .operation import API_PREFIX, capability_entries
-from .system import PasswordInput
+from .system import PasswordInput, SetupInput
 
 TRANSPORT_ONLY = (
     ("GET", "/auth/session", "Browser session state before sign-in; MCP uses a bearer token."),
@@ -56,9 +56,11 @@ def register_transport(app, router, public_url):
         )
         return response
 
-    def signed_in(request, password, setup=False):
+    def signed_in(request, password, setup=False, code=None):
         if setup:
-            auth.setup(password)
+            with workspace.db.lock:
+                auth.check_setup_code(code)
+                auth.setup(password)
         token, session = auth.login(password)
         response = JSONResponse(
             {"configured": True, "authenticated": True, "csrf_token": session["csrf"]}
@@ -77,8 +79,10 @@ def register_transport(app, router, public_url):
         demo is true in a disposable demo workspace (openings demo).
         """
         state = auth.session(request)
+        configured = auth.configured()
         return {
-            "configured": auth.configured(),
+            "configured": configured,
+            "setup_code": not configured and auth.setup_code is not None,
             "authenticated": bool(state),
             "csrf_token": state["csrf"] if state else None,
             "demo": workspace.demo,
@@ -105,9 +109,9 @@ def register_transport(app, router, public_url):
         operation_id="auth_setup",
         openapi_extra={"security": []},
     )
-    def setup(request: Request, value: PasswordInput):
-        """Set the owner password once and sign the browser in."""
-        return signed_in(request, value.password, True)
+    def setup(request: Request, value: SetupInput):
+        """Set the owner password once, with the setup code from the log, and sign in."""
+        return signed_in(request, value.password, True, value.setup_code)
 
     @router.post(
         API_PREFIX + "/auth/login",

@@ -1,0 +1,23 @@
+{
+  "name": "openings",
+  "displayName": "Openings",
+  "version": "0.27.3",
+  "description": "Your Openings job-search workspace in Claude Code: the MCP server at OPENINGS_URL (default http://127.0.0.1:8080) with the agent token in OPENINGS_TOKEN, and the skills that ship with the app.",
+  "author": {
+    "name": "Vincenzo Imperati",
+    "url": "https://github.com/VincenzoImp"
+  },
+  "homepage": "https://github.com/VincenzoImp/openings-job-search/blob/main/docs/user/agents.md",
+  "repository": "https://github.com/VincenzoImp/openings-job-search",
+  "license": "MIT",
+  "keywords": ["job-search", "mcp", "self-hosted", "applications", "cv"],
+  "mcpServers": {
+    "openings": {
+      "type": "http",
+      "url": "${OPENINGS_URL:-http://127.0.0.1:8080}/mcp/",
+      "headers": {
+        "Authorization": "Bearer ${OPENINGS_TOKEN}"
+      }
+    }
+  }
+}

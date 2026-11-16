@@ -5,25 +5,21 @@
 Read the [changelog](../../CHANGELOG.md) and take a backup (**Settings › Data ›
 Download backup**). Then update the way you installed:
 
-- **`docker run`**: pull the image, then replace the container. The `openings`
-  volume keeps your workspace.
+- **`docker run`**: pull the image and replace the container, then run the
+  same `docker run` line as at install, with your own options such as
+  `OPENINGS_PUBLIC_URL`. The `openings` volume keeps your workspace.
 
   ```bash
-  docker pull vincenzoimp/openings:0.28
-  docker stop openings && docker rm openings
-  docker run -d --name openings -p 127.0.0.1:8080:8080 -v openings:/data \
-    --read-only --tmpfs /tmp --restart unless-stopped vincenzoimp/openings:0.28
+  docker pull vincenzoimp/openings:latest && docker rm -f openings
+  docker run -d --name openings -p 127.0.0.1:8080:8080 -v openings:/data --read-only --tmpfs /tmp --restart unless-stopped vincenzoimp/openings:latest
   ```
 
-  Repeat your own `docker run` line if you added options, such as
-  `OPENINGS_PUBLIC_URL`.
 - **Docker Compose**: `docker compose pull && docker compose up -d` in the
-  folder of `docker-compose.yml`.
+  folder of `docker-compose.yml`. The file pins a minor release, such as `0.28`,
+  so this brings its patch releases. For a new minor release, download
+  `docker-compose.yml` again ([Getting started](getting-started.md#use-it)), or
+  set `OPENINGS_IMAGE` in `.env`.
 - **From a clone**: `git pull`, then the same two Compose commands.
-
-The tag `0.28` receives every 0.28.x fix. A new minor release, such as 0.29,
-needs a new tag: change it in your `docker run` line, or download
-`docker-compose.yml` again (or set `OPENINGS_IMAGE` in `.env`).
 
 Other Compose commands:
 
@@ -65,7 +61,8 @@ untouched.
 
 ### Roll back
 
-A release that kept the format: run the previous tag again, as in Update.
+A release that kept the format: run the previous release's tag, such as
+`vincenzoimp/openings:0.28.1`, instead of `latest`, as in Update.
 
 A release that changed the format, here 0.28: stop the container, put the
 pre-upgrade copy back in place, and start the previous release. With
@@ -101,8 +98,9 @@ OPENINGS_PUBLIC_URL=http://openings.example:8080
   localhost only.
 - `OPENINGS_PUBLIC_URL` is the address browsers and agents use. MCP accepts its
   host, and upload and download links start with it, so it must match the origin
-  clients use. A refused MCP host gets an error that names the host and this
-  variable; the dashboard opened from another address shows the value to set.
+  clients use. MCP refuses another host with `421 mcp_host`, in a message that
+  names this variable; the dashboard opened at another address shows a notice
+  with the value to set. With Compose, its default follows `OPENINGS_PORT`.
 - Claim the workspace before anyone else can reach it: the one-time setup code is
   in the log (`docker logs openings`), or set `OPENINGS_PASSWORD` before the
   first start.

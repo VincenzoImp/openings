@@ -118,6 +118,100 @@ test("add a search: Test shows the first ten results, then Save adds it", async 
   );
 });
 
+test("Test lists a board's titles first, then fetches their text", async ({
+  page,
+}) => {
+  let release = () => {};
+  const held = new Promise<void>((resolve) => (release = resolve));
+  const asked: { details?: boolean }[] = [];
+  const items = (text: string) =>
+    [1, 2, 3].map((index) => ({
+      title: `Synthetic platform engineer ${index}`,
+      company: "Syntheticlabs",
+      posting: text,
+    }));
+  await page.route("**/api/v1/sources/preview", async (route) => {
+    const body = route.request().postDataJSON();
+    asked.push(body);
+    if (body.details) await held;
+    return route.fulfill({
+      json: {
+        kind: "greenhouse",
+        url: "https://boards.greenhouse.io/syntheticlabs",
+        total: 3,
+        listed: 254,
+        preview_limit: 20,
+        items: items(body.details ? "Build reliable services." : ""),
+        diagnostics: [],
+      },
+    });
+  });
+  await go(page, "sources");
+  await page.getByRole("button", { name: "Add source" }).first().click();
+  const form = editor(page);
+  await form.getByLabel("Kind").selectOption("company");
+  await form
+    .getByLabel("Careers page address")
+    .fill("https://boards.greenhouse.io/syntheticlabs");
+  await form.getByRole("button", { name: "Test" }).click();
+  // The titles show as soon as the board's listing answers.
+  const results = form.locator(".src-test");
+  await expect(results).toContainText(
+    "254 jobs listed · fetching the text of the first 3…",
+  );
+  await expect(results.getByRole("listitem")).toHaveCount(3);
+  release();
+  await expect(results).toContainText("254 jobs found · the first 3");
+  expect(asked.map((body) => body.details)).toEqual([false, true]);
+});
+
+test("a refused search says why and when, and offers a careers page", async ({
+  page,
+}) => {
+  const until = new Date(Date.now() + 5 * 60_000);
+  await page.route("**/api/v1/sources/preview", (route) =>
+    route.fulfill({
+      json: {
+        kind: "jobspy",
+        total: 0,
+        preview_limit: 20,
+        items: [],
+        diagnostics: [
+          {
+            provider: "linkedin",
+            state: "deferred",
+            next_run_at: until.toISOString(),
+            message: `LinkedIn refused this request from your network; Openings waits until ${String(until.getUTCHours()).padStart(2, "0")}:${String(until.getUTCMinutes()).padStart(2, "0")} UTC and tries again. Careers pages are not affected.`,
+          },
+        ],
+      },
+    }),
+  );
+  await go(page, "sources");
+  await page.getByRole("button", { name: "Add source" }).first().click();
+  const form = editor(page);
+  await form.getByLabel("Keywords").fill("synthetic engineer");
+  await form.getByLabel("Indeed", { exact: true }).uncheck();
+  await form.getByRole("button", { name: "Test" }).click();
+  const results = form.locator(".src-test");
+  await expect(results).toContainText("No jobs found");
+  // The wait is shown in the browser's own clock.
+  const local = await page.evaluate(
+    (value) =>
+      new Date(value).toLocaleTimeString("en-GB", {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    until.toISOString(),
+  );
+  await expect(results).toContainText(
+    `LinkedIn refused this request from your network; Openings waits until ${local}`,
+  );
+  await expect(results).not.toContainText("UTC");
+  await results.getByRole("button", { name: "Follow a careers page" }).click();
+  await expect(form.getByLabel("Careers page address")).toBeVisible();
+});
+
 test("a company page names its job board from the address", async ({
   page,
 }) => {
@@ -155,6 +249,10 @@ test("check now, stop, pause with undo, and delete for good", async ({
     enabled: true,
   });
   await go(page, "sources");
+  // A new source is checked at once; its first check can be stopped.
+  await expect(row(page, name)).toContainText("Checking now…");
+  await menu(page, name, "Stop this check");
+  await expect(row(page, name)).not.toContainText("Checking now…");
   // Check now: from the hover action on a wide screen, the menu on a phone.
   if (isPhone(page)) await menu(page, name, "Check now");
   else {
@@ -250,8 +348,7 @@ test("a failing source says so in red, with Details; Recent checks retry", async
   });
   await expect(failed).toHaveCount(1);
   await expect(failed.getByRole("button")).toHaveCount(0);
-  // A check in progress can be stopped from there.
-  await menu(page, name, "Check now");
+  // A check in progress, such as a new source's first, can be stopped from there.
   const running = checks.getByRole("listitem").filter({ hasText: name });
   await expect(running).toContainText("Waiting to start");
   await running

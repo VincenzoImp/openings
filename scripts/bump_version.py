@@ -4,8 +4,9 @@ Usage:
     python3 scripts/bump_version.py 0.16.0   # write the new version everywhere
     python3 scripts/bump_version.py --check  # fail when the files disagree
 
-`pyproject.toml` is the reference for `--check`. The script uses only the
-standard library and edits the lock files' own project entries in place.
+`pyproject.toml` is the reference for `--check`. The Compose file pins the moving
+minor tag (X.Y), so `docker compose pull` brings patch releases. The script uses
+only the standard library and edits the lock files' own project entries in place.
 """
 
 import argparse
@@ -15,13 +16,16 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 VERSION = r"(?P<version>\d+\.\d+\.\d+(?:[-.+][0-9A-Za-z.-]+)?)"
+MINOR = r"(?P<minor>\d+\.\d+)"
 
-# Each pattern must match exactly once; the named group holds the version.
+# Each pattern must match exactly once; the named group holds the version, or
+# its X.Y for a `minor` group.
 LOCATIONS = [
     ("pyproject.toml", rf'(?m)^version = "{VERSION}"$'),
     ("backend/openings/__init__.py", rf'(?m)^__version__ = "{VERSION}"$'),
     ("Dockerfile", rf"(?m)^ARG VERSION={VERSION}$"),
-    ("docker-compose.yml", rf"vincenzoimp/openings:{VERSION}\}}"),
+    ("docker-compose.yml", rf"vincenzoimp/openings:{MINOR}\}}"),
+    (".claude-plugin/plugin.json", rf'(?m)^  "version": "{VERSION}",$'),
     (".env.example", rf"(?m)^# OPENINGS_IMAGE=docker\.io/vincenzoimp/openings:{VERSION}$"),
     ("frontend/package.json", rf'\A\{{\n  "name": "openings-dashboard",\n  "version": "{VERSION}"'),
     (
@@ -51,16 +55,26 @@ def find(path, pattern):
     return text, matches[0]
 
 
+def group(match):
+    return "minor" if "minor" in match.re.groupindex else "version"
+
+
+def minor(version):
+    return ".".join(version.split(".")[:2])
+
+
 def current_versions():
-    return [(path, find(path, pattern)[1]["version"]) for path, pattern in LOCATIONS]
+    return [(path, find(path, pattern)[1]) for path, pattern in LOCATIONS]
 
 
 def check():
     found = current_versions()
-    expected = found[0][1]
-    wrong = [(path, version) for path, version in found if version != expected]
-    for path, version in wrong:
-        print(f"{path}: {version} (pyproject.toml has {expected})", file=sys.stderr)
+    expected = found[0][1]["version"]
+    wanted = {"version": expected, "minor": minor(expected)}
+    found = [(path, match[group(match)], wanted[group(match)]) for path, match in found]
+    wrong = [(path, version, want) for path, version, want in found if version != want]
+    for path, version, want in wrong:
+        print(f"{path}: {version} (pyproject.toml wants {want})", file=sys.stderr)
     if wrong:
         print("Run: python3 scripts/bump_version.py " + expected, file=sys.stderr)
         return 1
@@ -73,8 +87,9 @@ def bump(version):
         raise SystemExit(f"Not a version: {version!r} (expected X.Y.Z)")
     for path, pattern in LOCATIONS:
         text, match = find(path, pattern)
-        start, end = match.span("version")
-        updated = text[:start] + version + text[end:]
+        start, end = match.span(group(match))
+        value = minor(version) if group(match) == "minor" else version
+        updated = text[:start] + value + text[end:]
         (ROOT / path).write_text(updated, encoding="utf-8")
     print(f"Set version {version} in {len(LOCATIONS)} locations.")
     print(FOLLOW_UP)

@@ -24,6 +24,8 @@ def code(response, status=409):
 
 def test_a_closed_gate_contacts_no_job_site(app, client, monkeypatch):
     discovery = app.state.discovery
+    discovery.providers.closed = True
+    # A new enabled source queues no first check behind a closed gate.
     source = discovery.create_source(
         SourceCreate(
             name="Synthetic search",

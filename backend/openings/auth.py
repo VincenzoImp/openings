@@ -3,6 +3,7 @@
 import base64
 import hashlib
 import hmac
+import logging
 import math
 import os
 import secrets
@@ -25,7 +26,22 @@ from .common import new_id, now
 from .errors import DomainError, missing
 from .idempotency import fingerprint, remember, replay
 
+LOG = logging.getLogger(__name__)
 COOKIE = "openings_session"
+# Letters and digits that read unambiguously in a log: no 0/O, 1/I/L.
+CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+
+
+def setup_code():
+    """A new one-time code, such as ``K7QM-3XPA``."""
+    letters = "".join(secrets.choice(CODE_ALPHABET) for _ in range(8))
+    return letters[:4] + "-" + letters[4:]
+
+
+def plain_code(value):
+    return "".join(value.split()).replace("-", "").upper()
+
+
 MAX_AGE = 7 * 24 * 3600
 OPERATION_MAX_AGE = 120
 
@@ -54,6 +70,29 @@ class Auth:
         password = os.environ.get("OPENINGS_PASSWORD")
         if password and not self.configured():
             self.setup(password)
+        # Until an owner exists, claiming the workspace needs a code printed to the
+        # log of this start, so the first visitor on a network cannot take it.
+        # The demo (openings demo) sets its own password and signs in by its link.
+        demo = getattr(self.workspace, "demo", False)
+        self.setup_code = None if self.configured() or demo else setup_code()
+        if self.setup_code:
+            LOG.warning(
+                "Setup code: %s · find it again with `docker compose logs openings` (or `docker logs openings`)",
+                self.setup_code,
+            )
+
+    def check_setup_code(self, value):
+        """Refuse a first-owner setup without this start's code (compared in constant time)."""
+        if self.setup_code is None:
+            return
+        if not value or not hmac.compare_digest(
+            plain_code(value).encode(), plain_code(self.setup_code).encode()
+        ):
+            raise DomainError(
+                403,
+                "setup_code",
+                "Enter the setup code from the server's log (docker compose logs openings).",
+            )
 
     def configured(self):
         return bool(self.workspace.get_settings("auth")["data"].get("password_hash"))
@@ -67,6 +106,7 @@ class Auth:
             self.workspace.set_settings(
                 "auth", {"password_hash": password_hash(password), "secret": secrets.token_hex(32)}
             )
+            self.setup_code = None
 
     def change_password(self, current, password):
         """Replace the owner password; ``current`` must be the password in use."""

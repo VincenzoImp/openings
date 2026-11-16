@@ -166,3 +166,15 @@ test("a Preferences section is saved whole: in place, moved or added", () => {
   );
   assert.equal(preferences.itemName("x".repeat(50), 10), "xxxxxxxxx…");
 });
+
+test("the guide resumes at the first step not done, or starts again", () => {
+  const resume = (facts) =>
+    checklist.resumeStep(checklist.progress({ ...empty, ...facts }).items);
+  assert.equal(resume({}), "about");
+  assert.equal(resume({ name: "Alex", preferences: 1 }), "jobs");
+  assert.equal(resume({ name: "Alex", preferences: 1, sources: 1 }), "cv");
+  assert.equal(
+    resume({ name: "Alex", preferences: 1, jobs: 2, cv: 1 }),
+    "about",
+  );
+});

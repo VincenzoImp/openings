@@ -78,7 +78,10 @@ def client(tmp_path_factory):
         TemplateCreate(name="Synthetic CV", tex="Synthetic TeX", is_default=True)
     )
     with TestClient(app) as client:
-        client.post("/api/v1/auth/setup", json={"password": "synthetic-password"})
+        client.post(
+            "/api/v1/auth/setup",
+            json={"password": "synthetic-password", "setup_code": app.state.auth.setup_code},
+        )
         yield client
 
 

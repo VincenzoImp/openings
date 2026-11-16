@@ -15,8 +15,8 @@ owner password.
 
 | Variable | Default | What it does |
 |---|---|---|
-| `OPENINGS_PUBLIC_URL` | unset (Compose: `http://127.0.0.1:` and `OPENINGS_PORT`) | The address browsers and agents use to reach Openings. Set it when other devices or agents connect, or with `docker run` on another host port. MCP accepts its host besides `localhost`, upload and download links start with it, and cookies are secure when it starts with `https://`. A refused MCP host gets an error that names it. |
-| `OPENINGS_PASSWORD` | unset | First-run owner password, at least 10 characters. Used only while no owner password exists; without it, each start prints a one-time setup code in the log until the workspace is claimed. |
+| `OPENINGS_PUBLIC_URL` | unset (Compose: `http://127.0.0.1:<OPENINGS_PORT>`) | The address browsers and agents use to reach Openings. Set it when other devices or agents connect. MCP accepts its host besides `localhost`, upload and download links start with it, and cookies are secure when it starts with `https://`. MCP refuses another host with a message that names this variable, and a dashboard opened at another address shows the value to set. With `docker run` and another host port, pass it too: `-p 127.0.0.1:18080:8080 -e OPENINGS_PUBLIC_URL=http://127.0.0.1:18080`. |
+| `OPENINGS_PASSWORD` | unset | First-run owner password, at least 10 characters. Used only while no owner password exists. Without it, a new workspace prints a one-time setup code to the log at each start, and the first owner enters it. |
 | `OPENINGS_TRUSTED_PROXIES` | empty: trust none | Comma-separated IPs or CIDR ranges of reverse proxies whose `X-Forwarded-For` and `X-Forwarded-Proto` are trusted. An invalid entry stops the start. Option `--trusted-proxies`. |
 | `OPENINGS_RETENTION_DAYS` | `90` | Days finished collection runs and tasks are kept; `0` keeps all. The 20 newest runs of every source always stay. |
 | `OPENINGS_BACKUP_DIR` | `<data dir>/backups` (`/data/backups`) | Where daily backups go. Created with mode 0700. |
