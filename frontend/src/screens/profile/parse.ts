@@ -301,14 +301,14 @@ export function parseCv(text: string): ParsedCv {
 
 export const EXAMPLE = `# Alex Morgan
 Data engineer
-Zurich · alex@example.com · example.dev
+Amsterdam · alex@example.com · example.dev
 
 ## Summary
 Six years building data pipelines for utilities.
 
 ## Experience
 ### Data engineer — Northwind Energy
-2021 – Present · Zurich
+2021 – Present · Amsterdam
 - Built pipelines that process 40 million readings a day.
 - Cut reporting time by 70%.
 

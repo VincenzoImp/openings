@@ -1,4 +1,4 @@
-"""Reading postings from a source: HTML text, Lever, Ashby and RSS, and adapters."""
+"""Reading postings from a source: HTML text, Lever, Ashby, RSS, HN and adapters."""
 
 from __future__ import annotations
 
@@ -6,14 +6,17 @@ import hashlib
 import html
 import json
 import re
-import xml.etree.ElementTree as ET
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from functools import partial
 from html.parser import HTMLParser
 from urllib.parse import quote, urljoin, urlsplit
 
-from ..collectors import company as company_collectors, jobspy as jobspy_collector
+from ..collectors import (
+    company as company_collectors,
+    hnhiring as hnhiring_collector,
+    jobspy as jobspy_collector,
+)
 from ..errors import DomainError
 from ..posting import matches_filters
 from .network import HTTP_BUDGET, MAX_LISTING_BYTES, fetch_bytes
@@ -159,6 +162,10 @@ def fetch_postings(source: dict) -> list[dict]:
         )
         source["streamed"] = source.get("on_item") is not None
         source["diagnostic"] = diagnostic
+    elif kind == "hnhiring":
+        items = hnhiring_collector.collect(
+            partial(fetch_bytes, maximum=MAX_LISTING_BYTES), html_text, config, source
+        )
     elif kind not in ("lever", "ashby", "rss"):
         source["streamed"] = source.get("on_item") is not None
         items = company_collectors.collect(
@@ -260,14 +267,7 @@ def fetch_postings(source: dict) -> list[dict]:
             )
     elif kind == "rss":
         body = fetch_bytes(config["url"], maximum=2 * 1024 * 1024)
-        if b"<!DOCTYPE" in body.upper() or b"<!ENTITY" in body.upper():
-            raise DomainError(
-                422, "source_format", "RSS declarations with entities are not supported."
-            )
-        try:
-            root = ET.fromstring(body)
-        except ET.ParseError as error:
-            raise DomainError(502, "source_format", "The feed returned invalid XML.") from error
+        root = company_collectors.xml(body, "The feed returned invalid XML.")
         if root.tag not in (
             "rss",
             "{http://www.w3.org/2005/Atom}feed",

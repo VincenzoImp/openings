@@ -50,6 +50,46 @@ export function PageHeader({
 }
 
 /**
+ * The head of a section: its h2 with an optional count, and at most one
+ * action at the end. One size on every reading screen (Today, Profile,
+ * Preferences, an application); `page` is the larger head of a page made of
+ * sections (Settings). The screen's own class sets the space around it.
+ */
+export function SectionHeader({
+  id,
+  title,
+  count,
+  action,
+  page = false,
+  focusable = false,
+  className,
+}: {
+  id: string;
+  title: ReactNode;
+  count?: ReactNode;
+  action?: ReactNode;
+  page?: boolean;
+  /** Focusable by script (tabIndex -1), as a jump target. */
+  focusable?: boolean;
+  className?: string;
+}) {
+  return (
+    <header className={cx("ui-section-head", className)}>
+      <h2
+        id={id}
+        className="ui-section-title"
+        data-level={page ? "page" : undefined}
+        tabIndex={focusable ? -1 : undefined}
+      >
+        {title}
+        {count}
+      </h2>
+      {action && <div className="ui-section-action">{action}</div>}
+    </header>
+  );
+}
+
+/**
  * What an empty place teaches: an icon tile, a title, one sentence and the
  * action that fills it (primary), with an alternative (ghost). A manual path
  * always exists.

@@ -23,6 +23,10 @@ HTTP_BUDGET: ContextVar[ProviderBudget | None] = ContextVar("collection_http_bud
 
 
 def public_url(value: str) -> str:
+    # The check resolves the host: a closed gate refuses before that lookup.
+    budget = HTTP_BUDGET.get()
+    if budget is not None:
+        budget.store.require_open()
     parsed = urlsplit(value)
     if (
         parsed.scheme not in ("http", "https")
@@ -37,8 +41,21 @@ def public_url(value: str) -> str:
     return value
 
 
+# IPv6 forms that carry an IPv4 address in their last 32 bits: NAT64 translates the
+# well-known prefix to that address, and IPv4-compatible addresses name it directly.
+EMBEDDED_IPV4 = (ipaddress.ip_network("64:ff9b::/96"), ipaddress.ip_network("::/96"))
+
+
 def is_public_address(address: str) -> bool:
-    return ipaddress.ip_address(address).is_global
+    """A global address, and for IPv6 one whose embedded IPv4 address is global too."""
+    ip = ipaddress.ip_address(address)
+    if ip.version == 6:
+        embedded = ip.ipv4_mapped or ip.sixtofour
+        if embedded is None and any(ip in network for network in EMBEDDED_IPV4):
+            embedded = ipaddress.IPv4Address(int(ip) & 0xFFFFFFFF)
+        if embedded is not None and not embedded.is_global:
+            return False
+    return ip.is_global
 
 
 def public_addresses(host: str, port: int) -> list[str]:
@@ -109,6 +126,8 @@ def fetch_bytes(
     budget = budget or HTTP_BUDGET.get()
     if budget is None and public:
         raise RuntimeError("no provider budget")
+    if budget is not None:
+        budget.store.require_open()
     current = url
     try:
         with httpx.Client(

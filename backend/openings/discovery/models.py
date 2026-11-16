@@ -10,7 +10,7 @@ from ..collectors.catalog import COMPANY_KINDS
 from ..collectors.policy import ProviderPatch
 from ..scheduling import IntervalSchedule, Schedule
 
-SourceKind = Literal["auto", "jobspy", "rss", *COMPANY_KINDS]
+SourceKind = Literal["auto", "jobspy", "rss", "hnhiring", *COMPANY_KINDS]
 
 
 class Input(BaseModel):
@@ -35,6 +35,20 @@ class SourcePreview(Input):
     kind: SourceKind = "auto"
     config: dict[str, Any] = Field(default_factory=dict)
     filters: Filters = Field(default_factory=Filters)
+
+
+class SourceTest(SourcePreview):
+    """A preview from the dashboard's Test: the listing first, then the posting text."""
+
+    details: bool = Field(
+        default=True,
+        description="false: the board's listing only, without fetching each posting's text.",
+    )
+    only: list[str] | None = Field(
+        default=None,
+        max_length=20,
+        description="With details: the text of these postings only (their source_key).",
+    )
 
 
 class SourceCreate(SourcePreview):

@@ -140,3 +140,49 @@ test("every stylesheet sits in a cascade layer, and no weight is 700", () => {
     assert.doesNotMatch(text, /font-weight:\s*(700|bold)|\b700 \d/, file);
   }
 });
+
+// The audit's guards: sizes, radii and colours come from tokens.css; screens
+// use the shared toolbar and draw icons through Icon. The design system
+// gallery (ui.html) is a reference page, not the dashboard.
+const STYLES = files(SRC).filter(
+  (file) =>
+    file.endsWith(".css") &&
+    !file.endsWith("tokens.css") &&
+    !file.includes("/gallery/"),
+);
+
+test("no rgb() or hsl() colour outside tokens.css", () => {
+  for (const file of STYLES)
+    assert.doesNotMatch(readFileSync(file, "utf8"), /\b(rgba?|hsla?)\(/, file);
+});
+
+test("font sizes, weights and radii come from the tokens", () => {
+  for (const file of STYLES) {
+    const text = readFileSync(file, "utf8");
+    assert.doesNotMatch(text, /font(-size)?:[^;]*\b\d+(\.\d+)?px/, file);
+    assert.doesNotMatch(text, /font(-weight)?:\s*[1-9]00\b/, file);
+    assert.doesNotMatch(text, /radius:[^;]*\b([2-9]|\d{2})px/, file);
+  }
+});
+
+test("screens use the shared toolbar, and icons go through Icon", () => {
+  for (const file of files(SRC)) {
+    if (!file.endsWith(".tsx") || file.endsWith("Icon.tsx")) continue;
+    const text = readFileSync(file, "utf8");
+    if (file.includes("/screens/"))
+      assert.doesNotMatch(text, /className="ui-toolbar\b/, file);
+    const imported = text.match(/import\s*\{([^}]*)\}\s*from\s*"lucide-react"/);
+    for (const name of imported?.[1].split(",") ?? []) {
+      const local = name
+        .trim()
+        .split(/\s+as\s+/)
+        .pop();
+      if (!local || local.startsWith("type ")) continue;
+      assert.doesNotMatch(
+        text,
+        new RegExp(`<${local}[\\s/>]`),
+        `${file}: ${local}`,
+      );
+    }
+  }
+});

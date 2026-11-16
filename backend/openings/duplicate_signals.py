@@ -267,7 +267,7 @@ def apply_targets(url):
     greenhouse = parse_qs(parts.query).get("gh_jid")
     if greenhouse and greenhouse[0].isdigit():
         keys.add("greenhouse:" + greenhouse[0])
-    if host.endswith("greenhouse.io") and "jobs" in path[:-1]:
+    if (host == "greenhouse.io" or host.endswith(".greenhouse.io")) and "jobs" in path[:-1]:
         keys.add("greenhouse:" + path[path.index("jobs") + 1])
     elif host in {"jobs.lever.co", "jobs.eu.lever.co"} and len(path) >= 2:
         keys.add("lever:" + path[1])

@@ -118,13 +118,13 @@
   @media (pointer: coarse) {
     .ui-menu-item {
       height: var(--touch);
-      font-size: 14px;
+      font-size: var(--fs-md);
     }
   }
   @container app (max-width: 719px) {
     .ui-menu-item {
       height: var(--touch);
-      font-size: 14px;
+      font-size: var(--fs-md);
     }
   }
 }

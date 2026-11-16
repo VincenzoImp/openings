@@ -5,6 +5,7 @@ import type { SetupStep } from "../setup/checklist";
 import { href, navigate } from "../../shell/router";
 import { Button } from "../../ui/Button";
 import { Icon } from "../../ui/Icon";
+import { SectionHeader } from "../../ui/Page";
 
 const HINTS: Record<SetupStep, string> = {
   about: "Your name, the roles you want and where.",
@@ -33,12 +34,16 @@ export function Checklist({
       data-compact={compact || undefined}
       aria-labelledby={id}
     >
-      <header className="today-section-head">
-        <h2 id={id}>Set up your workspace</h2>
-        <span className="today-setup-progress">
-          {setup.done} of {setup.total} done
-        </span>
-      </header>
+      <SectionHeader
+        id={id}
+        className="today-section-head"
+        title="Set up your workspace"
+        action={
+          <span className="today-setup-progress">
+            {setup.done} of {setup.total} done
+          </span>
+        }
+      />
       <ol className="today-checklist">
         {setup.items.map((item, index) => (
           <li key={item.step} data-done={item.done || undefined}>

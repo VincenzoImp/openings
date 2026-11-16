@@ -12,13 +12,15 @@ workspace:
         "Synthetic workspace at http://127.0.0.1:<port>" once it listens.
 
 With --demo either step seeds instead the curated workspace of one fictional
-person's job search (demo_workspace.py) for the screenshots, and with --empty a
+person's job search (openings.demo) for the screenshots, and with --empty a
 first run: only the owner password is set.
 
 Without --snapshot the server seeds a temporary workspace first. Only this
 server answers `POST /__e2e__/reset`, which restores its copy (the database and
-the backup files beside it) to the snapshot between tests; the product
-application has no such route.
+the backup files beside it) to the snapshot between tests, and `POST
+/__e2e__/collect`, which runs the queued checks against a fake provider: each
+board lists one synthetic job, and nothing leaves the machine. The product
+application has neither route.
 
 $OPENINGS_E2E_JOBS and $OPENINGS_E2E_APPLICATIONS set the size of the default workspace
 (60 jobs and 53 applications by default). Above 500 jobs they are written in
@@ -39,7 +41,6 @@ from pathlib import Path
 import uvicorn
 from fastapi.testclient import TestClient
 
-from demo_workspace import seed_demo
 from jobs_fixtures import seed_jobs
 from large_fixtures import seed_large
 from openings import backups
@@ -47,9 +48,12 @@ from openings.actors import OWNER, acting_as
 from openings.app import create_app
 from openings.auth import COOKIE
 from openings.career import EntryCreate, HighlightCreate, ProfileUpdate, TemplateCreate
+from openings.demo import seed_demo
+from openings.discovery import tasks
 from today_fixtures import seed_today
 
 RESET_PATH = "/__e2e__/reset"
+COLLECT_PATH = "/__e2e__/collect"
 PASSWORD = "synthetic-browser-password"
 # Above this many jobs the workspace is seeded in bulk (large_fixtures.py).
 LARGE = 500
@@ -65,6 +69,33 @@ def copy_side_files(snapshot, live):
         if not item.name.startswith(snapshot.name):
             target = live.parent / item.name
             shutil.copytree(item, target) if item.is_dir() else shutil.copy2(item, target)
+
+
+def fake_postings(source):
+    """The fake provider: one synthetic job for any board or search."""
+    board = source["config"].get("board") or source["config"].get("query") or "example"
+    return [
+        {
+            "title": "Synthetic platform engineer",
+            "company": source["name"],
+            "location": "Remote",
+            "url": f"https://jobs.example.test/{source['kind']}/{board}/1",
+            "source_key": f"{source['kind']}:{board}:1",
+            "posting": "Build reliable services.\n\nResponsibilities\nDesign practical APIs.",
+        }
+    ]
+
+
+def collect_queued(app):
+    """Run every queued check now, with the fake provider in place of the network."""
+    service = app.state.discovery
+    original = tasks.fetch_postings
+    tasks.fetch_postings = fake_postings
+    try:
+        while task := service.claim_task("e2e", "collect"):
+            service.run_task(task, "e2e")
+    finally:
+        tasks.fetch_postings = original
 
 
 def resettable(app, snapshot):
@@ -91,11 +122,12 @@ def resettable(app, snapshot):
             auth.used_operations.expiries.clear()
 
     async def serve(scope, receive, send):
-        if scope["type"] != "http" or scope["path"] != RESET_PATH:
+        routes = {RESET_PATH: reset, COLLECT_PATH: lambda: collect_queued(app)}
+        if scope["type"] != "http" or scope["path"] not in routes:
             return await app(scope, receive, send)
         status = 405
         if scope["method"] == "POST":
-            await asyncio.to_thread(reset)
+            await asyncio.to_thread(routes[scope["path"]])
             status = 204
         await send({"type": "http.response.start", "status": status, "headers": []})
         await send({"type": "http.response.body", "body": b""})
@@ -226,7 +258,10 @@ def seed(path, jobs=60, applications=53):
     workspace, career = app.state.workspace, app.state.career
     # One client for setup and seeding: an application starts its MCP sessions once.
     with TestClient(app) as client:
-        client.post("/api/v1/auth/setup", json={"password": PASSWORD})
+        client.post(
+            "/api/v1/auth/setup",
+            json={"password": PASSWORD, "setup_code": app.state.auth.setup_code},
+        )
         for index in range(35):
             evidence = career.create_entry(
                 EntryCreate(
@@ -312,9 +347,12 @@ def seed_other(path, demo):
     """Build the demo workspace (``demo``) or a first run at `path`; return the session cookie."""
     app = create_app(path, start_worker=False)
     with TestClient(app) as client:
-        client.post("/api/v1/auth/setup", json={"password": PASSWORD})
+        client.post(
+            "/api/v1/auth/setup",
+            json={"password": PASSWORD, "setup_code": app.state.auth.setup_code},
+        )
         if demo:
-            seed_demo(app, client)
+            seed_demo(app)
         cookie = client.post("/api/v1/auth/login", json={"password": PASSWORD}).cookies[COOKIE]
     if demo:
         workspace = app.state.workspace

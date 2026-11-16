@@ -118,6 +118,166 @@ test("add a search: Test shows the first ten results, then Save adds it", async 
   );
 });
 
+test("add the HN Who is hiring thread: Test reads it, Save adds it", async ({
+  page,
+}) => {
+  const asked: { kind?: string; details?: boolean }[] = [];
+  await page.route("**/api/v1/sources/preview", (route) => {
+    asked.push(route.request().postDataJSON());
+    return route.fulfill({
+      json: {
+        kind: "hnhiring",
+        total: 2,
+        listed: 2,
+        preview_limit: 20,
+        items: [
+          {
+            title: "Senior Backend Engineer",
+            company: "Northwind Labs",
+            location: "Berlin, Germany",
+            posting: "Synthetic logistics software in Python.",
+          },
+          {
+            title: "Data Scientist",
+            company: "Example Robotics",
+            location: "Remote",
+            posting: "Model fleets of synthetic robots.",
+          },
+        ],
+        diagnostics: [],
+      },
+    });
+  });
+  const name = unique("Synthetic HN");
+  await go(page, "sources");
+  await page.getByRole("button", { name: "Add source" }).first().click();
+  const form = editor(page);
+  await form.getByLabel("Kind").selectOption("hn");
+  await expect(form.getByText(/latest monthly Ask HN/)).toBeVisible();
+  await form.getByLabel(/^Name/).fill(name);
+  await form.getByRole("button", { name: "Test" }).click();
+  const results = form.getByRole("region", { name: /jobs found/ });
+  await expect(results).toContainText("2 jobs found");
+  await expect(results).toContainText("Northwind Labs · Berlin, Germany");
+  // One step: the thread carries every posting's text.
+  expect(asked).toEqual([
+    expect.objectContaining({ kind: "hnhiring", details: true }),
+  ]);
+  await fitsViewport(page);
+  await form.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(toast(page)).toContainText(`Added “${name}”`);
+  expect(await sourceNamed(page, name)).toMatchObject({
+    kind: "hnhiring",
+    enabled: true,
+    config: { max_results: 1000 },
+  });
+  await expect(row(page, name)).toContainText("Hacker News · latest thread");
+});
+
+test("Test lists a board's titles first, then counts the text it fetched", async ({
+  page,
+}) => {
+  const held: (() => void)[] = [];
+  const asked: { details?: boolean; only?: string[] }[] = [];
+  const key = (index: number) => `greenhouse:syntheticlabs:${index}`;
+  await page.route("**/api/v1/sources/preview", async (route) => {
+    const body = route.request().postDataJSON();
+    asked.push(body);
+    if (body.details) await new Promise<void>((resolve) => held.push(resolve));
+    return route.fulfill({
+      json: {
+        kind: "greenhouse",
+        url: "https://boards.greenhouse.io/syntheticlabs",
+        total: 3,
+        listed: 254,
+        preview_limit: 20,
+        items: [1, 2, 3].map((index) => ({
+          source_key: key(index),
+          title: `Synthetic platform engineer ${index}`,
+          company: "Syntheticlabs",
+          posting: body.only?.includes(key(index))
+            ? "Build reliable services."
+            : "",
+        })),
+        diagnostics: [],
+      },
+    });
+  });
+  await go(page, "sources");
+  await page.getByRole("button", { name: "Add source" }).first().click();
+  const form = editor(page);
+  await form.getByLabel("Kind").selectOption("company");
+  await form
+    .getByLabel("Careers page address")
+    .fill("https://boards.greenhouse.io/syntheticlabs");
+  await form.getByRole("button", { name: "Test" }).click();
+  // The titles show as soon as the board's listing answers, then the count
+  // of postings whose text arrived goes up one by one.
+  const results = form.locator(".src-test");
+  await expect(results.getByRole("listitem")).toHaveCount(3);
+  for (const fetched of [0, 1, 2]) {
+    await expect(results).toContainText(
+      `254 jobs listed · fetched ${fetched} of 3…`,
+    );
+    await expect.poll(() => held.length).toBe(1);
+    held.shift()!();
+  }
+  await expect(results).toContainText("254 jobs found · the first 3");
+  expect(asked.map((body) => [body.details, body.only])).toEqual([
+    [false, undefined],
+    [true, [key(1)]],
+    [true, [key(2)]],
+    [true, [key(3)]],
+  ]);
+});
+
+test("a refused search says why and when, and offers a careers page", async ({
+  page,
+}) => {
+  const until = new Date(Date.now() + 5 * 60_000);
+  await page.route("**/api/v1/sources/preview", (route) =>
+    route.fulfill({
+      json: {
+        kind: "jobspy",
+        total: 0,
+        preview_limit: 20,
+        items: [],
+        diagnostics: [
+          {
+            provider: "linkedin",
+            state: "deferred",
+            next_run_at: until.toISOString(),
+            message: `LinkedIn refused this request from your network; Openings waits until ${String(until.getUTCHours()).padStart(2, "0")}:${String(until.getUTCMinutes()).padStart(2, "0")} UTC and tries again. Careers pages are not affected.`,
+          },
+        ],
+      },
+    }),
+  );
+  await go(page, "sources");
+  await page.getByRole("button", { name: "Add source" }).first().click();
+  const form = editor(page);
+  await form.getByLabel("Keywords").fill("synthetic engineer");
+  await form.getByLabel("Indeed", { exact: true }).uncheck();
+  await form.getByRole("button", { name: "Test" }).click();
+  const results = form.locator(".src-test");
+  await expect(results).toContainText("No jobs found");
+  // The wait is shown in the browser's own clock.
+  const local = await page.evaluate(
+    (value) =>
+      new Date(value).toLocaleTimeString("en-GB", {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    until.toISOString(),
+  );
+  await expect(results).toContainText(
+    `LinkedIn refused this request from your network; Openings waits until ${local}`,
+  );
+  await expect(results).not.toContainText("UTC");
+  await results.getByRole("button", { name: "Follow a careers page" }).click();
+  await expect(form.getByLabel("Careers page address")).toBeVisible();
+});
+
 test("a company page names its job board from the address", async ({
   page,
 }) => {
@@ -155,6 +315,10 @@ test("check now, stop, pause with undo, and delete for good", async ({
     enabled: true,
   });
   await go(page, "sources");
+  // A new source is checked at once; its first check can be stopped.
+  await expect(row(page, name)).toContainText("Checking now…");
+  await menu(page, name, "Stop this check");
+  await expect(row(page, name)).not.toContainText("Checking now…");
   // Check now: from the hover action on a wide screen, the menu on a phone.
   if (isPhone(page)) await menu(page, name, "Check now");
   else {
@@ -250,8 +414,7 @@ test("a failing source says so in red, with Details; Recent checks retry", async
   });
   await expect(failed).toHaveCount(1);
   await expect(failed.getByRole("button")).toHaveCount(0);
-  // A check in progress can be stopped from there.
-  await menu(page, name, "Check now");
+  // A check in progress, such as a new source's first, can be stopped from there.
   const running = checks.getByRole("listitem").filter({ hasText: name });
   await expect(running).toContainText("Waiting to start");
   await running
@@ -274,7 +437,7 @@ test("the schedule line sets one interval and pauses every check", async ({
     schedule: { minutes?: number };
   }[];
   expect(items.every((item) => item.schedule.minutes === 360)).toBe(true);
-  await expect(page.locator(".src-topline")).toContainText("next check");
+  await expect(page.locator(".src-topline")).toContainText("Next check");
   // The switch of every automatic check is in `…`.
   await page
     .getByRole("button", { name: "More about automatic checks" })

@@ -45,7 +45,7 @@
   }
   .ui-sheet .ui-menu-item {
     height: var(--touch);
-    font-size: 15px;
+    font-size: var(--fs-title-sm);
   }
   .ui-sheet-cancel {
     justify-content: center;

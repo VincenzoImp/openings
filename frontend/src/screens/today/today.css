@@ -9,7 +9,8 @@
   }
   .today {
     width: 100%;
-    max-width: calc(var(--content) + 2 * var(--pane-pad));
+    max-width: var(--document);
+    margin-inline: auto;
     padding: var(--s-8) var(--pane-pad) var(--s-16);
   }
 
@@ -32,11 +33,6 @@
     color: var(--text);
     font-weight: var(--w-medium);
   }
-  .today-greeting:not(:last-child)::after {
-    content: " ·";
-    color: var(--text-3);
-    font-weight: var(--w-regular);
-  }
 
   .today-caught-up {
     display: flex;
@@ -51,28 +47,11 @@
 
   /* A section: heading and count, one action on the right, then rows. */
   .today-section-head {
-    display: flex;
-    align-items: center;
-    gap: var(--s-3);
     min-height: var(--control-h);
     margin-bottom: var(--s-2);
   }
-  .today-section-head h2 {
-    display: flex;
-    flex: 1;
-    align-items: baseline;
-    gap: var(--s-2);
-    min-width: 0;
-    font: var(--t-md);
-    font-weight: var(--w-semibold);
-    letter-spacing: var(--tr-md);
-  }
-  .today-section-action {
-    display: flex;
-    flex: none;
-  }
   /* A ghost action's text ends where a bordered button's edge does. */
-  .today-section-action .ui-btn[data-variant="ghost"] {
+  .today-section-head .ui-section-action .ui-btn[data-variant="ghost"] {
     margin-right: -10px;
   }
   .today-note {
@@ -251,9 +230,6 @@
       flex-direction: column;
       margin-top: 0;
     }
-    .today-greeting:not(:last-child)::after {
-      content: none;
-    }
     .today-list {
       --ui-row-pad: var(--s-4);
       margin: 0 calc(var(--s-4) * -1);
@@ -261,7 +237,7 @@
     .today-section:has(.today-start) .today-section-head {
       flex-wrap: wrap;
     }
-    .today-section-action:has(.today-start) {
+    .today-section-head .ui-section-action:has(.today-start) {
       order: 3;
       flex-basis: 100%;
       margin-top: var(--s-2);

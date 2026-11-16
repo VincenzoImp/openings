@@ -2,8 +2,16 @@
 
 from __future__ import annotations
 
+import json
+import threading
+import time
+
 from .. import events
-from ..collectors import company as company_collectors, jobspy as jobspy_collector
+from ..collectors import (
+    company as company_collectors,
+    hnhiring as hnhiring_collector,
+    jobspy as jobspy_collector,
+)
 from ..collectors.catalog import COMPANY_ADAPTERS
 from ..collectors.policy import ProviderDeferred
 from ..common import batch_result, check_version, decode_record, encode, missing, new_id, now
@@ -41,6 +49,25 @@ WHERE p.source_id IN ({ids}) AND NOT EXISTS(SELECT 1 FROM postings q WHERE q.sou
 GROUP BY p.source_id
 """
 COUNT_KEYS = ("found", "shortlisted", "applied", "replied")
+
+# A Test asks a board several times in a row (its listing, then each posting's text):
+# the answers of the last few boards are kept briefly, so the listing is read once.
+PREVIEW_SECONDS = 120
+PREVIEW_BOARDS = 4
+_previews_lock = threading.Lock()
+
+
+def preview_responses(previews: dict, key: str) -> dict:
+    """The answers a Test of this board read in the last two minutes, shared by its calls."""
+    moment = time.monotonic()
+    with _previews_lock:
+        for old in [name for name, (at, _) in previews.items() if moment - at > PREVIEW_SECONDS]:
+            del previews[old]
+        if key not in previews:
+            while len(previews) >= PREVIEW_BOARDS:
+                del previews[min(previews, key=lambda name: previews[name][0])]
+            previews[key] = (moment, {})
+        return previews[key][1]
 
 
 class SourceOperations:
@@ -197,21 +224,15 @@ class SourceOperations:
         for kind in SourceKind.__args__:
             if kind == "auto":
                 continue
-            cls = (
-                jobspy_collector.JobSpyConfig
-                if kind == "jobspy"
-                else RSSConfig
-                if kind == "rss"
-                else company_collectors.config_model(kind)
-            )
+            cls, label = {
+                "jobspy": (jobspy_collector.JobSpyConfig, "Saved portal search"),
+                "rss": (RSSConfig, "RSS / Atom feed"),
+                "hnhiring": (hnhiring_collector.HNHiringConfig, "HN Who is hiring"),
+            }.get(kind) or (company_collectors.config_model(kind), kind.title())
             items.append(
                 {
                     "kind": kind,
-                    "label": "Saved portal search"
-                    if kind == "jobspy"
-                    else "RSS / Atom feed"
-                    if kind == "rss"
-                    else kind.title(),
+                    "label": label,
                     "config_schema": cls.model_json_schema(),
                     "capabilities": {
                         "automatic_collection": automatic_collection_supported(kind),
@@ -225,7 +246,7 @@ class SourceOperations:
                         "description_mode": "portal"
                         if kind == "jobspy"
                         else "inline"
-                        if kind == "rss"
+                        if kind in ("rss", "hnhiring")
                         else COMPANY_ADAPTERS[kind].description_mode,
                     },
                 }
@@ -253,8 +274,12 @@ class SourceOperations:
         return self._source(source_id)
 
     def preview_source(self, value: SourcePreview):
-        resolved = self._resolve_source(value.model_dump())
-        source = {**resolved, "name": value.name or resolved["config"].get("board", "RSS source")}
+        details = getattr(value, "details", True)
+        only = getattr(value, "only", None)
+        self.providers.require_open()
+        resolved = self._resolve_source(value.model_dump(exclude={"details", "only"}))
+        default = "HN Who is hiring" if resolved["kind"] == "hnhiring" else "RSS source"
+        source = {**resolved, "name": value.name or resolved["config"].get("board", default)}
         config = {
             key: val for key, val in source["config"].items() if key not in ("url", "filters")
         }
@@ -268,20 +293,35 @@ class SourceOperations:
             adapter = COMPANY_ADAPTERS.get(source["kind"])
             count = source["config"].get("max_results", 100)
             count = min(count, 3) if preview else count
-            requests = 1 + (count if adapter and adapter.description_mode == "separate" else 0)
+            listing = 2 if source["kind"] == "hnhiring" else 1  # the thread, then its comments
+            requests = listing + (
+                count if adapter and adapter.description_mode == "separate" else 0
+            )
             return {
                 "total": requests,
-                "providers": [{"id": providers[0], "min": 1, "max": requests}],
+                "providers": [{"id": providers[0], "min": listing, "max": requests}],
                 "note": "Listing pagination, redirects and retries may add requests; cached text can reduce detail fetches.",
             }
 
-        items, diagnostics = [], []
+        items, diagnostics, listed = [], [], None
         for provider in providers:
             budget = self.http_budget(provider)
             token = HTTP_BUDGET.set(budget)
-            attempt = {**source, "provider": provider, "preview": True}
+            attempt = {
+                **source,
+                "provider": provider,
+                "preview": True,
+                "details": details,
+                "only": only,
+                "preview_responses": preview_responses(
+                    self.__dict__.setdefault("_previews", {}),
+                    json.dumps([source["kind"], source.get("url"), config], sort_keys=True),
+                ),
+            }
             try:
                 items.extend(fetch_postings(attempt))
+                if attempt.get("listed") is not None:
+                    listed = (listed or 0) + attempt["listed"]
                 diagnostics.append(attempt.get("diagnostic") or budget.diagnostics())
             except DomainError as error:
                 diagnostic = budget.diagnostics()
@@ -298,6 +338,7 @@ class SourceOperations:
                 {key: val for key, val in item.items() if key != "raw"} for item in items[:20]
             ],
             "total": len(items),
+            "listed": listed,
             "preview_limit": 20,
             "request_estimate": estimate(True),
             "full_request_estimate": estimate(False),
@@ -340,7 +381,24 @@ class SourceOperations:
                     connection, "source_created", ("source", record_id), {"kind": resolved["kind"]}
                 )
                 remember(connection, "sources", value.idempotency_key, digest, record_id)
+        if replayed is None and value.enabled:
+            self._queue_first_check(record_id, stamp)
         return self._source(replayed or record_id)
+
+    def _queue_first_check(self, source_id, stamp):
+        """Queue a new or re-enabled source's first check as its current schedule slot.
+
+        It takes the scheduler's path, so the global switch and the provider gate's
+        spacing apply, and the next scheduled check follows one interval later.
+        """
+        if self.providers.closed:
+            return  # the demo's closed gate: nothing to check, and nothing failed
+        try:
+            self.queue_collection(source_id, manual=False, planned_at=stamp)
+        except DomainError as error:
+            self.db.execute(
+                "UPDATE sources SET last_error=? WHERE id=?", (error.message[:1000], source_id)
+            )
 
     def update_source(self, source_id, value: SourcePatch):
         old = self._source(source_id)
@@ -373,6 +431,8 @@ class SourceOperations:
         schedule = schedule_adapter.validate_python(
             merged["schedule"] or {"kind": "interval"}
         ).model_dump()
+        stamp = now()
+        enabling = merged["enabled"] and not old["enabled"]
         with self.db.transaction() as connection:
             row = connection.execute("SELECT * FROM sources WHERE id=?", (source_id,)).fetchone()
             check_version(row, value.expected_version)
@@ -384,10 +444,8 @@ class SourceOperations:
                     encode(resolved["config"]),
                     int(merged["enabled"]),
                     encode(schedule),
-                    now()
-                    if "schedule" in updates or (merged["enabled"] and not old["enabled"])
-                    else old["last_scheduled_at"],
-                    now(),
+                    stamp if "schedule" in updates or enabling else old["last_scheduled_at"],
+                    stamp,
                     source_id,
                 ),
             )
@@ -400,6 +458,8 @@ class SourceOperations:
                     "version": row["version"] + 1,
                 },
             )
+        if enabling:
+            self._queue_first_check(source_id, stamp)
         return self._source(source_id)
 
     def delete_source(self, source_id, expected_version=None):

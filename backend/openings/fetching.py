@@ -151,7 +151,11 @@ def ats_posting(kind, body, job_id):
 
 
 async def read_posting(url, discovery):
-    """Unextractable or blocked pages stay incomplete; never archive challenge HTML as a job."""
+    """Unextractable or blocked pages stay incomplete; never archive challenge HTML as a job.
+
+    A closed gate (a demo workspace) refuses the import with providers_closed.
+    """
+    discovery.providers.require_open()
     endpoint = ats_endpoint(url)
     targets = [(endpoint[1], endpoint[0])] if endpoint else []
     targets.append((url, "manual"))

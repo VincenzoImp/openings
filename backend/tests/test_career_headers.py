@@ -250,7 +250,9 @@ def test_an_import_preview_reads_text_entries_or_a_profile_and_changes_nothing(w
     assert [(item["kind"], item["title"], item["narrative"]) for item in plain["entries"]] == [
         ("other", "Synthetic notes", "Led a synthetic migration.")
     ]
-    assert plain["warnings"] and "profile" not in plain
+    # Kept whole, and said so with what to ask an agent.
+    assert plain["warnings"][0].startswith("Kept as one entry. Your agent can split it")
+    assert "profile" not in plain
     for text in (json.dumps([entry]), json.dumps(entry), json.dumps({"entries": [entry]})):
         read = preview(text)
         assert [item["title"] for item in read["entries"]] == ["Synthetic project"], text

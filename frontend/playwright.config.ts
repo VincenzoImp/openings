@@ -8,6 +8,8 @@ import type { Options } from "./tests/fixtures";
 const CI = !!process.env.CI;
 const PERFORMANCE = "performance.spec.ts";
 const SCREENSHOTS = "screenshots.spec.ts";
+const REEL = "reel.spec.ts";
+const VIDEO = "video.spec.ts";
 const desktop = { width: 1440, height: 1000 };
 const mobile = { width: 390, height: 844 };
 
@@ -25,22 +27,22 @@ export default defineConfig<Options>({
   projects: [
     {
       name: "chromium",
-      testIgnore: [PERFORMANCE, SCREENSHOTS],
+      testIgnore: [PERFORMANCE, SCREENSHOTS, REEL, VIDEO],
       use: { browserName: "chromium", viewport: desktop },
     },
     {
       name: "chromium-mobile",
-      testIgnore: [PERFORMANCE, SCREENSHOTS],
+      testIgnore: [PERFORMANCE, SCREENSHOTS, REEL, VIDEO],
       use: { browserName: "chromium", viewport: mobile },
     },
     {
       name: "webkit",
-      testIgnore: [PERFORMANCE, SCREENSHOTS],
+      testIgnore: [PERFORMANCE, SCREENSHOTS, REEL, VIDEO],
       use: { browserName: "webkit", viewport: desktop },
     },
     {
       name: "webkit-mobile",
-      testIgnore: [PERFORMANCE, SCREENSHOTS],
+      testIgnore: [PERFORMANCE, SCREENSHOTS, REEL, VIDEO],
       use: { browserName: "webkit", viewport: mobile },
     },
     // The performance budget starts its own large workspace (25,000 jobs).
@@ -56,6 +58,18 @@ export default defineConfig<Options>({
       name: "screenshots",
       testMatch: SCREENSHOTS,
       use: { browserName: "chromium", signedIn: false },
+    },
+    // The README's demo reel (`npm run reel`), never run in CI.
+    {
+      name: "reel",
+      testMatch: REEL,
+      use: { browserName: "chromium" },
+    },
+    // Dashboard footage for a video, against a running demo (video.spec.ts).
+    {
+      name: "video",
+      testMatch: VIDEO,
+      use: { browserName: "chromium" },
     },
   ],
 });

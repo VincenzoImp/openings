@@ -1,13 +1,15 @@
 import { useState } from "react";
+import { ExternalLink } from "lucide-react";
 import type { Schema } from "../../api/client";
 import { isConflict } from "../../query/mutation";
 import { invalidate } from "../../query/query";
 import { formatNumber } from "../../ui/format";
+import { Icon } from "../../ui/Icon";
 import { Properties, SkeletonRows } from "../../ui/Page";
 import { useToast } from "../../ui/Toast";
 import { sitesInUse } from "../sources/model";
 import { useSources } from "../sources/queries";
-import { gateOf, spacing } from "./model";
+import { HELP_LINKS, gateOf, spacing } from "./model";
 import { useProviders, useUpdateProvider, useWorkspaceInfo } from "./queries";
 import { SettingsGroup, SettingsSection } from "./Rows";
 import { LoadError } from "../../ui/LoadError";
@@ -41,6 +43,18 @@ export function Advanced() {
             { label: "Address", value: info.data?.origin ?? "" },
           ]}
         />
+      </SettingsGroup>
+      <SettingsGroup title="Help">
+        <ul className="set-help" aria-label="Help">
+          {HELP_LINKS.map((link) => (
+            <li key={link.label}>
+              <a href={link.href} target="_blank" rel="noreferrer">
+                {link.label}
+                <Icon icon={ExternalLink} size="sm" className="set-external" />
+              </a>
+            </li>
+          ))}
+        </ul>
       </SettingsGroup>
     </SettingsSection>
   );

@@ -183,13 +183,14 @@
     flex: 1;
     min-width: 0;
     overflow: hidden;
-    font: 600 17px/22px var(--font);
+    font: var(--t-bar);
+    font-weight: var(--w-semibold);
     letter-spacing: -0.01em;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
   .ui-topbar-title-sub {
-    font-size: 15px;
+    font-size: var(--fs-title-sm);
   }
   .ui-topbar-actions {
     display: flex;
@@ -231,7 +232,8 @@
     border: 0;
     background: transparent;
     color: var(--text-3);
-    font: 500 10.5px/1 var(--font);
+    font: var(--t-tab);
+    font-weight: var(--w-medium);
     letter-spacing: 0;
     text-decoration: none;
     -webkit-tap-highlight-color: transparent;
@@ -260,7 +262,7 @@
     min-width: 16px;
     height: 16px;
     padding: 0 4px;
-    font-size: 10px;
+    font-size: var(--fs-micro);
     box-shadow: 0 0 0 2px var(--bg-subtle);
   }
 

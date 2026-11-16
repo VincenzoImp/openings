@@ -10,6 +10,8 @@ import { Callout } from "../../ui/Page";
 import { CountrySelect } from "./CountrySelect";
 import { useToast } from "../../ui/Toast";
 import {
+  CAREERS_ADVICE,
+  HN_HINT,
   KIND_LABELS,
   NATIONAL_SITES,
   POSTED_WITHIN,
@@ -18,17 +20,21 @@ import {
   countryIn,
   detectBoard,
   kindOf,
+  localReason,
   shortUrl,
   suggestedName,
   terms,
+  testHeading,
   type SourceKind,
   type SourceView,
 } from "./model";
 import {
   sourceKeys,
   useCreateSource,
-  usePreview,
+  useSourceTest,
   useUpdateSource,
+  type TestPhase,
+  type TestResult,
 } from "./queries";
 
 interface Draft {
@@ -88,18 +94,17 @@ function problems(draft: Draft, board: boolean) {
       !draft.country.trim()
     )
       found.country = "Indeed and Glassdoor need a country.";
-  } else if (!(board && !draft.url.trim()) && !httpUrl(draft.url))
+  } else if (
+    draft.kind !== "hn" && // the latest thread: nothing to fill in
+    !(board && !draft.url.trim()) &&
+    !httpUrl(draft.url)
+  )
     found.url =
       draft.kind === "feed"
         ? "Paste the feed's address, starting with https://."
         : "Paste the careers page's address, starting with https://.";
   return found;
 }
-
-type Preview = Schema<"SourcePreviewResult"> & {
-  kind?: string;
-  automatic_collection?: boolean;
-};
 
 /**
  * Add a source or change one, in a drawer (full screen on a phone): the
@@ -172,9 +177,6 @@ function Editor({
   const [base, setBase] = useState(source?.version ?? 0);
   const [submitted, setSubmitted] = useState(false);
   const [leaving, setLeaving] = useState(false);
-  const [preview, setPreview] = useState<Preview | null>(null);
-  const [previewError, setPreviewError] = useState("");
-  const asked = useRef(0);
   const board = !!source && !source.url && !!source.config.board;
 
   const latest = () =>
@@ -188,7 +190,7 @@ function Editor({
     setDraft(draftOf(stored, initialKind, country));
     setBase(stored.version);
   });
-  const test = usePreview();
+  const test = useSourceTest();
   const saving = create.isPending || update.isPending;
 
   const changes = (Object.keys(draft) as (keyof Draft)[]).filter(
@@ -200,9 +202,7 @@ function Editor({
   function set<K extends keyof Draft>(key: K, value: Draft[K]) {
     setDraft((current) => ({ ...current, [key]: value }));
     // A result describes the settings it was asked with.
-    asked.current += 1;
-    setPreview(null);
-    setPreviewError("");
+    test.reset();
   }
 
   function body() {
@@ -229,6 +229,16 @@ function Editor({
     const sameAddress = source && url === (source.url || text(kept.url));
     if (draft.kind === "feed")
       return { kind: "rss" as const, url, config: { url }, filters };
+    if (draft.kind === "hn")
+      return {
+        kind: "hnhiring" as const,
+        url: "",
+        config:
+          typeof kept.max_results === "number"
+            ? { max_results: kept.max_results }
+            : {},
+        filters,
+      };
     return {
       kind: (sameAddress
         ? source.kind
@@ -248,21 +258,7 @@ function Editor({
   async function runTest() {
     setSubmitted(true);
     if (Object.keys(problems(draft, board)).length) return;
-    const question = ++asked.current;
-    setPreview(null);
-    setPreviewError("");
-    try {
-      const result = (await test.mutateAsync({
-        ...body(),
-        name: name(),
-      })) as Preview;
-      if (asked.current === question) setPreview(result);
-    } catch (error) {
-      if (asked.current === question)
-        setPreviewError(
-          error instanceof Error ? error.message : "The test failed.",
-        );
-    }
+    await test.run({ ...body(), name: name() });
   }
 
   async function save(event?: FormEvent) {
@@ -296,7 +292,7 @@ function Editor({
             : undefined,
         });
         toast.show({
-          message: `Added “${name()}”. Its first check runs soon.`,
+          message: `Added “${name()}”. Checking it now.`,
           tone: "success",
         });
       }
@@ -331,9 +327,9 @@ function Editor({
             <Button
               icon={FlaskConical}
               onClick={runTest}
-              disabled={test.isPending || saving}
+              disabled={test.pending || saving}
             >
-              {test.isPending ? "Testing…" : "Test"}
+              {test.pending ? "Testing…" : "Test"}
             </Button>
             <span className="src-editor-spacer" />
             <Button variant="ghost" onClick={close}>
@@ -386,6 +382,8 @@ function Editor({
           )}
           {draft.kind === "search" ? (
             <SearchFields draft={draft} set={set} errors={errors} />
+          ) : draft.kind === "hn" ? (
+            <p className="ui-field-hint">{HN_HINT}</p>
           ) : (
             <Field
               label={
@@ -458,7 +456,7 @@ function Editor({
               />
             </Field>
           </div>
-          {draft.kind === "search" && (
+          {(draft.kind === "search" || draft.kind === "hn") && (
             <Field
               label="Skip companies"
               optional
@@ -471,12 +469,19 @@ function Editor({
               />
             </Field>
           )}
-          {(preview || previewError || test.isPending) && (
+          {test.phase !== "idle" && (
             <TestResults
-              preview={preview}
-              error={previewError}
-              pending={test.isPending}
+              preview={test.result}
+              error={test.error}
+              phase={test.phase}
+              fetched={test.fetched}
+              fetching={test.fetching}
               labels={labels}
+              onCareers={
+                draft.kind === "search" && !source
+                  ? () => set("kind", "company")
+                  : undefined
+              }
             />
           )}
         </form>
@@ -592,29 +597,47 @@ function SearchFields({
   );
 }
 
-/** The first ten results of a Test, and what each site answered. */
+/**
+ * A Test: the board's titles first, then the first postings with their text,
+ * and what each site answered, in words.
+ */
 function TestResults({
   preview,
   error,
-  pending,
+  phase,
+  fetched,
+  fetching,
   labels,
+  onCareers,
 }: {
-  preview: Preview | null;
+  preview: TestResult | null;
   error: string;
-  pending: boolean;
+  phase: TestPhase;
+  fetched?: number;
+  fetching?: number;
   labels: Record<string, string>;
+  /** Offered after an empty or refused search: follow a careers page. */
+  onCareers?: () => void;
 }) {
   const items = (preview?.items ?? []).slice(0, 10);
+  const deferred = (preview?.diagnostics ?? []).some(
+    (item) => item.state === "deferred" || item.state === "error",
+  );
   const notes = (preview?.diagnostics ?? [])
     .map((item) => {
       const provider = String(item.provider ?? "");
-      const message = String(item.message ?? "").trim();
-      return message
-        ? `${labels[provider] ?? capitalize(provider)}: ${message}`
-        : "";
+      const message = localReason(
+        String(item.message ?? "").trim(),
+        item.next_run_at,
+      );
+      if (!message) return "";
+      // The reasons in words already name their site.
+      const name = labels[provider] ?? capitalize(provider);
+      return message.startsWith(name) ? message : `${name}: ${message}`;
     })
     .filter(Boolean);
   const total = preview?.total ?? 0;
+  const pending = phase === "listing" || phase === "details";
   // A result shows itself: on a phone it sits below the form.
   const ref = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -630,27 +653,30 @@ function TestResults({
       aria-busy={pending}
     >
       <h3 id="src-test-title" className="src-test-title">
-        {pending
-          ? "Testing…"
-          : error
-            ? "Test failed"
-            : total
-              ? `${total} ${total === 1 ? "job" : "jobs"} found${total > items.length ? ` · the first ${items.length}` : ""}`
-              : "No jobs found"}
+        {testHeading({
+          phase: phase === "idle" ? "done" : phase,
+          total,
+          shown: items.length,
+          listed: preview?.listed,
+          failed: !!error && !preview,
+          fetched,
+          fetching,
+        })}
       </h3>
       {error && (
         <Callout icon={CircleAlert} tone="danger" title={error}>
           Nothing was saved. Check the address or the words, then test again.
         </Callout>
       )}
-      {preview?.kind && preview.kind !== "jobspy" && preview.kind !== "rss" && (
-        <p className="src-test-note">
-          Job board: {labels[preview.kind] ?? capitalize(preview.kind)}
-          {typeof preview.url === "string" && preview.url
-            ? ` · ${shortUrl(preview.url)}`
-            : ""}
-        </p>
-      )}
+      {preview?.kind &&
+        !["jobspy", "rss", "hnhiring"].includes(preview.kind) && (
+          <p className="src-test-note">
+            Job board: {labels[preview.kind] ?? capitalize(preview.kind)}
+            {typeof preview.url === "string" && preview.url
+              ? ` · ${shortUrl(preview.url)}`
+              : ""}
+          </p>
+        )}
       {preview?.automatic_collection === false && (
         <p className="src-test-note src-danger">
           This site gives titles without the posting text, so it cannot be
@@ -678,7 +704,15 @@ function TestResults({
           ))}
         </ul>
       )}
-      {preview && (
+      {onCareers && !pending && (error || deferred || !total) && (
+        <p className="src-test-note">
+          {CAREERS_ADVICE}{" "}
+          <Button variant="ghost" size="sm" onClick={onCareers}>
+            Follow a careers page
+          </Button>
+        </p>
+      )}
+      {preview && !pending && (
         <p className="src-test-note">
           Test shows what this source finds; nothing is saved.
         </p>

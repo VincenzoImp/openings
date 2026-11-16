@@ -1,4 +1,7 @@
-"""Proxy-aware sign-in limits and single-use operational grants."""
+"""Proxy-aware sign-in limits, single-use operational grants and security headers."""
+
+import base64
+import hashlib
 
 import pytest
 from fastapi.testclient import TestClient
@@ -7,6 +10,7 @@ from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from conftest import BASE_URL, PASSWORD
 from doubles import Clock
 from openings import __main__ as entrypoint
+from openings.app import API_POLICY, create_app
 from openings.auth import COOKIE, LoginGuard
 from openings.errors import DomainError
 
@@ -150,3 +154,47 @@ def test_operational_grants_are_single_use_and_separate_from_sessions(app):
     clock.advance(200)
     auth.authorize_operation(auth.operation_ticket("backup"), "backup")
     assert len(auth.used_operations.expiries) == 1
+
+
+# --- SEC-1: the security headers of the dashboard and the API ------------------------------
+
+
+def test_the_dashboard_and_the_api_answer_with_their_security_policies(
+    tmp_path, monkeypatch, owned_database, client, app
+):
+    """The dashboard runs only its own code; API answers and refusals run nothing."""
+    frontend = tmp_path / "dist"
+    (frontend / "assets").mkdir(parents=True)
+    style = "@layer reset,tokens,ui,screens;"
+    (frontend / "index.html").write_text(
+        f'<!doctype html><style>{style}</style><script type="module" src="/assets/a.js"></script>'
+    )
+    monkeypatch.setenv("OPENINGS_FRONTEND", str(frontend))
+    path = tmp_path / "served.sqlite"
+    path.write_bytes(owned_database.read_bytes())
+    served = TestClient(create_app(path, start_worker=False), base_url=BASE_URL)
+    digest = base64.b64encode(hashlib.sha256(style.encode()).digest()).decode()
+    page = served.get("/jobs")
+    policy = page.headers["content-security-policy"]
+    assert "script-src 'self';" in policy and f"style-src 'self' 'sha256-{digest}';" in policy
+    assert "'unsafe-inline'" not in policy and "frame-ancestors 'self'" in policy
+    for response in (
+        page,
+        served.get("/api/v1/jobs"),  # refused before any route: no session
+        served.post("/api/v1/auth/login", content=b"x"),  # refused: not JSON
+    ):
+        assert response.headers["x-content-type-options"] == "nosniff"
+        assert response.headers["x-frame-options"] == "SAMEORIGIN"
+        assert response.headers["cross-origin-opener-policy"] == "same-origin"
+    for response in (served.get("/api/v1/jobs"), client.get("/api/v1/jobs")):
+        assert response.headers["content-security-policy"] == API_POLICY
+    # A file keeps its own sandboxed policy, which the dashboard's preview may frame.
+    job = app.state.workspace.ingest_job({"title": "Synthetic role", "posting": "Build."})
+    grant = client.post(
+        "/api/v1/files/uploads",
+        json={"owner_type": "job", "owner_id": job["id"], "name": "page.html", "size": 6},
+    ).json()
+    record = client.put(grant["url"], headers=grant["headers"], content=b"<html>").json()
+    content = client.get(record["url"])
+    assert content.headers["content-security-policy"].startswith("sandbox;")
+    assert content.headers["content-disposition"].startswith("attachment;")

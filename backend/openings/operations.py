@@ -12,9 +12,9 @@ from pathlib import Path
 from . import events
 from .common import encode, now
 from .compaction import compact
-from .db import SCHEMA_VERSION, file_bytes, schema_error, utc_stamp
+from .db import SCHEMA_VERSION, file_bytes, schema_error
 from .errors import DomainError
-from .migrations import CONVERSIONS, UpgradeError, m15
+from .migrations import CONVERSIONS, UpgradeError
 from .retention import KEPT_RUNS_PER_SOURCE, retention_days
 
 # Slack for sidecar files and for an upgraded copy slightly larger than its upload.
@@ -137,29 +137,37 @@ def remove_installation_credentials(path):
         conn.execute("VACUUM")
 
 
+def own_schema(target, schema):
+    """Replace the restored file's triggers and views with this installation's own.
+
+    A backup is a whole database: a trigger or view it brought would run inside the
+    workspace on later writes, so only the schema objects of this installation stay.
+    """
+    rows = target.execute(
+        "SELECT type,name FROM sqlite_master WHERE type IN ('trigger','view') ORDER BY type='view'"
+    ).fetchall()
+    for kind, name in rows:
+        quoted = '"' + name.replace('"', '""') + '"'
+        target.execute(f"DROP {kind.upper()} IF EXISTS {quoted}")
+    for sql in schema:
+        target.execute(sql)
+
+
 def restore_database(workspace, source_path):
     with closing(sqlite3.connect(source_path)) as source:
         version = source.execute("PRAGMA user_version").fetchone()[0]
     if version in CONVERSIONS:
-        # Convert a copy of a backup of the previous schema; the uploaded file is only
-        # read. The removed records go to an archive beside the database, as in an
-        # upgrade at startup.
+        # Convert a copy of a backup of the previous schema, as an upgrade at startup
+        # does; the uploaded file is only read.
         upgraded = workspace.db.temp_file("upgrade")
-        path = workspace.db.path
-        archive = path.with_name(
-            f"{path.stem}.pre-{m15.RELEASE}-archive-restored-{utc_stamp()}.json"
-        )
         try:
             try:
-                CONVERSIONS[version](source_path, upgraded, archive)
+                CONVERSIONS[version](source_path, upgraded)
             except UpgradeError as error:
                 raise DomainError(
                     422, "backup_integrity", "The backup could not be upgraded to this schema."
                 ) from error
             result = _restore_current(workspace, upgraded)
-        except BaseException:
-            archive.unlink(missing_ok=True)
-            raise
         finally:
             workspace.db.remove_temp(upgraded)
         compact(workspace.db)
@@ -211,10 +219,18 @@ def _restore_current(workspace, source_path):
                 auth = workspace.db.one("SELECT * FROM settings WHERE key='auth'")
                 tokens = workspace.db.all("SELECT * FROM api_tokens")
                 providers = workspace.db.all("SELECT id,runtime FROM providers")
+                schema = [
+                    row["sql"]
+                    for row in workspace.db.all(
+                        "SELECT sql FROM sqlite_master WHERE type IN ('view','trigger') "
+                        "AND sql IS NOT NULL ORDER BY type='trigger'"
+                    )
+                ]
                 workspace.db.backup(rollback_name)
                 try:
                     with workspace.db.connect() as target:
                         source.backup(target)
+                        own_schema(target, schema)
                         target.execute("DELETE FROM transfer_grants")
                         target.execute("DELETE FROM api_tokens")
                         if auth:

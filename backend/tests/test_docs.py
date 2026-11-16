@@ -1,6 +1,6 @@
 """The documentation stays short, linked and in one vocabulary.
 
-User docs are at most 10,000 words, the README at most 1,000, CONTRIBUTING at most 80
+User docs are at most 12,500 words, the README at most 1,500, CONTRIBUTING at most 80
 lines and the architecture guide at most 150. Every relative link and image resolves,
 the changelog's too, and every image in docs/images is embedded. The MCP endpoint is
 spelled `/mcp/`, and no earlier vocabulary appears outside the changelog: not in the
@@ -22,6 +22,8 @@ PAGES = [
     ROOT / "CONTRIBUTING.md",
     ROOT / "SECURITY.md",
     ROOT / "docs" / "README.md",
+    ROOT / "docs" / "comparison.md",
+    ROOT / "docs" / "brand" / "README.md",
     *sorted((ROOT / "docs" / "developer").glob("*.md")),
     ROOT / "examples" / "README.md",
     ROOT / "examples" / "operator-workspace" / "README.md",
@@ -45,10 +47,41 @@ def words(path):
 
 
 def test_the_docs_fit_their_limits():
-    assert sum(words(path) for path in USER_DOCS) <= 10_000
-    assert words(ROOT / "README.md") <= 1_000
+    # 12,500 since 0.28: the launch adds the server and NAS path, troubleshooting, the
+    # agent quick start, the security model and the scheduling recipe (about 2,500
+    # words) to pages that held 9,600.
+    assert sum(words(path) for path in USER_DOCS) <= 12_500
+    # 1,500 since 0.28 (#391): the README carries the quick start's eight command
+    # blocks, a comparison table, the FAQ visitors ask and the screenshot gallery.
+    assert words(ROOT / "README.md") <= 1_500
     assert len((ROOT / "CONTRIBUTING.md").read_text().splitlines()) <= 80
     assert len((ROOT / "docs/developer/architecture.md").read_text().splitlines()) <= 150
+
+
+QUICK_START = re.compile(r"<!-- quick-start\b.*?-->(.*?)<!-- /quick-start -->", re.DOTALL)
+FENCE = re.compile(r"^```\w*\n(.*?)^```$", re.MULTILINE | re.DOTALL)
+
+
+def quick_start(page):
+    """The commands of a page's quick start: its fenced blocks between the markers."""
+    found = QUICK_START.search(page.read_text())
+    return found and FENCE.findall(found.group(1))
+
+
+def test_every_quick_start_carries_the_same_commands():
+    reference = quick_start(ROOT / "docs/user/getting-started.md")
+    assert reference and any(block.endswith(" demo\n") for block in reference)
+    assert not any("clone" in block for block in reference)
+    # The Docker Hub page carries the demo, run and Compose lines byte for byte
+    # (smoke_image.sh runs its copy).
+    hub = (ROOT / "docs/dockerhub.md").read_text().splitlines()
+    for line in ("--rm -p", "docker run -d", "curl -fsSLO"):
+        command = next(c for block in reference for c in block.splitlines() if line in c)
+        assert command in hub, command
+    # The README and the Docker Hub page carry the same blocks once they mark theirs.
+    for page in (ROOT / "README.md", ROOT / "docs/dockerhub.md"):
+        if page.exists() and quick_start(page):
+            assert quick_start(page) == reference, page.relative_to(ROOT)
 
 
 def links(page):

@@ -7,7 +7,11 @@ from urllib.parse import parse_qs, urljoin, urlsplit
 
 from pydantic import ValidationError
 
-from ..collectors import company as company_collectors, jobspy as jobspy_collector
+from ..collectors import (
+    company as company_collectors,
+    hnhiring as hnhiring_collector,
+    jobspy as jobspy_collector,
+)
 from ..collectors.catalog import COMPANY_ADAPTERS
 from ..errors import DomainError
 from .feeds import TextParser
@@ -179,6 +183,19 @@ def resolve_source(value: dict) -> dict:
                 error.errors(include_url=False, include_context=False),
             ) from error
         public_url(url)
+    elif kind == "hnhiring":
+        url = ""
+        try:
+            config = hnhiring_collector.HNHiringConfig.model_validate(
+                {key: val for key, val in config.items() if key not in ("url", "filters")}
+            ).model_dump()
+        except ValidationError as error:
+            raise DomainError(
+                422,
+                "source_config",
+                "The HN Who is hiring configuration is invalid.",
+                error.errors(include_url=False, include_context=False),
+            ) from error
     else:
         if not config.get("board") and url:
             resolved = detect_source(url)
@@ -187,7 +204,7 @@ def resolve_source(value: dict) -> dict:
                     422, "source_mismatch", "The URL does not match the selected ATS type."
                 )
             config.update(resolved["config"])
-    if kind not in ("jobspy", "rss"):
+    if kind not in ("jobspy", "rss", "hnhiring"):
         validate_board(config.get("board", ""), kind)
         if config.get("region", "global") not in ("global", "eu"):
             raise DomainError(422, "invalid_region", "Lever region must be global or eu.")

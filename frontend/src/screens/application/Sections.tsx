@@ -6,10 +6,10 @@ import type { Schema } from "../../api/client";
 import { ConflictNotice } from "../../query/ConflictNotice";
 import { Button, IconButton } from "../../ui/Button";
 import { Checkbox, Input, Textarea, Field } from "../../ui/Field";
-import { formatDate, formatFull } from "../../ui/format";
+import { formatDay, formatFull } from "../../ui/format";
 import { copyText } from "../../ui/CodeBlock";
 import { Icon } from "../../ui/Icon";
-import { Skeleton } from "../../ui/Page";
+import { SectionHeader, Skeleton } from "../../ui/Page";
 import { ReadEdit } from "../../ui/ReadEdit";
 import { Switch } from "../../ui/Field";
 import { useToast } from "../../ui/Toast";
@@ -38,12 +38,12 @@ export function Section({
 }) {
   return (
     <section className="ap-section" aria-labelledby={`ap-${id}`}>
-      <header className="ap-section-head">
-        <h2 className="ap-section-title" id={`ap-${id}`}>
-          {title}
-        </h2>
-        {aside}
-      </header>
+      <SectionHeader
+        id={`ap-${id}`}
+        className="ap-section-head"
+        title={title}
+        action={aside}
+      />
       {children}
     </section>
   );
@@ -414,7 +414,7 @@ export function HistoryList({ app }: { app: Application }) {
                     dateTime={item.created_at}
                     title={formatFull(item.created_at)}
                   >
-                    {formatDate(item.created_at)}
+                    {formatDay(item.created_at)}
                   </time>
                   {actorPhrase(item.actor) && ` · ${actorPhrase(item.actor)}`}
                 </p>

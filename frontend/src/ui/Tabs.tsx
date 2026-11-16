@@ -1,4 +1,4 @@
-import { useRef, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useRef, type KeyboardEvent, type ReactNode } from "react";
 import { X } from "lucide-react";
 import { cx } from "./cx";
 import { formatNumber } from "./format";
@@ -61,6 +61,19 @@ export function Tabs({
     value,
     onChange,
   );
+  // Where the tabs scroll (a phone's chips), the selected one is in view.
+  const list = keys.ref;
+  useEffect(() => {
+    const tab = list.current?.querySelector<HTMLElement>(
+      '[role="tab"][aria-selected="true"]',
+    );
+    const box = list.current;
+    if (!tab || !box || box.scrollWidth <= box.clientWidth) return;
+    box.scrollLeft = Math.max(
+      0,
+      tab.offsetLeft - (box.clientWidth - tab.offsetWidth) / 2,
+    );
+  }, [value, list]);
   return (
     <div
       ref={keys.ref}
@@ -178,6 +191,61 @@ export function Toolbar({
   );
 }
 
+/**
+ * A value as a 26 px pill, the one chip of the system: removable with
+ * `onRemove` (a filter, a language, a skill), or a toggle with `onPress` and
+ * `pressed`. On a phone its button reaches 44 px.
+ */
+export function Chip({
+  children,
+  field,
+  onRemove,
+  removeLabel,
+  onPress,
+  pressed = false,
+  disabled,
+}: {
+  children: ReactNode;
+  /** The filter's name before its value, in the secondary colour. */
+  field?: string;
+  onRemove?: () => void;
+  removeLabel?: string;
+  onPress?: () => void;
+  pressed?: boolean;
+  disabled?: boolean;
+}) {
+  if (onPress)
+    return (
+      <button
+        type="button"
+        className="ui-chip"
+        data-toggle=""
+        aria-pressed={pressed}
+        disabled={disabled}
+        onClick={onPress}
+      >
+        {children}
+      </button>
+    );
+  return (
+    <span className="ui-chip" data-removable={onRemove ? "" : undefined}>
+      {field && <span className="ui-chip-field">{field}</span>}
+      <span>{children}</span>
+      {onRemove && (
+        <button
+          type="button"
+          className="ui-chip-remove"
+          aria-label={removeLabel}
+          disabled={disabled}
+          onClick={onRemove}
+        >
+          <Icon icon={X} size="sm" />
+        </button>
+      )}
+    </span>
+  );
+}
+
 export interface FilterChip {
   key: string;
   field: string;
@@ -204,18 +272,14 @@ export function FilterChips({
   return (
     <div className="ui-chips" role="group" aria-label="Active filters">
       {chips.map((chip) => (
-        <span className="ui-chip" key={chip.key}>
-          <span className="ui-chip-field">{chip.field}</span>
-          <span>{chip.value}</span>
-          <button
-            type="button"
-            className="ui-chip-remove"
-            aria-label={`Remove filter ${chip.field} ${chip.value}`}
-            onClick={() => onRemove(chip.key)}
-          >
-            <Icon icon={X} size="sm" />
-          </button>
-        </span>
+        <Chip
+          key={chip.key}
+          field={chip.field}
+          removeLabel={`Remove filter ${chip.field} ${chip.value}`}
+          onRemove={() => onRemove(chip.key)}
+        >
+          {chip.value}
+        </Chip>
       ))}
       {children}
       <button type="button" className="ui-chips-clear" onClick={onClear}>

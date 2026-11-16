@@ -58,6 +58,19 @@
   .jobs-signal[data-tone="warning"] {
     color: var(--warning);
   }
+  /* Jobs that arrived while New is triaged wait here until Show. */
+  .jobs-arrivals {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-3);
+    padding: var(--s-2) var(--s-3) var(--s-2) var(--pane-pad);
+    border-bottom: 1px solid var(--border);
+    background: var(--accent-soft);
+    color: var(--accent-text);
+    font: var(--t-sm);
+    font-weight: var(--w-medium);
+  }
   .jobs-more {
     display: flex;
     justify-content: center;
@@ -427,28 +440,14 @@
     .jobs-hint {
       display: none;
     }
-    /* Beside the sidebar the tools keep to their icons. */
-    .jobs .ui-toolbar-tools .ui-search {
-      width: 140px;
-    }
-    .jobs .ui-toolbar-tools .ui-btn-label {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      overflow: hidden;
-      clip-path: inset(50%);
-      white-space: nowrap;
-    }
   }
   @container app (max-width: 719px) {
     /* The phone's top bar carries the title. */
     .jobs > .ui-page-header {
       display: none;
     }
-    /* The pushed job takes the whole screen: its own bar on top, its
-       decision at the bottom; the shell's bars step aside. */
-    .ui-app:has(.jobs[data-pushed]) .ui-topbar,
-    .ui-app:has(.jobs[data-pushed]) .ui-app-bottom,
+    /* The pushed job takes the whole screen (ui/split.css): the toolbar,
+       the search and the chips step aside too. */
     .jobs[data-pushed] > :not(.jobs-panel, dialog) {
       display: none;
     }
@@ -463,17 +462,6 @@
     }
     .jobs .ui-bulkbar .ui-kbd {
       display: none;
-    }
-    .jobs[data-pushed] .ui-detail-bar {
-      height: var(--bar-top);
-      padding-right: var(--s-1);
-    }
-    .jobs[data-pushed] .ui-detail-bar .ui-btn {
-      min-width: var(--touch);
-      height: var(--touch);
-    }
-    .jobs[data-pushed] .ui-detail-pos {
-      margin-left: 0;
     }
     .jobs-posting-link .ui-btn-label {
       position: absolute;
@@ -494,8 +482,8 @@
       margin-left: 0;
     }
     .jobs-title {
-      font-size: 20px;
-      line-height: 26px;
+      font: var(--t-phone-title);
+      font-weight: var(--w-semibold);
     }
   }
   @media (prefers-reduced-motion: no-preference) {

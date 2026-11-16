@@ -88,6 +88,7 @@ class ApplicationChanges:
                     [r.model_dump() for r in value.requirements]
                 ),
                 required_documents=value.required_documents,
+                salary=value.salary,
             )
             remember(c, "applications", value.idempotency_key, digest, record_id)
             if job["triage"] != "shortlisted":
@@ -105,12 +106,14 @@ class ApplicationChanges:
         requirements=(),
         required_documents=("cv", "letter"),
         from_shortlist=False,
+        salary=None,
     ):
         """Insert a Shortlisted application with its creation event; returns its id."""
         record_id, stamp = new_id(), now()
         conn.execute(
             "INSERT INTO applications(id,job_id,questions,priority,deadline,requirements,"
-            "required_documents,from_shortlist,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
+            "required_documents,from_shortlist,salary,created_at,updated_at) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
             (
                 record_id,
                 job_id,
@@ -120,6 +123,7 @@ class ApplicationChanges:
                 encode(list(requirements)),
                 encode(canonical_documents(required_documents)),
                 int(from_shortlist),
+                salary,
                 stamp,
                 stamp,
             ),

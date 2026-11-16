@@ -1,7 +1,6 @@
 """Job records: full and compact reads, filters, search and triage counts."""
 
 import json
-import re
 
 from ..common import decode_record
 from ..errors import DomainError, missing
@@ -18,11 +17,14 @@ from ..job_signals import (
 from ..posting import posting_complete, posting_complete_sql
 from ..preferences import spoken_languages
 from .readiness import READY_SQL
+from .search import JOB_STATES, search_sql
 
 # Where a job came from: its provider, its hiring platform or manual.
 JOB_SOURCE_SQL = (
     "coalesce(json_extract(j.metadata,'$.source'),json_extract(j.metadata,'$.ats'),'manual')"
 )
+# The jobs a saved source observed: one of their postings came from it (postings_source).
+SAVED_SOURCE_SQL = "j.id IN (SELECT job_id FROM postings WHERE source_id=?)"
 # The fields a facet lists the values of, by facet.
 FACETS = {
     "companies": ("company", "j.company"),
@@ -164,6 +166,7 @@ class JobReads:
         unspoken=None,
         batch_id=None,
         since=None,
+        source_id=None,
     ):
         conditions, args = [], []
         if signal:
@@ -224,6 +227,9 @@ class JobReads:
         if source:
             conditions.append(JOB_SOURCE_SQL + "=?")
             args.append(source)
+        if source_id:
+            conditions.append(SAVED_SOURCE_SQL)
+            args.append(source_id)
         if remote is not None:
             conditions.append("json_extract(j.metadata,'$.is_remote')=?")
             args.append(int(remote))
@@ -237,10 +243,10 @@ class JobReads:
             if value:
                 conditions.append("j.created_at" + operator + "?")
                 args.append(value)
-        terms = re.findall(r"\w+", q)
-        if terms:
-            conditions.append("j.rowid IN (SELECT rowid FROM jobs_fts WHERE jobs_fts MATCH ?)")
-            args.append(" AND ".join('"' + term + '"*' for term in terms[:15]))
+        found = search_sql(q, JOB_STATES)
+        if found:
+            conditions.append(found[0])
+            args.extend(found[1])
         return (" WHERE " + " AND ".join(conditions)) if conditions else "", args
 
     def list_jobs(
@@ -250,7 +256,7 @@ class JobReads:
         company=None,
         limit=50,
         offset=0,
-        sort="newest",
+        sort="relevance",
         location=None,
         source=None,
         remote=None,
@@ -269,6 +275,7 @@ class JobReads:
         batch_id=None,
         dismissed_since=None,
         url=None,
+        source_id=None,
     ):
         if url:
             # The archived jobs posted at a URL (its identities), as resolve_jobs finds them.
@@ -299,6 +306,7 @@ class JobReads:
                 "dismissed_by": dismissed_by,
                 "batch_id": batch_id,
                 "since": dismissed_since,
+                "source_id": source_id,
             }
             where, args = self._job_filters(**filters, **signal_filters)
             base = " FROM jobs j"
@@ -308,15 +316,19 @@ class JobReads:
                 "title": "j.title",
                 "dismissed": "j.dismissed_at IS NULL,j.dismissed_at DESC,j.created_at DESC",
             }.get(sort, "j.created_at DESC")
+            # relevance: with words to search, the best matches first, then the newest.
+            found = search_sql(q, JOB_STATES) if sort == "relevance" else None
+            rank, rank_args = (found[2] + ",", found[3]) if found else ("", [])
             rows = connection.execute(
                 "SELECT "
                 + self._job_columns()
                 + base
                 + where
                 + " ORDER BY "
+                + rank
                 + order
                 + ",j.id LIMIT ? OFFSET ?",
-                (*args, limit, offset),
+                (*args, *rank_args, limit, offset),
             ).fetchall()
             total = connection.execute("SELECT count(*)" + base + where, args).fetchone()[0]
             result = {
@@ -343,6 +355,7 @@ class JobReads:
                     dismissed_by=dismissed_by,
                     batch_id=batch_id,
                     since=dismissed_since,
+                    source_id=source_id,
                     **{**signal_filters, "unspoken": None},
                 )
             if include_counts:

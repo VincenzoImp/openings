@@ -68,6 +68,23 @@
     --t-md: 14px/20px var(--font);
     --t-sm: 13px/18px var(--font);
     --t-xs: 12px/16px var(--font);
+    /* Off the scale, each for one role; no size is written outside this file. */
+    --t-prose: 14.5px/23px var(--font); /* reading text */
+    --t-row: 13.5px/18px var(--font); /* a list row's title */
+    --t-control-sm: 12.5px/1 var(--font); /* small button, segment, chip */
+    --t-micro: 11px/1 var(--font); /* badge, kbd */
+    --t-bar: 17px/22px var(--font); /* the phone's top bar */
+    --t-title-sm: 15px/22px var(--font); /* a dialog's or sheet's title */
+    --t-tab: 10.5px/1 var(--font); /* the phone's tab bar */
+    --t-phone-title: 20px/26px var(--font); /* a job or template on a phone */
+    --t-phone-name: 24px/30px var(--font); /* the name on a phone's CV */
+    --t-code: 12.5px/19px var(--mono);
+    --fs-micro: 10px; /* a count on the phone's tab bar */
+    --fs-control-sm: 12.5px;
+    --fs-sm: 13px;
+    --fs-row: 13.5px;
+    --fs-md: 14px; /* touch controls */
+    --fs-title-sm: 15px;
     --tr-3xl: -0.022em;
     --tr-2xl: -0.018em;
     --tr-xl: -0.012em;
@@ -90,10 +107,14 @@
     --s-12: 48px;
     --s-16: 64px;
     --pane-pad: 24px;
-    /* Every screen's content starts at the pane padding, left-aligned under
-       its title; a reading column (Today, Preferences, the CV, an
-       application) is at most this wide. Lists and panes take the width. */
+    /* A pane holds a list or a document. A list spans its pane. A document
+       (Today, Preferences, the CV, Settings, a job or template read in its
+       pane) is one column at most this wide plus the pane padding, carries
+       its own title and is centred in the pane. A body under a title bar
+       that spans the pane (an application, Stats) stays at the pane padding
+       and uses the rest of the width with panes, not margins. */
     --content: 760px;
+    --document: calc(var(--content) + 2 * var(--pane-pad));
 
     /* Sizes */
     --control-h: 32px;
@@ -110,6 +131,7 @@
     --touch: 44px;
 
     /* Radius */
+    --r-xs: 2px;
     --r-sm: 4px;
     --r-md: 6px;
     --r-lg: 8px;

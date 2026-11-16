@@ -2,7 +2,9 @@
 
 Requests share one configurable spacing and durable server cooldowns.
 Attempts count even when transport fails. Internal batches yield the worker;
-they do not impose an hourly or daily acquisition quota.
+they do not impose an hourly or daily acquisition quota. A demo workspace
+closes the gate (``ProviderStore.closed``): every request is refused with
+``providers_closed`` before its address is checked or resolved.
 """
 
 from __future__ import annotations
@@ -16,7 +18,7 @@ from urllib.parse import urljoin, urlsplit
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..common import check_version, encode, now
-from ..errors import DomainError, missing
+from ..errors import DomainError, missing, providers_closed
 from .catalog import COMPANY_KINDS
 from .pinning import pin_session
 
@@ -41,6 +43,11 @@ PROVIDERS = {
         "JobSpy 1.4.1 search, location lookup and batched posting details.",
     ),
     "rss": ("RSS / Atom", "feed", "Explicit feed URL; locations absent from feeds remain unknown."),
+    "hnhiring": (
+        "HN Who is hiring",
+        "feed",
+        "Latest monthly Hacker News thread through the HN Algolia API; one job per top comment.",
+    ),
     "manual": (
         "Manual URL / board detection",
         "manual",
@@ -121,12 +128,38 @@ def retry_after(value: str | None, moment: float) -> float | None:
     return moment + min(seconds, MAX_RETRY_AFTER)
 
 
+def deferred_message(provider, reason, next_run_at=None):
+    """Why a provider's request waits, in words a person reads (Test, Sources, agents).
+
+    A time is given as HH:MM UTC; the dashboard shows it in the viewer's time zone.
+    """
+    name, kind, _ = PROVIDERS[provider]
+    until = (
+        f"until {datetime.fromisoformat(next_run_at).astimezone(UTC):%H:%M} UTC "
+        if next_run_at
+        else ""
+    )
+    if reason == "provider_cooldown":
+        if kind == "search":
+            return (
+                f"{name} refused this request from your network; Openings waits {until}"
+                "and tries again. Careers pages are not affected."
+            )
+        return f"{name} asked Openings to slow down; it waits {until}and tries again."
+    if reason == "provider_interval":
+        return f"{name} was asked a moment ago; Openings waits {until}to space its requests."
+    if reason == "collection_batch":
+        return f"{name}: this check continues in its next batch of requests."
+    # provider_paused keeps its words: queued work is found again by them (runs.py).
+    return f"{name}: {reason.replace('_', ' ')}."
+
+
 class ProviderDeferred(DomainError):
     def __init__(self, provider, reason, next_run_at=None):
         super().__init__(
             429,
             reason,
-            f"{PROVIDERS[provider][0]}: {reason.replace('_', ' ')}.",
+            deferred_message(provider, reason, next_run_at),
             {"provider": provider, "next_run_at": next_run_at},
         )
         self.provider = provider
@@ -136,6 +169,8 @@ class ProviderDeferred(DomainError):
 class ProviderStore:
     def __init__(self, db):
         self.db = db
+        # Set only by demo mode: no request leaves, whatever the policy says.
+        self.closed = False
         with db.transaction() as connection:
             for provider in PROVIDERS:
                 policy = ProviderPolicy().model_dump()
@@ -143,6 +178,11 @@ class ProviderStore:
                     "INSERT OR IGNORE INTO providers(id,policy,runtime,updated_at) VALUES(?,?,?,?)",
                     (provider, encode(policy), "{}", now()),
                 )
+
+    def require_open(self):
+        """Refuse every provider request of a closed gate, before any name lookup."""
+        if self.closed:
+            raise providers_closed()
 
     def _row(self, provider):
         if provider not in PROVIDERS:
@@ -246,6 +286,7 @@ class ProviderBudget:
             raise self.blocked
 
     def before(self, method, url):
+        self.store.require_open()
         self._check_active()
         target_provider = provider_for_url(url)
         if target_provider not in ("manual", self.provider):
@@ -345,6 +386,7 @@ class ProviderBudget:
         self.responses.append({"status": status, "retry_after": headers.get("retry-after")})
 
     def request(self, send, method, url, **kwargs):
+        self.store.require_open()
         kwargs["allow_redirects"] = False
         owner = getattr(send, "__self__", None)
         is_curl = any(cls.__module__.startswith("curl_cffi") for cls in type(owner).__mro__)

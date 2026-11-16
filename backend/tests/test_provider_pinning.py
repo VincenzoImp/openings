@@ -30,6 +30,29 @@ def runtime(gate):
     return gate.providers.get("manual")["runtime"]
 
 
+@pytest.mark.parametrize(
+    ("address", "public"),
+    [
+        ("93.184.216.34", True),
+        ("2606:2800:220:1::1", True),
+        ("::ffff:93.184.216.34", True),
+        ("64:ff9b::5db8:d822", True),
+        ("127.0.0.1", False),
+        ("169.254.169.254", False),
+        ("::ffff:127.0.0.1", False),
+        # NAT64 and IPv4-compatible forms of loopback, private and link-local addresses.
+        ("64:ff9b::7f00:1", False),
+        ("64:ff9b::a00:1", False),
+        ("64:ff9b::a9fe:a9fe", False),
+        ("::127.0.0.1", False),
+        ("::10.0.0.1", False),
+        ("2002:7f00:1::", False),
+    ],
+)
+def test_an_ipv6_address_is_public_only_with_a_public_embedded_ipv4(address, public):
+    assert network.is_public_address(address) is public
+
+
 def test_a_public_fetch_connects_only_to_the_checked_address(gate, monkeypatch, local_server):
     """``fetch_bytes`` (httpx): each hop is checked, then dialed at the checked address."""
     port = local_server.server_address[1]

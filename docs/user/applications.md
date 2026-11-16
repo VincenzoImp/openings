@@ -10,7 +10,8 @@ Shortlisting a job starts its application in **Shortlisted**. From there:
 **Applied**, **Interview**, **Offer** and **Closed**. **Applications** has one chip
 per stage, with its count, and **Ready**, the Shortlisted applications that are
 ready to send. Search finds words that start with what you type in the role,
-the company, the posting or the pinned note, as the Jobs search does; **Filter** by
+the company, the location, the posting or the pinned note, as the Jobs search does,
+and a stage name ("interview") finds that stage; **Filter** by
 priority, deadline, job site or outcome. The default order, **Most urgent first**, puts Ready ones first (by
 deadline), then Shortlisted ones with a deadline, then sent ones waiting longer
 than the no-reply period, then the rest; you can also sort by deadline, last
@@ -60,8 +61,8 @@ head shows the role, company, stage, deadline and priority, **Open posting** and
   the Ready page.
 - **Ready:** the posting, CV and letter side by side, each document with a
   PDF/Text switch; on a phone, tabs **Check**, **Posting**, **CV**, **Letter**.
-  **Before you send** lists open requirements (tick them there), the form's
-  answers with copy buttons, **Apply on employer's site** and **Download CV +
+  **Before you send** lists the salary expectation your agent recorded, open
+  requirements (tick them there), the form's answers with copy buttons, **Apply on employer's site** and **Download CV +
   Letter**. The page shows its place in Today's order ("2 of 5 ready · Next: …");
   `[` and `]` move between them.
 - **Applied, Interview, Offer:** where it stands first ("Applied 12 Oct · no

@@ -45,7 +45,9 @@
       {
         "text": "Ask before dismissing more than 50 jobs at once; show me a sample first."
       },
-      { "text": "Never submit an application or contact an employer for me." }
+      { "text": "Never submit an application or contact an employer for me." },
+      { "text": "Close applications with no reply after 45 days as no reply." },
+      { "text": "Prepare up to 10 applications per run, highest priority first." }
     ]
   },
   "settings": { "no_reply_days": 45, "spoken_languages": ["en", "it"] }

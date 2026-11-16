@@ -262,7 +262,7 @@
     width: min(100%, 72ch);
     padding: 52px var(--s-5) var(--s-6);
     color: var(--text);
-    font: 13.5px/1.65 var(--font);
+    font: var(--fs-row) / 1.65 var(--font);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }
@@ -289,7 +289,7 @@
     padding: var(--s-2) 0;
     border: 1px solid var(--border);
     border-radius: var(--r-md);
-    font: 12.5px/1.6 var(--mono);
+    font: var(--fs-control-sm) / 1.6 var(--mono);
     list-style: none;
   }
   .ap-diff li {
@@ -460,7 +460,7 @@
     gap: var(--s-3) var(--s-6);
     align-items: start;
   }
-  .apg-check > .ap-section-title {
+  .apg-check > .ui-section-title {
     align-self: center;
   }
   .apg-check-links {
@@ -471,6 +471,17 @@
   }
   .apg-check-part {
     grid-column: 1 / -1;
+  }
+  .apg-salary {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--s-2);
+    margin: 0;
+    font: var(--t-sm);
+    white-space: pre-wrap;
+  }
+  .apg-salary .ui-icon-btn {
+    margin-top: -5px;
   }
   /* On a phone the check is a tab of its own: say when it has nothing. */
   .apg-check-none {
@@ -523,7 +534,8 @@
 
   /* Sent stages */
   .apg-follow {
-    max-width: calc(var(--content) + 2 * var(--pane-pad));
+    min-width: 0;
+    max-width: var(--document);
     padding: var(--s-5) var(--pane-pad) 0;
   }
   .apg-statusline {
@@ -637,7 +649,7 @@
       border-left: 1px solid var(--border);
       overflow: auto;
     }
-    .apg-side .ap-section-title {
+    .apg-side .ui-section-title {
       margin-bottom: var(--s-3);
     }
     .apg-posting-fold {
@@ -646,6 +658,11 @@
   }
   /* Phone: the bottom bar carries the primary; Ready shows one part at a time. */
   @container app (max-width: 719px) {
+    /* An application is a pushed page, as a job is: the bottom bar steps
+       aside for its action bar. */
+    .ui-app:has(.apg) .ui-app-bottom {
+      display: none;
+    }
     /* The action bar closes the page: no room below it. */
     .apg:has(.ui-actionbar) {
       padding-bottom: 0;
@@ -686,6 +703,17 @@
     }
     .apg-queue {
       padding: var(--s-1) var(--s-4) var(--s-1) var(--s-2);
+    }
+    .apg-queue .ui-icon-btn {
+      width: var(--touch);
+      height: var(--touch);
+    }
+    /* Before you send: the title on its line, the links under it. */
+    .apg-check {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .apg-check-links {
+      justify-content: flex-start;
     }
     .apg-queue-label {
       display: none;

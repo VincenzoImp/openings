@@ -53,6 +53,11 @@ export const test = base.extend<
     async ({ page }, use) => {
       const errors: string[] = [];
       page.on("pageerror", (error) => errors.push(error.message));
+      // The served Content-Security-Policy (backend app.py) must allow the dashboard.
+      page.on("console", (message) => {
+        if (/Content Security Policy/i.test(message.text()))
+          errors.push(message.text());
+      });
       await use(errors);
       expect(errors, "uncaught errors of the page").toEqual([]);
     },

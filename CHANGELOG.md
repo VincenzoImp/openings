@@ -1,5 +1,57 @@
 # Changelog
 
+## 0.28.0 — 2026-11-16
+
+Every new job, filtered, prepared and ranked: a demo in one command, skills for every workflow
+
+Openings is a self-hosted job-search app. New jobs arrive from your searches and the companies you follow, without duplicates. Your own AI agent (Claude Code, Codex, any MCP client) shortlists, tailors and ranks them, and you apply, best first. You can do everything by hand, from scripts over REST, or through your agent over MCP. Try it on fictional data with `docker run --rm -p 127.0.0.1:8080:8080 vincenzoimp/openings demo`.
+
+**Upgrade.** This release changes the workspace format once (applications gain a salary field). 0.28 upgrades a 0.24–0.27 workspace when it starts and keeps the old file as `openings.pre-0.28.sqlite`. Open an older workspace or backup with 0.27 first. The repository is now `VincenzoImp/openings-job-search`; old links redirect.
+
+**Try it and install it**
+
+- `openings demo` (or `docker run … vincenzoimp/openings demo`) starts a disposable workspace of fictional data. It contacts no job site, prints a one-time sign-in link, an agent token and the lines that connect Claude Code and Codex, and deletes everything when it stops.
+- Install without a clone: one `docker run` line, or a `curl`-downloaded `docker-compose.yml`, which now pins the minor release (`0.28`) so `docker compose pull` brings patch fixes.
+- A new installation asks for a one-time setup code printed in the server's log, unless `OPENINGS_PASSWORD` is set.
+- `latest` follows every final release, the image is also on `ghcr.io/vincenzoimp/openings`, and the Docker Hub page is synced from the repository.
+
+**Your agent**
+
+- Eleven skills: new "Run my job search" (triage, prepare, rank, check deadlines and replies, report; on request or on a schedule), "Rank and review what is Ready" (priorities, sending order, a salary range with its basis, employers you apply to too often, fixes across every letter) and "Keep your workspace safe and tidy" (checked backups and exports, reversible clean-up, deletion only when asked, undoing an agent run).
+- Standing instructions in Working with me count as your request: a line there can authorize marking applied, closing silent applications or deleting, and the agent reports when it used one. Your Preferences override skill defaults, including an employer's AI clause.
+- A Claude Code plugin: `/plugin marketplace add VincenzoImp/openings-job-search`, then `/plugin install openings@openings-job-search`.
+- Settings › API & agents gives ready-to-paste lines for the plugin, `claude mcp add`, Codex and JSON at your real address, and a first agent session. Ready-made cron, launchd and systemd files run "Run my job search" on a schedule.
+- Applications have a salary expectation, shown on Ready with Copy and in the Ready list; it is never put in a document unless the employer asks.
+- `documents_list` is an MCP tool that searches CV and letter text; `jobs_list` filters by saved source; agent tokens can take the records export; `workspace_context` says when feedback was cut. Tool descriptions say exactly what the server does.
+- Tectonic is the default TeX engine: no TeX distribution needed.
+
+**Collecting jobs**
+
+- A new or resumed source is checked at once.
+- New source: HN Who is hiring reads the latest monthly Hacker News thread, one job per top-level comment.
+- Greenhouse boards read every description in one request, so a 250-job board takes seconds instead of minutes.
+- Test lists a board's titles first, counts "fetched N of M", and explains a refused or empty result and until when.
+- Board location labels drop placeholder offices and repeated places.
+
+**The dashboard**
+
+- Search finds the right thing first (exact title, then title, company, location and state) in the dashboard, REST and MCP alike; the ⌘K palette labels each hit and opens a job in the tab that lists it.
+- Documents are centred on wide screens while lists fill the width; sent stages show the posting beside them.
+- Jobs › New stays still while you triage: new arrivals wait in a "N new jobs · Show" bar.
+- The setup guide offers a company careers page first, prefills the title filter from your roles and resumes where you stopped; Setup and Preferences share one language list, and any language can be added.
+- The new Openings mark, consistent toolbars, section headings, chips and tooltips, 44 px touch targets on a phone, and many wording and accessibility fixes.
+- A dashboard opened at an address other than `OPENINGS_PUBLIC_URL` says which value to set; MCP refuses an unknown host with the same advice.
+
+**Security**
+
+- The dashboard and API send a strict Content-Security-Policy and full security headers, error responses included.
+- Restoring a backup keeps the installation's own triggers and views; collection refuses NAT64 and IPv4-compatible forms of private addresses; board feeds and RSS refuse XML document types and entities; a large PDF upload no longer pauses other requests.
+- CodeQL and zizmor run in CI. SECURITY.md publishes the security model.
+
+**Documentation**
+
+- A clone-free quick start, "Your agent in five minutes", a server, NAS and reverse-proxy guide with troubleshooting, a rehearsed rollback, a comparison with other tools, and a design system in `docs/brand/`.
+
 ## 0.27.3 — 2026-11-16
 
 **Fixes**

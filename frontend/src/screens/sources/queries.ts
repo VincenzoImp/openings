@@ -1,9 +1,10 @@
 // The reads and writes of the Sources screen, over the generated client.
+import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, call, type Schema } from "../../api/client";
 import { useApiMutation, useVersionedMutation } from "../../query/mutation";
 import { POLL_MS } from "../../query/query";
-import type { SourceView } from "./model";
+import { hasText, withText, type SourceView } from "./model";
 
 export const sourceKeys = {
   list: ["sources", "list"] as const,
@@ -161,9 +162,98 @@ export function useUpdateSource(onReload?: () => void) {
 export function usePreview() {
   return useApiMutation({
     touches: ["providers"],
-    mutationFn: (body: Schema<"SourcePreview">) =>
+    mutationFn: (body: Schema<"SourceTest">) =>
       call(api.POST("/api/v1/sources/preview", { body })),
   });
+}
+
+export type TestResult = Schema<"SourcePreviewResult"> & {
+  kind?: string;
+  url?: string;
+  automatic_collection?: boolean;
+};
+export type TestPhase = "idle" | "listing" | "details" | "done";
+
+type TestState = {
+  phase: TestPhase;
+  result: TestResult | null;
+  error: string;
+  /** While the text arrives: how many postings have it, of how many. */
+  fetched?: number;
+  fetching?: number;
+};
+
+const IDLE: TestState = { phase: "idle", result: null, error: "" };
+
+const refused = (result: TestResult) =>
+  (result.diagnostics ?? []).some(
+    (item) => item.state === "deferred" || item.state === "error",
+  );
+
+/**
+ * Test a source in steps: the board's listing first (its titles show at
+ * once), then the posting text of the first few, one at a time, so the
+ * heading counts "fetched N of M". A search, a feed or HN answers in one
+ * step. Every step goes through the shared request gate; nothing is saved.
+ */
+export function useSourceTest() {
+  const preview = usePreview();
+  const asked = useRef(0);
+  const [state, setState] = useState<TestState>(IDLE);
+
+  async function run(body: Omit<Schema<"SourceTest">, "details" | "only">) {
+    const question = ++asked.current;
+    const current = () => asked.current === question;
+    const twoSteps = !["jobspy", "rss", "hnhiring"].includes(body.kind ?? "");
+    setState({ ...IDLE, phase: "listing" });
+    try {
+      let result = (await preview.mutateAsync({
+        ...body,
+        details: !twoSteps,
+      })) as TestResult;
+      if (!current()) return;
+      const waiting = twoSteps
+        ? result.items.filter((item) => !hasText(item) && item.source_key)
+        : [];
+      for (const [fetched, item] of waiting.entries()) {
+        setState({
+          ...IDLE,
+          phase: "details",
+          result,
+          fetched,
+          fetching: waiting.length,
+        });
+        const answer = (await preview.mutateAsync({
+          ...body,
+          details: true,
+          only: [String(item.source_key)],
+        })) as TestResult;
+        if (!current()) return;
+        // A refusal keeps the titles the listing gave and stops asking.
+        result = withText(result, answer);
+        if (refused(answer)) break;
+      }
+      setState({ ...IDLE, phase: "done", result });
+    } catch (error) {
+      if (current())
+        setState((before) => ({
+          ...IDLE,
+          phase: "done",
+          result: before.result,
+          error: error instanceof Error ? error.message : "The test failed.",
+        }));
+    }
+  }
+
+  return {
+    ...state,
+    pending: state.phase === "listing" || state.phase === "details",
+    run,
+    reset: () => {
+      asked.current += 1;
+      setState(IDLE);
+    },
+  };
 }
 
 /** Pause or resume every automatic check. */

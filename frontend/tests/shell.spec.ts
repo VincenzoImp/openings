@@ -1,5 +1,13 @@
 import { test, expect, type Page } from "./fixtures";
-import { call, go, heading, isPhone, settled, tabKey } from "./session";
+import {
+  call,
+  findings,
+  go,
+  heading,
+  isPhone,
+  settled,
+  tabKey,
+} from "./session";
 
 // The shell: the sidebar and the phone's bars, the routes, the account menu
 // and the theme, the global keyboard, the ⌘K palette and Add job, and the
@@ -80,10 +88,12 @@ test("the needs-you counts come from the workspace", async ({ page }) => {
   await expect(
     links.getByRole("link", { name: /Applications/ }),
   ).toHaveAccessibleName(
-    ready ? new RegExp(`${ready} ready applications`) : /^Applications$/,
+    ready
+      ? new RegExp(`${ready} ready application${ready === 1 ? "" : "s"}`)
+      : /^Applications$/,
   );
   await expect(links.getByRole("link", { name: /Jobs/ })).toHaveAccessibleName(
-    fresh ? new RegExp(`${fresh} new jobs`) : /^Jobs$/,
+    fresh ? new RegExp(`${fresh} new job${fresh === 1 ? "" : "s"}`) : /^Jobs$/,
   );
   // A new job counts at once: the shell reads again after a write.
   await page.keyboard.press("n");
@@ -219,6 +229,136 @@ test("g and a letter go to a screen; ? shows the shortcuts; n adds a job", async
   await expect(page).toHaveURL(/#today$/);
   await page.keyboard.press("Escape");
   await expect(add).toBeHidden();
+});
+
+test("the phone's top bar: Search first everywhere, a pushed page hides the bottom bar", async ({
+  page,
+}) => {
+  test.skip(!isPhone(page), "The top bar is a phone's.");
+  const bar = page.locator(".ui-topbar");
+  for (const route of [
+    "today",
+    "jobs",
+    "applications",
+    "profile",
+    "preferences",
+    "templates",
+    "sources",
+    "settings",
+  ]) {
+    await go(page, route);
+    const buttons = bar.getByRole("button").filter({ visible: true });
+    await expect(buttons.first(), route).toHaveAccessibleName(/^Search/);
+    // Search and at most two of the screen's actions, all 44 px icons.
+    expect(await buttons.count(), route).toBeLessThanOrEqual(3);
+    for (const box of await buttons.evaluateAll((all) =>
+      all.map((button) => button.getBoundingClientRect().height),
+    ))
+      expect(box, route).toBe(44);
+  }
+  const [ready] = (await call(page, "/applications?stage=ready&limit=1")).items;
+  await go(page, `applications/${ready.id}`);
+  await expect(page.locator(".ui-app-bottom")).toBeHidden();
+});
+
+test("a demo workspace says so on every screen until put away for the session", async ({
+  page,
+}) => {
+  const banner = page.getByRole("region", { name: "Demo workspace" });
+  // A real workspace never shows it.
+  await expect(heading(page)).toBeVisible();
+  await expect(banner).toHaveCount(0);
+  // The session of `openings demo` says demo: true.
+  await page.route("**/api/v1/auth/session", async (route) => {
+    const response = await route.fetch();
+    await route.fulfill({
+      response,
+      json: { ...(await response.json()), demo: true },
+    });
+  });
+  await page.reload();
+  await expect(banner).toContainText("no job site is contacted");
+  expect(await findings(page)).toEqual([]);
+  await go(page, "jobs");
+  await expect(banner).toBeVisible();
+  await banner.getByRole("button", { name: "Hide for this session" }).click();
+  await expect(banner).toHaveCount(0);
+  // Hidden for the rest of the session, a reload included.
+  await page.reload();
+  await expect(heading(page)).toBeVisible();
+  await expect(banner).toHaveCount(0);
+  // A new session shows it again.
+  const fresh = await page.context().newPage();
+  await fresh.route("**/api/v1/auth/session", async (route) => {
+    const response = await route.fetch();
+    await route.fulfill({
+      response,
+      json: { ...(await response.json()), demo: true },
+    });
+  });
+  await go(fresh, "today");
+  await expect(
+    fresh.getByRole("region", { name: "Demo workspace" }),
+  ).toBeVisible();
+});
+
+test("a palette hit opens the job in the tab that lists it, even with New empty", async ({
+  page,
+}) => {
+  // Everything triaged: New is empty, as for an owner who is all caught up.
+  for (;;) {
+    const { items } = await call(page, "/jobs?triage=new&limit=200");
+    if (!items.length) break;
+    await call(page, "/jobs/bulk", "POST", {
+      action: "dismissed",
+      reason: "Synthetic: triaged.",
+      items: items.map((item: { id: string; version: number }) => ({
+        id: item.id,
+        expected_version: item.version,
+      })),
+    });
+  }
+  const [applied] = (await call(page, "/applications?stage=applied&limit=1"))
+    .items;
+  const [dismissed] = (
+    await call(page, "/jobs?triage=dismissed&sort=newest&limit=1")
+  ).items;
+  const palette = page.getByRole("dialog", { name: "Search and commands" });
+  for (const [target, section] of [
+    [applied.job, "all"],
+    [dismissed, "dismissed"],
+  ] as const) {
+    // A title no other job has, so the hit is this job.
+    const { version } = await call(page, `/jobs/${target.id}`);
+    const job = await call(page, `/jobs/${target.id}`, "PATCH", {
+      title: `Palette target ${section}`,
+      expected_version: version,
+    });
+    await page.keyboard.press(`${mod(page)}+k`);
+    await palette.getByRole("combobox").fill(job.title);
+    const hit = palette
+      .getByRole("group", { name: "Jobs" })
+      .getByRole("option", { name: new RegExp(job.title) })
+      .first();
+    // The hit names its state, so it differs from the application's.
+    await expect(hit).toContainText(
+      section === "all" ? "Shortlisted" : "Dismissed",
+    );
+    await hit.click();
+    await expect(page).toHaveURL(
+      new RegExp(`#jobs\\?section=${section}&job=${job.id}$`),
+    );
+    const title = isPhone(page)
+      ? heading(page)
+      : page.locator(".ui-split-detail h2").first();
+    await expect(title).toHaveText(job.title);
+    await expect(page.getByText("You're all caught up.")).toBeHidden();
+    if (!isPhone(page)) {
+      const row = page.locator(`.jobs-list [data-row-id="${job.id}"]`);
+      await expect(row).toBeVisible();
+      await expect(row).toHaveAttribute("aria-current", "true");
+    }
+  }
 });
 
 test("⌘K and / open the palette: jobs, applications and commands", async ({

@@ -3,8 +3,8 @@
 A ready folder to run your AI agent from, with the Openings connection set up
 for six clients. Copy it, point it at your server and start your agent here. The
 agent reads its skills from your Openings server, sets up your workspace and
-keeps the search going. You answer its questions in the chat, send the
-applications that are Ready, and mark them applied or close them. See
+keeps the search going. You answer its questions in the chat and apply to the
+Ready applications, best first. See
 [Work with an agent](../../docs/user/agents.md). You do not need this folder to
 use an agent.
 
@@ -12,8 +12,9 @@ use an agent.
 
 Requires Python 3.9+ and an agent client with MCP support (for example Claude
 Code, Codex, Cursor, VS Code with Copilot, Gemini CLI or opencode). To compile
-CV and letter PDFs from LaTeX, the agent's machine also needs `pdflatex` (for
-example from TeX Live, MacTeX or TinyTeX).
+CV and letter PDFs from LaTeX, the agent's machine also needs
+[Tectonic](https://tectonic-typesetting.github.io), a single program that fetches
+the packages it needs; `pdflatex` from a TeX distribution works too.
 
 ```bash
 cp -R examples/operator-workspace ~/job-search && cd ~/job-search
@@ -35,6 +36,19 @@ For a server behind a private certificate authority, put its CA certificate at
 `certs/openings-ca.pem` or set `OPENINGS_CA_FILE`. Clients that load skills from
 disk read them through the `.claude/skills` link: run
 `python3 .agents/scripts/fetch_skills.py` from a launched shell to fetch them.
+
+## Permissions and schedule
+
+`.claude/settings.json` lets Claude Code use the Openings tools, `curl` to
+Openings, Tectonic and the ignored `.local/` folder without asking, and asks
+before anything else. Change its address if your server is elsewhere, and start
+Claude Code here once to trust the folder.
+
+`schedule/` runs "Run my job search" unattended from this folder: a crontab, a
+launchd plist, a systemd timer and the script they call, which writes each report
+to `.local/reports/`. Give each schedule its own Agent token in the scheduler's
+environment. See
+[Run it on a schedule](../../docs/user/agents.md#run-it-on-a-schedule).
 
 ## First session
 

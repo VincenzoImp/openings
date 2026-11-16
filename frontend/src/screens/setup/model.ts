@@ -14,22 +14,6 @@ export type StepId = (typeof STEPS)[number]["id"];
 export const stepOf = (value: string | null): StepId =>
   STEPS.find((step) => step.id === value)?.id ?? "about";
 
-/** The languages offered first; their ISO 639-1 codes are what is stored. */
-export const LANGUAGES: [string, string][] = [
-  ["en", "English"],
-  ["de", "German"],
-  ["fr", "French"],
-  ["it", "Italian"],
-  ["es", "Spanish"],
-  ["nl", "Dutch"],
-  ["pt", "Portuguese"],
-  ["pl", "Polish"],
-  ["sv", "Swedish"],
-  ["da", "Danish"],
-  ["no", "Norwegian"],
-  ["fi", "Finnish"],
-];
-
 export interface About {
   name: string;
   roles: string;

@@ -109,10 +109,17 @@ class BatchOperations:
         """Start an application per job; a job's open application is returned, not doubled.
 
         Shortlisting a job already started its application: then the item's
-        required_documents, priority, deadline, questions and requirements are set on
-        it while it is Shortlisted (``created`` false).
+        required_documents, priority, deadline, questions, requirements and salary are set
+        on it while it is Shortlisted (``created`` false).
         """
-        fields = {"required_documents", "priority", "deadline", "questions", "requirements"}
+        fields = {
+            "required_documents",
+            "priority",
+            "deadline",
+            "questions",
+            "requirements",
+            "salary",
+        }
 
         def apply(item):
             try:

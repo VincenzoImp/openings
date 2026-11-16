@@ -8,13 +8,13 @@ body:
         Thanks for reporting a problem. Use synthetic examples only: never paste
         personal databases, CVs, API tokens, `.env` files or real postings you
         cannot share. Report security vulnerabilities privately through
-        [SECURITY.md](https://github.com/VincenzoImp/openings/blob/main/SECURITY.md).
+        [SECURITY.md](https://github.com/VincenzoImp/openings-job-search/blob/main/SECURITY.md).
   - type: input
     id: version
     attributes:
       label: Openings version
       description: Shown in Settings, by `GET /api/v1/capabilities`, or the image tag you run.
-      placeholder: "0.24.2"
+      placeholder: "0.28.0"
     validations:
       required: true
   - type: dropdown

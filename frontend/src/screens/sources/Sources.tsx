@@ -189,17 +189,18 @@ export default function SourcesScreen() {
             <>
               <Button
                 variant="primary"
-                onClick={() => open({ kind: "search" })}
+                onClick={() => open({ kind: "company" })}
               >
-                Add a search
+                Follow a company's careers page
               </Button>
-              <Button onClick={() => open({ kind: "company" })}>
-                Add a company careers page
+              <Button onClick={() => open({ kind: "search" })}>
+                Add a search
               </Button>
             </>
           }
         >
-          Add a search to get new jobs every few hours.
+          A careers page is read directly and checked at once. A search asks
+          LinkedIn; with a country, also Indeed and Glassdoor.
         </EmptyState>
       ) : (
         <>
@@ -293,7 +294,7 @@ export default function SourcesScreen() {
 }
 
 /**
- * "Checked every [6 h] · next check 14:00 · Check all now", with the
+ * "Checked every [6 h]  Next check 14:00  Check all now", with the
  * switch of every automatic check in `…`.
  */
 function ScheduleLine({
@@ -362,7 +363,7 @@ function ScheduleLine({
         {on ? (
           <>
             <label className="src-interval">
-              <span>Checked every</span>
+              <span>{interval == null ? "Checked on" : "Checked every"}</span>
               <Select
                 aria-label="How often sources are checked"
                 value={interval ?? "mixed"}
@@ -371,7 +372,7 @@ function ScheduleLine({
               >
                 {interval == null && (
                   <option value="mixed" disabled>
-                    own schedules
+                    each source's schedule
                   </option>
                 )}
                 {options.map((minutes) => (
@@ -382,9 +383,7 @@ function ScheduleLine({
               </Select>
             </label>
             {next && (
-              <span title={formatFull(next)}>
-                <span aria-hidden="true">· </span>next check {clock(next)}
-              </span>
+              <span title={formatFull(next)}>Next check {clock(next)}</span>
             )}
           </>
         ) : (

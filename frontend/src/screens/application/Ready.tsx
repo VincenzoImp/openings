@@ -3,6 +3,7 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
+  Copy,
   Download,
   ExternalLink,
 } from "lucide-react";
@@ -30,7 +31,7 @@ import {
   type Kind,
 } from "./Documents";
 import type { PageContext } from "./Page";
-import { Answers, PostingText, Requirements } from "./Sections";
+import { Answers, PostingText, Requirements, useCopy } from "./Sections";
 
 type Pane = "check" | "posting" | Kind;
 /**
@@ -99,6 +100,23 @@ function QueuePlace({ queue, id }: { queue: ApplicationRow[]; id: string }) {
   );
 }
 
+/** The salary expectation to state when the employer asks, with Copy. */
+function Salary({ value }: { value: string }) {
+  const copy = useCopy();
+  return (
+    <p className="apg-salary">
+      <span>{value}</span>
+      <IconButton
+        icon={Copy}
+        size="sm"
+        label="Copy the salary expectation"
+        tooltip="none"
+        onClick={() => void copy(value, "the salary expectation")}
+      />
+    </p>
+  );
+}
+
 /** Mark applied, with the day it was sent (today unless changed). */
 function MarkApplied({
   busy,
@@ -155,8 +173,9 @@ function MarkApplied({
 }
 
 /**
- * Ready: the last check, then send and go on. Before you send (open
- * requirements, the form's answers, the employer's site, both PDFs), then
+ * Ready: the last check, then send and go on. Before you send (the salary
+ * expectation, open requirements, the form's answers, the employer's site,
+ * both PDFs), then
  * posting, CV and letter side by side. Mark applied (⇧↵) opens the next
  * Ready application; [ and ] move in the queue.
  */
@@ -238,7 +257,7 @@ export function ReadyView({
   const open = (app.requirements ?? []).filter((item) => !item.resolved);
   const check = (
     <section className="apg-check" aria-labelledby="apg-check-title">
-      <h2 className="ap-section-title" id="apg-check-title">
+      <h2 className="ui-section-title" id="apg-check-title">
         Before you send
       </h2>
       <div className="apg-check-links">
@@ -272,6 +291,12 @@ export function ReadyView({
             Nothing open. Download the PDFs and apply on the employer's site.
           </p>
         )}
+      {app.salary && (
+        <div className="apg-check-part">
+          <h3 className="ap-sub-title">Salary expectation</h3>
+          <Salary value={app.salary} />
+        </div>
+      )}
       {open.length > 0 && (
         <div className="apg-check-part">
           <h3 className="ap-sub-title">Open requirements</h3>

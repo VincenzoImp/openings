@@ -265,6 +265,7 @@ export default function TemplatesScreen() {
           onClose={() => go(null)}
           list={
             <List
+              pageKeys
               label="Templates"
               activeId={selected?.id ?? null}
               onActiveChange={(id) => go(id, tab)}

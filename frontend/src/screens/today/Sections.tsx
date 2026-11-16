@@ -8,9 +8,10 @@ import {
 import type { Schema } from "../../api/client";
 import { href, navigate } from "../../shell/router";
 import { Count, Dot, ToneText } from "../../ui/Badge";
+import { SectionHeader } from "../../ui/Page";
 import { Button } from "../../ui/Button";
 import { formatDate, formatNumber } from "../../ui/format";
-import { STAGES, StatusGlyph, type Stage } from "../../ui/Icon";
+import { Icon, STAGES, StatusGlyph, type Stage } from "../../ui/Icon";
 import { List, ListRow, ListRows } from "../../ui/List";
 import { useToast } from "../../ui/Toast";
 import {
@@ -48,13 +49,13 @@ function Section({
   const id = useId();
   return (
     <section className="today-section" aria-labelledby={id}>
-      <header className="today-section-head">
-        <h2 id={id}>
-          {title}
-          {count != null && <Count value={count} />}
-        </h2>
-        {action && <div className="today-section-action">{action}</div>}
-      </header>
+      <SectionHeader
+        id={id}
+        className="today-section-head"
+        title={title}
+        count={count != null && <Count value={count} />}
+        action={action}
+      />
       {children}
     </section>
   );
@@ -136,7 +137,7 @@ export function Ready({
       {page.total > page.items.length && (
         <a className="today-more" href={stageHref("ready")}>
           All {page.total} ready applications
-          <ArrowRight aria-hidden="true" size={14} strokeWidth={1.75} />
+          <Icon icon={ArrowRight} size="sm" />
         </a>
       )}
     </Section>
@@ -190,7 +191,7 @@ export function Attention({ rows }: { rows: Row[] }) {
       {rows.length > SHOWN && (
         <a className="today-more" href={href("applications")}>
           All {rows.length}
-          <ArrowRight aria-hidden="true" size={14} strokeWidth={1.75} />
+          <Icon icon={ArrowRight} size="sm" />
         </a>
       )}
     </Section>
@@ -345,7 +346,7 @@ export function Waiting({
           href={href("applications", {}, { stage: "applied", waiting: "1" })}
         >
           All {total} waiting
-          <ArrowRight aria-hidden="true" size={14} strokeWidth={1.75} />
+          <Icon icon={ArrowRight} size="sm" />
         </a>
       )}
       {opened && (

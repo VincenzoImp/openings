@@ -10,7 +10,7 @@
     border-radius: var(--r-lg);
     background: var(--bg-subtle);
     color: var(--text);
-    font: 12.5px/19px var(--mono);
+    font: var(--t-code);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }

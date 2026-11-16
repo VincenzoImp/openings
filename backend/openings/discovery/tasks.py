@@ -100,6 +100,7 @@ class TaskOperations:
         return self.get_task(task_id)
 
     def retry_task(self, task_id):
+        self.providers.require_open()
         task = self.get_task(task_id, include_checkpoint=True)
         if task["state"] not in ("failed", "cancelled"):
             raise DomainError(409, "task_state", "Only a failed or cancelled task can be retried.")
@@ -135,6 +136,8 @@ class TaskOperations:
         return self.get_task(task_id)
 
     def claim_task(self, owner, kind=None):
+        if self.providers.closed:
+            return None
         stamp = now()
         with self.db.transaction() as connection:
             connection.execute(
@@ -250,6 +253,8 @@ class TaskOperations:
             ):
                 count = value.get(key, 0)
                 result[target] = len(count) if isinstance(count, (list, dict)) else int(count or 0)
+            if isinstance(value.get("listed"), int):
+                result["listed"] = value["listed"]
             persist()
 
         def store(posting):

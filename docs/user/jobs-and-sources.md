@@ -26,7 +26,9 @@ application returns the job to New.
 
 The keyboard does it all: `j` and `k` (or the arrows) move, `s`, `d` and `r`
 decide, `z` undoes, `o` opens the posting, `e` corrects the details, Enter moves
-to the job, `/` searches and `?` lists every shortcut. Select several jobs (`x`,
+to the job, `/` searches and `?` lists every shortcut. ⌘K (Ctrl+K) searches jobs and
+applications from any screen, best match first: the title, then company, location
+and state, then the posting text. Select several jobs (`x`,
 shift+`j`/`k`, or shift-click for a range) to shortlist, dismiss, restore or
 forget them at once; each job succeeds or fails on its own. On a phone a job
 opens full screen with **Dismiss** and **Shortlist** at the bottom; swipe a row
@@ -80,10 +82,12 @@ The top line sets how often every source is checked and has **Check all now**;
 its `…` pauses every automatic check. **Recent checks**, collapsed at the
 bottom, lists the last 20 checks with Stop and Retry.
 
-**Add source** opens a form: the kind first (**Search**, **Company careers page**
-or **RSS feed**), then its fields. **Test** shows the first ten results and saves
-nothing; **Save** adds the source, checked on the
-schedule. A source added over REST or MCP starts paused unless it says
+**Add source** opens a form: the kind first (**Search**, **Company careers page**,
+**RSS feed** or **HN Who is hiring**), then its fields. **Test** shows the first
+ten results and saves nothing; on a careers page it lists the titles first, then
+fetches their text. When a site refuses or finds nothing, Test says why and until
+when, and suggests a careers page; **Save** adds the source and checks it at
+once, then on the schedule. A source added over REST or MCP starts paused unless it says
 otherwise. A paused source can still be checked by hand.
 
 | Source | What it collects |
@@ -91,9 +95,10 @@ otherwise. A paused source can still be checked by hand.
 | Search | One query and place on LinkedIn, Indeed and Glassdoor |
 | Company careers page | The jobs of one company on Greenhouse, Lever, Ashby, Recruitee, Personio, Workable, SmartRecruiters, BambooHR, Rippling, Workday, Oracle or join.com |
 | RSS feed | An RSS or Atom feed of jobs |
+| HN Who is hiring | The latest monthly Hacker News "Ask HN: Who is hiring?" thread |
 
-Jobs you add under Jobs have no source. Breezy pages can be previewed but not collected automatically; add their postings
-by hand.
+Jobs you add under Jobs have no source. Breezy pages can be previewed but not
+collected automatically; add their postings by hand.
 
 ### Searches
 
@@ -127,13 +132,20 @@ example by location) and paste that URL: its facets (such as
 read. Careers pages and feeds can hold undated jobs, so **Posted within** does not
 apply to them.
 
+**HN Who is hiring** (`hnhiring`) needs no address: each check reads the newest
+thread through the HN Algolia API. Every top-level comment is one job; replies
+are skipped. Title, company and place come from the comment's first line
+("Company | Role | Place | …"), and the whole comment is the posting. The
+result limit is 1000 (`max_results`). When a new month's thread appears, the
+previous month's jobs are marked no longer listed.
+
 ### Schedule
 
 The top line of Sources sets one interval for every source (1 to 24 hours).
 Over REST and MCP a source can have its own **interval** (default every 1440
 minutes, 15 to 43200) or **daily times**: one to twelve local `HH:MM` times and a
-time zone, such as `08:00, 16:00` in `Europe/Berlin`. The first scheduled check
-waits one interval after enabling; use **Check now** to collect now. Missed slots
+time zone, such as `08:00, 16:00` in `Europe/Berlin`. A source is checked as soon
+as it is added or resumed, then on its schedule; **Check now** checks it again. Missed slots
 merge instead of queueing. Pausing every automatic check keeps the settings;
 checks already queued continue until **Stop** under Recent checks.
 
@@ -165,6 +177,11 @@ scheduled and manual checks, redirects and detail pages. When a site answers
 "too many requests" (HTTP 429), Openings pauses requests to it until the time the
 site names; the pause survives restarts. REST and MCP can lift it early with
 `clear_cooldown`.
+A refusal reads, for example, "LinkedIn refused this request from your network;
+Openings waits until 14:30 UTC and tries again. Careers pages are not affected."
+Servers in a data centre or at a VPS provider are refused far more often than a home
+connection; there, follow company careers pages first. See
+[Troubleshooting](operations.md#a-job-site-refused-requests).
 A login page is reported as blocked. A careers page that does not exist (HTTP 404,
 or a redirect to the job site's home page) fails at once and names its board; check
 its URL. A portal can still block requests or change its pages; paste the posting

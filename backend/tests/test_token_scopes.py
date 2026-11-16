@@ -60,12 +60,12 @@ def test_an_agent_token_keeps_the_workflow_operations(app, client):
         "items"
     ]
     assert {item["actor"] for item in history} == {"agent:Synthetic agent"}
-    # The records export is the owner's; the backup and permanent deletion stay available.
+    # The records export, the backup and permanent deletion stay available to an agent.
     # Every owner-only route refuses an agent token (test_parity.py); the refusal
     # says which authority is missing.
-    refused_over_rest(client.get("/api/v1/export", headers=headers))
+    refused_over_rest(client.get("/api/v1/tokens", headers=headers))
     _, error = tool(client, agent, "workspace_export")
-    assert error["code"] == "owner_only"
+    assert error["code"] == "rest_only" and error["details"]["use"] == ["workspace_backup"]
     current = client.get(f"/api/v1/jobs/{job['id']}", headers=headers).json()
     forgotten, error = tool(
         client, agent, "jobs_delete", {"job_id": job["id"], "expected_version": current["version"]}
@@ -127,6 +127,42 @@ def test_an_agent_backup_carries_no_installation_credentials(app, client, tmp_pa
     kinds = {item["name"]: item["kind"] for item in auth.list_tokens()["items"]}
     assert kinds == {"Synthetic agent": "agent", "Synthetic owner token": "owner"}
     assert client.get("/api/v1/jobs", headers=bearer(agent)).status_code == 200
+
+
+def test_an_agent_takes_an_export_without_credentials(app, client):
+    workspace, auth = app.state.workspace, app.state.auth
+    agent = auth.create_token("Synthetic agent", "agent")
+    owner = auth.create_token("Synthetic owner token", "owner")
+    job = workspace.ingest_job({"title": "Exported job", "company": "Example", "posting": "Build."})
+    workspace.create_application({"job_id": job["id"], "salary": "EUR 50-55k a year"})
+    secrets = workspace.get_settings("auth")["data"]
+    needles = [
+        secrets["password_hash"],
+        secrets["secret"],
+        agent["token"],
+        owner["token"],
+        hashlib.sha256(agent["token"].encode()).hexdigest(),
+    ]
+    grant, error = tool(client, agent, "workspace_backup", {"kind": "export"})
+    assert error is None and grant["curl"].endswith(f"-o 'openings-export.json' '{grant['url']}'")
+    for response in (
+        client.get(grant["url"], headers=grant["headers"]),
+        client.get("/api/v1/export", headers=bearer(agent)),
+        client.post("/api/v1/export/grant", headers=bearer(agent)),
+    ):
+        assert response.status_code == 200, response.text
+        assert not any(needle in response.text for needle in needles)
+    records = client.get(grant["url"], headers=grant["headers"])
+    assert records.status_code == 401  # a grant is used once
+    export = client.get("/api/v1/export", headers=bearer(agent)).json()
+    assert export["format"] == "openings-records-v1"
+    assert [job["title"] for job in export["jobs"]] == ["Exported job"]
+    assert [item["salary"] for item in export["applications"]] == ["EUR 50-55k a year"]
+    assert "api_tokens" not in export and set(export["settings"]) <= {
+        "profile",
+        "workspace",
+        "collection",
+    }
 
 
 def test_an_owner_token_keeps_full_access_and_chooses_the_kind(app, client):
@@ -207,7 +243,10 @@ def test_a_session_write_needs_its_csrf_header_and_a_revoked_token_is_refused(tm
     app = create_app(tmp_path / "auth.sqlite", start_worker=False)
     with TestClient(app) as client:
         assert client.get("/api/v1/jobs").status_code == 401
-        setup = client.post("/api/v1/auth/setup", json={"password": PASSWORD})
+        setup = client.post(
+            "/api/v1/auth/setup",
+            json={"password": PASSWORD, "setup_code": app.state.auth.setup_code},
+        )
         assert setup.status_code == 200
         assert client.post("/api/v1/jobs", json={"posting": "Text"}).status_code == 403
         client.headers["X-CSRF-Token"] = setup.json()["csrf_token"]

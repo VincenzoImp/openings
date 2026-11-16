@@ -101,7 +101,7 @@ export function Preparing({ context }: { context: PageContext }) {
           </div>
         </div>
         <aside className="apg-side" aria-label="Posting">
-          <h2 className="ap-section-title">Posting</h2>
+          <h2 className="ui-section-title">Posting</h2>
           <PostingText text={posting} />
         </aside>
       </div>

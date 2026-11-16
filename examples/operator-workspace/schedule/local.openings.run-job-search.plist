@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  macOS launchd: copy to ~/Library/LaunchAgents/, replace /Users/you/job-search with the
+  agent folder and the token with one Agent token named for this schedule, chmod 600
+  the copy, then: launchctl load ~/Library/LaunchAgents/local.openings.run-job-search.plist
+  The run starts at 08:00, after the sources' morning check. launchd never starts a
+  job that is still running, and runs a missed one when the Mac wakes.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>local.openings.run-job-search</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/you/job-search/schedule/run-job-search.sh</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/you/job-search</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/Users/you/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <key>OPENINGS_TOKEN</key>
+    <string>REPLACE_WITH_THE_SCHEDULE_TOKEN</string>
+  </dict>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>8</integer>
+    <key>Minute</key>
+    <integer>0</integer>
+  </dict>
+  <key>StandardErrorPath</key>
+  <string>/Users/you/job-search/.local/reports/launchd.log</string>
+</dict>
+</plist>

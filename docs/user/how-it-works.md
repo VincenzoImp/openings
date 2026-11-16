@@ -8,7 +8,7 @@ restore, stay with you.
 ## The concepts
 
 1. **Job.** A posting you might apply to: title, company, location, text and where it came from.
-2. **Source.** A search, company careers page or RSS feed that collects jobs on a schedule. Jobs you add by hand have no source.
+2. **Source.** A search, company careers page, RSS feed or the Hacker News "Who is hiring?" thread that collects jobs on a schedule. Jobs you add by hand have no source.
 3. **Triage.** Where a job stands in review: **New**, **Shortlisted** or **Dismissed**. Dismissing keeps the job, remembers it and can be undone.
 4. **Label.** A mark computed without a model: the posting's language, the languages it requires, a likely duplicate, or no longer listed. Labels describe and filter; they never dismiss.
 5. **Application.** Your attempt to get one job. A job has at most one open application. Shortlisting a job starts it.
@@ -24,13 +24,15 @@ restore, stay with you.
 
 ## The daily loop
 
-**New** jobs arrive, from your sources or by hand. You **shortlist** the ones you
-want. For each, you or your agent **prepare** the CV and letter. When the
-application shows **Ready**, you check it, send it on the employer's site and
-choose **Mark applied**. Later you **record the reply**, or close the application
-as **No reply**.
+**New** jobs arrive from your sources, deduplicated, or by hand. You or your
+agent **shortlist** the ones that fit your Preferences and career, and
+**prepare** the CV and letter for each. **Ready** applications are ranked by
+priority and deadline: you apply on the employer's site, best first, and choose
+**Mark applied**. Later you **record the reply**, or close the application as
+**No reply**.
 
-Only you mark an application applied. No agent, source or upload does.
+You decide when an application counts as applied: you mark it, or your agent
+does when you tell it or a standing rule says how.
 
 ## Who does what
 
@@ -40,8 +42,8 @@ Only you mark an application applied. No agent, source or upload does.
 | REST API | Scripts and your own tools | All dashboard actions, plus the owner-only ones |
 | MCP and skills | An external agent you talk to in its own chat | Everything the dashboard does, except owner-only actions |
 
-Owner-only actions: the password, API tokens, restore, the records export, the
-career import and downloading kept backups.
+Owner-only actions: the password, API tokens, restore, the career import and
+downloading kept backups.
 
 ## Words
 

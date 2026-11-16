@@ -65,15 +65,27 @@ function stop(child: ChildProcess) {
 
 /**
  * Start a synthetic server on a free port: on a copy of `snapshot`, or on a
- * workspace it seeds itself (sized by OPENINGS_E2E_JOBS/APPLICATIONS in `env`).
+ * workspace it seeds itself (sized by OPENINGS_E2E_JOBS/APPLICATIONS in `env`,
+ * or a first run with `empty`: only the owner password is set).
  */
 export async function startServer({
   snapshot,
   env,
+  empty = false,
   timeout = 60_000,
-}: { snapshot?: string; env?: NodeJS.ProcessEnv; timeout?: number } = {}) {
+}: {
+  snapshot?: string;
+  env?: NodeJS.ProcessEnv;
+  empty?: boolean;
+  timeout?: number;
+} = {}) {
   const child = dashboardServer(
-    ["--port", "0", ...(snapshot ? ["--snapshot", snapshot] : [])],
+    [
+      "--port",
+      "0",
+      ...(snapshot ? ["--snapshot", snapshot] : []),
+      ...(empty ? ["--empty"] : []),
+    ],
     env,
   );
   const [, url] = await firstLine(

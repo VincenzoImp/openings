@@ -5,6 +5,7 @@ import {
   HardDrive,
   History,
   Trash2,
+  Upload,
 } from "lucide-react";
 import { download, save } from "../../api/client";
 import { Button, IconButton } from "../../ui/Button";
@@ -54,7 +55,14 @@ export function Data() {
   }
 
   return (
-    <SettingsSection title="Data">
+    <SettingsSection
+      title="Data"
+      lead={
+        info.data?.demo
+          ? "This is a demo workspace: a restore, a backup or a new password lasts only until the demo stops, and nothing is kept after it."
+          : undefined
+      }
+    >
       <SettingRow
         title="Backup"
         control={
@@ -390,15 +398,23 @@ function RestoreDialog({
           }
           hint={limit != null ? `Up to ${bytes(limit)}.` : undefined}
         >
-          <Input
-            type="file"
-            className="set-file"
-            accept=".sqlite,.sqlite3,.db"
-            onChange={(event) => {
-              setFile(event.target.files?.[0] ?? null);
-              setError("");
-            }}
-          />
+          <div className="set-file">
+            <Input
+              type="file"
+              className="set-file-input"
+              accept=".sqlite,.sqlite3,.db"
+              onChange={(event) => {
+                setFile(event.target.files?.[0] ?? null);
+                setError("");
+              }}
+            />
+            <Button icon={Upload} aria-hidden="true" tabIndex={-1}>
+              Choose a file
+            </Button>
+            <span className="set-file-name">
+              {file ? file.name : "No file chosen"}
+            </span>
+          </div>
         </Field>
       </form>
     </Dialog>

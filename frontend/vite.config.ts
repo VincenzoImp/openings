@@ -12,8 +12,14 @@ const pages = (mode: string): Record<string, string> =>
 // Fewer, larger chunks compress better. The barrel (ui/index.ts) stays out,
 // or it would pull every primitive into the first chunk.
 const LATER =
-  /\/src\/ui\/(Dialog|ActionSheet|ReadEdit|CodeView|CodeBlock|Table|Choice|Disclosure|Field|Tabs|Split)\./;
+  /\/src\/ui\/(Dialog|ActionSheet|ReadEdit|CodeView|CodeBlock|Table|Choice|Disclosure|Field|Tabs|Split|LanguagePicker)\./;
 const FIRST = /\/src\/ui\/(?!index\.)/;
+// The icons that several later screens share join the later chunk: alone,
+// each became a file of about 200 bytes, and together they cost more than
+// 3 kB. An icon the first screen draws (arrow-right) or the palette draws
+// (sun) stays out, or that screen would load the whole later chunk.
+const LATER_ICONS =
+  /\/lucide-react\/dist\/esm\/icons\/(bookmark|building-complex|clock|download|external-link|eye-off|file-text|globe|grip-vertical|layers|link|list|list-filter|mail|map-pin|trash|triangle-exclamation-point|upload)\.mjs$/;
 
 export default defineConfig(({ mode }) => ({
   plugins: [react()],
@@ -32,15 +38,17 @@ export default defineConfig(({ mode }) => ({
       // for its styles. The gallery's own stylesheet stays apart.
       output: {
         manualChunks: (id) =>
-          id.includes("/gallery/") || !id.includes("/src/")
-            ? undefined
-            : id.endsWith(".css")
-              ? "styles"
-              : LATER.test(id)
-                ? "ui-later"
-                : FIRST.test(id)
-                  ? "ui"
-                  : undefined,
+          LATER_ICONS.test(id)
+            ? "ui-later"
+            : id.includes("/gallery/") || !id.includes("/src/")
+              ? undefined
+              : id.endsWith(".css")
+                ? "styles"
+                : LATER.test(id)
+                  ? "ui-later"
+                  : FIRST.test(id)
+                    ? "ui"
+                    : undefined,
       },
     },
   },

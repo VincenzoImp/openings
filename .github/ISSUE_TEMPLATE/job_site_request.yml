@@ -1,0 +1,65 @@
+name: Job site request
+description: Ask Openings to collect jobs from a careers platform or job board it does not support yet.
+labels: [job-site]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Openings reads company careers pages on Greenhouse, Lever, Ashby, Recruitee,
+        Personio, Workable, SmartRecruiters, BambooHR, Rippling, Workday, Oracle and
+        join.com, searches LinkedIn, Indeed and Glassdoor, reads the Hacker News
+        "Who is hiring?" thread and follows RSS feeds
+        ([Jobs and sources](https://github.com/VincenzoImp/openings-job-search/blob/main/docs/user/jobs-and-sources.md)).
+        Before asking, try the careers page's link in **Sources › Add source**: many
+        companies use one of these platforms behind their own domain.
+  - type: input
+    id: site
+    attributes:
+      label: Site or platform
+      description: The name of the job board, or of the platform behind the careers pages.
+      placeholder: "Example Jobs"
+    validations:
+      required: true
+  - type: input
+    id: url
+    attributes:
+      label: Example URL
+      description: A public page with job listings, open without signing in.
+      placeholder: "https://careers.example.com/jobs"
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What kind of site is it?
+      options:
+        - Careers page platform (one company's jobs, used by many companies)
+        - Job board (many companies' jobs, with a search)
+        - Not sure
+    validations:
+      required: true
+  - type: input
+    id: country
+    attributes:
+      label: Countries
+      description: Where its jobs are, or "worldwide".
+      placeholder: "Germany, Austria"
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else
+      description: |
+        A public API or RSS feed you know of, the site's terms on automated access,
+        or what a search on it should filter by.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I searched existing issues for this site.
+          required: true
+        - label: The example URL works without signing in.
+          required: true
+        - label: I would like to help build the collector.

@@ -1,0 +1,11 @@
+# Starts openings-job-search.service at 08:00, after the sources' morning check. A
+# run still working is never started twice; Persistent runs a missed one at boot.
+[Unit]
+Description=Openings: run my job search every morning
+
+[Timer]
+OnCalendar=*-*-* 08:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

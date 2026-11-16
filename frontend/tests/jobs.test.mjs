@@ -65,6 +65,29 @@ test("the address gives the tab, the order and the filters, and only differences
   assert.equal(view("section=shortlisted").section, "new");
 });
 
+test("a link to a job opens the tab that lists it", () => {
+  const cases = [
+    ["new", "new"],
+    ["shortlisted", "all"],
+    ["dismissed", "dismissed"],
+    [undefined, "all"],
+  ];
+  for (const [triage, section] of cases) {
+    const link = model.jobLink("j7", triage);
+    const query = new URLSearchParams(
+      Object.entries(link).filter(([, value]) => value),
+    );
+    const read = model.readView(query);
+    assert.equal(read.section, section, triage);
+    assert.equal(read.job, "j7");
+    // Written back, the address is the same link.
+    const written = Object.fromEntries(
+      Object.entries(model.viewQuery(read)).filter(([, value]) => value),
+    );
+    assert.deepEqual(written, link);
+  }
+});
+
 test("the list request names the tab, the filters and always the languages switch", () => {
   const fresh = model.listQuery(view("q=rust&source=linkedin"), 200);
   assert.equal(fresh.triage, "new");
@@ -253,4 +276,18 @@ test("history entries are named in words", () => {
     model.unspokenLine({ count: 3, hidden: true }, 37),
     "hides 3 of 40",
   );
+});
+
+test("New stays still: arrivals above the rows on screen wait for Show", () => {
+  const rows = (...ids) => ids.map((id) => ({ id }));
+  const ids = (list) => list.map((row) => row.id);
+  // The first read: everything shows.
+  assert.deepEqual(ids(model.stillRows(rows("a", "b"), null).rows), ["a", "b"]);
+  // Two jobs arrive at the top, one lands between, a next page adds "z".
+  const { rows: shown, held } = model.stillRows(
+    rows("n1", "n2", "a", "n3", "b", "z"),
+    new Set(["a", "b"]),
+  );
+  assert.deepEqual(ids(shown), ["a", "b", "z"]);
+  assert.deepEqual(ids(held), ["n1", "n2", "n3"]);
 });

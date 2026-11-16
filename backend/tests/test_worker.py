@@ -434,15 +434,18 @@ def test_missed_daily_slots_coalesce_into_one_run(lane, clock, monkeypatch):
     def runs():
         return service.list_runs(source_id=source["id"])["items"]
 
+    # The first check runs at once; the next waits for the following slot.
+    collect(worker, clock)
+    assert [run["state"] for run in runs()] == ["succeeded"]
     worker._schedule_loop(Lane(2, clock))
-    assert runs() == []
+    assert len(runs()) == 1
 
     # Two days without a scheduler leave seven elapsed slots.
     clock.advance(2 * 86400 + 5 * 3600 - 30)
     stopping = Lane(3, clock)
     worker._schedule_loop(stopping)
     assert stopping.waits == [15, 15, 15]
-    assert len(runs()) == 1
+    assert len(runs()) == 2
     planned = service.get_run(runs()[0]["id"])
     assert planned["planned_at"] == "2026-03-04T12:00:00.000000+00:00"
     assert len(planned["task_ids"]) == 1 and planned["state"] == "queued"
@@ -450,15 +453,16 @@ def test_missed_daily_slots_coalesce_into_one_run(lane, clock, monkeypatch):
     # A slot that elapses while the run is still active is absorbed by it.
     clock.advance(6 * 3600)
     worker._schedule_loop(Lane(1, clock))
-    assert len(runs()) == 1
+    assert len(runs()) == 2
     collect(worker, clock)
     assert service.get_run(planned["id"])["state"] == "succeeded"
     worker._schedule_loop(Lane(1, clock))
-    assert len(runs()) == 1
+    assert len(runs()) == 2
 
     clock.advance(12 * 3600)
     worker._schedule_loop(Lane(1, clock))
     assert sorted(service.get_run(run["id"])["planned_at"] for run in runs()) == [
+        "2026-03-02T08:00:00.000000+00:00",  # the first check, when the source was created
         "2026-03-04T12:00:00.000000+00:00",
         "2026-03-05T06:00:00.000000+00:00",
     ]
@@ -466,9 +470,11 @@ def test_missed_daily_slots_coalesce_into_one_run(lane, clock, monkeypatch):
 
 def test_paused_automation_schedules_nothing_until_resumed(lane, clock):
     _, service, worker = lane
-    source = make_source(service, enabled=True)  # default schedule: one run a day
-    paused = make_source(service, board="paused")
     service.update_collection(CollectionWrite(enabled=False, expected_version=0))
+    # Default schedule: one run a day. With collection off, a new source queues no first check.
+    source = make_source(service, enabled=True)
+    paused = make_source(service, board="paused")
+    assert service.list_runs()["total"] == 0
     clock.advance(3 * 86400)
     worker._schedule_loop(Lane(2, clock))
     assert service.list_runs()["total"] == 0

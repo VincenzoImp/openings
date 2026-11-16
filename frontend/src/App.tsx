@@ -67,6 +67,7 @@ export default function App() {
       <Suspense fallback={waiting}>
         <Auth
           configured={session.configured}
+          setupCode={!!session.setup_code}
           onSuccess={(value) => {
             // A new installation starts with the first-run guide.
             if (!session.configured) navigate(href("setup"), { replace: true });
@@ -76,5 +77,5 @@ export default function App() {
         />
       </Suspense>
     );
-  return <Shell onSignOut={signOut} />;
+  return <Shell onSignOut={signOut} demo={!!session.demo} />;
 }

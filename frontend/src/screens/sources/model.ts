@@ -10,18 +10,23 @@ export type SourceView = components["schemas"]["Source"];
 /** A collection run (a check) as Recent checks reads it. */
 export type CheckView = components["schemas"]["CollectionRun"];
 
-/** The three kinds a person chooses between. */
-export type SourceKind = "search" | "company" | "feed";
+/** The kinds a person chooses between. */
+export type SourceKind = "search" | "company" | "feed" | "hn";
 
 export const KIND_LABELS: Record<SourceKind, string> = {
   search: "Search",
   company: "Company careers page",
   feed: "RSS feed",
+  hn: "HN Who is hiring",
 };
+/** What an HN source reads, in its row and its form. */
+export const HN_HINT =
+  "Each top-level comment of the latest monthly Ask HN: Who is hiring? thread is a job.";
 
 export function kindOf(source: { kind: string }): SourceKind {
   if (source.kind === "jobspy") return "search";
   if (source.kind === "rss") return "feed";
+  if (source.kind === "hnhiring") return "hn";
   return "company";
 }
 
@@ -105,7 +110,8 @@ export function sitesLine(source: SourceView) {
 
 /**
  * What a source searches, in one line, without empty parts:
- * "Data engineer · Zurich · LinkedIn, Indeed", "Greenhouse" or "RSS feed · example.test".
+ * "Data engineer · Zurich · LinkedIn, Indeed", "Greenhouse", "RSS feed · example.test"
+ * or "Hacker News · latest thread".
  * A board's internal slug is not shown; the source's name says which board.
  */
 export function describeSource(
@@ -121,6 +127,7 @@ export function describeSource(
     ]
       .filter(Boolean)
       .join(" · ");
+  if (kind === "hn") return "Hacker News · latest thread";
   const where = source.url
     ? shortUrl(source.url)
     : text(source.config.url)
@@ -205,8 +212,16 @@ export function sourceStatus(
   now = new Date(),
 ): SourceStatus {
   const run = source.last_run ?? null;
-  if (run && isActive(run.state))
-    return { text: "Checking now…", running: true };
+  if (run && isActive(run.state)) {
+    const counts = (run.counts ?? {}) as Record<string, unknown>;
+    const listed = number(counts.listed);
+    return {
+      text: listed
+        ? `Checking now… · fetched ${Math.min(number(counts.received), listed)} of ${listed}`
+        : "Checking now…",
+      running: true,
+    };
+  }
   if (!source.automatic_collection)
     return {
       text: "Can't be checked automatically: the site gives no posting text",
@@ -290,6 +305,7 @@ export function suggestedName(
     return [values.query?.trim(), values.location?.trim()]
       .filter(Boolean)
       .join(" · ");
+  if (kind === "hn") return KIND_LABELS.hn;
   const url = values.url?.trim();
   if (!url) return "";
   const detected = detectBoard(url);
@@ -400,3 +416,76 @@ export const POSTED_WITHIN: [number, string][] = [
   [336, "14 days"],
   [720, "30 days"],
 ];
+
+/**
+ * A reason the server gives for a wait ("… waits until 14:05 UTC …"), with
+ * the time in the viewer's own clock when the wait's moment is known.
+ */
+export function localReason(message: string, until?: unknown) {
+  if (typeof until !== "string" || !until) return message;
+  const local = clock(until);
+  return local ? message.replace(/\b\d{2}:\d{2} UTC\b/, local) : message;
+}
+
+/** Whether a previewed posting came with its text. */
+export const hasText = (item: Record<string, unknown>) =>
+  typeof item.posting === "string" && item.posting.trim() !== "";
+
+type Previewed = {
+  items: Record<string, unknown>[];
+  total: number;
+  listed?: number | null;
+};
+
+/**
+ * A Test's listing with the text one posting's answer brought. The rest of
+ * the answer (its diagnostics) replaces the earlier one's; a refusal keeps
+ * the titles the listing gave.
+ */
+export function withText<T extends Previewed>(before: T, answer: T): T {
+  const id = (item: Record<string, unknown>) =>
+    String(item.source_key ?? item.url);
+  const arrived = new Map(
+    answer.items.filter(hasText).map((item) => [id(item), item]),
+  );
+  return {
+    ...answer,
+    items: before.items.map((item) => arrived.get(id(item)) ?? item),
+    total: before.total,
+    listed: answer.listed ?? before.listed,
+  };
+}
+
+/** What a Test is doing or found: its heading. */
+export function testHeading({
+  phase,
+  total,
+  shown,
+  listed,
+  failed,
+  fetched = 0,
+  fetching = shown,
+}: {
+  /** "listing" until the board answers, "details" while the text arrives. */
+  phase: "listing" | "details" | "done";
+  total: number;
+  shown: number;
+  listed?: number | null;
+  failed?: boolean;
+  /** While the text arrives: the postings that have it, of how many. */
+  fetched?: number;
+  fetching?: number;
+}) {
+  const count = listed ?? total;
+  const jobs = `${count} ${count === 1 ? "job" : "jobs"}`;
+  if (phase === "listing") return "Testing…";
+  if (phase === "details")
+    return `${jobs} listed · fetched ${fetched} of ${fetching}…`;
+  if (failed) return "Test failed";
+  if (!total && !count) return "No jobs found";
+  return shown < count ? `${jobs} found · the first ${shown}` : `${jobs} found`;
+}
+
+/** The advice under an empty or refused search: a careers page is read directly. */
+export const CAREERS_ADVICE =
+  "Job sites can answer with nothing or refuse requests from your network. A company's careers page is read directly: follow one instead.";

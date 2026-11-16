@@ -9,8 +9,8 @@ from ..discovery import (
     SourceBulk,
     SourceCreate,
     SourcePatch,
-    SourcePreview,
     SourceRun,
+    SourceTest,
 )
 from ..discovery.models import (
     CollectionQuery,
@@ -108,8 +108,8 @@ def sources_list(ws: WS, query: Q[SourceQuery]) -> SourcePage:
 def sources_save(ws: WS, body: SourcesSave) -> BatchResult:
     """Add or update up to 50 sources (saved searches, company boards, feeds).
 
-    source_id with expected_version updates; enabled false pauses. Preview a new source
-    with sources_run first.
+    source_id with expected_version updates. A new source is paused unless enabled true.
+    Preview a new source with sources_run first.
     """
     return ws.discovery.save_sources(body)
 
@@ -125,7 +125,7 @@ def sources_run(ws: WS, body: SourceRunInput) -> SourcePreviewResult | Task:
 
 
 @operation("POST /sources/preview", open_world=True, tags=["sources"], mcp="sources_run")
-def sources_preview(ws: WS, body: SourcePreview) -> SourcePreviewResult:
+def sources_preview(ws: WS, body: SourceTest) -> SourcePreviewResult:
     """Preview a source without storing jobs, through the provider gate."""
     return ws.discovery.preview_source(body)
 

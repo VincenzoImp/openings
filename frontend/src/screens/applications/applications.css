@@ -25,29 +25,10 @@
     letter-spacing: 0;
   }
 
-  /* Toolbar: the stage tabs scroll, with a fade where they do not fit; the
-     tools keep their room. */
-  .ap-toolbar {
-    gap: var(--s-4);
-  }
+  /* Toolbar: every stage tab shows; where the tools do not fit beside
+     them, the tools take a line of their own (ui/tabs.css). */
   .ap-stages {
-    flex: 1;
-    padding-right: var(--s-8);
-    mask-image: linear-gradient(
-      to right,
-      black calc(100% - var(--s-8)),
-      transparent
-    );
-  }
-  .ap-tools {
-    display: flex;
-    align-items: center;
     flex: none;
-    gap: var(--s-1);
-  }
-  .ap-tools .ui-search {
-    width: 200px;
-    margin-right: var(--s-1);
   }
   .ap-search-row {
     display: none;
@@ -121,11 +102,6 @@
     font-weight: var(--w-medium);
     letter-spacing: 0;
   }
-  .ap-section-title {
-    font: var(--t-md);
-    font-weight: var(--w-semibold);
-    letter-spacing: var(--tr-md);
-  }
   .ap-funnel {
     display: flex;
     flex-direction: column;
@@ -191,18 +167,17 @@
     text-decoration: underline;
   }
 
-  @container app (max-width: 1100px) {
-    .ap-tools .ui-search {
-      width: 150px;
-    }
-  }
-
   @container app (max-width: 719px) {
-    .ap-toolbar {
-      padding: 0 var(--s-4);
-    }
-    .ap-tools {
-      display: none;
+    /* The phone's chips scroll, with a fade where they do not fit. */
+    .ap-stages {
+      flex: 1 1 auto;
+      min-width: 0;
+      padding-right: var(--s-8);
+      mask-image: linear-gradient(
+        to right,
+        black calc(100% - var(--s-8)),
+        transparent
+      );
     }
     .ap-search-row {
       display: block;
