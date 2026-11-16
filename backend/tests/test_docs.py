@@ -54,6 +54,26 @@ def test_the_docs_fit_their_limits():
     assert len((ROOT / "docs/developer/architecture.md").read_text().splitlines()) <= 150
 
 
+QUICK_START = re.compile(r"<!-- quick-start\b.*?-->(.*?)<!-- /quick-start -->", re.DOTALL)
+FENCE = re.compile(r"^```\w*\n(.*?)^```$", re.MULTILINE | re.DOTALL)
+
+
+def quick_start(page):
+    """The commands of a page's quick start: its fenced blocks between the markers."""
+    found = QUICK_START.search(page.read_text())
+    return found and FENCE.findall(found.group(1))
+
+
+def test_every_quick_start_carries_the_same_commands():
+    reference = quick_start(ROOT / "docs/user/getting-started.md")
+    assert reference and any(block.endswith(" demo\n") for block in reference)
+    assert not any("clone" in block for block in reference)
+    # The README and the Docker Hub page carry the same blocks once they mark theirs.
+    for page in (ROOT / "README.md", ROOT / "docs/dockerhub.md"):
+        if page.exists() and quick_start(page):
+            assert quick_start(page) == reference, page.relative_to(ROOT)
+
+
 def links(page):
     return [markdown or html for markdown, html in LINK.findall(page.read_text())]
 
