@@ -1,9 +1,9 @@
 ---
 name: openings
 title: Work in your Openings workspace
-summary: Ask about or change anything in your job search, from jobs and applications to your Profile, career entries and Preferences.
+summary: Your agent answers any question and makes any change in your job search, from jobs and applications to your Profile, career entries and Preferences.
 example: What needs my attention in Openings this week?
-description: Core rules for any work in an Openings job-search workspace over MCP - the start read, Preferences and standing instructions, hard limits, critical actions and their undo, runs without the owner, the report back. Read it before every other Openings skill, and alone for questions no other skill covers.
+description: Core rules for any work in an Openings job-search workspace over MCP (the start read, Preferences and standing instructions, hard limits, critical actions and their undo, runs without the owner, the report back). Read it before every other Openings skill, and alone for questions no other skill covers.
 ---
 
 # Openings

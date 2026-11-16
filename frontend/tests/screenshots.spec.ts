@@ -1,7 +1,8 @@
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { screenshotWithPdfs } from "../scripts/capture.mjs";
 import { test as base, expect, type Page } from "./fixtures";
 import { startServer, type Server } from "./server";
 import { blockButton, call, go } from "./session";
@@ -249,6 +250,11 @@ const SOURCES_AND_SETTINGS: Screen[] = [
     route: "settings?section=agents",
     // The address as an installation shows it, not the test server's port.
     prepare: localOrigin,
+    // The Codex line, the one the docs give beside the plugin's.
+    open: async (page) => {
+      await page.getByRole("tab", { name: "Codex" }).click();
+      await expect(page.getByText(/^codex mcp add openings/)).toBeVisible();
+    },
     docs: "agents",
   },
   {
@@ -315,6 +321,22 @@ async function settledScreen(page: Page) {
   await expect(page.locator(".ui-skeleton")).toHaveCount(0);
 }
 
+/**
+ * Stats of the demo workspace, labelled "Example data" beside the period:
+ * the docs show no outcome numbers that could be read as anyone's own.
+ */
+async function exampleData(page: Page) {
+  await settledScreen(page);
+  const period = page.getByRole("toolbar", { name: "Period" });
+  await period.evaluate((toolbar) => {
+    const label = document.createElement("span");
+    label.className = "ui-tag ui-tone-warning"; // docs/brand: "Example data" is warning
+    label.textContent = "Example data";
+    toolbar.append(label);
+  });
+  await expect(period.getByText("Example data")).toBeVisible();
+}
+
 /** The default CV template. */
 async function defaultCv(page: Page) {
   const cv = (await call(page, "/templates?kind=cv&limit=200")).items.find(
@@ -343,7 +365,7 @@ const SCREENS: Screen[] = [
   { name: "setup-jobs", route: "setup?step=jobs", workspace: "empty" },
   { name: "setup-cv", route: "setup?step=cv", workspace: "empty" },
   { name: "setup-done", route: "setup?step=done", workspace: "empty" },
-  { name: "today", route: "today", wide: true },
+  { name: "today", route: "today", docs: "today", wide: true },
   { name: "today-caught-up", route: "today", prepare: caughtUp },
   { name: "today-empty", route: "today", workspace: "empty" },
   {
@@ -380,7 +402,8 @@ const SCREENS: Screen[] = [
   {
     name: "applications-stats",
     route: "applications?section=stats",
-    open: settledScreen,
+    docs: "stats",
+    open: exampleData,
   },
   {
     name: "application-shortlisted",
@@ -391,7 +414,7 @@ const SCREENS: Screen[] = [
   {
     name: "ready",
     route: async (page) =>
-      `applications/${await first(page, "/applications?stage=ready&sort=deadline&limit=1")}`,
+      `applications/${await first(page, "/applications?stage=ready&sort=priority&limit=1")}`,
     docs: "ready",
     open: settledScreen,
     wide: true,
@@ -399,7 +422,7 @@ const SCREENS: Screen[] = [
   {
     name: "application-after-mark-applied",
     route: async (page) =>
-      `applications/${await first(page, "/applications?stage=ready&sort=deadline&limit=1")}`,
+      `applications/${await first(page, "/applications?stage=ready&sort=priority&limit=1")}`,
     open: async (page) => {
       await settledScreen(page);
       await page
@@ -417,6 +440,17 @@ const SCREENS: Screen[] = [
       `applications/${await first(page, "/applications?stage=interview&limit=1")}`,
     open: settledScreen,
     wide: true,
+  },
+  {
+    // The interview brief the agent saved as a note on the application.
+    name: "application-brief",
+    route: async (page) =>
+      `applications/${await first(page, "/applications?company=Freightwise&limit=1")}`,
+    docs: "brief",
+    open: async (page) => {
+      await settledScreen(page);
+      await expect(page.getByText(/^Interview brief:/).first()).toBeVisible();
+    },
   },
   {
     name: "application-record-reply",
@@ -466,6 +500,14 @@ const SCREENS: Screen[] = [
   {
     name: "jobs-dismissed",
     route: "jobs?section=dismissed&dismissed_by=agent",
+    docs: "dismissed",
+    // The dismissal whose reason quotes a line of the Preferences.
+    open: async (page) => {
+      await page.getByText("Staff Backend Engineer").first().click();
+      await expect(
+        page.getByText(/remote within Europe/).first(),
+      ).toBeVisible();
+    },
   },
   { name: "jobs-all", route: "jobs?section=all" },
   { name: "jobs-empty", route: "jobs?q=no%20job%20has%20this%20title" },
@@ -591,7 +633,13 @@ async function capture(
   if (!viewportOnly) await page.addStyleTag({ content: FULL_PAGE });
   const fullPage =
     !viewportOnly && !(screen.sheet && (page.viewportSize()?.width ?? 0) < 720);
-  await page.screenshot({ path, fullPage, animations: "disabled" });
+  // An application's PDFs must show in the image, page and all.
+  const image = await screenshotWithPdfs(page, {
+    fullPage,
+    animations: "disabled",
+  });
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, image);
 }
 
 const FULL_PAGE = `

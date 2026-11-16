@@ -1,9 +1,9 @@
 ---
 name: maintain-workspace
 title: Keep your workspace safe and tidy
-summary: Have backups and exports taken and checked, stale items tidied away reversibly, records deleted only when you ask, and an agent run undone.
+summary: Your agent takes and checks backups and exports, tidies stale items reversibly, deletes records only when you ask and undoes an agent run.
 example: Take a backup, then undo what you did yesterday.
-description: Back up, export, tidy and clean up an Openings workspace - "back up my workspace", "export my records", "clean up old jobs", "delete these permanently", "undo what you did yesterday". Prefers what can be undone, backs up before deleting and checks every result.
+description: Back up, export, tidy and clean up an Openings workspace, as in "back up my workspace", "export my records", "clean up old jobs", "delete these permanently", "undo what you did yesterday". Prefers what can be undone, backs up before deleting and checks every result.
 ---
 
 # Keep your workspace safe and tidy

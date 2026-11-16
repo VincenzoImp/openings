@@ -1,9 +1,9 @@
 ---
 name: run-job-search
 title: Run my job search
-summary: Have new jobs triaged, the shortlist prepared to Ready and ranked, deadlines and replies checked and a short report written, on request or on a schedule.
-example: Go through my new jobs and get everything Ready.
-description: Run the whole Openings routine end to end - "run my job search", "empty my inbox", "get everything Ready", "do the daily run", "weekly report", "run this every morning". Checks collection, triages, prepares, ranks, watches deadlines and replies, and reports; also on a schedule in the owner's own harness.
+summary: Your agent triages new jobs, prepares and ranks the shortlist, checks deadlines and replies, and reports back, when you ask or on a schedule.
+example: Run my job search and get everything Ready.
+description: Run the whole Openings routine end to end, as in "run my job search", "clear Jobs › New", "get everything Ready", "do the daily run", "weekly report", "run this every morning". Checks collection, triages, prepares, ranks, watches deadlines and replies, and reports; also on a schedule in the owner's own harness.
 ---
 
 # Run my job search

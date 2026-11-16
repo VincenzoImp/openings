@@ -67,7 +67,7 @@ test("each row has one status phrase that follows its stage", () => {
   });
 });
 
-test("Needs action: Ready by deadline, dated Shortlisted, overdue, then the rest", () => {
+test("Needs action: Ready best first, dated Shortlisted, overdue, then the rest", () => {
   const rows = [
     app({ id: "rest", stage: "interview", updated_at: "2026-11-12T00:00Z" }),
     app({ id: "late", stage: "applied", applied_at: "2026-08-01T00:00Z" }),
@@ -88,6 +88,37 @@ test("Needs action: Ready by deadline, dated Shortlisted, overdue, then the rest
     model.sortApplications(rows, "updated", 45, now)[0].id,
     "rest",
   );
+});
+
+test("Ready is ranked best first: priority, then deadline", () => {
+  const rows = [
+    app({ id: "none", ready: true, deadline: "2026-11-14" }),
+    app({ id: "p2-soon", ready: true, priority: 2, deadline: "2026-11-15" }),
+    app({ id: "p1-late", ready: true, priority: 1, deadline: "2026-12-20" }),
+    app({ id: "p2-undated", ready: true, priority: 2 }),
+    app({ id: "p1-soon", ready: true, priority: 1, deadline: "2026-11-30" }),
+    app({
+      id: "tie-new",
+      ready: true,
+      priority: 3,
+      deadline: "2026-11-20",
+      updated_at: "2026-11-12T00:00Z",
+    }),
+    app({ id: "tie-old", ready: true, priority: 3, deadline: "2026-11-20" }),
+  ];
+  assert.deepEqual(
+    model.sortApplications(rows, "needs", 45, now).map((row) => row.id),
+    [
+      "p1-soon",
+      "p1-late",
+      "p2-soon",
+      "p2-undated",
+      "tie-new",
+      "tie-old",
+      "none",
+    ],
+  );
+  assert.equal(model.NEEDS_GROUPS[0], "Ready to send, best first");
 });
 
 test("the bulk bar offers only the actions valid for the whole selection", () => {

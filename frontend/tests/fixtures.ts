@@ -10,6 +10,7 @@
 // a describe block opts out) and fails on any uncaught error of the page; a
 // test that provokes one on purpose empties `pageErrors` itself.
 import { expect, test as base } from "@playwright/test";
+import { expectPdfViewer } from "../scripts/capture.mjs";
 import { startServer, type Server } from "./server";
 import { ownerSession } from "./session";
 
@@ -17,11 +18,21 @@ export { expect } from "@playwright/test";
 export type { BrowserContext, Locator, Page } from "@playwright/test";
 
 export type Options = { signedIn: boolean };
+// A capture project (screenshots, reel, video) needs the browser's PDF viewer.
+export type WorkerOptions = { pdfViewer: boolean };
 
 export const test = base.extend<
   Options & { seededWorkspace: void; pageErrors: string[] },
-  { server: Server }
+  WorkerOptions & { server: Server; pdfViewerChecked: void }
 >({
+  pdfViewer: [false, { option: true, scope: "worker" }],
+  pdfViewerChecked: [
+    async ({ browser, pdfViewer }, use) => {
+      if (pdfViewer) await expectPdfViewer(browser);
+      await use();
+    },
+    { scope: "worker", auto: true },
+  ],
   server: [
     async ({}, use) => {
       const snapshot = process.env.OPENINGS_E2E_SNAPSHOT;

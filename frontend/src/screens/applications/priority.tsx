@@ -18,3 +18,17 @@ export function HighPriority({ priority }: { priority?: number | null }) {
     </span>
   );
 }
+
+/** A Ready row's place in the best-first order (priority, then deadline). */
+export function ReadyRank({ rank }: { rank: number }) {
+  return (
+    <span className="ui-row-rank" title="Best first: priority, then deadline">
+      <span className="ui-sr">Rank </span>
+      {rank}
+    </span>
+  );
+}
+
+/** "Priority 2", or nothing when the application has no priority. */
+export const priorityText = (priority?: number | null) =>
+  priority ? `Priority ${priority}` : "";

@@ -67,9 +67,15 @@ function Modal({
   useEffect(() => {
     const dialog = ref.current;
     if (!dialog) return;
+    // The close event comes a task after close(): by then the browser may
+    // have restored focus itself, or the person moved it on, so focus goes
+    // back only when nothing outside the dialog holds it.
     const restore = () => {
       const target = returnTo.current;
       returnTo.current = null;
+      const active = document.activeElement;
+      if (active && active !== document.body && !dialog.contains(active))
+        return;
       if (target?.isConnected) target.focus();
     };
     dialog.addEventListener("close", restore);

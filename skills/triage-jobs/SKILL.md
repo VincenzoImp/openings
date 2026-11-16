@@ -1,9 +1,9 @@
 ---
 name: triage-jobs
 title: Go through new jobs
-summary: Have your new jobs read against your Preferences and experience, then shortlisted with a priority or dismissed with a reason.
-example: Go through my new jobs using my criteria, and filter them really well.
-description: Triage the new jobs in Openings by the owner's Preferences and career entries - "go through new jobs", "triage my new jobs", "filter them well", "anything good today?". Completes partial postings, shortlists clear fits with a priority, dismisses confirmed mismatches with a reason, resolves duplicates and asks about the rest.
+summary: Your agent reads new jobs by your Preferences and experience, shortlists fits with a priority and dismisses mismatches with a reason.
+example: Go through my new jobs and filter them by my criteria.
+description: Triage the new jobs in Openings by the owner's Preferences and career entries, as in "go through new jobs", "triage my new jobs", "filter them well", "anything good today?". Completes partial postings, shortlists clear fits with a priority, dismisses confirmed mismatches with a reason, resolves duplicates and asks about the rest.
 ---
 
 # Go through new jobs
@@ -62,8 +62,8 @@ Read every other posting in full, 20 at a time, and decide each:
   CV and letter for each one, unless Working with me sets another bar.
 - **Dismiss**: a concrete dealbreaker or a clear mismatch, stated in the
   posting. The reason is one sentence the owner reads beside the job: the fact
-  and their preference, as in "Requires fluent German; you speak English and
-  Italian".
+  and the Preference in its words: "Office in Oslo; you look for remote
+  within Europe".
 - **Leave it new and ask**: a plausible fit that depends on a fact you lack,
   or a borderline case. Group these into a few questions. In a run without the
   owner, leave them and list them in the report.

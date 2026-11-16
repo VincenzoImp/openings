@@ -101,7 +101,7 @@ test("five Ready applications are sent from Today with five Mark applied and no 
   await page.reload();
   await page.locator(`a[href="#applications/${queue[0].id}"]`).first().click();
   await expect(page).toHaveURL(new RegExp(`#applications/${queue[0].id}$`));
-  await expect(page.getByText("1 of 5 ready")).toBeVisible();
+  await expect(page.getByText("1 of 5 ready · best first")).toBeVisible();
   for (const [index, app] of queue.entries()) {
     await expect(page).toHaveURL(new RegExp(`#applications/${app.id}$`));
     await expect(
@@ -416,7 +416,7 @@ test("the list starts with what needs action and opens the page; Stats has its n
   await go(page, "applications");
   const list = page.getByRole("region", { name: "Applications" });
   await expect(
-    list.getByRole("heading", { name: /^Ready to send/ }),
+    list.getByRole("heading", { name: /^Ready to send, best first/ }),
   ).toBeVisible();
   const row = list.locator("[data-row-id]").first();
   const box = (await row.boundingBox())!;

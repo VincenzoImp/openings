@@ -20,7 +20,7 @@ import {
   type Application,
 } from "./data";
 import { deadlineLabel } from "../applications/days";
-import { HighPriority } from "../applications/priority";
+import { priorityText, ReadyRank } from "../applications/priority";
 import { daysSince, missingText, roleOf, type Row } from "./model";
 
 // The reply form loads when it is first opened; Today itself stays small.
@@ -89,7 +89,7 @@ function Rows({
   );
 }
 
-/** Ready to apply: the send queue, closest deadline first. */
+/** Ready to apply: the send queue, best first (priority, then deadline). */
 export function Ready({
   page,
 }: {
@@ -113,8 +113,9 @@ export function Ready({
         )
       }
     >
+      <p className="today-note">Best first: priority, then deadline.</p>
       <Rows label="Ready applications" ids={page.items.map((row) => row.id)}>
-        {page.items.map((row) => {
+        {page.items.map((row, index) => {
           const { title, company } = roleOf(row);
           const deadline = deadlineLabel(row.deadline);
           return (
@@ -122,9 +123,11 @@ export function Ready({
               key={row.id}
               id={row.id}
               href={applicationHref(row.id)}
-              leading={<HighPriority priority={row.priority} />}
+              leading={<ReadyRank rank={index + 1} />}
               title={title}
-              sub={company}
+              sub={[company, priorityText(row.priority)]
+                .filter(Boolean)
+                .join(" · ")}
               meta={
                 deadline && (
                   <ToneText tone={deadline.tone}>{deadline.text}</ToneText>

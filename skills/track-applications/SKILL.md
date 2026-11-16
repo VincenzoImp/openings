@@ -1,9 +1,9 @@
 ---
 name: track-applications
 title: Track your applications
-summary: Tell your agent what happened - a reply, an interview, a rejection - and see what is waiting on you or an employer.
-example: Northstar Labs replied, they want an interview on Monday.
-description: Record and review the progress of Openings applications - "X replied", "I applied to Y", "I got rejected by Z", "what's waiting?", "what's due this week?", "close the ones that never answered", "draft a follow-up", "I accepted an offer". Records what the owner reports, or what a source they named shows.
+summary: Your agent records each reply, interview or rejection you report and tells you what is waiting on you or on an employer.
+example: Northstar Labs replied. They want an interview on Monday.
+description: Record and review the progress of Openings applications, as in "X replied", "I applied to Y", "I got rejected by Z", "what's waiting?", "what's due this week?", "close the ones that never answered", "draft a follow-up", "I accepted an offer". Records what the owner reports, or what a source they named shows.
 ---
 
 # Track your applications

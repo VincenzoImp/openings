@@ -73,7 +73,7 @@ export function TemplateDetail({
   const kind = kindLabel(template.kind);
   // On a phone the detail is the page: its title is the h1.
   const Heading = usePushed() ? "h1" : "h2";
-  const files = template.file_count ?? 0;
+  const files = full?.files?.length ?? template.file_count ?? 0;
   const fail = (cause: unknown) =>
     toast.show({
       tone: "error",

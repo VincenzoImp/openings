@@ -195,18 +195,20 @@ export function EditBlock({
   const cancel = () => editing.request(null);
 
   // The field marked data-autofocus, or else the first, takes focus when the
-  // block opens.
+  // block opens, unless a field already has it: the person may have tapped
+  // one before the next frame, and typing must stay where they put it.
   const formRef = useCallback((form: HTMLFormElement | null) => {
     if (!form || !first.current) return;
     first.current = false;
-    requestAnimationFrame(() =>
+    requestAnimationFrame(() => {
+      if (form.contains(document.activeElement)) return;
       (
         form.querySelector<HTMLElement>("[data-autofocus]") ??
         form.querySelector<HTMLElement>(
           "input:not([type=file]), textarea, select",
         )
-      )?.focus(),
-    );
+      )?.focus();
+    });
   }, []);
 
   useEffect(() => {

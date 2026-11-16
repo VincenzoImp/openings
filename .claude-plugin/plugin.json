@@ -1,7 +1,7 @@
 {
   "name": "openings",
   "displayName": "Openings",
-  "version": "0.28.0",
+  "version": "0.28.1",
   "description": "Your Openings job-search workspace in Claude Code: the MCP server at OPENINGS_URL (default http://127.0.0.1:8080) with the agent token in OPENINGS_TOKEN, and the skills that ship with the app.",
   "author": {
     "name": "Vincenzo Imperati",

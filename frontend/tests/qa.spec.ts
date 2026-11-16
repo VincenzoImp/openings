@@ -2,8 +2,6 @@ import { test, expect } from "./fixtures";
 import { go, heading, settled } from "./session";
 
 // Regressions found by the interaction QA pass (docs/developer/qa-checklist.md).
-// A `test.fail` is a known defect with its own issue: it passes while the
-// defect is there, and the fix removes the annotation.
 
 // The widths of the QA checklist that shell.spec.ts does not already cover.
 for (const width of [768, 1280, 1920, 2560])

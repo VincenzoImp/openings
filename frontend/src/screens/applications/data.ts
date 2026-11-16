@@ -102,16 +102,16 @@ export function useApplicationList(params: ListParams, limit = PAGE) {
   };
 }
 
-/** Every Ready application, in Today's order: the send queue. */
+/** Every Ready application, best first as Today ranks it: the send queue. */
 export function useReadyQueue() {
   const query = useQuery({
-    queryKey: ["applications", "list", { stage: "ready", sort: "deadline" }],
+    queryKey: ["applications", "list", { stage: "ready", sort: "priority" }],
     queryFn: ({ signal }) =>
       readRows(Number.POSITIVE_INFINITY, (limit, offset) =>
         call(
           api.GET("/api/v1/applications", {
             params: {
-              query: { stage: "ready", sort: "deadline", limit, offset },
+              query: { stage: "ready", sort: "priority", limit, offset },
             },
             signal,
           }),

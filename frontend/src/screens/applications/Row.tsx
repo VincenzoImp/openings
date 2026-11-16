@@ -8,7 +8,7 @@ import { href, navigate } from "../../shell/router";
 import { jobOf, type ApplicationRow } from "./data";
 import type { DialogKind } from "./dialogs";
 import { isSent, stageOf, statusPhrase } from "./model";
-import { HighPriority } from "./priority";
+import { HighPriority, priorityText, ReadyRank } from "./priority";
 
 /** The page of an application. */
 export const pageHref = (id: string) => href("application", { id });
@@ -87,8 +87,9 @@ export function rowMenu(
 /**
  * One application: role, company and place, then its one status phrase. The
  * stage glyph shows only where stages mix (`mixed`); in a stage tab or group
- * the phrase says the rest (a Ready row: its deadline, and the salary to
- * state when one is set). On hover, focus or
+ * the phrase says the rest (a Ready row: its priority and deadline, and the
+ * salary to state when one is set). In the best-first order a Ready row
+ * leads with its `rank`. On hover, focus or
  * selection the phrase gives way to the stage's action (Apply, Record reply)
  * and the `…` menu.
  */
@@ -96,6 +97,7 @@ export function ApplicationRowView({
   app,
   noReplyDays,
   mixed = true,
+  rank,
   onDialog,
   onReopen,
 }: {
@@ -103,6 +105,8 @@ export function ApplicationRowView({
   noReplyDays: number;
   /** Rows of several stages together: the stage glyph tells them apart. */
   mixed?: boolean;
+  /** A Ready row's place in the best-first order. */
+  rank?: number;
   onDialog: (kind: DialogKind) => void;
   onReopen: () => void;
 }) {
@@ -111,6 +115,8 @@ export function ApplicationRowView({
   const phrase = statusPhrase(app, noReplyDays, undefined, {
     stageShown: !mixed,
   });
+  // Every Ready row says its priority, which ranks it.
+  const priority = stage === "ready" ? priorityText(app.priority) : "";
   const actions: RowAction[] = [];
   if (stage === "ready")
     actions.push({
@@ -129,7 +135,13 @@ export function ApplicationRowView({
     <ListRow
       id={app.id}
       href={pageHref(app.id)}
-      leading={<HighPriority priority={app.priority} />}
+      leading={
+        rank && stage === "ready" ? (
+          <ReadyRank rank={rank} />
+        ) : (
+          <HighPriority priority={app.priority} />
+        )
+      }
       title={job.title}
       sub={
         <>
@@ -140,9 +152,11 @@ export function ApplicationRowView({
               {job.location}
             </span>
           )}
-          {phrase.text && (
+          {(priority || phrase.text) && (
             <span className="ap-sub-status">
               {" · "}
+              {priority}
+              {priority && phrase.text && " · "}
               <ToneText tone={phrase.tone}>{phrase.text}</ToneText>
             </span>
           )}
@@ -155,11 +169,16 @@ export function ApplicationRowView({
       }
       meta={
         mixed ? (
-          <StatusText app={app} noReplyDays={noReplyDays} />
+          <span className="ap-status">
+            {priority && `${priority} · `}
+            <StatusText app={app} noReplyDays={noReplyDays} />
+          </span>
         ) : (
-          phrase.text && (
+          (priority || phrase.text) && (
             <span className="ap-status">
               <span className="ui-sr">{STAGES[stage]}: </span>
+              {priority}
+              {priority && phrase.text && " · "}
               <ToneText tone={phrase.tone}>{phrase.text}</ToneText>
             </span>
           )

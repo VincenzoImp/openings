@@ -1,9 +1,9 @@
 ---
 name: maintain-career
 title: Keep your Profile and career entries current
-summary: Give your agent a CV or tell it what changed, and have your Profile, career entries, highlights, templates and Preferences kept current.
+summary: Your agent keeps your Profile, career entries, highlights, templates and Preferences current from a CV or from what you say changed.
 example: Update my profile from this CV.
-description: Maintain the owner's Openings Profile, career entries, highlights, CV/letter templates and Preferences - "update my profile from this CV", "add my new job", "improve my highlights", "fix my CV template", "learn from my corrections". Reconciles new material into the record without inventing anything.
+description: Maintain the owner's Openings Profile, career entries, highlights, CV and letter templates and Preferences, as in "update my profile from this CV", "add my new job", "improve my highlights", "fix my CV template", "learn from my corrections". Reconciles new material into the record and invents nothing.
 ---
 
 # Keep your Profile and career entries current

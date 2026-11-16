@@ -288,7 +288,7 @@ jobs:
           # The description equals pyproject.toml's (scripts/check_package.py checks it).
           docker buildx imagetools create "${tags[@]}" \
             --annotation 'index:org.opencontainers.image.title=Openings' \
-            --annotation 'index:org.opencontainers.image.description=Self-hosted job search: every new job, filtered, prepared and ranked. You just apply. Use it by hand, over a REST API, or with your own AI agent over MCP. One container, one SQLite file.' \
+            --annotation 'index:org.opencontainers.image.description=Self-hosted job-search app. Set up your career, rules, templates and sources once; your own AI agent (Claude Code, Codex, any MCP client) works it by your rules. You apply.' \
             --annotation 'index:org.opencontainers.image.url=https://github.com/VincenzoImp/openings-job-search' \
             --annotation 'index:org.opencontainers.image.source=https://github.com/VincenzoImp/openings-job-search' \
             --annotation 'index:org.opencontainers.image.licenses=MIT' \
@@ -360,7 +360,7 @@ jobs:
           password: ${{ secrets.DOCKERHUB_DESCRIPTION_TOKEN }}
           repository: ${{ steps.repository.outputs.name }}
           readme-filepath: docs/dockerhub.md
-          short-description: 'Self-hosted job search: fresh jobs, no duplicates, prepared and ranked by your AI agent.'
+          short-description: 'Set up your job search once; your own AI agent works it by your rules. Self-hosted. You apply.'
 
   release:
     needs: [version, publish]

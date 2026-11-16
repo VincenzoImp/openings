@@ -1,30 +1,62 @@
 <p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/brand/wordmark-mark-dark.svg"><img alt="Openings" src="docs/brand/wordmark-mark.svg" height="48"></picture></p>
 
-<h3 align="center">Every new job, filtered, prepared and ranked. You just apply.</h3>
+<h3 align="center">Set up your job search once. Your AI agent works it by your rules. You just apply.</h3>
 
-<p align="center">A self-hosted job-search app: fresh jobs from your searches and favorite companies, no duplicates. Your own AI agent (Claude Code, Codex, any MCP client) shortlists, tailors and ranks them. You apply, best first.</p>
+<p align="center">Openings keeps your career, your rules in your own words, your CV and letter templates and the searches you watch in one self-hosted app. Your own AI agent reads them to sort every new job, write a tailored CV and letter as PDFs, and rank what's ready. Everything also works by hand. Nothing in Openings can apply for you.</p>
 
 <div align="center">
 
-[Quick start](#quick-start) · [Try the demo](#look-first) · [Use with your agent](#mcp-server-for-your-ai-agent) · [Compare](#compared) · [Docs](docs/README.md) · [Changelog](CHANGELOG.md)
+[Try the demo](#look-first) · [Quick start](#quick-start) · [Claude Code, Codex, any MCP client](#use-it-with-your-agent) · [REST API](docs/user/api.md) · [Compare](#compared) · [Docs](docs/README.md)
 
 [![Latest release](https://img.shields.io/github/v/release/VincenzoImp/openings-job-search?sort=semver&label=release)](https://github.com/VincenzoImp/openings-job-search/releases/latest) [![Docker image](https://img.shields.io/docker/v/vincenzoimp/openings?sort=semver&label=docker)](https://hub.docker.com/r/vincenzoimp/openings) [![License: MIT](https://img.shields.io/github/license/VincenzoImp/openings-job-search)](LICENSE)
 
 </div>
 
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/demo-dark.gif"><img alt="Openings on the demo workspace: sources, Jobs › New, the agent's decisions, a Ready application, Mark applied and Today" src="docs/images/demo.gif"></picture>
+<img alt="Openings on the demo workspace: a Ready application with its PDFs, a Preferences line, Claude Code running the search, a dismissal that quotes the rule, Ready ranked best first, Mark applied" src="docs/images/demo.gif">
 
-## Self-hosted job search, in three steps
+<p align="center"><!-- video-link --><a href="https://github.com/VincenzoImp/openings-job-search/releases/download/v0.28.1/openings-walkthrough.mp4">▶ Watch the walkthrough, with voice</a></p>
 
-Job hunting is mostly busywork: checking the same boards every day, skipping reposts, rewriting the CV for every role. Openings does that part and leaves you the step that matters.
+## How a day goes
 
-1. **Fresh jobs, no duplicates.** Your searches and watched companies, on your schedule: LinkedIn, Indeed and Glassdoor searches (no login), careers pages on 12 hiring platforms, the Hacker News "Who is hiring?" thread, RSS feeds and job links, into **Jobs › New**.
-2. **Your agent prepares.** It shortlists by fit, with a reason you can read, and tailors each CV and letter from your career record.
-3. **You apply, best first.** Ready is ranked by priority and deadline. You send each application on the employer's site; your agent (or you) then tracks replies, follow-ups and deadlines, and prepares you for each interview.
+**Every new job, filtered, prepared and ranked.**
 
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/flow-dark.svg"><img alt="Fresh jobs, no duplicates; your agent prepares; you apply, best first" src="docs/images/flow.svg"></picture>
+1. **Openings brings in fresh jobs** from your searches and watched companies, on your schedule. Repeats are left out and likely copies flagged.
+2. **Your agent decides and prepares.** Your agent reads each job by your rules, dismisses with a reason and writes a CV and letter for the rest.
+3. **You apply, best first.** Ready is ranked by priority, then deadline. You send each one yourself.
 
-Use it by hand in the dashboard, from scripts with the [REST API](docs/user/api.md), or with your own AI agent over MCP: the same operations, everywhere. Built-in skills cover each workflow. Your searches, Preferences and templates shape every step, and your agent reads your corrections.
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/flow-dark.svg"><img alt="Set up Profile, Preferences, Templates and Sources; fresh jobs arrive; your agent prepares; you apply, best first" src="docs/images/flow.svg"></picture>
+
+Change a line in your Preferences, and your agent's next decisions change with it:
+
+| Preferences › What I'm looking for | Jobs › Dismissed |
+|---|---|
+| "…or remote within Europe." | "Dismissed by Claude Code · On site in London five days a week; you look for … remote within Europe." |
+
+## What Openings holds
+
+You set these up once, by hand or with your agent.
+
+**Profile.** Your career entries and highlights. ★ means always in your CV, and only approved highlights are used.
+
+![The Profile, read as a CV](docs/images/profile.png)
+
+**Preferences.** Five sections in your own words: What I'm looking for, What I rule out, Facts about me, Writing rules (for the CV, the letter or both) and Working with me.
+
+![Preferences, in your own words](docs/images/preferences.png)
+
+**Templates.** Your own TeX for the CV and the letter, with a Preview and Limits on pages, bullets per entry and bullet length.
+
+![A template on Preview](docs/images/templates.png)
+
+**Sources.** LinkedIn, Indeed and Glassdoor searches (no login), careers pages on 12 hiring platforms, Hacker News, RSS feeds and job links. Each shows found · ever shortlisted · applied, to tune over time.
+
+![Sources and their counts](docs/images/sources.png)
+
+## After you apply
+
+**Today** shows what is ready to send, what needs attention and what waits for a reply. Openings tracks replies, follow-ups and deadlines, and your agent briefs you before each interview, with a debrief saved after it.
+
+![An application with its interview brief](docs/images/brief.png)
 
 ## Quick start
 
@@ -92,7 +124,7 @@ Put HTTPS in front before you reach it from outside your home: [Operations](docs
 
 <!-- /quick-start -->
 
-## MCP server for your AI agent
+## Use it with your agent
 
 In **Settings › API & agents**, create an agent token and put it in your shell: `export OPENINGS_TOKEN=op_...`. Then install the Claude Code plugin, with the MCP connection and the skills:
 
@@ -101,9 +133,54 @@ In **Settings › API & agents**, create an agent token and put it in your shell
 /plugin install openings@openings-job-search
 ```
 
-Any other client connects to `http://127.0.0.1:8080/mcp/` with the token as a bearer header; [Work with an agent](docs/user/agents.md) has the lines for Claude Code without the plugin, Codex and the rest. Then ask, in order: **"Set up my Openings workspace from my CV."**, **"Go through my new jobs."** and **"Prepare CV and letter for my shortlist."** Afterwards, **"Run my job search"** does it all in one go, also [on a schedule](docs/user/agents.md#run-it-on-a-schedule).
+Other clients connect to `http://127.0.0.1:8080/mcp/` with the token as a bearer header: [Work with an agent](docs/user/agents.md). The skills ship with the app:
 
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/agent-vs-you-dark.svg"><img alt="What your agent does over MCP and what stays yours. Nothing in Openings can submit an application to an employer" src="docs/images/agent-vs-you.svg"></picture>
+| Skill | Your agent |
+|---|---|
+| `setup-openings` | Checks the connection, then records your career entries, Preferences, templates and first sources from your CV and a short interview. |
+| `manage-sources` | Adds, previews, tunes and pauses your searches, company boards and feeds so new jobs fit what you want. |
+| `triage-jobs` | Reads new jobs by your Preferences and experience, shortlists fits with a priority and dismisses mismatches with a reason. |
+| `prepare-applications` | Writes, compiles and checks a tailored CV and letter for each shortlisted job until the application is Ready. |
+| `review-applications` | Ranks your open applications by priority, gives each a salary range with its basis and flags employers you apply to too often. |
+| `track-applications` | Records each reply, interview or rejection you report and tells you what is waiting on you or on an employer. |
+| `prepare-interview` | Saves an interview brief on the application, with stories from your record and likely questions, then a debrief after the interview. |
+| `run-job-search` | Triages new jobs, prepares and ranks the shortlist, checks deadlines and replies, and reports back, when you ask or on a schedule. |
+| `maintain-career` | Keeps your Profile, career entries, highlights, templates and Preferences current from a CV or from what you say changed. |
+| `maintain-workspace` | Takes and checks backups and exports, tidies stale items reversibly, deletes records only when you ask and undoes an agent run. |
+| `openings` | Answers any question and makes any change in your job search, from jobs and applications to your Profile, career entries and Preferences. |
+
+Then ask, in order: **"Set up my Openings workspace from my CV."**, **"Go through my new jobs."** and **"Prepare CV and letter for my shortlist."** Afterwards, **"Run my job search"** does it all in one go, also [on a schedule](docs/user/agents.md#run-it-on-a-schedule).
+
+## By hand, by REST, by MCP
+
+Every step is one operation, three ways. Shortlisting a job:
+
+| By hand | REST | MCP |
+|---|---|---|
+| In **Jobs › New**: `j` `k` move, `s` shortlists, `d` dismisses, `z` undoes | `POST /api/v1/jobs/triage` | The `jobs_triage` tool |
+
+```bash
+curl -fsS http://127.0.0.1:8080/api/v1/jobs/triage -H "Authorization: Bearer $OPENINGS_TOKEN" \
+  -H 'Content-Type: application/json' -d '{"items":[{"job_id":"'"$JOB_ID"'","to":"shortlisted"}]}'
+```
+
+```json
+{"name": "jobs_triage", "arguments": {"items": [{"job_id": "<JOB_ID>", "to": "shortlisted"}]}}
+```
+
+`JOB_ID` is a job's `id` from `GET /api/v1/jobs?triage=new`.
+
+## What stays yours
+
+- **No submission.** Nothing in Openings can submit an application or contact an employer.
+- **Attributed writes.** Every agent change carries its token's name, and non-destructive changes can be undone.
+- **Deliberate deletes.** Records are deleted permanently only when you ask.
+- **Your autonomy dial.** Working with me, in Preferences, says what your agent may do on its own.
+- **One SQLite file.** Your workspace lives in a Docker volume, with verified daily backups.
+- **No account and no telemetry.** Openings contacts only the job sites your sources name.
+- **Any language, any country.** Postings, Preferences and documents can be in any language.
+
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/agent-vs-you-dark.svg"><img alt="What Openings holds, what your agent does and what stays yours" src="docs/images/agent-vs-you.svg"></picture>
 
 ## Compared
 
@@ -111,46 +188,48 @@ Any other client connects to `http://127.0.0.1:8080/mcp/` with the token as a be
 |---|---|---|---|---|
 | Runs on your machine | Yes: one container, one SQLite file | No: hosted services | Yes | Yes: in your AI CLI |
 | AI | Bring your own agent, over MCP | Built in, on paid plans | Built in | Your CLI's agent |
+| Holds your career, rules and templates | Yes: Profile, Preferences, Templates | A profile and resumes | A profile for forms | Files in your CLI's folder |
 | Collects from company job boards | 12 platforms, on your schedule | No: a browser extension saves jobs | Not documented | Ashby, Greenhouse, Lever, Wellfound |
 | Auto-apply | No: you send each one | Autofill; Simplify+ "Autopilot" | Yes: fills and submits forms | No |
 
-career-ops and Openings work well together. Sources, dates and more tools (JobSync, job-ops, a spreadsheet): [Openings compared](docs/comparison.md).
+career-ops and Openings work well together. More tools, with sources: [Openings compared](docs/comparison.md).
 
-<details><summary><b>Screenshots</b> (the demo workspace, fictional data)</summary>
+## Screenshots
 
-![Jobs: the New list beside the selected job, shortlist or dismiss with one key](docs/images/jobs.png)
-![A Ready application: the posting, the tailored CV and letter, and Mark applied](docs/images/ready.png)
-![Applications: ready to send, deadlines, replies to wait for and the rest](docs/images/applications.png)
-![Settings, API & agents: a token, the line for your agent and what to ask](docs/images/agents.png)
+<details open><summary>The demo workspace, fictional data</summary>
+
+![Profile with starred highlights](docs/images/profile.png)
+![Preferences, in your own words](docs/images/preferences.png)
+![A template's Preview](docs/images/templates.png)
+![Sources and their counts](docs/images/sources.png)
+![A dismissal quoting your Preferences](docs/images/dismissed.png)
+![A Ready application's PDFs](docs/images/ready.png)
+![An interview brief](docs/images/brief.png)
+![Today, best first](docs/images/today.png)
+![Stats, Example data](docs/images/stats.png)
 <img alt="Jobs on a phone" src="docs/images/jobs-mobile.png" width="320">
 
 </details>
 
-## Your data
-
-Everything lives in one SQLite file in a Docker volume on your machine, with every uploaded document. One container (an image of about 70 MB, amd64 and arm64), no account, no API key and no telemetry. Openings writes a verified backup every day and keeps the last three; you can download a backup or restore one in **Settings › Data**. Nothing leaves your machine except the requests to the job sites your sources name, and whatever your own agent sends to its AI service.
-
 ## FAQ
 
-**Which agents work?** Any MCP client: Claude Code (with the plugin), Codex, Cursor, Gemini CLI and others. The skills ship with the app.
+**Which agents work?** Any MCP client: Claude Code, Codex, Cursor, Gemini CLI and others.
 
-**How is this different from auto-apply?** Nothing in Openings can submit an application to an employer or contact one: no such operation exists. Every application is tailored, one per job is enforced, and you send each one yourself.
+**How is this different from auto-apply?** No operation submits an application. You send each one yourself.
 
-**What does it cost?** Openings is free and MIT-licensed. Your agent costs what your plan already costs, and the whole app works by hand without one.
+**Employer bans AI-written applications?** Record it as a blocking requirement; the application can't reach Ready until you settle it.
 
-**Which countries and sites?** LinkedIn searches anywhere; Indeed and Glassdoor by country. Careers pages on Greenhouse, Lever, Ashby, Workday, SmartRecruiters, Personio, Recruitee, Workable, BambooHR, Rippling, Oracle and JOIN, the monthly Hacker News "Who is hiring?" thread, and any RSS feed. Missing one? [Request a job site](https://github.com/VincenzoImp/openings-job-search/issues/new?template=job_site_request.yml).
+**What does it cost?** Nothing: MIT-licensed. Your agent costs what your plan costs.
 
-**What if LinkedIn blocks me?** Searches use the sites' public guest pages, spaced out through one rate gate. A refused site is paused and retried later; careers pages are not affected ([details](docs/user/operations.md#a-job-site-refused-requests)).
+**Which sites?** LinkedIn anywhere; Indeed and Glassdoor by country; [12 hiring platforms](docs/user/jobs-and-sources.md). Missing one? [Request a job site](https://github.com/VincenzoImp/openings-job-search/issues/new?template=job_site_request.yml).
 
-**Do I need LaTeX?** No. Upload your CV and letter as PDFs, or let your agent compile them with [Tectonic](docs/user/agents.md#without-latex-tectonic): no TeX distribution needed.
+**What if LinkedIn blocks me?** A refused site is paused and retried later ([details](docs/user/operations.md#a-job-site-refused-requests)).
 
-**Is the dashboard in English only?** Yes. Postings, Preferences and documents can be in any language.
+**Do I need LaTeX?** No. Upload PDFs, or your agent compiles with [Tectonic](docs/user/agents.md#without-latex-tectonic).
 
-**Is this more AI slop for recruiters?** It is the opposite of mass-applying: each application is tailored to the posting, and a person sends every one.
+**Prompt injection in postings?** Posting text is data: see the [security model](docs/user/agents.md#security-model).
 
-**What about prompt injection in postings?** Posting text is treated as data, and the skills tell your agent when to ask first. Agent writes are attributed, non-destructive changes can be undone, and backups run daily. See the [security model](docs/user/agents.md#security-model).
-
-**Is it vibe-coded?** The rules that matter are enforced in the services and in SQLite, not in prompts: one open application per job, version checks, no operation that submits to an employer. Tests cover each of them, and complete workflows run in a browser.
+**Is it vibe-coded?** The rules that matter are enforced in the services and in SQLite, not in prompts, and tests cover each one.
 
 I built Openings for my own job search and use it every day. I built it with AI coding agents, mainly Claude Code: I decide what it does and how it behaves, and every change passes the full test suite before it ships.
 
