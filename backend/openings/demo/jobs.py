@@ -1,8 +1,8 @@
 """The demo's jobs and applications, in every stage, by the owner and by the agent.
 
 47 jobs at fictional companies in 20 countries: 33 New (one a likely duplicate of
-the Voltline job), three dismissals (two by the agent "Claude Code" with its
-reasons, one by the owner) and eleven applications: three Ready with the agent's
+the Voltline job), three dismissals by the agent "Claude Code", each with a
+reason that names the Preference it applies and eleven applications: three Ready with the agent's
 CV and letter, priorities 1 to 3, deadlines and a salary range with its basis;
 two Shortlisted that still need work; and Applied (one past its no-reply
 period), Interview with the agent's interview brief, Offer and a rejection.
@@ -530,7 +530,12 @@ class DemoJobs:
                 "Frontend role at an agency; you rule out pure frontend roles and agencies.",
             )
         with self.moment(days=4):
-            self.dismiss(london, OWNER, "On site in London five days a week.")
+            self.dismiss(
+                london,
+                self.agent,
+                "On site in London five days a week; you look for hybrid in Amsterdam, Berlin, "
+                "Lisbon, Dublin or Barcelona, or remote within Europe.",
+            )
 
     def history(self):
         """Collection history: each source ran this morning, the search also yesterday."""
