@@ -24,6 +24,7 @@ def load(name):
 
 
 check_package = load("check_package")
+bump_version = load("bump_version")
 traffic_archive = load("traffic_archive")
 
 
@@ -94,6 +95,25 @@ def test_the_docker_hub_overview_is_synced_from_final_releases_only():
     assert re.search(r"peter-evans/dockerhub-description@[0-9a-f]{40} # v", job)
     assert "readme-filepath: docs/dockerhub.md" in job
     assert "secrets.DOCKERHUB_DESCRIPTION_TOKEN" in job
+
+
+def copy_versions(tmp_path, monkeypatch):
+    for path in {path for path, _ in bump_version.LOCATIONS}:
+        (tmp_path / path).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(ROOT / path, tmp_path / path)
+    monkeypatch.setattr(bump_version, "ROOT", tmp_path)
+    return tmp_path
+
+
+def test_compose_pins_the_moving_minor_and_the_plugin_the_release(tmp_path, monkeypatch):
+    assert bump_version.check() == 0
+    root = copy_versions(tmp_path, monkeypatch)
+    assert bump_version.bump("4.5.6") == 0
+    assert "docker.io/vincenzoimp/openings:4.5}" in (root / "docker-compose.yml").read_text()
+    assert json.loads((root / ".claude-plugin/plugin.json").read_text())["version"] == "4.5.6"
+    compose = root / "docker-compose.yml"
+    compose.write_text(compose.read_text().replace("openings:4.5}", "openings:4.4}"))
+    assert bump_version.check() == 1
 
 
 def fixtures(responses, calls):

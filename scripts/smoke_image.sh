@@ -9,7 +9,8 @@
 # served skills and dashboard (without the gallery), and that the installed
 # package is the checkout's. Then it starts `demo` read-only, without
 # capabilities, and checks the printed sign-in link (once), the printed agent
-# token over MCP, and that nothing is written to /data.
+# token over MCP, and that nothing is written to /data. Last, it runs the documented
+# one-line `docker run` with this image.
 set -euo pipefail
 
 image="$1"
@@ -19,6 +20,7 @@ port=18080
 url="http://127.0.0.1:$port"
 demo="openings-smoke-demo"
 demo_url="http://127.0.0.1:18081"
+run="openings-smoke-run"
 work="$(mktemp -d)"
 version="$(sed -n 's/^version = "\(.*\)"$/\1/p' pyproject.toml)"
 description="$(sed -n 's/^description = "\(.*\)"$/\1/p' pyproject.toml)"
@@ -26,7 +28,7 @@ export VERSION="$version" DESCRIPTION="$description" WORK="$work"
 
 docker volume create "$name" > /dev/null
 docker volume create "$demo" > /dev/null
-trap 'docker logs "$name"; docker logs "$demo" 2> /dev/null || true; docker rm -f "$name" "$demo" > /dev/null 2>&1 || true; docker volume rm "$name" "$demo"; rm -rf "$work"' EXIT
+trap 'docker logs "$name"; docker logs "$demo" 2> /dev/null || true; docker rm -f "$name" "$demo" "$run" > /dev/null 2>&1 || true; docker volume rm "$name" "$demo"; docker volume rm "$run" > /dev/null 2>&1 || true; rm -rf "$work"' EXIT
 docker run -d --name "$name" --init --cpus=0.5 --memory=512m --platform "linux/$arch" \
   --publish "127.0.0.1:$port:8080" --mount "source=$name,target=/data" "$image"
 for _ in {1..60}; do
@@ -103,4 +105,31 @@ mcp '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"
 mcp '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' > "$work/tools.json"
 python3 -c "import json,os; t=json.load(open(os.environ['WORK']+'/tools.json'))['result']['tools']; assert 44<=len(t)<=45, len(t)"
 test -z "$(docker exec "$demo" ls -A /data)"
+docker rm -f "$demo" > /dev/null
+
+# The documented one-line `docker run` (docs/dockerhub.md), with this image and its
+# own name, volume and port, so a local run never touches a real `openings`.
+line="$(grep -m1 '^docker run -d --name openings ' docs/dockerhub.md)"
+swap() {
+  case "$line" in
+    *"$1"*) line="${line/"$1"/$2}" ;;
+    *) echo "The documented docker run line lacks: $1" >&2; exit 1 ;;
+  esac
+}
+swap "--name openings " "--name $run "
+swap "-v openings:/data " "-v $run:/data "
+swap "-p 127.0.0.1:8080:8080 " "-p 127.0.0.1:18082:8080 "
+case "$line" in
+  *" vincenzoimp/openings:latest") line="${line% vincenzoimp/openings:latest} $image" ;;
+  *) echo "The documented docker run line must end with the image" >&2; exit 1 ;;
+esac
+read -ra command <<< "$line"
+"${command[@]}" > /dev/null
+for _ in {1..60}; do
+  if curl --silent --fail "http://127.0.0.1:18082/health" > "$work/run-health.json"; then break; fi
+  sleep 1
+done
+python3 -c "import json,os; h=json.load(open(os.environ['WORK']+'/run-health.json')); assert h['status']=='ok' and h['version']==os.environ['VERSION'], h"
+test "$(docker inspect "$run" --format '{{.HostConfig.ReadonlyRootfs}} {{.HostConfig.RestartPolicy.Name}}')" = "true unless-stopped"
+docker exec "$run" test -f /data/openings.sqlite
 echo "Smoke passed: $image ($arch, $version)"
