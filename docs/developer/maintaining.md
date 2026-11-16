@@ -81,9 +81,10 @@ track the video is cut from: each scene's caption and focal regions, the cursor,
 the clicks and the keys. Re-render both after a change to a screen it shows.
 
 The `video` Playwright project (`frontend/tests/video.spec.ts`) records the same
-kind of track and the bare frames, at twice the pixels, from a running
-`openings demo` that an agent works on at the same time: before the agent, live
-while it works, and after. A capture script outside the repository starts the
+kind of track and the bare frames, at three times the pixels, on the desktop
+layout or the phone layout (390×844), from a running `openings demo` that an
+agent works on at the same time: before the agent, live while it works, and
+after. A capture script outside the repository starts the
 demo and the agent session and sets its variables (see the spec's header); the
 recorder both specs share is `frontend/tests/reel.ts`.
 

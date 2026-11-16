@@ -121,6 +121,7 @@ export class Reel {
   private size: { width: number; height: number };
   private overlay: boolean;
   private scale: number;
+  private quality: number;
 
   /**
    * `overlay: false` records the bare dashboard, for a video that draws the
@@ -135,11 +136,13 @@ export class Reel {
       theme?: string;
       overlay?: boolean;
       scale?: number;
+      quality?: number;
     } = {},
   ) {
     this.size = options.size ?? SIZE;
     this.overlay = options.overlay ?? true;
     this.scale = options.scale ?? 1;
+    this.quality = options.quality ?? 90;
     this.track.size = this.size;
     this.track.theme = options.theme ?? "light";
     if (this.scale !== 1) this.track.scale = this.scale;
@@ -171,7 +174,7 @@ export class Reel {
         width: this.size.width * this.scale,
         height: this.size.height * this.scale,
       },
-      quality: 90,
+      quality: this.quality,
       onFrame: ({ data }) => {
         const file = `frames/${String(this.frames.length).padStart(5, "0")}.jpg`;
         this.frames.push({ file, t: this.now() });
