@@ -296,7 +296,7 @@ function Editor({
             : undefined,
         });
         toast.show({
-          message: `Added “${name()}”. Its first check runs soon.`,
+          message: `Added “${name()}”. Checking it now.`,
           tone: "success",
         });
       }
