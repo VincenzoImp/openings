@@ -168,6 +168,9 @@ class ApplicationReads:
             # Ready, Shortlisted with a deadline, waiting past the no-reply period, the rest.
             "needs": f"CASE WHEN {READY_SQL} THEN 0 WHEN app.status='shortlisted' AND app.deadline "
             f"IS NOT NULL THEN 1 WHEN {REPLY_OVERDUE_SQL} THEN 2 ELSE 3 END,"
+            # Ready goes best first: priority, then deadline; the rest by deadline.
+            f"CASE WHEN {READY_SQL} THEN app.priority IS NULL END,"
+            f"CASE WHEN {READY_SQL} THEN app.priority END,"
             "app.deadline IS NULL,app.deadline,app.priority IS NULL,app.priority,app.updated_at DESC",
         }.get(sort, "app.updated_at DESC")
         order_args = [cutoff] if sort == "needs" else []
