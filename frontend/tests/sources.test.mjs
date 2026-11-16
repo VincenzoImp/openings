@@ -68,7 +68,7 @@ test("what a source searches leaves out empty parts and never shows quotes", () 
   );
   const hn = source({ kind: "hnhiring", config: { max_results: 1000 } });
   assert.equal(sources.kindOf(hn), "hn");
-  assert.equal(describe(hn), "HN Who is hiring · latest thread");
+  assert.equal(describe(hn), "Hacker News · latest thread");
   assert.equal(sources.suggestedName("hn", {}), "HN Who is hiring");
 });
 

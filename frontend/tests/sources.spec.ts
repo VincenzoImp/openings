@@ -171,9 +171,7 @@ test("add the HN Who is hiring thread: Test reads it, Save adds it", async ({
     enabled: true,
     config: { max_results: 1000 },
   });
-  await expect(row(page, name)).toContainText(
-    "HN Who is hiring · latest thread",
-  );
+  await expect(row(page, name)).toContainText("Hacker News · latest thread");
 });
 
 test("Test lists a board's titles first, then fetches their text", async ({

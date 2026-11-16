@@ -111,7 +111,7 @@ export function sitesLine(source: SourceView) {
 /**
  * What a source searches, in one line, without empty parts:
  * "Data engineer · Zurich · LinkedIn, Indeed", "Greenhouse", "RSS feed · example.test"
- * or "HN Who is hiring · latest thread".
+ * or "Hacker News · latest thread".
  * A board's internal slug is not shown; the source's name says which board.
  */
 export function describeSource(
@@ -127,7 +127,7 @@ export function describeSource(
     ]
       .filter(Boolean)
       .join(" · ");
-  if (kind === "hn") return `${KIND_LABELS.hn} · latest thread`;
+  if (kind === "hn") return "Hacker News · latest thread";
   const where = source.url
     ? shortUrl(source.url)
     : text(source.config.url)
