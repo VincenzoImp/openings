@@ -163,6 +163,9 @@ class ContextService:
                 # More matched than one read lists: feedback_since pages to the earlier ones.
                 result["feedback"] = result["feedback"][:FEEDBACK_LIMIT]
                 result["feedback_more"] = True
+        if getattr(ws, "demo", False):
+            # Fictional data in a temporary file, and no job site is contacted.
+            result["workspace"]["demo"] = True
         collection = ws.discovery.get_collection()
         result["settings"]["collection"] = {
             "enabled": collection["enabled"],

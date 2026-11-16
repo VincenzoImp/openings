@@ -118,6 +118,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/auth/demo": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Demo Link
+     * @description Sign the browser in with the link openings demo prints; it works once.
+     */
+    get: operations["auth_demo"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/auth/login": {
     parameters: {
       query?: never;
@@ -190,6 +210,8 @@ export interface paths {
     /**
      * Session
      * @description Read the browser session state and its CSRF token.
+     *
+     *     demo is true in a disposable demo workspace (openings demo).
      */
     get: operations["auth_session"];
     put?: never;
@@ -3045,7 +3067,7 @@ export interface components {
     };
     /**
      * Error
-     * @description Every error response. Codes by status: 401 unauthorized: sign in or send a valid bearer token (also transfer_token, transfer_expired, transfer_used: a grant works once). 403 forbidden: an agent token on an owner-only operation; csrf: a browser write without its X-CSRF-Token header. 404 not_found: the record or route does not exist, including a record the body names (application_id, career_id...). 409 conflict: the record changed (details.current_version and details.id); also constraint, application_has_work and similar rule conflicts. 413 request_size or file_size: the body or file is over its limit. 422 validation: details lists {field, message, type} per invalid field; other codes name a rule. 429 rate_limited: the shared provider gate is waiting; details.retry_after_seconds and the Retry-After header give the wait.
+     * @description Every error response. Codes by status: 401 unauthorized: sign in or send a valid bearer token (also transfer_token, transfer_expired, transfer_used: a grant works once). 403 forbidden: an agent token on an owner-only operation; csrf: a browser write without its X-CSRF-Token header. 404 not_found: the record or route does not exist, including a record the body names (application_id, career_id...). 409 conflict: the record changed (details.current_version and details.id); also constraint, application_has_work and similar rule conflicts; providers_closed: a demo workspace contacts no job site. 413 request_size or file_size: the body or file is over its limit. 422 validation: details lists {field, message, type} per invalid field; other codes name a rule. 429 rate_limited: the shared provider gate is waiting; details.retry_after_seconds and the Retry-After header give the wait.
      */
     Error: {
       error: components["schemas"]["ErrorBody"];
@@ -5460,6 +5482,12 @@ export interface components {
       actor: string;
       /** Api Base */
       api_base: string;
+      /**
+       * Demo
+       * @description A disposable demo workspace: fictional data, nothing kept, no job site contacted.
+       * @default false
+       */
+      demo: boolean;
       /** Mcp Endpoint */
       mcp_endpoint: string;
       /** Name */
@@ -6099,6 +6127,44 @@ export interface operations {
         };
       };
       /** @description validation */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+    };
+  };
+  auth_demo: {
+    parameters: {
+      query?: {
+        ticket?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      307: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description not_found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description Validation Error */
       422: {
         headers: {
           [name: string]: unknown;

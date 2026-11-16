@@ -102,6 +102,10 @@ class WorkspaceInfo(Out):
     actor: str = Field(description="owner, agent:<token name> or system: the label of changes.")
     storage: Storage
     workflow: str
+    demo: bool = Field(
+        default=False,
+        description="A disposable demo workspace: fictional data, nothing kept, no job site contacted.",
+    )
 
 
 class WorkspaceContext(Out):

@@ -127,6 +127,7 @@ def workspace_info(ws: WS) -> WorkspaceInfo:
         "actor": current_actor().label,
         "storage": storage_status(ws.db),
         "workflow": WORKFLOW,
+        "demo": getattr(ws, "demo", False),
     }
 
 

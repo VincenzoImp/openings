@@ -21,7 +21,7 @@ ERROR_CODES = {
     401: "unauthorized: sign in or send a valid bearer token (also transfer_token, transfer_expired, transfer_used: a grant works once).",
     403: "forbidden: an agent token on an owner-only operation; csrf: a browser write without its X-CSRF-Token header.",
     404: "not_found: the record or route does not exist, including a record the body names (application_id, career_id...).",
-    409: "conflict: the record changed (details.current_version and details.id); also constraint, application_has_work and similar rule conflicts.",
+    409: "conflict: the record changed (details.current_version and details.id); also constraint, application_has_work and similar rule conflicts; providers_closed: a demo workspace contacts no job site.",
     413: "request_size or file_size: the body or file is over its limit.",
     422: "validation: details lists {field, message, type} per invalid field; other codes name a rule.",
     429: "rate_limited: the shared provider gate is waiting; details.retry_after_seconds and the Retry-After header give the wait.",

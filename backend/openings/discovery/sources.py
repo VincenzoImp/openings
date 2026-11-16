@@ -253,6 +253,7 @@ class SourceOperations:
         return self._source(source_id)
 
     def preview_source(self, value: SourcePreview):
+        self.providers.require_open()
         resolved = self._resolve_source(value.model_dump())
         source = {**resolved, "name": value.name or resolved["config"].get("board", "RSS source")}
         config = {
