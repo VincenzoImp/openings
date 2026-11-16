@@ -317,7 +317,14 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
     slug = quote(board, safe="")
     if kind == "greenhouse":
         base = f"https://boards-api.greenhouse.io/v1/boards/{slug}/jobs"
-        rows = records(get(base), "jobs")
+        # One listing carries every description. A board too large for it falls back to
+        # the plain listing and one detail request a job.
+        try:
+            rows = records(get(base + "?content=true"), "jobs")
+        except DomainError as error:
+            if error.code != "source_too_large":
+                raise
+            rows = records(get(base), "jobs")
         # A listing's location is often a work mode ("Hybrid"); its cities are its offices.
         offices = get(f"https://boards-api.greenhouse.io/v1/boards/{slug}/offices")
         cities = {}
@@ -334,7 +341,12 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
         rows = select(rows, lambda row: row.get("title"), place)
         for row in ordered(rows, lambda row: f"{kind}:{board}:{row.get('id')}"):
             identity = row.get("id")
-            full = detail(f"{kind}:{board}:{identity}", base + "/" + quote(str(identity), safe=""))
+            full = row
+            if not any(character.isalnum() for character in text(str(row.get("content") or ""))):
+                # Only a row the listing gave no text costs a detail request.
+                full = detail(
+                    f"{kind}:{board}:{identity}", base + "/" + quote(str(identity), safe="")
+                )
             add(
                 {**row, **full},
                 identity,

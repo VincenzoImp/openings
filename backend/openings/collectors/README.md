@@ -34,6 +34,13 @@ An access challenge must stop affected work instead of triggering empty detail
 retries for every job. Metadata-only adapters expose `automatic_collection: false`
 and support preview only.
 
+Prefer a vendor's bulk form when it carries the text. Greenhouse lists every
+description with `?content=true`, so a board costs the listing and its offices;
+only a row without text, or a board too large for that listing, reads details one
+by one. The other `separate` adapters (SmartRecruiters, BambooHR, Rippling,
+Workday, Oracle, JOIN) offer no public listing with descriptions and keep their
+per-job detail requests.
+
 ## JobSpy subset
 
 The attributed [JobSpy subset](../_vendor/jobspy/PROVENANCE.md) uses an explicit
