@@ -57,7 +57,6 @@ export function Advanced() {
                     className="set-external"
                   />
                 </span>
-                <span className="set-help-detail">{link.detail}</span>
               </a>
             </li>
           ))}

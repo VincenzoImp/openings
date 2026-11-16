@@ -244,14 +244,6 @@ test("Settings: sections, sizes, access, snippets and request limits", () => {
   assert.equal(settings.accessOf("owner"), "owner");
   assert.equal(settings.accessOf("anything"), "agent");
   assert.equal(settings.ACCESS.agent.label, "Agent");
-  assert.match(
-    settings.connectSnippet("claude", "https://openings.example.test/"),
-    /^claude mcp add --transport http openings https:\/\/openings\.example\.test\/mcp\/ /,
-  );
-  assert.match(
-    settings.connectSnippet("codex", "https://openings.example.test"),
-    /bearer_token_env_var = "OPENINGS_TOKEN"/,
-  );
   const provider = (policy, runtime = {}) => ({
     capability: { supported: true },
     policy,

@@ -3,18 +3,24 @@ import { Ellipsis, ExternalLink, KeyRound, Plus, Trash2 } from "lucide-react";
 import { Button, IconButton } from "../../ui/Button";
 import { CodeBlock } from "../../ui/CodeBlock";
 import { ConfirmDialog, Dialog } from "../../ui/Dialog";
-import { Field, Input, Select } from "../../ui/Field";
+import { Field, Input } from "../../ui/Field";
 import { formatDay, formatFull } from "../../ui/format";
 import { Icon } from "../../ui/Icon";
 import { Menu } from "../../ui/Menu";
 import { SkeletonRows } from "../../ui/Page";
+import { Tabs } from "../../ui/Tabs";
 import { useToast } from "../../ui/Toast";
 import { ago } from "../sources/model";
 import {
   ACCESS,
+  CHECKS,
   CLIENTS,
+  FIRST_SESSION,
+  TOKEN_PLACEHOLDER,
   accessOf,
   connectSnippet,
+  exportLines,
+  tokenLine,
   type ClientId,
   type TokenKind,
 } from "./model";
@@ -31,8 +37,10 @@ import { SettingsSection } from "./Rows";
 import { LoadError } from "../../ui/LoadError";
 
 /**
- * Connecting an agent in three numbered steps: a token, the agent's MCP
- * configuration, and what to ask it. Openings itself runs no AI.
+ * Connecting an agent in four numbered steps: a token, the shell line that
+ * holds it, the agent's MCP configuration, and a first session. Openings
+ * itself runs no AI. Every snippet uses the address agents reach Openings at
+ * (OPENINGS_PUBLIC_URL, else this browser's).
  */
 export function Agents() {
   const owner = useIsOwner();
@@ -53,14 +61,57 @@ export function Agents() {
             </p>
           )}
         </Step>
-        <Step number={2} title="Add Openings to your agent">
+        <Step number={2} title="Put the token in your shell">
+          <ShellLines origin={origin} />
+        </Step>
+        <Step number={3} title="Add Openings to your agent">
           <ConnectSnippet origin={origin} />
         </Step>
-        <Step number={3} title="Open your agent and ask">
+        <Step number={4} title="Your first agent session">
+          <FirstSession />
           <AskList />
         </Step>
       </ol>
     </SettingsSection>
+  );
+}
+
+/** Step 2: the export lines for ~/.zshrc or ~/.bashrc. */
+function ShellLines({ origin }: { origin: string }) {
+  const toast = useToast();
+  const lines = exportLines(origin);
+  return (
+    <div className="set-connect">
+      <CodeBlock
+        code={lines}
+        label="Shell lines"
+        onCopied={(ok) =>
+          toast.show(
+            ok
+              ? { message: "Lines copied", tone: "success" }
+              : { message: "Select the lines and copy them.", tone: "error" },
+          )
+        }
+      />
+      <p className="set-row-desc">
+        Add these lines to ~/.zshrc or ~/.bashrc with your token in place of{" "}
+        {TOKEN_PLACEHOLDER}, then open a new terminal.
+      </p>
+    </div>
+  );
+}
+
+/** Step 4: three prompts, in order, and what each one does. */
+function FirstSession() {
+  return (
+    <ol className="set-session" aria-label="Your first agent session">
+      {FIRST_SESSION.map((step) => (
+        <li key={step.prompt}>
+          <span className="set-ask-name">“{step.prompt}”</span>
+          <span className="set-ask-summary">{step.result}</span>
+        </li>
+      ))}
+    </ol>
   );
 }
 
@@ -237,7 +288,7 @@ export function NewTokenDialog({
       title={secret ? "Copy your token" : "New token"}
       description={
         secret
-          ? "It is shown only this once. Keep it in your agent's OPENINGS_TOKEN environment variable."
+          ? "It is shown only this once. Add this line to ~/.zshrc or ~/.bashrc, then open a new terminal."
           : undefined
       }
       initialFocus="input"
@@ -265,13 +316,13 @@ export function NewTokenDialog({
     >
       {secret ? (
         <CodeBlock
-          code={secret}
+          code={tokenLine(secret)}
           label="Token"
           onCopied={(ok) =>
             toast.show(
               ok
-                ? { message: "Token copied", tone: "success" }
-                : { message: "Select the token and copy it.", tone: "error" },
+                ? { message: "Token line copied", tone: "success" }
+                : { message: "Select the line and copy it.", tone: "error" },
             )
           }
         />
@@ -317,43 +368,58 @@ export function NewTokenDialog({
   );
 }
 
-/** The MCP configuration of Claude Code or Codex, and the REST address. */
+/**
+ * The MCP configuration of the Claude Code plugin, Claude Code, Codex or any
+ * client (JSON), how to check it, and the REST address.
+ */
 export function ConnectSnippet({ origin }: { origin: string }) {
-  const [client, setClient] = useState<ClientId>("claude");
+  const [client, setClient] = useState<ClientId>("plugin");
   const toast = useToast();
   const base = origin.replace(/\/$/, "");
   return (
     <div className="set-connect">
-      <Select
-        aria-label="Agent"
-        className="set-select"
+      <Tabs
+        items={CLIENTS.map(({ id, label }) => ({ id, label }))}
         value={client}
-        onChange={(event) => setClient(event.target.value as ClientId)}
-      >
-        {CLIENTS.map((item) => (
-          <option key={item.id} value={item.id}>
-            {item.label}
-          </option>
-        ))}
-      </Select>
-      <CodeBlock
-        code={connectSnippet(client, base)}
-        label="MCP configuration"
-        onCopied={(ok) =>
-          toast.show(
-            ok
-              ? { message: "Configuration copied", tone: "success" }
-              : {
-                  message: "Select the configuration and copy it.",
-                  tone: "error",
-                },
-          )
-        }
+        onChange={(id) => setClient(id as ClientId)}
+        label="Agent"
+        idPrefix="set-client"
+        className="set-clients"
       />
+      <div
+        id="set-client-panel"
+        role="tabpanel"
+        aria-labelledby={`set-client-tab-${client}`}
+        className="set-connect"
+      >
+        <CodeBlock
+          code={connectSnippet(client, base)}
+          label={
+            client === "plugin" ? "Claude Code commands" : "MCP configuration"
+          }
+          onCopied={(ok) =>
+            toast.show(
+              ok
+                ? { message: "Configuration copied", tone: "success" }
+                : {
+                    message: "Select the configuration and copy it.",
+                    tone: "error",
+                  },
+            )
+          }
+        />
+        {client === "plugin" && (
+          <p className="set-row-desc">
+            Run them in Claude Code: the plugin brings the connection and the
+            skills.
+          </p>
+        )}
+        {CHECKS[client] && <p className="set-row-desc">{CHECKS[client]}</p>}
+      </div>
       <p className="set-row-desc">
-        Put the token from step 1 in the OPENINGS_TOKEN environment variable,
-        never in the file. Scripts use the REST API at{" "}
-        <code className="set-code">{base}/api/v1</code> with the same token.{" "}
+        The token stays in OPENINGS_TOKEN, never in a file. Scripts use the REST
+        API at <code className="set-code">{base}/api/v1</code> with the same
+        token.{" "}
         <a
           href="/api/docs"
           target="_blank"
@@ -388,8 +454,8 @@ function AskList() {
     );
   return (
     <>
-      <h4 className="set-ask-title">What you can ask your agent</h4>
-      <ul className="set-ask" aria-label="What you can ask your agent">
+      <h4 className="set-ask-title">What else you can ask</h4>
+      <ul className="set-ask" aria-label="What else you can ask">
         {skills.data.map((skill) => (
           <li key={skill.name}>
             <span className="set-ask-name">{skill.title || skill.name}</span>

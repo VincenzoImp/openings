@@ -124,8 +124,9 @@ test("API & agents: three steps, an Agent token by default, copy, revoke", async
   await go(page, "settings?section=agents");
   await expect(page.locator(".set-step-title")).toContainText([
     "Create a token",
+    "Put the token in your shell",
     "Add Openings to your agent",
-    "Open your agent and ask",
+    "Your first agent session",
   ]);
   await expect(page.locator("#content")).toContainText(
     "Openings has no AI of its own; nothing happens until you ask your agent.",
@@ -141,10 +142,16 @@ test("API & agents: three steps, an Agent token by default, copy, revoke", async
   await create.getByLabel("Name", { exact: true }).fill(name);
   await create.getByRole("button", { name: "Create token" }).click();
   const shown = page.getByRole("dialog", { name: "Copy your token" });
-  const secret = await shown.getByRole("region", { name: "Token" }).innerText();
-  expect(secret).toMatch(/^op_/);
+  // The dialog shows, and copies, the whole line for the shell.
+  const line = await shown.getByRole("region", { name: "Token" }).innerText();
+  expect(line).toMatch(/^export OPENINGS_TOKEN=op_\S+$/);
+  const secret = line.replace("export OPENINGS_TOKEN=", "");
   await shown.getByRole("button", { name: "Copy token" }).click();
-  await expect(toast(page)).toContainText("Token copied");
+  await expect(toast(page)).toContainText("Token line copied");
+  if (clipboard)
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
+      line,
+    );
   await shown.getByRole("button", { name: "Done" }).click();
   const tokens = page.getByRole("list", { name: "API tokens" });
   const item = tokens.getByRole("listitem").filter({ hasText: name });
@@ -164,12 +171,37 @@ test("API & agents: three steps, an Agent token by default, copy, revoke", async
   }, secret);
   expect(status).toBe(403);
 
-  // The connect snippet, with its copy button inside the block.
+  // The shell lines, at the address agents use.
+  const workspace = await call(page, "/workspace");
+  const origin = String(workspace.origin).replace(/\/$/, "");
+  const shell = page.getByRole("region", { name: "Shell lines" });
+  await expect(shell).toContainText("export OPENINGS_TOKEN=op_…");
+  if (origin !== "http://127.0.0.1:8080")
+    await expect(shell).toContainText(`export OPENINGS_URL=${origin}`);
+
+  // The connect snippets as tabs, the plugin first, each with its copy
+  // button inside the block.
+  const clients = page.getByRole("tablist", { name: "Agent" });
+  await expect(clients.getByRole("tab")).toHaveText([
+    "Claude Code plugin",
+    "Claude Code",
+    "Codex",
+    "JSON",
+  ]);
+  await expect(
+    page.getByRole("region", { name: "Claude Code commands" }),
+  ).toContainText("/plugin install openings@openings-job-search");
+  await clients.getByRole("tab", { name: "Claude Code", exact: true }).click();
   const snippet = page.getByRole("region", { name: "MCP configuration" });
   await expect(snippet).toContainText(
-    "claude mcp add --transport http openings",
+    `claude mcp add --transport http openings ${origin}/mcp/`,
   );
-  await page.getByRole("combobox", { name: "Agent" }).selectOption("codex");
+  await expect(page.locator("#content")).toContainText(
+    "claude mcp list shows openings ✔ Connected.",
+  );
+  await clients.getByRole("tab", { name: "JSON" }).click();
+  await expect(snippet).toContainText('"Bearer ${OPENINGS_TOKEN}"');
+  await clients.getByRole("tab", { name: "Codex" }).click();
   await expect(snippet).toContainText("bearer_token_env_var");
   await page.getByRole("button", { name: "Copy mcp configuration" }).click();
   await expect(toast(page)).toContainText("Configuration copied");
@@ -186,13 +218,19 @@ test("API & agents: three steps, an Agent token by default, copy, revoke", async
     page.getByRole("link", { name: "API reference" }),
   ).toHaveAttribute("href", "/api/docs");
 
-  // What you can ask: title, summary and example of each skill, no skill text.
+  // The first session: three prompts in order, each with what it does.
+  const session = page.getByRole("list", { name: "Your first agent session" });
+  await expect(session.getByRole("listitem")).toHaveCount(3);
+  await expect(session.getByRole("listitem").first()).toContainText(
+    "“Set up my Openings workspace from my CV”",
+  );
+  // What else: title, summary and example of each skill, no skill text.
   const skills = (await call(page, "/skills")).items as {
     title: string;
     summary: string;
     example: string;
   }[];
-  const ask = page.getByRole("list", { name: "What you can ask your agent" });
+  const ask = page.getByRole("list", { name: "What else you can ask" });
   await expect(ask.getByRole("listitem")).toHaveCount(skills.length);
   await expect(ask.getByRole("listitem").first()).toContainText(
     skills[0].title,

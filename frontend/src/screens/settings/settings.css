@@ -287,6 +287,35 @@
     margin-left: 3px;
     vertical-align: -2px;
   }
+  /* API & agents: the clients as tabs over their snippet */
+  .set-clients {
+    border-bottom: 1px solid var(--border);
+  }
+  /* The first session: three prompts, numbered, each with what it does */
+  .set-session {
+    margin: 0 0 var(--s-4);
+    padding: 0;
+    list-style: none;
+    counter-reset: session;
+    border-top: 1px solid var(--border);
+  }
+  .set-session li {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 10px 0 10px var(--s-6);
+    border-bottom: 1px solid var(--border);
+    counter-increment: session;
+    position: relative;
+  }
+  .set-session li::before {
+    content: counter(session) ".";
+    position: absolute;
+    left: 0;
+    color: var(--text-3);
+    font: var(--t-row);
+  }
+
   /* Advanced › Help: three links out to the repository */
   .set-help {
     margin: 0;
@@ -299,9 +328,7 @@
   }
   .set-help a {
     display: flex;
-    flex-direction: column;
-    justify-content: center;
-    gap: 2px;
+    align-items: center;
     min-height: var(--touch);
     padding: var(--s-2) 0;
     color: inherit;
@@ -318,11 +345,6 @@
     color: var(--accent-text);
     font: var(--t-row);
     font-weight: var(--w-medium);
-  }
-  .set-help-detail {
-    color: var(--text-3);
-    font: var(--t-xs);
-    letter-spacing: 0;
   }
   .set-ask-title {
     color: var(--text-2);
