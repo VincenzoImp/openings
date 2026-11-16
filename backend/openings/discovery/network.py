@@ -23,6 +23,10 @@ HTTP_BUDGET: ContextVar[ProviderBudget | None] = ContextVar("collection_http_bud
 
 
 def public_url(value: str) -> str:
+    # The check resolves the host: a closed gate refuses before that lookup.
+    budget = HTTP_BUDGET.get()
+    if budget is not None:
+        budget.store.require_open()
     parsed = urlsplit(value)
     if (
         parsed.scheme not in ("http", "https")
@@ -109,6 +113,8 @@ def fetch_bytes(
     budget = budget or HTTP_BUDGET.get()
     if budget is None and public:
         raise RuntimeError("no provider budget")
+    if budget is not None:
+        budget.store.require_open()
     current = url
     try:
         with httpx.Client(
