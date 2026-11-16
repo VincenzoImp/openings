@@ -17,8 +17,10 @@ first run: only the owner password is set.
 
 Without --snapshot the server seeds a temporary workspace first. Only this
 server answers `POST /__e2e__/reset`, which restores its copy (the database and
-the backup files beside it) to the snapshot between tests; the product
-application has no such route.
+the backup files beside it) to the snapshot between tests, and `POST
+/__e2e__/collect`, which runs the queued checks against a fake provider: each
+board lists one synthetic job, and nothing leaves the machine. The product
+application has neither route.
 
 $OPENINGS_E2E_JOBS and $OPENINGS_E2E_APPLICATIONS set the size of the default workspace
 (60 jobs and 53 applications by default). Above 500 jobs they are written in
@@ -47,9 +49,11 @@ from openings.actors import OWNER, acting_as
 from openings.app import create_app
 from openings.auth import COOKIE
 from openings.career import EntryCreate, HighlightCreate, ProfileUpdate, TemplateCreate
+from openings.discovery import tasks
 from today_fixtures import seed_today
 
 RESET_PATH = "/__e2e__/reset"
+COLLECT_PATH = "/__e2e__/collect"
 PASSWORD = "synthetic-browser-password"
 # Above this many jobs the workspace is seeded in bulk (large_fixtures.py).
 LARGE = 500
@@ -65,6 +69,33 @@ def copy_side_files(snapshot, live):
         if not item.name.startswith(snapshot.name):
             target = live.parent / item.name
             shutil.copytree(item, target) if item.is_dir() else shutil.copy2(item, target)
+
+
+def fake_postings(source):
+    """The fake provider: one synthetic job for any board or search."""
+    board = source["config"].get("board") or source["config"].get("query") or "example"
+    return [
+        {
+            "title": "Synthetic platform engineer",
+            "company": source["name"],
+            "location": "Remote",
+            "url": f"https://jobs.example.test/{source['kind']}/{board}/1",
+            "source_key": f"{source['kind']}:{board}:1",
+            "posting": "Build reliable services.\n\nResponsibilities\nDesign practical APIs.",
+        }
+    ]
+
+
+def collect_queued(app):
+    """Run every queued check now, with the fake provider in place of the network."""
+    service = app.state.discovery
+    original = tasks.fetch_postings
+    tasks.fetch_postings = fake_postings
+    try:
+        while task := service.claim_task("e2e", "collect"):
+            service.run_task(task, "e2e")
+    finally:
+        tasks.fetch_postings = original
 
 
 def resettable(app, snapshot):
@@ -91,11 +122,12 @@ def resettable(app, snapshot):
             auth.used_operations.expiries.clear()
 
     async def serve(scope, receive, send):
-        if scope["type"] != "http" or scope["path"] != RESET_PATH:
+        routes = {RESET_PATH: reset, COLLECT_PATH: lambda: collect_queued(app)}
+        if scope["type"] != "http" or scope["path"] not in routes:
             return await app(scope, receive, send)
         status = 405
         if scope["method"] == "POST":
-            await asyncio.to_thread(reset)
+            await asyncio.to_thread(routes[scope["path"]])
             status = 204
         await send({"type": "http.response.start", "status": status, "headers": []})
         await send({"type": "http.response.body", "body": b""})

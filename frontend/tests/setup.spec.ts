@@ -1,5 +1,8 @@
 import { test, expect, type Page } from "./fixtures";
+import { startServer, type Server } from "./server";
 import { call, fitsViewport, go, heading } from "./session";
+
+const PASSWORD = "synthetic-browser-password";
 
 // The first-run guide (#setup): About you, Find jobs, Your CV, Done. Every
 // step writes through an existing operation and reaches Today in four steps.
@@ -154,4 +157,93 @@ test("first run with skipping: Find jobs and Your CV are skipped, Back returns",
   // An address that names no step opens the first.
   await go(page, "setup?step=record");
   await expect(current(page)).toContainText("About you");
+});
+
+test("an empty search offers a careers page, one click away", async ({
+  page,
+}) => {
+  await page.route("**/api/v1/sources/preview", (route) =>
+    route.fulfill({
+      json: { kind: "jobspy", total: 0, preview_limit: 20, items: [] },
+    }),
+  );
+  await go(page, "setup?step=jobs");
+  // A careers page comes first; the search names the sites it asks.
+  const careers = page.getByLabel(/^Careers page address/);
+  await expect(page.locator("#setup-careers")).toHaveText(
+    "Follow a company's careers page",
+  );
+  await expect(page.locator("#content")).toContainText(
+    "Searches LinkedIn; with a country, also Indeed and Glassdoor.",
+  );
+  await page.getByLabel("Keywords").fill("synthetic nothing");
+  await page
+    .getByRole("region", { name: "Or search job sites" })
+    .getByRole("button", { name: "Test" })
+    .click();
+  await expect(page.getByText("No jobs found")).toBeVisible();
+  await page.getByRole("button", { name: "Follow a careers page" }).click();
+  await expect(careers).toBeFocused();
+});
+
+test.describe("a new workspace", () => {
+  // Its own first-run server: only the password is set, nothing else.
+  test.use({ signedIn: false });
+  let server: Server;
+  test.beforeAll(async () => {
+    test.setTimeout(120_000);
+    server = await startServer({ empty: true, timeout: 110_000 });
+  });
+  test.afterAll(async () => server?.stop());
+
+  test("a careers page from setup is checked at once, and the guide resumes", async ({
+    page,
+  }) => {
+    const base = server.url;
+    await page.goto(base + "/");
+    await page.locator("input[name=password]").fill(PASSWORD);
+    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await page.goto(base + "/#setup");
+    await expect(current(page)).toContainText("About you");
+    await page.getByLabel("Your name").fill("Alex Example");
+    await page.getByLabel("Roles you're after").fill("platform engineer");
+    await next(page).click();
+
+    // Find jobs: the title filter starts from the roles; the board is detected.
+    await expect(page.getByLabel(/^Title must include/)).toHaveValue(
+      "platform engineer",
+    );
+    const board = `synthetic${Date.now()}`;
+    await page
+      .getByLabel(/^Careers page address/)
+      .fill(`https://boards.greenhouse.io/${board}`);
+    await expect(page.locator("#content")).toContainText(
+      `Detected: Greenhouse · ${board}`,
+    );
+    await page.getByLabel("Keywords").fill("");
+    await next(page, "Save and continue").click();
+    await expect(current(page)).toContainText("Your CV");
+
+    // A reload of the guide opens the first step not done: Your CV.
+    await page.goto(base + "/#setup");
+    await page.reload();
+    await expect(current(page)).toContainText("Your CV");
+
+    // The new source is being checked already, not tomorrow.
+    const name = board[0].toUpperCase() + board.slice(1);
+    await page.goto(base + "/#sources");
+    const row = page.locator(".src-row").filter({ hasText: name });
+    await expect(row).toContainText("Checking now…", { timeout: 2_000 });
+    // The fake provider answers the check with one synthetic job.
+    const collected = await fetch(base + "/__e2e__/collect", {
+      method: "POST",
+    });
+    expect(collected.status).toBe(204);
+    await page.reload();
+    await expect(row).toContainText("1 new");
+    await page.goto(base + "/#jobs");
+    await expect(page.locator("#content")).toContainText(
+      "Synthetic platform engineer",
+    );
+  });
 });
