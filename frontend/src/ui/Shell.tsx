@@ -319,9 +319,12 @@ export function AppFrame({
   children,
   className,
   preview = false,
+  banner,
 }: {
   sidebar: ReactNode;
   topBar?: ReactNode;
+  /** A thin line above everything in the main column (the demo's). */
+  banner?: ReactNode;
   bottomBar: ReactNode;
   children: ReactNode;
   className?: string;
@@ -334,6 +337,7 @@ export function AppFrame({
       <div className="ui-app-grid">
         <div className="ui-app-side">{sidebar}</div>
         <div className="ui-app-main">
+          {banner}
           {topBar}
           <Content
             className="ui-app-content"

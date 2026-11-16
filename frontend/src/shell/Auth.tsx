@@ -12,6 +12,8 @@ export interface Session {
   configured: boolean;
   authenticated: boolean;
   csrf_token?: string;
+  /** A disposable demo workspace (`openings demo`). */
+  demo?: boolean;
 }
 
 /** The frame of the screens shown before the workspace: one card. */

@@ -54,7 +54,14 @@ export function Data() {
   }
 
   return (
-    <SettingsSection title="Data">
+    <SettingsSection
+      title="Data"
+      lead={
+        info.data?.demo
+          ? "This is a demo workspace: a restore, a backup or a new password lasts only until the demo stops, and nothing is kept after it."
+          : undefined
+      }
+    >
       <SettingRow
         title="Backup"
         control={

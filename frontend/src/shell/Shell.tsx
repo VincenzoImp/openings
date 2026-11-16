@@ -25,6 +25,7 @@ import {
 } from "../ui/Shell";
 import { ToastProvider } from "../ui/Toast";
 import { ShellContext, type ShellApi } from "./context";
+import { DemoBanner } from "./DemoBanner";
 import { BOTTOM, NAV, NEEDS_LABEL, type NavDef } from "./nav";
 import { href, navigate, useRoute } from "./router";
 import { ROUTES } from "./routes";
@@ -53,7 +54,14 @@ const ShortcutSheet = lazy(() =>
  * bars on phones, the routed screen, the ⌘K palette, the Add job dialog, the
  * shortcut sheet and the global keyboard.
  */
-export function Shell({ onSignOut }: { onSignOut: () => void }) {
+export function Shell({
+  onSignOut,
+  demo = false,
+}: {
+  onSignOut: () => void;
+  /** A demo workspace: every screen says so (DemoBanner). */
+  demo?: boolean;
+}) {
   const route = useRoute();
   const counts = useNeedsCounts();
   const name = useAccountName();
@@ -189,6 +197,7 @@ export function Shell({ onSignOut }: { onSignOut: () => void }) {
         </a>
         <AppFrame
           className="shell"
+          banner={demo ? <DemoBanner /> : undefined}
           sidebar={
             <div
               className="shell-side"

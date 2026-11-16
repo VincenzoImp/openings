@@ -1,5 +1,13 @@
 import { test, expect, type Page } from "./fixtures";
-import { call, go, heading, isPhone, settled, tabKey } from "./session";
+import {
+  call,
+  findings,
+  go,
+  heading,
+  isPhone,
+  settled,
+  tabKey,
+} from "./session";
 
 // The shell: the sidebar and the phone's bars, the routes, the account menu
 // and the theme, the global keyboard, the ⌘K palette and Add job, and the
@@ -219,6 +227,47 @@ test("g and a letter go to a screen; ? shows the shortcuts; n adds a job", async
   await expect(page).toHaveURL(/#today$/);
   await page.keyboard.press("Escape");
   await expect(add).toBeHidden();
+});
+
+test("a demo workspace says so on every screen until put away for the session", async ({
+  page,
+}) => {
+  const banner = page.getByRole("region", { name: "Demo workspace" });
+  // A real workspace never shows it.
+  await expect(heading(page)).toBeVisible();
+  await expect(banner).toHaveCount(0);
+  // The session of `openings demo` says demo: true.
+  await page.route("**/api/v1/auth/session", async (route) => {
+    const response = await route.fetch();
+    await route.fulfill({
+      response,
+      json: { ...(await response.json()), demo: true },
+    });
+  });
+  await page.reload();
+  await expect(banner).toContainText("no job site is contacted");
+  expect(await findings(page)).toEqual([]);
+  await go(page, "jobs");
+  await expect(banner).toBeVisible();
+  await banner.getByRole("button", { name: "Hide for this session" }).click();
+  await expect(banner).toHaveCount(0);
+  // Hidden for the rest of the session, a reload included.
+  await page.reload();
+  await expect(heading(page)).toBeVisible();
+  await expect(banner).toHaveCount(0);
+  // A new session shows it again.
+  const fresh = await page.context().newPage();
+  await fresh.route("**/api/v1/auth/session", async (route) => {
+    const response = await route.fetch();
+    await route.fulfill({
+      response,
+      json: { ...(await response.json()), demo: true },
+    });
+  });
+  await go(fresh, "today");
+  await expect(
+    fresh.getByRole("region", { name: "Demo workspace" }),
+  ).toBeVisible();
 });
 
 test("a palette hit opens the job in the tab that lists it, even with New empty", async ({
