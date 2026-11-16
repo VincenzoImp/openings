@@ -1835,6 +1835,11 @@ export interface components {
        * @default []
        */
       requirements: components["schemas"]["EmployerRequirement"][];
+      /**
+       * Salary
+       * @description The owner's pay expectation.
+       */
+      salary?: string | null;
       /** Stage */
       stage: string;
       /** Updated At */
@@ -1955,6 +1960,11 @@ export interface components {
        * @default []
        */
       requirements: components["schemas"]["EmployerRequirement"][];
+      /**
+       * Salary
+       * @description The owner's pay expectation.
+       */
+      salary?: string | null;
       /** Stage */
       stage: string;
       /** Updated At */
@@ -1993,6 +2003,11 @@ export interface components {
       required_documents: ("cv" | "letter")[];
       /** Requirements */
       requirements?: components["schemas"]["Requirement"][];
+      /**
+       * Salary
+       * @description Expected pay as text (range, currency); never in a document.
+       */
+      salary?: string | null;
     };
     /** ApplicationItem */
     ApplicationItem: {
@@ -2016,7 +2031,7 @@ export interface components {
       deadline?: string | null;
       /**
        * Expected Version
-       * @description The version read; required to change priority, deadline, documents, requirements, questions or answers.
+       * @description The version read; required to change priority, deadline, documents, requirements, questions, answers or salary.
        */
       expected_version?: number | null;
       /** Outcome */
@@ -2040,6 +2055,11 @@ export interface components {
        * @description Replaces the list; keep ids to keep items.
        */
       requirements?: components["schemas"]["Requirement"][] | null;
+      /**
+       * Salary
+       * @description Expected pay as text (range, currency); never in a document.
+       */
+      salary?: string | null;
       /**
        * Stage
        * @description applied when the owner says they applied or a standing rule allows; closed needs outcome; shortlisted undoes applied while no reply; from closed it reopens.
@@ -2112,6 +2132,11 @@ export interface components {
        * @description Replaces the whole requirement list; include existing ids to keep them.
        */
       requirements?: components["schemas"]["Requirement"][] | null;
+      /**
+       * Salary
+       * @description Expected pay as text (range, currency); never in a document.
+       */
+      salary?: string | null;
       /**
        * Stage
        * @description applied is Mark applied (applied_at defaults to now); shortlisted again undoes it while the application has no reply, clearing applied_at. Record an employer reply with reply, which sets the stage itself.
@@ -2188,6 +2213,11 @@ export interface components {
       ready: boolean;
       /** Required Documents */
       required_documents: string[];
+      /**
+       * Salary
+       * @description The owner's pay expectation.
+       */
+      salary?: string | null;
       /** Stage */
       stage: string;
       /** Updated At */

@@ -13,12 +13,12 @@ from .errors import DomainError
 from .migrations import MIGRATIONS, UpgradeError, recover
 from .posting import posting_complete
 
-SCHEMA_VERSION = 15
+SCHEMA_VERSION = 16
 SCHEMA_SQL = Path(__file__).with_name("schema.sql")
 TEMP_PREFIX = ".openings-temp-"
 # The only workspace an upgrade starts from is one of the previous schema.
 OLDER = (
-    "This workspace was written by Openings older than 0.23. Open it once with the 0.23 "
+    "This workspace was written by Openings older than 0.24. Open it once with the 0.27 "
     "image, then start this version."
 )
 NEWER = (

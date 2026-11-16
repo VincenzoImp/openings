@@ -174,7 +174,8 @@ class ApplicationReads:
         order_args = [cutoff] if sort == "needs" else []
         with self.db.connect() as connection:
             projection = "app.id,app.job_id,app.status,app.outcome,app.version,app.applied_at,app.created_at,app.updated_at,app.concluded_on,"
-            projection += "app.priority,app.deadline,app.required_documents,app.requirements,"
+            projection += "app.priority,app.deadline,app.salary,app.required_documents,"
+            projection += "app.requirements,"
             projection += f"{REQUIREMENT_COUNTS_SQL},"
             projection += (
                 "(SELECT count(*) FROM documents WHERE application_id=app.id) AS documents_count,"

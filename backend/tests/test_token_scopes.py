@@ -133,7 +133,8 @@ def test_an_agent_takes_an_export_without_credentials(app, client):
     workspace, auth = app.state.workspace, app.state.auth
     agent = auth.create_token("Synthetic agent", "agent")
     owner = auth.create_token("Synthetic owner token", "owner")
-    workspace.ingest_job({"title": "Exported job", "company": "Example", "posting": "Build."})
+    job = workspace.ingest_job({"title": "Exported job", "company": "Example", "posting": "Build."})
+    workspace.create_application({"job_id": job["id"], "salary": "EUR 50-55k a year"})
     secrets = workspace.get_settings("auth")["data"]
     needles = [
         secrets["password_hash"],
@@ -156,6 +157,7 @@ def test_an_agent_takes_an_export_without_credentials(app, client):
     export = client.get("/api/v1/export", headers=bearer(agent)).json()
     assert export["format"] == "openings-records-v1"
     assert [job["title"] for job in export["jobs"]] == ["Exported job"]
+    assert [item["salary"] for item in export["applications"]] == ["EUR 50-55k a year"]
     assert "api_tokens" not in export and set(export["settings"]) <= {
         "profile",
         "workspace",

@@ -315,6 +315,53 @@ def test_jobs_list_tells_two_searches_on_one_site_apart(app, mcp):
     assert {item["id"] for item in rest["items"]} == {job["id"] for job in found[first["id"]]}
 
 
+def test_an_application_keeps_a_salary_expectation_under_its_version(app, mcp):
+    first, second = jobs(app, 2)
+    workspace = app.state.workspace
+    workspace.set_triage(second["id"], "shortlisted", second["version"])
+    created = ok(
+        mcp.call(
+            "applications_create",
+            {
+                "items": [
+                    {"job_id": first["id"], "salary": " CHF 95-105k a year "},
+                    # A shortlist's application takes the salary of the item.
+                    {"job_id": second["id"], "salary": "EUR 4,000 a month"},
+                ]
+            },
+        )
+    )
+    new, started = (item["id"] for item in created["items"])
+    read = ok(mcp.call("applications_get", {"ids": [new, started]}))["items"]
+    assert [item["salary"] for item in read] == ["CHF 95-105k a year", "EUR 4,000 a month"]
+    # A change needs the version read; a stale one is refused (409) and changes nothing.
+    item = {"application_id": new, "salary": "CHF 100k a year"}
+    _, error = mcp.call("applications_update", {"items": [item]})
+    assert error["code"] == "validation"
+    owner = workspace.update_application(
+        new, {"expected_version": read[0]["version"], "priority": 2}
+    )
+    stale = ok(mcp.call("applications_update", {"items": [item | {"expected_version": 1}]}))
+    assert stale["items"][0]["error"]["status"] == 409
+    assert workspace.get_application(new)["salary"] == "CHF 95-105k a year"
+    fresh = item | {"expected_version": owner["version"]}
+    ok(mcp.call("applications_update", {"items": [fresh]}))
+    changed = workspace.get_application(new)
+    assert changed["salary"] == "CHF 100k a year"
+    assert changed["version"] == owner["version"] + 1
+    # Listed beside the other fields, over REST and MCP; null clears it.
+    listed = ok(mcp.call("applications_list", {"job_id": first["id"]}))["items"][0]
+    assert listed["salary"] == "CHF 100k a year"
+    clear = {"application_id": new, "expected_version": changed["version"], "salary": None}
+    ok(mcp.call("applications_update", {"items": [clear]}))
+    assert workspace.get_application(new)["salary"] is None
+    _, error = mcp.call(
+        "applications_update",
+        {"items": [clear | {"expected_version": changed["version"] + 1, "salary": "x" * 301}]},
+    )
+    assert error["code"] == "validation"
+
+
 async def test_documents_list_searches_revision_text_over_mcp(app, mcp):
     """A fix pass finds every letter that says something without downloading PDFs."""
     assert "documents_list" in {tool.name for tool in await app.state.mcp.list_tools()}

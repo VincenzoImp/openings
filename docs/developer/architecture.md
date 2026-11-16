@@ -135,8 +135,8 @@ candidates stay in the run's checkpoint until usable text exists.
 `migrations/` (`MIGRATIONS` has one key, `SCHEMA_VERSION - 1`) upgrades a workspace of
 the previous schema; older ones are refused with the release to open first. It is
 frozen with its release, imports only the standard library and builds a new file from
-`schema.sql`, copying data in one transaction, writes removed records to a JSON archive
-beside the database, verifies the result and keeps the original. `test_upgrade.py`
+`schema.sql`, copying data in one transaction (a release that removes records writes
+them to a JSON archive beside the database), verifies the result and keeps the original. `test_upgrade.py`
 upgrades a real fixture (`backend/tests/fixtures/workspace-<schema>.sql.gz`, written by
 `scripts/release_fixture.py`) and compares it to a new file. Until its release ships,
 edit the migration instead of adding one.

@@ -127,6 +127,19 @@ RequirementKind = Literal[
 Priority = Annotated[int, Field(ge=1, le=5, description="1 is the highest priority, 5 the lowest.")]
 
 
+def salary_field():
+    """An application's salary expectation: text, blank or null clears it (#348)."""
+    return Field(
+        default=None,
+        max_length=300,
+        description="Expected pay as text (range, currency); never in a document.",
+    )
+
+
+def blank_as_none(value):
+    return (value.strip() or None) if isinstance(value, str) else value
+
+
 class Requirement(Input):
     """An employer requirement from the posting or the form."""
 
@@ -201,6 +214,7 @@ PastDay = Annotated[str, AfterValidator(past_day)]  # YYYY-MM-DD, not in the fut
 Since = Annotated[str, AfterValidator(normalized_date)]  # a date or timestamp, from its start
 Until = Annotated[str, AfterValidator(lambda value: normalized_date(value, end=True))]
 NonBlank = Annotated[str, AfterValidator(not_blank)]  # stripped, not empty
+Salary = Annotated[str, AfterValidator(blank_as_none)]  # stripped; blank is none
 
 
 class SubjectRef(Input):
@@ -245,6 +259,7 @@ class ApplicationInput(Input):
     )
     deadline: Day | None = Field(default=None, description="Closing date as YYYY-MM-DD.")
     requirements: list[Requirement] = Field(default_factory=list, max_length=100)
+    salary: Salary | None = salary_field()
     idempotency_key: str | None = Field(default=None, min_length=1, max_length=200)
 
 
@@ -304,6 +319,7 @@ class ApplicationFields(Input):
         default=None,
         description="With outcome no_response: the day it was concluded that no reply will come (YYYY-MM-DD, not in the future); today (UTC) when omitted.",
     )
+    salary: Salary | None = salary_field()
     reply: ReplyChange | None = Field(
         default=None,
         description="Record an employer reply (kind, date, note) and move the stage with it in the same change: interview moves an Applied application to Interview, offer moves it to Offer, rejection closes it as rejected; other never moves the stage. A Closed application without a reply (no_response) is reopened the same way. With id: correct a reply's kind, date or note, or remove it (remove=true); a correction never moves the stage.",
@@ -655,6 +671,7 @@ VERSIONED_FIELDS = (
     "requirements",
     "questions",
     "answers",
+    "salary",
 )
 
 
@@ -663,7 +680,7 @@ class ApplicationItem(Input):
     expected_version: int | None = Field(
         default=None,
         ge=1,
-        description="The version read; required to change priority, deadline, documents, requirements, questions or answers.",
+        description="The version read; required to change priority, deadline, documents, requirements, questions, answers or salary.",
     )
     stage: Stage | None = Field(
         default=None,
@@ -693,6 +710,7 @@ class ApplicationItem(Input):
     answers: dict[str, Any] | None = Field(
         default=None, description="Replaces all answers: include those to keep."
     )
+    salary: Salary | None = salary_field()
 
     @model_validator(mode="after")
     def version_for_fields(self):

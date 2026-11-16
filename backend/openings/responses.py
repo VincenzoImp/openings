@@ -364,6 +364,7 @@ class ApplicationRow(Record):
     outcome: str | None = None
     priority: int | None = None
     deadline: str | None = None
+    salary: str | None = Field(default=None, description="The owner's pay expectation.")
     applied_at: str | None = None
     concluded_on: str | None = None
     required_documents: list[str]

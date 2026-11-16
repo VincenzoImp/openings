@@ -115,14 +115,14 @@ Records and fields the release no longer keeps are written to
 file. If a check fails, the start stops with the reason and the original is
 untouched.
 
-**Roll back** with the copy, here from the upgrade to 0.24:
+**Roll back** with the copy, here from the upgrade to 0.28:
 
 ```bash
 docker compose down
 cd "$(docker volume inspect openings_workspace --format '{{ .Mountpoint }}')"
 mv openings.sqlite openings.failed-upgrade.sqlite
 rm -f openings.sqlite-wal openings.sqlite-shm
-cp -p openings.pre-0.24.sqlite openings.sqlite
+cp -p openings.pre-0.28.sqlite openings.sqlite
 # Set OPENINGS_IMAGE in .env to the previous release, then:
 docker compose up -d
 ```
