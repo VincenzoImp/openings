@@ -80,6 +80,13 @@ encoder noise. `frontend/reel/` (ignored by Git) receives the MP4 master and the
 track the video is cut from: each scene's caption and focal regions, the cursor,
 the clicks and the keys. Re-render both after a change to a screen it shows.
 
+The `video` Playwright project (`frontend/tests/video.spec.ts`) records the same
+kind of track and the bare frames, at twice the pixels, from a running
+`openings demo` that an agent works on at the same time: before the agent, live
+while it works, and after. A capture script outside the repository starts the
+demo and the agent session and sets its variables (see the spec's header); the
+recorder both specs share is `frontend/tests/reel.ts`.
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="../images/demo-dark.gif">
   <img alt="The demo reel: sources, Jobs › New, the agent's dismissals, a Ready application, Mark applied and Today" src="../images/demo.gif">
