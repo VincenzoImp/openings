@@ -1,27 +1,33 @@
 # Applications
 
-An application is your attempt to get one job. It holds the documents, the
-employer's requirements, form answers, notes and replies. A job has at most one
-open application and can keep earlier closed ones.
+Prepare, send and track each application here, from the first document to the
+last reply. An application is your attempt to get one job. It holds the
+documents, the employer's requirements, form answers, notes and replies.
 
 ## Stages
 
-Shortlisting a job starts its application in **Shortlisted**. From there:
-**Applied**, **Interview**, **Offer** and **Closed**. **Applications** has one tab
-per stage, with its count, and **Ready**, the Shortlisted applications that are
-ready to send. Search finds words that start with what you type in the role,
-the company, the location, the posting or the pinned note, as the Jobs search does,
-and a stage name ("interview") finds that stage; **Filter** by
-priority, deadline, job site or outcome. The default order, **Most urgent first**, puts Ready ones first (by
-deadline), then Shortlisted ones with a deadline, then sent ones waiting longer
-than the no-reply period, then the rest; you can also sort by deadline, last
-change or the day it was sent.
+Shortlisting a job starts its application in **Shortlisted**. From there it moves
+to **Applied**, **Interview**, **Offer** and **Closed**. A job has at most one
+open application, and can keep earlier closed ones.
 
-Each row shows the role and company, the stage and one phrase about it ("Missing:
-letter", "Ready · due Fri", "Applied 12 Oct · no reply 32 days"), and the
-priority as a small glyph. Pointing at a row shows **Apply** (Ready) or **Record
-reply** (sent), and `…` with **Change stage…**, **Close…** or **Reopen**, and
-**Delete permanently…**.
+**Applications** has one tab per stage with its count, plus **Ready**: the
+Shortlisted applications that are ready to send. The list offers:
+
+- **Search**, as in Jobs, over the role, company, location, posting and pinned
+  note; a stage name such as "interview" finds that stage.
+- **Filter**, by priority, deadline, job site or outcome.
+- **Sort**, by **Most urgent first** (the default), deadline, last change or the
+  day it was sent.
+
+Most urgent first puts **Ready to send, best first** at the top, ranked by
+priority, then deadline. Shortlisted ones with a deadline follow, then sent ones
+past the no-reply period, then the rest.
+
+Each row shows the role and company, the stage, one phrase about it ("Missing:
+letter", "Ready · due Fri", "Applied 12 Oct · no reply 32 days") and the
+priority. Ready rows also show their rank and "Priority n". Pointing at a row
+shows **Apply** (Ready) or **Record reply** (sent), and `…` with **Change
+stage…**, **Close…** or **Reopen**, and **Delete permanently…**.
 
 Closing needs an outcome: **Accepted**, **Rejected**, **Not pursued** or **No
 reply**. A closed application stays in the list with its history and files. You
@@ -36,93 +42,94 @@ and a failure is named without stopping the others.
 
 ## Ready
 
-Ready is computed. A Shortlisted application is Ready when every document it
-requires has a complete current revision and no blocking requirement is open. The
-required documents are a CV and a letter unless you untick one in **Required
-documents…**.
-Where something is missing, the application says what, for example "Missing:
-letter" or an open blocking requirement. Today lists Ready applications by closest
-deadline, then priority.
+Openings computes Ready from the records. A Shortlisted application is Ready when
+every document it requires has a complete current revision and no blocking
+requirement is open. The required documents are a CV and a letter, unless you
+untick one in **Required documents…**.
 
-Ready follows the records. Add a blocking requirement, or a new revision still
-without its PDF, and the application is not Ready until that is settled. Ready
-does not judge the content, and preparing documents never sends anything.
+Where something is missing, the application says what, such as "Missing:
+letter". A new blocking requirement, or a new revision still without its PDF,
+takes the application out of Ready until it is settled. Ready does not judge the
+content, and preparing documents never sends anything. Today and the Ready tab
+list Ready applications best first: priority, then deadline.
 
 ## Review and apply
 
 An application opens on its own page from Today, a row of the list or a link. Its
 head shows the role, company, stage, deadline and priority, **Open posting** and
 `…` (**Change stage…**, **Deadline and priority…**, **Required documents…**,
-**Close…**, **Delete permanently…**). The rest follows the stage.
+**Close…**, **Delete permanently…**). The rest follows the stage:
 
 - **Shortlisted:** **What's missing** (CV, letter, requirements done), a slot per
-  required document to upload its PDF, the requirements and the form's answers.
-  The main action settles the first missing item; once nothing is, the page is
-  the Ready page.
+  required document for its PDF, the requirements and the form's answers. The
+  main action settles the first missing item. Once nothing is missing, the page
+  becomes the Ready page.
 - **Ready:** the posting, CV and letter side by side, each document with a
-  PDF/Text switch; on a phone, tabs **Check**, **Posting**, **CV**, **Letter**.
-  **Before you send** lists the salary expectation your agent recorded, open
-  requirements (tick them there), the form's answers with copy buttons, **Apply on employer's site** and **Download CV +
-  Letter**. The page shows its place in Today's order ("2 of 5 ready · Next: …");
-  `[` and `]` move between them.
+  PDF/Text switch; on a phone, the tabs **Check**, **Posting**, **CV** and
+  **Letter**. **Before you send** lists the salary expectation your agent
+  recorded, open requirements (tick them there), the form's answers with copy
+  buttons, **Apply** and **Download CV + Letter**.
 - **Applied, Interview, Offer:** where it stands first ("Applied 12 Oct · no
-  reply for 32 days") and **Record reply**, then the notes, the history, the
-  documents that were sent, and the posting, requirements and answers folded.
+  reply for 32 days") and **Record reply**. Then the notes, the history, the
+  documents that were sent, and the folded posting, requirements and answers.
 - **Closed:** how it ended ("Rejected on 2 Nov after interview"), the notes, the
-  history and the sent documents; `…` **Reopen**s it.
+  history and the sent documents. `…` › **Reopen** opens it again.
 
-![The Ready page: before you send, the posting, the CV and the letter, and Mark applied](../images/ready.png)
+![The Ready page: the posting, the CV and letter as PDFs, Apply and Mark applied](../images/ready.png)
+
+**Apply** opens the employer's site in a new tab, where you send the application.
+The Ready page shows its place in the queue ("1 of 3 ready · best first"), and
+`[` and `]` move between Ready applications.
 
 **Mark applied** (`⇧↵`) records that you sent it, today unless you pick another
-day beside the button. Only you do this. The next Ready application opens at once
-and **Undo** is offered; it returns the application to Shortlisted while no reply
-is recorded. After the last one the page says **All sent** and links back to
-Today. **Not pursuing** (in `…`) closes it and keeps everything.
+day beside the button. The next Ready application opens at once, and the toast
+offers **Undo**, which returns the application to Shortlisted while no reply is
+recorded. After the last one the page says **All sent** and links back to Today.
+**Not pursuing** (in `…`) closes the application and keeps everything.
 
 ## Documents
 
 A CV or letter revision is a **PDF**, and optionally the **LaTeX source** it was
-built from. You need no LaTeX: a PDF alone is complete. Drop the PDF on its slot of
-the application page, or choose **Upload PDF**, with the `.tex` source alongside if
-you have it. A revision is incomplete until its PDF is stored, then complete and
-fixed: its files never change. A filled slot's `…` offers **Replace…** (a new
-revision), **Download**, **Earlier versions**, **Show changes from previous
-version** and **Remove…**.
+built from. You need no LaTeX: a PDF alone is complete. Drop the PDF on its slot,
+or choose **Upload PDF**, with the `.tex` source alongside if you have it.
+
+A revision is incomplete until its PDF is stored. Then it is complete, and its
+files never change. A filled slot's `…` offers **Replace…** (a new revision),
+**Download**, **Earlier versions**, **Show changes from previous version** and
+**Remove…**.
 
 - **Readable text** comes from the source when there is one, otherwise from the
-  PDF, without running TeX. It is what the Text switch shows and what **Show
-  changes** compares (lines removed and added). A PDF with no readable text is
-  still complete.
-- A PDF uploaded with a source must have been built from that source, or it is
-  refused.
-- Each revision can record the career entries and highlights it uses.
-- Form answers and other documents are text, not PDFs.
+  PDF, without running TeX. The Text switch shows it, and **Show changes**
+  compares it line by line. A PDF with no readable text is still complete.
+- **A PDF uploaded with a source** must have been built from that source, or
+  Openings refuses it.
+- **Each revision** can record the career entries and highlights it uses.
+- **Form answers and other documents** are text, not PDFs.
 
-Your agent can write and upload revisions the same way; see
-[Work with an agent](agents.md). Files are limited to 20 MiB each.
+Your agent uploads revisions the same way. Each file is limited to 20 MiB.
 
 ## Requirements and form answers
 
 **Requirements** record the employer's conditions: authorship rules (such as no
 AI-written applications), attachments, references, format, language, eligibility
-and dates. Add one on the page and mark it **Blocking** when the application must
-not go out until it is settled; tick it once it is. They belong to the
-application, so refreshing the job does not remove them.
+and dates. Add one on the page, and mark it **Blocking** when the application
+must not go out until it is settled. Tick it once it is. Requirements belong to
+the application, so refreshing the job keeps them.
 
 **Form answers** keep the answer to each question of the employer's form, with a
 copy button, so you can paste them into the form.
 
 ## Plan
 
-Give an application a **priority** (1 highest to 5) and the employer's
-**deadline** with **Deadline and priority…**, or a priority for several at once
-from the list. Rows show them, and a past deadline on an application still
-Shortlisted is marked overdue.
+Give an application a **priority**, from 1 (highest) to 5, and the employer's
+**deadline** with **Deadline and priority…**. From the list, you can set a
+priority for several at once. Rows show both, and a past deadline on a
+Shortlisted application is marked overdue.
 
 ## Replies
 
-When the employer answers, choose **Record reply** on the row or the page, say what
-happened, the date it arrived (today by default, never in the future) and an
+When the employer answers, choose **Record reply** on the row or the page. Say
+what happened, the date it arrived (today by default, never in the future) and an
 optional note. One action records the reply and moves the stage:
 
 | Reply | Stage |
@@ -132,31 +139,37 @@ optional note. One action records the reply and moves the stage:
 | Rejection | Closed, Rejected |
 | Other (for example a request for references) | unchanged |
 
-The dashboard cannot edit a recorded reply yet: your agent or the REST API
-corrects or removes one (`applications_update`), and that never moves the stage. Only applications you marked applied can have replies. A sent
-application's `…` also has **Close as no reply**, **Withdraw** and, at Offer,
-**Accept offer**, each with **Undo**.
+Only applications you marked applied can have replies. The dashboard cannot edit
+a recorded reply yet. Your agent or the REST API corrects or removes one
+(`applications_update`), and that never moves the stage. A sent application's
+`…` also has **Close as no reply**, **Withdraw** and, at Offer, **Accept offer**,
+each with **Undo**.
 
-**No reply** is a way to close. The period is **Count an application as no reply
-after [30] days** in [Preferences](profile-preferences-templates.md#settings).
+**No reply** is a way to close. Set its period with **Count an application as no
+reply after [30] days** in [Preferences](profile-preferences-templates.md#settings).
 Today's **Waiting for a reply** lists Applied applications without a reply for
-longer, with **Close as no reply** one by one or for all. Nothing closes by itself,
-and an agent closes them only when you ask.
+longer, with **Close as no reply** for one or for all. Nothing closes by itself,
+and your agent closes them only when you ask.
 
 ## Notes and history
 
-The application's note is its standing guidance: read first on the page, changed
-with **Edit**, and read first by your agent. The history lists replies, stage
-changes and notes, newest first, each with who made it: "by you", "by <token
-name>" for an agent, or "by job sources". **Show all changes** adds every recorded
-change, including the job's.
+The application's note is its standing guidance. You read it first on the page
+and change it with **Edit**, and your agent reads it first too. The history lists
+replies, stage changes and notes, newest first, each with its author: "by you",
+"by <token name>" for an agent, or "by job sources". **Show all changes** adds
+every recorded change, including the job's.
+
+Before an interview, ask your agent to prepare you. Your agent saves a brief on
+the application as a note: what the role needs, stories from your record, likely
+questions, weak spots, logistics and questions to ask. After the interview, your
+agent saves your debrief as a note too.
 
 ## Stats
 
-**Applications › Stats** (beside **List**) counts the applications you sent in the last 90 days, 12
-months or all time: the share that got a reply or led to an interview, the median
-days to a reply, the funnel, and replies by saved source once two sources each have
-five sent applications (**Added by hand** and **Removed source** group the rest).
+**Applications › Stats** (beside **List**) covers the applications you sent in
+the last 90 days, 12 months or all time: the share that got a reply or an
+interview, the median days to a reply and the funnel. Once two sources each have
+five sent applications, it adds replies by source.
 
 ## Delete
 

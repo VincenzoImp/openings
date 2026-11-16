@@ -1,38 +1,62 @@
 # How it works
 
-Openings is one workspace for one person's job search. Everything you do in the
-dashboard can also be done by a script (the REST API) or by your AI agent (MCP),
-with the same names. Only a few owner actions, such as the password, tokens and
-restore, stay with you.
+Learn here what Openings holds, how a day goes and the words every page shares.
+Openings is a self-hosted app with no AI of its own. Your own AI agent reads
+what Openings holds to decide on jobs and write documents, and you apply.
 
-## The concepts
+## What Openings holds
 
-1. **Job.** A posting you might apply to: title, company, location, text and where it came from.
-2. **Source.** A search, company careers page, RSS feed or the Hacker News "Who is hiring?" thread that collects jobs on a schedule. Jobs you add by hand have no source.
-3. **Triage.** Where a job stands in review: **New**, **Shortlisted** or **Dismissed**. Dismissing keeps the job, remembers it and can be undone.
-4. **Label.** A mark computed without a model: the posting's language, the languages it requires, a likely duplicate, or no longer listed. Labels describe and filter; they never dismiss.
-5. **Application.** Your attempt to get one job. A job has at most one open application. Shortlisting a job starts it.
-6. **Stage.** Where the application stands: **Shortlisted**, **Applied**, **Interview**, **Offer** or **Closed** (Accepted, Rejected, Not pursued or No reply).
-7. **Ready.** Computed, never set by hand: a Shortlisted application whose required documents are complete and that no blocking requirement holds back.
-8. **Document.** A CV, letter, set of form answers or other file for an application. A CV or letter is a PDF, with its LaTeX source if you have one. Each change is a new revision; a stored revision never changes.
-9. **Requirement.** A condition from the employer, such as "no AI-written applications" or "references". A blocking one keeps the application from Ready until you resolve it.
-10. **Reply.** What the employer did: interview, offer, rejection or other, with a date. Recording one also moves the stage.
-11. **Profile and career entries.** Who you are, and your jobs, studies, publications and skills.
-12. **Highlight.** One reusable sentence under a career entry. You approve it; a star means "always include in my CV".
-13. **Template.** A CV or letter layout, with guidance and limits such as the number of pages.
-14. **Preferences.** Five lists of plain statements: what you are looking for, what you rule out, facts about you, writing rules and how to work with you. Your agent reads them; nothing in them acts on its own.
+You set these up once, in your own words:
 
-## The daily loop
+- **Profile.** Your career entries and their highlights. You approve each
+  highlight, and only approved ones reach an application. A ★ means "Always
+  include in my CV".
+- **Preferences.** Five sections of plain lines: *What I'm looking for*, *What I
+  rule out*, *Facts about me*, *Writing rules* (for All documents, the CV or the
+  Letter) and *Working with me*, which says what your agent may do on its own.
+- **Templates.** Your own CV and letter layouts in TeX, with limits on pages,
+  bullets per entry and bullet length, and one default per kind.
+- **Sources.** LinkedIn, Indeed and Glassdoor searches, careers pages on 12
+  hiring platforms, the Hacker News "Who is hiring?" thread and RSS feeds.
+  Each source shows what it found, how many were ever shortlisted and how many
+  you applied to.
 
-**New** jobs arrive from your sources, deduplicated, or by hand. You or your
-agent **shortlist** the ones that fit your Preferences and career, and
-**prepare** the CV and letter for each. **Ready** applications are ranked by
-priority and deadline: you apply on the employer's site, best first, and choose
-**Mark applied**. Later you **record the reply**, or close the application as
-**No reply**.
+Change a line in your Preferences, and your agent's next decisions change with it.
 
-You decide when an application counts as applied: you mark it, or your agent
-does when you tell it or a standing rule says how.
+## Every new job, filtered, prepared and ranked
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/flow-dark.svg">
+  <img alt="You set it up: Profile, Preferences, Templates and Sources. Fresh jobs arrive. Your agent decides and prepares. You apply, best first. By hand, REST or MCP." src="../images/flow.svg">
+</picture>
+
+1. **Openings collects.** Fresh jobs arrive from your sources on their schedule,
+   or by hand. Repeats are left out and likely copies are flagged.
+2. **Your agent decides.** Your agent reads each new job by your Preferences and
+   career, then shortlists it with a priority or dismisses it with a reason.
+3. **Your agent prepares.** For each shortlisted job, your agent writes a CV and
+   letter from your templates and uploads the PDFs.
+4. **You apply.** **Ready** lists the complete applications best first: priority,
+   then deadline. You choose **Apply**, send it on the employer's site, then
+   choose **Mark applied**.
+5. **Openings follows through.** You **Record reply** when the employer answers,
+   or close a silent application as **No reply**.
+
+Each step also works by hand. You decide when an application counts as applied:
+you mark it, or your agent does when you say so or a line in *Working with me*
+says how.
+
+## Concepts
+
+1. **Job.** A posting you might apply to, with its text and where it came from.
+2. **Triage.** Where a job stands in review: **New**, **Shortlisted** or **Dismissed**. A dismissed job is kept, and can be restored.
+3. **Label.** A mark Openings computes without a model: the languages, a likely duplicate, or no longer listed. Labels filter; they never dismiss.
+4. **Application.** Your attempt to get one job. A job has at most one open application, and shortlisting the job starts it.
+5. **Stage.** **Shortlisted**, **Applied**, **Interview**, **Offer** or **Closed** (Accepted, Rejected, Not pursued or No reply).
+6. **Ready.** A Shortlisted application with its required documents complete and no blocking requirement open. Openings computes it.
+7. **Document.** A CV or letter as a PDF, with its LaTeX source if you have one, or form answers. A stored revision never changes.
+8. **Requirement.** An employer's condition, such as "no AI-written applications". A blocking one keeps the application out of Ready.
+9. **Reply.** What the employer did, with a date. Recording one also moves the stage.
 
 ## Who does what
 
@@ -40,15 +64,7 @@ does when you tell it or a standing rule says how.
 |---|---|---|
 | Dashboard | You, by hand | Everything you need to find, decide, prepare, send and track |
 | REST API | Scripts and your own tools | All dashboard actions, plus the owner-only ones |
-| MCP and skills | An external agent you talk to in its own chat | Everything the dashboard does, except owner-only actions |
+| MCP and skills | Your agent, in its own chat | Everything except the owner-only actions: the password, tokens, restore, the career import and kept backups |
 
-Owner-only actions: the password, API tokens, restore, the career import and
-downloading kept backups.
-
-## Words
-
-The word on screen is the word in REST, MCP and these pages: a job's **triage**
-(New, Shortlisted, Dismissed), an application's **stage** (Shortlisted, Applied,
-Interview, Offer, Closed), **Ready**, **CV** and **letter**, **career entry**,
-**highlight**, **Preferences**, **reply** and **source**. The
+The word on screen is the word in REST, MCP and these pages. The
 [REST API](api.md#names) page lists the field names behind them.
