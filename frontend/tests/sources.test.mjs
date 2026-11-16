@@ -291,8 +291,15 @@ test("a Test says what it is doing, then what it found", () => {
   const heading = sources.testHeading;
   assert.equal(heading({ phase: "listing", total: 0, shown: 0 }), "Testing…");
   assert.equal(
-    heading({ phase: "details", total: 3, shown: 3, listed: 254 }),
-    "254 jobs listed · fetching the text of the first 3…",
+    heading({
+      phase: "details",
+      total: 3,
+      shown: 3,
+      listed: 254,
+      fetched: 1,
+      fetching: 3,
+    }),
+    "254 jobs listed · fetched 1 of 3…",
   );
   assert.equal(
     heading({ phase: "done", total: 3, shown: 3, listed: 254 }),
@@ -304,6 +311,45 @@ test("a Test says what it is doing, then what it found", () => {
     heading({ phase: "done", total: 0, shown: 0, failed: true }),
     "Test failed",
   );
+});
+
+test("a Test's postings take their text one at a time", () => {
+  const listing = {
+    items: [
+      { source_key: "greenhouse:example:1", title: "A", posting: "" },
+      { source_key: "greenhouse:example:2", title: "B", posting: "" },
+    ],
+    total: 2,
+    listed: 254,
+    diagnostics: [],
+  };
+  const one = sources.withText(listing, {
+    items: [
+      { source_key: "greenhouse:example:1", title: "A", posting: "Text" },
+      { source_key: "greenhouse:example:2", title: "B", posting: "" },
+    ],
+    total: 2,
+    listed: 254,
+    diagnostics: [{ state: "ok" }],
+  });
+  assert.deepEqual(
+    one.items.map((item) => item.posting),
+    ["Text", ""],
+  );
+  // A refusal answers with nothing: the titles stay, with the reason.
+  const refused = sources.withText(one, {
+    items: [],
+    total: 0,
+    listed: null,
+    diagnostics: [{ state: "deferred", message: "Wait" }],
+  });
+  assert.deepEqual(
+    refused.items.map((item) => item.title),
+    ["A", "B"],
+  );
+  assert.equal(refused.total, 2);
+  assert.equal(refused.listed, 254);
+  assert.equal(refused.diagnostics[0].message, "Wait");
 });
 
 test("a wait's time is shown in the viewer's clock", () => {

@@ -419,6 +419,35 @@ export function localReason(message: string, until?: unknown) {
   return local ? message.replace(/\b\d{2}:\d{2} UTC\b/, local) : message;
 }
 
+/** Whether a previewed posting came with its text. */
+export const hasText = (item: Record<string, unknown>) =>
+  typeof item.posting === "string" && item.posting.trim() !== "";
+
+type Previewed = {
+  items: Record<string, unknown>[];
+  total: number;
+  listed?: number | null;
+};
+
+/**
+ * A Test's listing with the text one posting's answer brought. The rest of
+ * the answer (its diagnostics) replaces the earlier one's; a refusal keeps
+ * the titles the listing gave.
+ */
+export function withText<T extends Previewed>(before: T, answer: T): T {
+  const id = (item: Record<string, unknown>) =>
+    String(item.source_key ?? item.url);
+  const arrived = new Map(
+    answer.items.filter(hasText).map((item) => [id(item), item]),
+  );
+  return {
+    ...answer,
+    items: before.items.map((item) => arrived.get(id(item)) ?? item),
+    total: before.total,
+    listed: answer.listed ?? before.listed,
+  };
+}
+
 /** What a Test is doing or found: its heading. */
 export function testHeading({
   phase,
@@ -426,6 +455,8 @@ export function testHeading({
   shown,
   listed,
   failed,
+  fetched = 0,
+  fetching = shown,
 }: {
   /** "listing" until the board answers, "details" while the text arrives. */
   phase: "listing" | "details" | "done";
@@ -433,12 +464,15 @@ export function testHeading({
   shown: number;
   listed?: number | null;
   failed?: boolean;
+  /** While the text arrives: the postings that have it, of how many. */
+  fetched?: number;
+  fetching?: number;
 }) {
   const count = listed ?? total;
   const jobs = `${count} ${count === 1 ? "job" : "jobs"}`;
   if (phase === "listing") return "Testing…";
   if (phase === "details")
-    return `${jobs} listed · fetching the text of the first ${shown}…`;
+    return `${jobs} listed · fetched ${fetched} of ${fetching}…`;
   if (failed) return "Test failed";
   if (!total && !count) return "No jobs found";
   return shown < count ? `${jobs} found · the first ${shown}` : `${jobs} found`;

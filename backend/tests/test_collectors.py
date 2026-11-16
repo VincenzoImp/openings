@@ -245,10 +245,18 @@ def test_a_test_lists_a_large_board_first_then_fetches_its_text(collection, monk
     first = service.preview_source(SourceTest(**board, details=False))
     assert len(calls) == 1 and first["listed"] == 254
     assert [item["title"] for item in first["items"]] == ["Engineer 1", "Engineer 2", "Engineer 3"]
-    # Then the posting text of the first few.
-    second = service.preview_source(SourceTest(**board))
-    assert len(calls) == 1 + 2 + 3 and second["listed"] == 254
-    assert all(item["posting"] for item in second["items"])
+    # Then the posting text of the first few, one at a time ("Fetched N of M"): the
+    # board's listing is read once, and each call costs one posting's request.
+    keys = [item["source_key"] for item in first["items"]]
+    for count, key in enumerate(keys, start=1):
+        answer = service.preview_source(SourceTest(**board, only=[key]))
+        assert len(calls) == 1 + 1 + count and answer["listed"] == 254
+        assert [bool(item["posting"]) for item in answer["items"]] == [
+            item["source_key"] in keys[:count] for item in answer["items"]
+        ]
+    # Everything is then known: a full Test asks for nothing more.
+    full = service.preview_source(SourceTest(**board))
+    assert len(calls) == 5 and all(item["posting"] for item in full["items"])
 
 
 def test_a_check_counts_what_it_fetched_of_what_the_board_lists(collection, monkeypatch):

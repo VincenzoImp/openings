@@ -44,6 +44,11 @@ class SourceTest(SourcePreview):
         default=True,
         description="false: the board's listing only, without fetching each posting's text.",
     )
+    only: list[str] | None = Field(
+        default=None,
+        max_length=20,
+        description="With details: the text of these postings only (their source_key).",
+    )
 
 
 class SourceCreate(SourcePreview):

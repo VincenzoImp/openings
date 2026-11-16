@@ -118,22 +118,16 @@ test("add a search: Test shows the first ten results, then Save adds it", async 
   );
 });
 
-test("Test lists a board's titles first, then fetches their text", async ({
+test("Test lists a board's titles first, then counts the text it fetched", async ({
   page,
 }) => {
-  let release = () => {};
-  const held = new Promise<void>((resolve) => (release = resolve));
-  const asked: { details?: boolean }[] = [];
-  const items = (text: string) =>
-    [1, 2, 3].map((index) => ({
-      title: `Synthetic platform engineer ${index}`,
-      company: "Syntheticlabs",
-      posting: text,
-    }));
+  const held: (() => void)[] = [];
+  const asked: { details?: boolean; only?: string[] }[] = [];
+  const key = (index: number) => `greenhouse:syntheticlabs:${index}`;
   await page.route("**/api/v1/sources/preview", async (route) => {
     const body = route.request().postDataJSON();
     asked.push(body);
-    if (body.details) await held;
+    if (body.details) await new Promise<void>((resolve) => held.push(resolve));
     return route.fulfill({
       json: {
         kind: "greenhouse",
@@ -141,7 +135,14 @@ test("Test lists a board's titles first, then fetches their text", async ({
         total: 3,
         listed: 254,
         preview_limit: 20,
-        items: items(body.details ? "Build reliable services." : ""),
+        items: [1, 2, 3].map((index) => ({
+          source_key: key(index),
+          title: `Synthetic platform engineer ${index}`,
+          company: "Syntheticlabs",
+          posting: body.only?.includes(key(index))
+            ? "Build reliable services."
+            : "",
+        })),
         diagnostics: [],
       },
     });
@@ -154,15 +155,24 @@ test("Test lists a board's titles first, then fetches their text", async ({
     .getByLabel("Careers page address")
     .fill("https://boards.greenhouse.io/syntheticlabs");
   await form.getByRole("button", { name: "Test" }).click();
-  // The titles show as soon as the board's listing answers.
+  // The titles show as soon as the board's listing answers, then the count
+  // of postings whose text arrived goes up one by one.
   const results = form.locator(".src-test");
-  await expect(results).toContainText(
-    "254 jobs listed · fetching the text of the first 3…",
-  );
   await expect(results.getByRole("listitem")).toHaveCount(3);
-  release();
+  for (const fetched of [0, 1, 2]) {
+    await expect(results).toContainText(
+      `254 jobs listed · fetched ${fetched} of 3…`,
+    );
+    await expect.poll(() => held.length).toBe(1);
+    held.shift()!();
+  }
   await expect(results).toContainText("254 jobs found · the first 3");
-  expect(asked.map((body) => body.details)).toEqual([false, true]);
+  expect(asked.map((body) => [body.details, body.only])).toEqual([
+    [false, undefined],
+    [true, [key(1)]],
+    [true, [key(2)]],
+    [true, [key(3)]],
+  ]);
 });
 
 test("a refused search says why and when, and offers a careers page", async ({

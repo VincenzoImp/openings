@@ -224,6 +224,8 @@ function TestPreview({
           shown: Math.min(found.length, 3),
           listed: preview?.listed,
           failed: !!test.error && !preview,
+          fetched: test.fetched,
+          fetching: test.fetching,
         })}
       </p>
       {found.length > 0 && (

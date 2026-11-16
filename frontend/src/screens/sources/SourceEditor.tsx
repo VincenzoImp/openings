@@ -457,6 +457,8 @@ function Editor({
               preview={test.result}
               error={test.error}
               phase={test.phase}
+              fetched={test.fetched}
+              fetching={test.fetching}
               labels={labels}
               onCareers={
                 draft.kind === "search" && !source
@@ -586,12 +588,16 @@ function TestResults({
   preview,
   error,
   phase,
+  fetched,
+  fetching,
   labels,
   onCareers,
 }: {
   preview: TestResult | null;
   error: string;
   phase: TestPhase;
+  fetched: number;
+  fetching: number;
   labels: Record<string, string>;
   /** Offered after an empty or refused search: follow a careers page. */
   onCareers?: () => void;
@@ -636,6 +642,8 @@ function TestResults({
           shown: items.length,
           listed: preview?.listed,
           failed: !!error && !preview,
+          fetched,
+          fetching,
         })}
       </h3>
       {error && (

@@ -5008,6 +5008,11 @@ export interface components {
        */
       name: string;
       /**
+       * Only
+       * @description With details: the text of these postings only (their source_key).
+       */
+      only?: string[] | null;
+      /**
        * Url
        * @default
        */

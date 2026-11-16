@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api, call, type Schema } from "../../api/client";
 import { useApiMutation, useVersionedMutation } from "../../query/mutation";
 import { POLL_MS } from "../../query/query";
-import type { SourceView } from "./model";
+import { hasText, withText, type SourceView } from "./model";
 
 export const sourceKeys = {
   list: ["sources", "list"] as const,
@@ -174,50 +174,78 @@ export type TestResult = Schema<"SourcePreviewResult"> & {
 };
 export type TestPhase = "idle" | "listing" | "details" | "done";
 
-const hasText = (item: Record<string, unknown>) =>
-  typeof item.posting === "string" && item.posting.trim() !== "";
+type TestState = {
+  phase: TestPhase;
+  result: TestResult | null;
+  error: string;
+  /** While the text arrives: how many postings have it, of how many. */
+  fetched: number;
+  fetching: number;
+};
+
+const IDLE: TestState = {
+  phase: "idle",
+  result: null,
+  error: "",
+  fetched: 0,
+  fetching: 0,
+};
+
+const refused = (result: TestResult) =>
+  (result.diagnostics ?? []).some(
+    (item) => item.state === "deferred" || item.state === "error",
+  );
 
 /**
- * Test a source in two steps: the board's listing first (its titles show at
- * once), then the posting text of the first few. A search or a feed answers
- * in one step. Both go through the shared request gate; nothing is saved.
+ * Test a source in steps: the board's listing first (its titles show at
+ * once), then the posting text of the first few, one at a time, so the
+ * heading counts "fetched N of M". A search or a feed answers in one step.
+ * Every step goes through the shared request gate; nothing is saved.
  */
 export function useSourceTest() {
   const preview = usePreview();
   const asked = useRef(0);
-  const [state, setState] = useState<{
-    phase: TestPhase;
-    result: TestResult | null;
-    error: string;
-  }>({ phase: "idle", result: null, error: "" });
+  const [state, setState] = useState<TestState>(IDLE);
 
-  async function run(body: Omit<Schema<"SourceTest">, "details">) {
+  async function run(body: Omit<Schema<"SourceTest">, "details" | "only">) {
     const question = ++asked.current;
     const current = () => asked.current === question;
     const twoSteps = body.kind !== "jobspy" && body.kind !== "rss";
-    setState({ phase: "listing", result: null, error: "" });
+    setState({ ...IDLE, phase: "listing" });
     try {
       let result = (await preview.mutateAsync({
         ...body,
         details: !twoSteps,
       })) as TestResult;
       if (!current()) return;
-      const waiting = result.items.some((item) => !hasText(item));
-      if (twoSteps && result.items.length && waiting) {
-        setState({ phase: "details", result, error: "" });
-        const listed = result;
-        result = (await preview.mutateAsync({
+      const waiting = twoSteps
+        ? result.items.filter((item) => !hasText(item) && item.source_key)
+        : [];
+      let fetched = 0;
+      for (const item of waiting) {
+        setState({
+          ...IDLE,
+          phase: "details",
+          result,
+          fetched,
+          fetching: waiting.length,
+        });
+        const answer = (await preview.mutateAsync({
           ...body,
           details: true,
+          only: [String(item.source_key)],
         })) as TestResult;
         if (!current()) return;
-        // A later refusal keeps the titles the listing gave.
-        if (!result.items.length) result = { ...result, items: listed.items };
+        // A refusal keeps the titles the listing gave and stops asking.
+        result = withText(result, answer);
+        fetched += 1;
+        if (refused(answer)) break;
       }
-      setState({ phase: "done", result, error: "" });
+      setState({ ...IDLE, phase: "done", result });
     } catch (error) {
       if (current())
         setState((before) => ({
+          ...IDLE,
           phase: "done",
           result: before.result,
           error: error instanceof Error ? error.message : "The test failed.",
@@ -231,7 +259,7 @@ export function useSourceTest() {
     run,
     reset: () => {
       asked.current += 1;
-      setState({ phase: "idle", result: null, error: "" });
+      setState(IDLE);
     },
   };
 }

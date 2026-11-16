@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import json
+import threading
+import time
+
 from .. import events
 from ..collectors import company as company_collectors, jobspy as jobspy_collector
 from ..collectors.catalog import COMPANY_ADAPTERS
@@ -41,6 +45,25 @@ WHERE p.source_id IN ({ids}) AND NOT EXISTS(SELECT 1 FROM postings q WHERE q.sou
 GROUP BY p.source_id
 """
 COUNT_KEYS = ("found", "shortlisted", "applied", "replied")
+
+# A Test asks a board several times in a row (its listing, then each posting's text):
+# the answers of the last few boards are kept briefly, so the listing is read once.
+PREVIEW_SECONDS = 120
+PREVIEW_BOARDS = 4
+_previews_lock = threading.Lock()
+
+
+def preview_responses(previews: dict, key: str) -> dict:
+    """The answers a Test of this board read in the last two minutes, shared by its calls."""
+    moment = time.monotonic()
+    with _previews_lock:
+        for old in [name for name, (at, _) in previews.items() if moment - at > PREVIEW_SECONDS]:
+            del previews[old]
+        if key not in previews:
+            while len(previews) >= PREVIEW_BOARDS:
+                del previews[min(previews, key=lambda name: previews[name][0])]
+            previews[key] = (moment, {})
+        return previews[key][1]
 
 
 class SourceOperations:
@@ -254,8 +277,9 @@ class SourceOperations:
 
     def preview_source(self, value: SourcePreview):
         details = getattr(value, "details", True)
+        only = getattr(value, "only", None)
         self.providers.require_open()
-        resolved = self._resolve_source(value.model_dump(exclude={"details"}))
+        resolved = self._resolve_source(value.model_dump(exclude={"details", "only"}))
         source = {**resolved, "name": value.name or resolved["config"].get("board", "RSS source")}
         config = {
             key: val for key, val in source["config"].items() if key not in ("url", "filters")
@@ -281,7 +305,17 @@ class SourceOperations:
         for provider in providers:
             budget = self.http_budget(provider)
             token = HTTP_BUDGET.set(budget)
-            attempt = {**source, "provider": provider, "preview": True, "details": details}
+            attempt = {
+                **source,
+                "provider": provider,
+                "preview": True,
+                "details": details,
+                "only": only,
+                "preview_responses": preview_responses(
+                    self.__dict__.setdefault("_previews", {}),
+                    json.dumps([source["kind"], source.get("url"), config], sort_keys=True),
+                ),
+            }
             try:
                 items.extend(fetch_postings(attempt))
                 if attempt.get("listed") is not None:

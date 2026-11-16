@@ -161,7 +161,12 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
         config.get("max_results", config.get("results_wanted", 100)), 3 if preview else 2000
     )
     items = []
-    checkpoint = source.get("checkpoint", {}) if not preview else {}
+    # A Test reuses the board's answers from its earlier calls (preview_responses).
+    checkpoint = (
+        source.get("checkpoint", {})
+        if not preview
+        else {"responses": source.get("preview_responses", {})}
+    )
     cache = checkpoint.setdefault("responses", {})
     attempts = checkpoint.setdefault("detail_attempts", {})
     detail_requests = checkpoint.setdefault("detail_requests", {})
@@ -170,6 +175,12 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
     max_candidates = min(config.get("max_candidates", 2000), 3 if preview else 10000)
     # A Test's first answer: the listing alone, without one request per posting.
     listing_only = preview and not source.get("details", True)
+    # Its later calls fetch one posting's text each, so it can count "Fetched N of M".
+    only = (
+        {str(key).split(":", 2)[-1] for key in source["only"]}
+        if preview and source.get("only") is not None
+        else None
+    )
 
     def save():
         checkpoint["complete"] = False
@@ -248,6 +259,8 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
         load = (lambda: decode(url)) if decode else (lambda: get(url, body=body))
         if request_key in cache:
             return load()
+        if only is not None and key.split(":", 2)[-1] not in only:
+            return {}
         if attempts.get(key, 0) >= 3:
             unavailable.add(key)
             return {}
