@@ -5,7 +5,7 @@ name: Release images
 # and max provenance, push by digest, smoke-test that digest) -> publish
 # (multi-arch index from the tested digests, tagged X.Y.Z, X.Y and latest on
 # Docker Hub and the GHCR mirror) -> release (GitHub Release titled with the
-# section's headline).
+# section's headline) and, for the newest final release, the Docker Hub overview.
 
 on:
   push:
@@ -333,6 +333,29 @@ jobs:
         run: |
           docker pull --platform linux/amd64 "$IMAGE:latest"
           scripts/smoke_image.sh "$IMAGE:latest" amd64
+
+  # The Docker Hub overview follows the newest final release: docs/dockerhub.md
+  # and the short description below (scripts/check_package.py checks both sizes).
+  hub-description:
+    needs: [version, publish]
+    if: needs.version.outputs.prerelease == 'false' && needs.version.outputs.latest == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: repository
+        name: Docker Hub repository of the image
+        env:
+          IMAGE: ${{ needs.version.outputs.image }}
+        run: echo "name=${IMAGE#docker.io/}" >> "$GITHUB_OUTPUT"
+      - uses: peter-evans/dockerhub-description@1b9a80c056b620d92cedb9d9b5a223409c68ddfa # v5.0.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_DESCRIPTION_TOKEN }}
+          repository: ${{ steps.repository.outputs.name }}
+          readme-filepath: docs/dockerhub.md
+          short-description: 'Self-hosted job search: fresh jobs, no duplicates, prepared and ranked by your AI agent.'
 
   release:
     needs: [version, publish]

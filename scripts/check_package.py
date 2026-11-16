@@ -1,7 +1,8 @@
-"""Check that the project description is the same everywhere, then smoke an
+"""Check that the project description is the same everywhere and that the Docker
+Hub overview and short description fit Docker Hub's limits, then smoke an
 installed wheel outside the checkout, using the current dev dependencies.
 
-    python3 scripts/check_package.py              # the description only
+    python3 scripts/check_package.py              # the texts only
     python3 scripts/check_package.py dist/*.whl   # and the wheel
 """
 
@@ -46,6 +47,31 @@ def check_descriptions(root=ROOT):
     return expected
 
 
+# Docker Hub limits: the overview (docs/dockerhub.md) and the short description
+# that images.yml syncs to the repository page.
+HUB_OVERVIEW = "docs/dockerhub.md"
+HUB_OVERVIEW_BYTES = 25_000
+HUB_WORKFLOW = ".github/workflows/images.yml"
+HUB_SHORT_PATTERN = r"(?m)^\s*short-description: '([^']*)'$"
+HUB_SHORT_CHARACTERS = 100
+
+
+def check_docker_hub(root=ROOT):
+    """Fail unless the Docker Hub overview and short description fit their limits."""
+    size = len((root / HUB_OVERVIEW).read_bytes())
+    if size > HUB_OVERVIEW_BYTES:
+        raise SystemExit(f"{HUB_OVERVIEW}: {size} bytes, over {HUB_OVERVIEW_BYTES}")
+    found = re.findall(HUB_SHORT_PATTERN, (root / HUB_WORKFLOW).read_text(encoding="utf-8"))
+    if len(found) != 1:
+        raise SystemExit(f"{HUB_WORKFLOW}: expected one short description, found {len(found)}")
+    if not found[0] or len(found[0]) > HUB_SHORT_CHARACTERS:
+        raise SystemExit(
+            f"{HUB_WORKFLOW}: the short description has {len(found[0])} characters, "
+            f"not 1 to {HUB_SHORT_CHARACTERS}"
+        )
+    return size, found[0]
+
+
 def main():
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -54,8 +80,9 @@ def main():
     parser.add_argument("--uv", default="uv")
     args = parser.parse_args()
     check_descriptions()
+    check_docker_hub()
     if args.wheel is None:
-        print("The description matches in every file.")
+        print("The description matches in every file, and the Docker Hub texts fit.")
         return
     wheel = args.wheel.resolve()
     repository = ROOT
