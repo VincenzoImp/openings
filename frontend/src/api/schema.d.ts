@@ -211,7 +211,7 @@ export interface paths {
     put?: never;
     /**
      * Setup
-     * @description Set the owner password once and sign the browser in.
+     * @description Set the owner password once, with the setup code from the log, and sign in.
      */
     post: operations["auth_setup"];
     delete?: never;
@@ -4405,6 +4405,16 @@ export interface components {
        */
       spoken_languages?: string[] | null;
     };
+    /** SetupInput */
+    SetupInput: {
+      /** Password */
+      password: string;
+      /**
+       * Setup Code
+       * @description The one-time code the server prints to its log until an owner exists.
+       */
+      setup_code?: string | null;
+    };
     /** Signals */
     Signals: {
       /** Computed */
@@ -6233,7 +6243,7 @@ export interface operations {
     };
     requestBody: {
       content: {
-        "application/json": components["schemas"]["PasswordInput"];
+        "application/json": components["schemas"]["SetupInput"];
       };
     };
     responses: {

@@ -322,6 +322,20 @@ async function defaultCv(page: Page) {
 
 const SCREENS: Screen[] = [
   { name: "sign-in", route: "today", signedOut: true },
+  {
+    // A new installation asks for the setup code printed to the server's log.
+    name: "first-owner",
+    route: "today",
+    signedOut: true,
+    before: async (page) => {
+      await page.route("**/api/v1/auth/session", (route) =>
+        route.fulfill({
+          json: { configured: false, setup_code: true, authenticated: false },
+        }),
+      );
+      await page.reload();
+    },
+  },
   { name: "setup", route: "setup", workspace: "empty", docs: "setup" },
   { name: "setup-jobs", route: "setup?step=jobs", workspace: "empty" },
   { name: "setup-cv", route: "setup?step=cv", workspace: "empty" },

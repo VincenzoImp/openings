@@ -186,6 +186,47 @@ test("an empty search offers a careers page, one click away", async ({
   await expect(careers).toBeFocused();
 });
 
+test.describe("a new installation", () => {
+  test.use({ signedIn: false });
+
+  test("asks for the setup code from the server's log", async ({ page }) => {
+    await page.route("**/api/v1/auth/session", (route) =>
+      route.fulfill({
+        json: { configured: false, setup_code: true, authenticated: false },
+      }),
+    );
+    const sent: unknown[] = [];
+    await page.route("**/api/v1/auth/setup", (route) => {
+      sent.push(route.request().postDataJSON());
+      return route.fulfill({
+        status: 403,
+        json: {
+          error: {
+            code: "setup_code",
+            status: 403,
+            message:
+              "Enter the setup code from the server's log (docker compose logs openings).",
+          },
+        },
+      });
+    });
+    await page.goto("/");
+    const code = page.getByLabel("Setup code");
+    await expect(code).toBeFocused();
+    await expect(page.locator(".auth")).toContainText(
+      "docker compose logs openings",
+    );
+    await code.fill("k7qm-3xpa");
+    await page.getByLabel("Choose a password").fill(PASSWORD);
+    await page.getByLabel("Confirm password").fill(PASSWORD);
+    await page.getByRole("button", { name: "Create workspace" }).click();
+    await expect(page.getByRole("alert")).toContainText(
+      "Enter the setup code from the server's log",
+    );
+    expect(sent).toEqual([{ password: PASSWORD, setup_code: "k7qm-3xpa" }]);
+  });
+});
+
 test.describe("a new workspace", () => {
   // Its own first-run server: only the password is set, nothing else.
   test.use({ signedIn: false });

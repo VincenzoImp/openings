@@ -32,8 +32,12 @@ test "$(docker exec "$name" id -u)" = 10001
 docker exec "$name" test -f /data/openings.sqlite
 
 test "$(curl --silent --output /dev/null --write-out '%{http_code}' "$url/api/v1/career/profile")" = 401
+# The first owner needs the one-time code the container prints to its log.
+code="$(docker logs "$name" 2>&1 | sed -n 's/.*Setup code: \([A-Z0-9-]*\).*/\1/p' | tail -1)"
+test -n "$code"
 curl --silent --fail "$url/api/v1/auth/setup" --header 'Content-Type: application/json' \
-  --cookie-jar "$work/cookie" --data '{"password":"synthetic-smoke-password"}' --output /dev/null
+  --cookie-jar "$work/cookie" --output /dev/null \
+  --data "{\"password\":\"synthetic-smoke-password\",\"setup_code\":\"$code\"}"
 get() { curl --silent --fail --cookie "$work/cookie" "$url/api/v1/$1" --output "$work/$2"; }
 get capabilities capabilities.json
 python3 -c "import json,os; p=json.load(open(os.environ['WORK']+'/capabilities.json')); assert p['version']==os.environ['VERSION'] and p['operations']"

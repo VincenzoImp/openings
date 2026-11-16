@@ -27,8 +27,12 @@ see [Operations](operations.md#reach-it-from-other-devices).
 
 ## Set up your workspace
 
-Open **http://127.0.0.1:8080** and choose an owner password of at least 10
-characters (or set `OPENINGS_PASSWORD` in `.env` before the first start). A new
+Open **http://127.0.0.1:8080**, enter the **setup code** and choose an owner
+password of at least 10 characters. The code is printed to the server's log at
+each start until the workspace has an owner, so nobody else on your network can
+claim it first: `docker compose logs openings` (or `docker logs openings` after
+`docker run`) shows `Setup code: XXXX-XXXX`. With
+`OPENINGS_PASSWORD` set in `.env` before the first start, no code is needed. A new
 installation then opens the **setup guide**, four short steps about you:
 
 1. **About you.** Your name, the roles you are after and where (saved as

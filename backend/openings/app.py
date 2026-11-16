@@ -164,7 +164,10 @@ def create_app(database=None, start_worker=True):
                 if not host_allowed(host, allowed_hosts):
                     raise refused_host(host, request.url.scheme, public_url)
                 actor = auth.authorize(request, mcp=True)
-            sign_in = path == "/api/v1/auth/login" and request.method == "POST"
+            # A setup code is limited like a password: both are guessed by the same means.
+            sign_in = path in {"/api/v1/auth/login", "/api/v1/auth/setup"} and (
+                request.method == "POST"
+            )
             if path.startswith("/api/v1/auth/") and request.method == "POST" and path in public:
                 if not request.headers.get("content-type", "").startswith("application/json"):
                     raise DomainError(415, "content_type", "Send JSON request data.")
@@ -199,7 +202,7 @@ def create_app(database=None, start_worker=True):
             finally:
                 request_origin.reset(origin)
             if sign_in:
-                if response.status_code == 401:
+                if response.status_code in (401, 403):
                     login_guard.failed()
                 elif response.status_code == 200:
                     login_guard.succeeded()

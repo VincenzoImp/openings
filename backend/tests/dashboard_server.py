@@ -258,7 +258,10 @@ def seed(path, jobs=60, applications=53):
     workspace, career = app.state.workspace, app.state.career
     # One client for setup and seeding: an application starts its MCP sessions once.
     with TestClient(app) as client:
-        client.post("/api/v1/auth/setup", json={"password": PASSWORD})
+        client.post(
+            "/api/v1/auth/setup",
+            json={"password": PASSWORD, "setup_code": app.state.auth.setup_code},
+        )
         for index in range(35):
             evidence = career.create_entry(
                 EntryCreate(
@@ -344,7 +347,10 @@ def seed_other(path, demo):
     """Build the demo workspace (``demo``) or a first run at `path`; return the session cookie."""
     app = create_app(path, start_worker=False)
     with TestClient(app) as client:
-        client.post("/api/v1/auth/setup", json={"password": PASSWORD})
+        client.post(
+            "/api/v1/auth/setup",
+            json={"password": PASSWORD, "setup_code": app.state.auth.setup_code},
+        )
         if demo:
             seed_demo(app, client)
         cookie = client.post("/api/v1/auth/login", json={"password": PASSWORD}).cookies[COOKIE]
