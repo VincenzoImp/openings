@@ -29,11 +29,33 @@ ROLE = re.compile(
 )
 LINK = re.compile(r"https?://|www\.|^[\w-]+(\.[\w-]+)+(/\S*)?$", re.IGNORECASE)
 PAY = re.compile(r"[$€£¥]|\b\d+\s*[kK]\b|\bsalary\b|\bequity\b", re.IGNORECASE)
-TERMS = re.compile(
-    r"^(full[- ]?time|part[- ]?time|contract(or)?|freelance|intern(ship)?|permanent|"
-    r"[,/&+ ]|and|or)+$",
-    re.IGNORECASE,
+# Employment terms, read word by word: one alternation repeated over the whole
+# part would backtrack exponentially on text such as "contractororor".
+TERM_WORDS = frozenset(
+    [
+        "fulltime",
+        "parttime",
+        "full",
+        "part",
+        "time",
+        "contract",
+        "contractor",
+        "freelance",
+        "intern",
+        "internship",
+        "permanent",
+        "and",
+        "or",
+    ]
 )
+TERM_SPLIT = re.compile(r"[,/&+\s-]+")
+
+
+def _is_terms(part):
+    words = [word for word in TERM_SPLIT.split(part.lower()) if word]
+    return bool(words) and all(word in TERM_WORDS for word in words)
+
+
 WORKPLACE = re.compile(r"\b(remote|on[- ]?site|in[- ]office|hybrid)\b", re.IGNORECASE)
 
 
@@ -81,7 +103,7 @@ def first_line(text: str) -> dict:
             continue
         if PAY.search(part):
             pay.append(part)
-        elif TERMS.match(part):
+        elif _is_terms(part):
             terms.append(part)
         elif not WORKPLACE.sub("", part).strip(" ,/&()-"):
             workplace.append(part)
