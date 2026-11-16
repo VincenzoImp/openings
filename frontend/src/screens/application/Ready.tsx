@@ -60,7 +60,7 @@ function useLayout() {
   return { ref, layout };
 }
 
-/** "2 of 5 ready · Next: Data Engineer · Orbit →", with [ and ]. */
+/** "2 of 5 ready · best first · Next: Data Engineer · Orbit →", with [ and ]. */
 function QueuePlace({ queue, id }: { queue: ApplicationRow[]; id: string }) {
   const place = queuePlace(queue, id);
   if (!place) return null;
@@ -87,7 +87,7 @@ function QueuePlace({ queue, id }: { queue: ApplicationRow[]; id: string }) {
         onClick={() => place.next && navigate(pageHref(place.next.id))}
       />
       <span className="apg-queue-pos">
-        {place.position} of {place.total} ready
+        {place.position} of {place.total} ready · best first
       </span>
       {place.next && (
         <a className="apg-queue-next" href={pageHref(place.next.id)}>
@@ -268,9 +268,11 @@ export function ReadyView({
             href={job.url}
             target="_blank"
             rel="noreferrer noopener"
+            title="Apply on the employer's site (opens a new tab)"
+            aria-label="Apply on the employer's site (opens a new tab)"
           >
             <Icon icon={ExternalLink} />
-            <span className="ui-btn-label">Apply on employer's site</span>
+            <span className="ui-btn-label">Apply</span>
           </a>
         )}
         {kinds.map((kind) => (

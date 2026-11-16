@@ -86,6 +86,13 @@
     display: grid;
     place-items: center;
   }
+  /* A ranked row's place (Ready, best first) in the glyph's column. */
+  .ui-row-rank {
+    color: var(--text-2);
+    font: var(--t-sm);
+    font-weight: var(--w-semibold);
+    font-variant-numeric: tabular-nums;
+  }
   .ui-row-text {
     grid-column: 3;
     display: flex;

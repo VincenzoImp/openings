@@ -308,6 +308,9 @@ export default function ApplicationsScreen() {
             items: rows.filter((app) => needsRank(app, days) === rank),
           })).filter((group) => group.items.length)
         : [];
+    // Unfiltered and best first, Ready rows lead with their place in the
+    // send queue; they come first, so the place is their index.
+    const ranked = filters.sort === "needs" && !narrowed;
     // The stage glyph tells stages apart only where they mix: the All tab,
     // and its last group.
     const row = (app: ApplicationRow, mixed = filters.stage === "all") => (
@@ -316,6 +319,11 @@ export default function ApplicationsScreen() {
         app={app}
         noReplyDays={days}
         mixed={mixed}
+        rank={
+          ranked && needsRank(app, days) === 0
+            ? rows.indexOf(app) + 1
+            : undefined
+        }
         onDialog={(kind) => setDialog({ kind, app })}
         onReopen={() => reopen(app)}
       />

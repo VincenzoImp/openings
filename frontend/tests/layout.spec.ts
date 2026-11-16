@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "./fixtures";
-import { fitsViewport, go, settled } from "./session";
+import { call, fitsViewport, go, settled } from "./session";
 
 // One layout rule (tokens.css, --content): a pane holds a list or a
 // document. A list spans its pane; a document is one column of at most
@@ -96,6 +96,41 @@ test.describe("720 px", () => {
     expect(Math.abs(box.width - Math.min(pane.width, 808))).toBeLessThanOrEqual(
       1,
     );
+    await fitsViewport(page);
+  });
+});
+
+test.describe("390 px", () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+  test("an application's CV text uses the phone's width, as the posting does", async ({
+    page,
+  }) => {
+    await go(page, "today");
+    const ready = await call(page, "/applications?stage=ready&limit=1");
+    await go(page, `applications/${ready.items[0].id}`);
+    await settled(page);
+    await page.getByRole("tab", { name: "CV" }).click();
+    const cv = page.getByRole("region", { name: "CV" });
+    await cv.getByRole("radio", { name: "Text" }).click();
+    const paper = cv.locator(".ap-paper");
+    await expect(paper).toBeVisible();
+    // Characters a line: the text's inner width over one character's width.
+    const perLine = await paper.evaluate((element) => {
+      const probe = document.createElement("span");
+      probe.style.position = "absolute";
+      probe.style.whiteSpace = "nowrap";
+      probe.textContent = "abcdefghijklmnopqrstuvwxyz".repeat(4);
+      element.append(probe);
+      const char = probe.getBoundingClientRect().width / 104;
+      probe.remove();
+      const style = getComputedStyle(element);
+      const inner =
+        element.clientWidth -
+        parseFloat(style.paddingLeft) -
+        parseFloat(style.paddingRight);
+      return Math.floor(inner / char);
+    });
+    expect(perLine).toBeGreaterThanOrEqual(40);
     await fitsViewport(page);
   });
 });

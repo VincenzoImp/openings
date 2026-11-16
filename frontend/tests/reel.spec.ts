@@ -182,7 +182,7 @@ test("demo reel", async ({ page, session }) => {
 
   // 5. You apply: on the employer's site, then mark it applied.
   await reel.scene("You apply, best first.", main);
-  const employer = main.getByRole("link", { name: /Apply on employer/ });
+  const employer = main.getByRole("link", { name: /Apply on the employer/ });
   await reel.focus(employer);
   const popup = page.context().waitForEvent("page");
   await reel.click(employer);

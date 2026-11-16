@@ -168,8 +168,9 @@ export const SORTS: { id: SortKey; label: string }[] = [
 ];
 
 /**
- * The "Most urgent first" order: 0 Ready, 1 Shortlisted with a deadline, 2 sent
- * past the no-reply period, 3 everything else.
+ * The "Most urgent first" order: 0 Ready (best first: priority, then
+ * deadline), 1 Shortlisted with a deadline, 2 sent past the no-reply period,
+ * 3 everything else.
  */
 export function needsRank(
   app: AppFacts,
@@ -183,7 +184,7 @@ export function needsRank(
   return 3;
 }
 export const NEEDS_GROUPS = [
-  "Ready to send",
+  "Ready to send, best first",
   "Shortlisted with a deadline",
   "Waiting for a reply",
   "Everything else",
@@ -192,6 +193,10 @@ export const NEEDS_GROUPS = [
 const byDeadline = (a: AppFacts, b: AppFacts) =>
   (a.deadline || "9999").localeCompare(b.deadline || "9999") ||
   (a.priority ?? 9) - (b.priority ?? 9);
+/** Best first, as the server's `sort=priority` and the skills rank Ready. */
+export const byPriority = (a: AppFacts, b: AppFacts) =>
+  (a.priority ?? 9) - (b.priority ?? 9) ||
+  (a.deadline || "9999").localeCompare(b.deadline || "9999");
 const byUpdated = (a: AppFacts, b: AppFacts) =>
   b.updated_at.localeCompare(a.updated_at);
 
@@ -218,7 +223,8 @@ export function sortApplications<T extends AppFacts>(
   return list.sort((a, b) => {
     const order = rank.get(a.id)! - rank.get(b.id)!;
     if (order) return order;
-    if (rank.get(a.id)! <= 1) return byDeadline(a, b) || byUpdated(a, b);
+    if (rank.get(a.id) === 0) return byPriority(a, b) || byUpdated(a, b);
+    if (rank.get(a.id) === 1) return byDeadline(a, b) || byUpdated(a, b);
     if (rank.get(a.id) === 2)
       return (a.applied_at || "").localeCompare(b.applied_at || "");
     return byUpdated(a, b);

@@ -37,7 +37,7 @@ test("Today says what to do now, with one filled button, and Start applying open
   await settled(page);
   const ready = await call(
     page,
-    "/applications?stage=ready&sort=deadline&limit=5",
+    "/applications?stage=ready&sort=priority&limit=5",
   );
   const jobs = await call(page, "/jobs?triage=new&limit=1");
   expect(ready.total).toBeGreaterThan(5);
@@ -47,7 +47,8 @@ test("Today says what to do now, with one filled button, and Start applying open
   await expect(summary).toContainText(`${ready.total} ready to apply`);
   await expect(summary).toContainText(`${jobs.total} new jobs`);
 
-  // Ready to apply: closest deadline first, five rows, the rest behind a link.
+  // Ready to apply: best first (priority, then deadline), five ranked rows,
+  // the rest behind a link.
   const readyRows = rows(page, "Ready applications");
   await expect(readyRows).toHaveCount(5);
   for (const [index, application] of ready.items.entries())
@@ -56,10 +57,15 @@ test("Today says what to do now, with one filled button, and Start applying open
     readyRows.filter({ hasText: "Python Engineer" }).locator(".ui-tone"),
   ).toHaveText("Due tomorrow");
   await expect(
-    readyRows.filter({ hasText: "Python Engineer" }).getByRole("img", {
-      name: "High priority",
-    }),
+    section(page, "Ready to apply").getByText(
+      "Best first: priority, then deadline.",
+    ),
   ).toBeVisible();
+  await expect(readyRows.first()).toContainText("Python Engineer");
+  await expect(readyRows.first().locator(".ui-row-rank")).toHaveText("Rank 1");
+  await expect(
+    readyRows.filter({ hasText: "Python Engineer" }).locator(".ui-row-sub"),
+  ).toHaveText("Northstar Labs · Priority 1");
   await expect(
     section(page, "Ready to apply").getByRole("link", {
       name: `All ${ready.total} ready applications`,

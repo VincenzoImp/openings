@@ -282,7 +282,7 @@ test("video footage", async ({ page, session }) => {
 
     // You apply on the employer's site, then mark it applied.
     const employer = page
-      .getByRole("link", { name: /Apply on employer/ })
+      .getByRole("link", { name: /Apply on the employer/ })
       .first();
     await reel.scene("You apply, best first.", main, "send");
     await reel.pause(500);

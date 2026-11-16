@@ -169,7 +169,8 @@ You can do this without an agent or LaTeX. Have your CV and letter ready as PDFs
    **Requirements** and mark the ones that must be settled first as **Blocking**.
 4. When both documents are stored and nothing blocks the application, the page
    becomes the **Ready** page and Today lists it under **Ready to apply**.
-5. Choose **Download CV + Letter**, then **Apply on employer's site**.
+5. Choose **Download CV + Letter**, then **Apply**, which opens the employer's
+   site in a new tab.
 6. Back in Openings, choose **Mark applied**. **Undo** is offered, and the next
    Ready application opens.
 

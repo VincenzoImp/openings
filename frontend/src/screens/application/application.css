@@ -728,6 +728,10 @@
     .apg-ready[data-pane="check"] .apg-panes {
       display: none;
     }
+    /* One pane at a time, at the full width (the CV and letter too). */
+    .apg-panes {
+      grid-template-columns: minmax(0, 1fr);
+    }
     .apg-ready:not([data-pane="check"]) .apg-pane:not([data-pane]),
     .apg-ready[data-pane="posting"] .apg-pane:not([data-pane="posting"]),
     .apg-ready[data-pane="cv"] .apg-pane:not([data-pane="cv"]),
