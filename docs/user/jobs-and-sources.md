@@ -82,7 +82,9 @@ bottom, lists the last 20 checks with Stop and Retry.
 
 **Add source** opens a form: the kind first (**Search**, **Company careers page**
 or **RSS feed**), then its fields. **Test** shows the first ten results and saves
-nothing; **Save** adds the source and checks it at once, then on the
+nothing; on a careers page it lists the titles first, then fetches their text. When
+a site refuses or finds nothing, Test says why and until when, and suggests a
+careers page; **Save** adds the source and checks it at once, then on the
 schedule. A source added over REST or MCP starts paused unless it says
 otherwise. A paused source can still be checked by hand.
 

@@ -253,7 +253,8 @@ class SourceOperations:
         return self._source(source_id)
 
     def preview_source(self, value: SourcePreview):
-        resolved = self._resolve_source(value.model_dump())
+        details = getattr(value, "details", True)
+        resolved = self._resolve_source(value.model_dump(exclude={"details"}))
         source = {**resolved, "name": value.name or resolved["config"].get("board", "RSS source")}
         config = {
             key: val for key, val in source["config"].items() if key not in ("url", "filters")
@@ -275,13 +276,15 @@ class SourceOperations:
                 "note": "Listing pagination, redirects and retries may add requests; cached text can reduce detail fetches.",
             }
 
-        items, diagnostics = [], []
+        items, diagnostics, listed = [], [], None
         for provider in providers:
             budget = self.http_budget(provider)
             token = HTTP_BUDGET.set(budget)
-            attempt = {**source, "provider": provider, "preview": True}
+            attempt = {**source, "provider": provider, "preview": True, "details": details}
             try:
                 items.extend(fetch_postings(attempt))
+                if attempt.get("listed") is not None:
+                    listed = (listed or 0) + attempt["listed"]
                 diagnostics.append(attempt.get("diagnostic") or budget.diagnostics())
             except DomainError as error:
                 diagnostic = budget.diagnostics()
@@ -298,6 +301,7 @@ class SourceOperations:
                 {key: val for key, val in item.items() if key != "raw"} for item in items[:20]
             ],
             "total": len(items),
+            "listed": listed,
             "preview_limit": 20,
             "request_estimate": estimate(True),
             "full_request_estimate": estimate(False),

@@ -150,6 +150,7 @@ class RunOperations:
                 "invalid",
                 "pending_descriptions",
                 "unavailable_descriptions",
+                "listed",
             )
         }
         record["task_ids"] = [task["id"] for task in decoded]

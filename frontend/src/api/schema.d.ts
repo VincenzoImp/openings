@@ -4791,46 +4791,6 @@ export interface components {
       /** Url */
       url?: string | null;
     };
-    /** SourcePreview */
-    SourcePreview: {
-      /** Config */
-      config?: {
-        [key: string]: unknown;
-      };
-      filters?: components["schemas"]["Filters"];
-      /**
-       * Kind
-       * @default auto
-       * @enum {string}
-       */
-      kind:
-        | "auto"
-        | "jobspy"
-        | "rss"
-        | "greenhouse"
-        | "lever"
-        | "ashby"
-        | "recruitee"
-        | "personio"
-        | "workable"
-        | "breezy"
-        | "smartrecruiters"
-        | "bamboohr"
-        | "rippling"
-        | "workday"
-        | "oracle"
-        | "joincom";
-      /**
-       * Name
-       * @default
-       */
-      name: string;
-      /**
-       * Url
-       * @default
-       */
-      url: string;
-    };
     /** SourcePreviewResult */
     SourcePreviewResult: {
       /**
@@ -4844,6 +4804,11 @@ export interface components {
       items: {
         [key: string]: unknown;
       }[];
+      /**
+       * Listed
+       * @description Matching jobs the board lists, when it says.
+       */
+      listed?: number | null;
       /** Preview Limit */
       preview_limit: number;
       /** Total */
@@ -4931,6 +4896,55 @@ export interface components {
     SourcesSave: {
       /** Items */
       items: components["schemas"]["SourceItem"][];
+    };
+    /**
+     * SourceTest
+     * @description A preview from the dashboard's Test: the listing first, then the posting text.
+     */
+    SourceTest: {
+      /** Config */
+      config?: {
+        [key: string]: unknown;
+      };
+      /**
+       * Details
+       * @description false: the board's listing only, without fetching each posting's text.
+       * @default true
+       */
+      details: boolean;
+      filters?: components["schemas"]["Filters"];
+      /**
+       * Kind
+       * @default auto
+       * @enum {string}
+       */
+      kind:
+        | "auto"
+        | "jobspy"
+        | "rss"
+        | "greenhouse"
+        | "lever"
+        | "ashby"
+        | "recruitee"
+        | "personio"
+        | "workable"
+        | "breezy"
+        | "smartrecruiters"
+        | "bamboohr"
+        | "rippling"
+        | "workday"
+        | "oracle"
+        | "joincom";
+      /**
+       * Name
+       * @default
+       */
+      name: string;
+      /**
+       * Url
+       * @default
+       */
+      url: string;
     };
     /** SourceVersion */
     SourceVersion: {
@@ -10906,7 +10920,7 @@ export interface operations {
     };
     requestBody: {
       content: {
-        "application/json": components["schemas"]["SourcePreview"];
+        "application/json": components["schemas"]["SourceTest"];
       };
     };
     responses: {

@@ -250,6 +250,8 @@ class TaskOperations:
             ):
                 count = value.get(key, 0)
                 result[target] = len(count) if isinstance(count, (list, dict)) else int(count or 0)
+            if isinstance(value.get("listed"), int):
+                result["listed"] = value["listed"]
             persist()
 
         def store(posting):

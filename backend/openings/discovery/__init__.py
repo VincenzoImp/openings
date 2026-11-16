@@ -18,6 +18,7 @@ from .models import (
     SourcePatch,
     SourcePreview,
     SourceRun,
+    SourceTest,
     SourceVersion,
 )
 from .service import DiscoveryService
@@ -35,5 +36,6 @@ __all__ = [
     "SourcePatch",
     "SourcePreview",
     "SourceRun",
+    "SourceTest",
     "SourceVersion",
 ]
