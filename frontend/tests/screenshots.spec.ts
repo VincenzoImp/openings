@@ -97,7 +97,8 @@ const test = base.extend<
 });
 
 // Each screen signs in to its own workspace (capture), not the tests' one.
-test.use({ signedIn: false });
+// The full-page capture adds a style element the served policy would refuse.
+test.use({ signedIn: false, bypassCSP: true });
 
 /** The owner session as cookies for the browser. */
 const sessionCookies = (session: string) => {
