@@ -6,6 +6,9 @@ and the relevant [user guide](docs/README.md) before changing behavior. Code, UI
 and docs are in American English; examples and fixtures are synthetic.
 Participation follows the [code of conduct](CODE_OF_CONDUCT.md); report
 vulnerabilities privately as in [SECURITY.md](SECURITY.md).
+New here? Pick a
+[good first issue](https://github.com/VincenzoImp/openings-job-search/labels/good%20first%20issue):
+each names the files to read and when it is done.
 
 ## Run locally
 
@@ -57,7 +60,7 @@ npm --prefix frontend run format:check && npm --prefix frontend test
 - **Types:** after changing an operation or model, run `npm --prefix frontend run
   api:gen` and commit `frontend/src/api/schema.d.ts`.
 - **MCP budget:** `test_mcp_budget.py` caps the tool list; add a tool last.
-- **Docs:** `test_docs.py` caps `docs/user` at 10,000 words and checks links,
+- **Docs:** `test_docs.py` caps `docs/user` at 12,500 words and checks links,
   vocabulary and the routes and tools they name. Screenshots:
   `npm --prefix frontend run screenshots -- --docs`; the demo GIFs:
   `npm --prefix frontend run reel` and `-- --dark`.

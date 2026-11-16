@@ -126,7 +126,7 @@ type Screen = {
   workspace?: Workspace;
   /** The file name under docs/images, for an image the docs embed. */
   docs?: string;
-  /** The same for the dark image (the README's hero). */
+  /** The same for a dark image. */
   docsDark?: string;
   /** The same for the phone image. Docs images show the viewport only. */
   docsMobile?: string;
@@ -343,13 +343,7 @@ const SCREENS: Screen[] = [
   { name: "setup-jobs", route: "setup?step=jobs", workspace: "empty" },
   { name: "setup-cv", route: "setup?step=cv", workspace: "empty" },
   { name: "setup-done", route: "setup?step=done", workspace: "empty" },
-  {
-    name: "today",
-    route: "today",
-    docs: "today",
-    docsDark: "today-dark",
-    wide: true,
-  },
+  { name: "today", route: "today", wide: true },
   { name: "today-caught-up", route: "today", prepare: caughtUp },
   { name: "today-empty", route: "today", workspace: "empty" },
   {
