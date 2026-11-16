@@ -12,14 +12,15 @@ per stage, with its count, and **Ready**, the Shortlisted applications that are
 ready to send. Search finds words that start with what you type in the role,
 the company, the location, the posting or the pinned note, as the Jobs search does,
 and a stage name ("interview") finds that stage; **Filter** by
-priority, deadline, job site or outcome. The default order, **Most urgent first**, puts Ready ones first (by
-deadline), then Shortlisted ones with a deadline, then sent ones waiting longer
+priority, deadline, job site or outcome. The default order, **Most urgent first**, puts Ready ones first (best
+first: by priority, then deadline), then Shortlisted ones with a deadline, then sent ones waiting longer
 than the no-reply period, then the rest; you can also sort by deadline, last
 change or the day it was sent.
 
 Each row shows the role and company, the stage and one phrase about it ("Missing:
-letter", "Ready · due Fri", "Applied 12 Oct · no reply 32 days"), and the
-priority as a small glyph. Pointing at a row shows **Apply** (Ready) or **Record
+letter", "Ready · due Fri", "Applied 12 Oct · no reply 32 days"). A Ready row
+also shows its priority ("Priority 2 · due Fri") and, in the default order, its
+place in the send queue. Pointing at a row shows **Apply** (Ready) or **Record
 reply** (sent), and `…` with **Change stage…**, **Close…** or **Reopen**, and
 **Delete permanently…**.
 
@@ -41,8 +42,8 @@ requires has a complete current revision and no blocking requirement is open. Th
 required documents are a CV and a letter unless you untick one in **Required
 documents…**.
 Where something is missing, the application says what, for example "Missing:
-letter" or an open blocking requirement. Today lists Ready applications by closest
-deadline, then priority.
+letter" or an open blocking requirement. Today lists Ready applications best first:
+by priority (1 is highest), then by closest deadline.
 
 Ready follows the records. Add a blocking requirement, or a new revision still
 without its PDF, and the application is not Ready until that is settled. Ready
@@ -63,7 +64,8 @@ head shows the role, company, stage, deadline and priority, **Open posting** and
   PDF/Text switch; on a phone, tabs **Check**, **Posting**, **CV**, **Letter**.
   **Before you send** lists the salary expectation your agent recorded, open
   requirements (tick them there), the form's answers with copy buttons, **Apply on employer's site** and **Download CV +
-  Letter**. The page shows its place in Today's order ("2 of 5 ready · Next: …");
+  Letter**. The page shows its place in Today's order ("2 of 5 ready · best
+  first · Next: …");
   `[` and `]` move between them.
 - **Applied, Interview, Offer:** where it stands first ("Applied 12 Oct · no
   reply for 32 days") and **Record reply**, then the notes, the history, the

@@ -148,7 +148,7 @@ function Header({
             </li>
           )}
         {app.priority != null && (
-          <li>
+          <li title={`Priority ${app.priority} of 5 (1 is highest)`}>
             <PriorityGlyph priority={app.priority} />
             Priority {app.priority}
           </li>
