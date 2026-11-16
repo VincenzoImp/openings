@@ -8,7 +8,7 @@ from openings.interfaces.operation import without_empty
 
 @pytest.fixture
 def demo(app, client):
-    seed_demo(app, client)
+    seed_demo(app)
     return client
 
 
@@ -54,7 +54,7 @@ def test_an_explicit_sort_keeps_its_order(demo):
 def test_rest_and_mcp_rank_alike(app, owner_token, mcp):
     demo = mcp.client
     demo.headers.update(owner_token["headers"])
-    seed_demo(app, demo)
+    seed_demo(app)
     for q in ("Python Backend Engineer", "interview", "dublin backend"):
         rest = demo.get("/api/v1/jobs", params={"q": q, "limit": 8}).json()
         listed, error = mcp.call("jobs_list", {"q": q, "limit": 8})
