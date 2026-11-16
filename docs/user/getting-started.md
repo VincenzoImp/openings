@@ -20,7 +20,8 @@ docker compose ps
 curl --fail http://127.0.0.1:8080/health
 ```
 
-Every setting has a default. To change one, copy `.env.example` to `.env` first
+Port 8080 taken? `OPENINGS_PORT=18080 docker compose up -d`; agent links follow
+the port. Every setting has a default. To change one, copy `.env.example` to `.env` first
 (see [Configuration](configuration.md)). To reach Openings from other devices,
 see [Operations](operations.md#reach-it-from-other-devices).
 

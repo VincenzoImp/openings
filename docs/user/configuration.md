@@ -14,7 +14,7 @@ owner password.
 
 | Variable | Default | What it does |
 |---|---|---|
-| `OPENINGS_PUBLIC_URL` | unset (Compose: `http://127.0.0.1:8080`) | The address browsers and agents use to reach Openings. Set it when other devices or agents connect. MCP accepts its host besides `localhost`, upload and download links start with it, and cookies are secure when it starts with `https://`. |
+| `OPENINGS_PUBLIC_URL` | unset (Compose: `http://127.0.0.1:<OPENINGS_PORT>`) | The address browsers and agents use to reach Openings. Set it when other devices or agents connect. MCP accepts its host besides `localhost`, upload and download links start with it, and cookies are secure when it starts with `https://`. MCP refuses another host with a message that names this variable, and a dashboard opened at another address shows the value to set. With `docker run` and another host port, pass it too: `-p 127.0.0.1:18080:8080 -e OPENINGS_PUBLIC_URL=http://127.0.0.1:18080`. |
 | `OPENINGS_PASSWORD` | unset | First-run owner password, at least 10 characters. Used only while no owner password exists. |
 | `OPENINGS_TRUSTED_PROXIES` | empty: trust none | Comma-separated IPs or CIDR ranges of reverse proxies whose `X-Forwarded-For` and `X-Forwarded-Proto` are trusted. An invalid entry stops the start. Option `--trusted-proxies`. |
 | `OPENINGS_RETENTION_DAYS` | `90` | Days finished collection runs and tasks are kept; `0` keeps all. The 20 newest runs of every source always stay. |
@@ -30,7 +30,7 @@ A retention or backup count that is not a number falls back to its default with 
 | Variable | Default | What it does |
 |---|---|---|
 | `OPENINGS_BIND` | `127.0.0.1` | Host address the port is published on; `0.0.0.0` exposes it to the network. |
-| `OPENINGS_PORT` | `8080` | Host port; the container listens on 8080. Update `OPENINGS_PUBLIC_URL` to match. |
+| `OPENINGS_PORT` | `8080` | Host port; the container listens on 8080. The default `OPENINGS_PUBLIC_URL` follows it. |
 | `OPENINGS_IMAGE` | the released image | The image to run, for a mirror or a local build (`docker build -t openings:dev .`). |
 
 ## Process and paths
