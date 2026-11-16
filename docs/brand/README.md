@@ -43,25 +43,89 @@ demo seed.
   showing the synthetic demo workspace, never a mock or a redrawn screen.
 - **Synthetic data only.** No real person, company or job search in any image.
   Numbers come from the demo seed and say "Example data".
-- **Voice.** Plain, short, concrete sentences. Name what the product does, not
-  what it promises. Say "you" to the reader; "your agent" is the reader's own.
+- **Voice.** The grammar rule and the tone rules under [Message](#message).
 
 ## Message
 
-- **Tagline:** "Every new job, filtered, prepared and ranked. You just apply."
-- **Short form:** "Collect. Prepare. Rank. You apply."
-- **Three steps:**
-  1. **Fresh jobs, no duplicates.** Your searches and watched companies, on your
-     schedule.
-  2. **Your agent prepares.** It shortlists by fit and tailors each CV and letter.
-  3. **You apply, best first.** Ready is ranked by priority and deadline.
-- **Three ways in:** use it by hand in the dashboard, from scripts with the REST
-  API, or with your own AI agent over MCP. The operations are the same
-  everywhere, and built-in skills cover each workflow.
-- **Say:** fresh, deduplicated, tailored, ranked, best first; your agent, your
-  Preferences; by hand, by API, by MCP. The queue of new jobs is **Jobs › New**.
+- **Tagline:** "Set up your job search once. Your AI agent works it by your rules. You just
+  apply."
+- **Short form:** "Your rules. Your agent. You apply."
+- **How-it-works headline:** "Every new job, filtered, prepared and ranked."
+- **One sentence:** "Openings is a self-hosted app that holds your job search: your career, your
+  rules in your own words, your CV and letter templates, the sources you watch and every
+  application. Your own AI agent reads all of it to bring in fresh jobs, decide each one
+  with a reason, write a tailored CV and letter as PDFs and rank them, and you apply."
+- **Tie line,** where a piece needs one: "Change a line in your Preferences, and your
+  agent's next decisions change with it."
+
+### The grammar rule
+
+Openings *holds, collects, labels, tracks and enforces*. Your agent *reads, decides,
+writes and ranks*. You *set up, approve, correct and apply*. Never use "it" for both
+Openings and the agent; inside a sentence, "it" refers back only to the subject that
+sentence named.
+
+### Five pillars
+
+Each pillar has a fixed subject: Openings, your agent or you.
+
+1. **Openings holds who you are.** Your career, your highlights and your rules, written
+   once, in your own words. Profile marks a highlight ★ "Always include in my CV", and
+   only approved highlights reach an application. Preferences has five sections: *What
+   I'm looking for*, *What I rule out*, *Facts about me*, *Writing rules* scoped
+   All/CV/Letter, and *Working with me*. Templates hold your own TeX, its Limits and one
+   default per kind.
+2. **Openings brings in the jobs.** Your searches and watched companies bring in fresh
+   jobs every day. Repeats are left out and likely copies are flagged. Sources cover
+   LinkedIn, Indeed and Glassdoor guest searches, careers pages on 12 hiring platforms,
+   HN "Who is hiring?", RSS and job links. Each source shows *found · ever shortlisted ·
+   applied*, and language labels come with a filter.
+3. **Your agent decides, prepares and ranks.** Your agent reads each new job by your
+   rules, dismisses with a reason you can read, writes a CV and letter from your
+   templates, and ranks the rest best first. Jobs shows "Dismissed by Claude Code ·
+   reason" with **Restore**. Each application gets a priority from 1 to 5, a salary range
+   with its basis and real PDFs; a blocking requirement keeps it out of Ready.
+4. **You apply; Openings follows through.** You send each application yourself. Openings
+   tracks replies and follow-ups, and your agent briefs you before each interview.
+   **Mark applied** comes with Undo, Today shows what needs you, and `prepare-interview`
+   saves a brief and a debrief as notes on the application.
+5. **Yours, every way in.** Every step works by hand, from scripts over REST, or through
+   your agent over MCP, on your machine. One SQLite file, verified daily backups,
+   attributed agent writes and undo. No account, no telemetry, MIT, and nothing in
+   Openings can submit to an employer.
+
+**Ordering rule for long pieces:** the result first, then pillars 1 to 5.
+
+### Tone and rhythm
+
+- **Voice.** "You" for the reader, "your agent" for theirs. Name Openings, never "it",
+  wherever an agent appears in the same paragraph.
+- **Sentences.** Plain and concrete, mostly 8 to 20 words, one idea each. Name what the
+  product does, not what it promises.
+- **Paragraphs.** At most 4 sentences; the lead sentence states the point.
+- **Page openings.** One sentence on what you can do there, then the steps. No
+  preamble, history or "In this guide".
+- **Headings.** Sentence case. Task headings start with a verb ("Run it on a NAS");
+  concept headings are nouns ("What stays yours").
+- **Lists.** Parallel grammar; each item starts with the same part of speech. Bold only
+  the lead phrase of an item, never inside a sentence.
+- **Tables.** Comparisons and references only, never narrative.
+- **Punctuation.** No em dashes, no exclamation marks; colons only to introduce a list
+  or an example.
+- **UI names.** Exactly as on screen, bold for actions (**Mark applied**, **Restore**);
+  `›` for paths (Jobs › New, Settings › API & agents).
+- **Spelling.** American. The demo persona's "British spelling" rule is data, not house
+  style.
+- **Numbers.** Product facts only (12 hiring platforms, 11 skills). No personal or
+  outcome numbers; demo numbers are labelled "Example data".
+- **Say:** fresh, deduplicated (repeats left out, likely copies flagged), tailored,
+  ranked, best first, by your rules, in your own words, by hand · REST · MCP. The queue
+  of new jobs is **Jobs › New**.
+- **Never say:** autopilot, applies for you, it learns, "no duplicates" unqualified,
+  magic, effortless, seamless, supercharge, revolutionary, the mail word for Jobs › New.
 - **Never imply** that you must re-filter what the agent prepared, or that the
   dashboard is only an Apply button: every action works by hand too.
+- **Links.** Descriptive text, never "here". Code blocks run as shown.
 
 ## Claims register
 
@@ -80,7 +144,7 @@ Product facts only. No personal usage or outcome numbers anywhere.
 - No AI inside, no API key, no account, no telemetry. You bring your own agent
   (Claude Code, Codex, any MCP client).
 - One container, one SQLite file, amd64 and arm64, an image under 100 MB.
-- It collects from LinkedIn, Indeed and Glassdoor searches (guest endpoints, no
+- Openings collects from LinkedIn, Indeed and Glassdoor searches (guest endpoints, no
   login), company careers pages on 12 platforms that collect automatically (13
   adapters; Breezy is preview-only), the Hacker News "Who is hiring?" thread,
   RSS, and job links.
@@ -92,11 +156,24 @@ Product facts only. No personal usage or outcome numbers anywhere.
 - Runs on a schedule from your own machine (#378).
 - A first check right away (#332).
 - No TeX distribution needed (#346).
+- Only approved highlights reach an application.
+- Writing rules are scoped to All, CV or Letter.
+- Each source shows found · ever shortlisted · applied.
+- `prepare-interview` saves a brief and a debrief as notes on the application.
+- A blocking requirement keeps an application out of Ready until you settle it.
+- 11 built-in skills. Recount them at each release.
+- Repeats are left out and likely copies are flagged.
+- Ready is ranked best first, by priority then deadline, in the dashboard, REST
+  and MCP (#448).
 
 **Banned:**
 
 - "The agent can't mark applied" or "can't delete": both are false by decision.
 - "It learns": say "your agent reads your corrections".
+- "No duplicates" unqualified: say "repeats left out, likely copies flagged".
+- "It" for both Openings and the agent in one sentence or paragraph.
+- "Every day" for the agent: your agent runs when you ask or on your schedule.
+  Openings checks your sources on their own schedule.
 - "Autopilot", "applies for you", and "scrapes LinkedIn" as a lead.
 - "Every job from every platform".
 - Any salary figure not drawn from a stated basis.
@@ -113,16 +190,16 @@ Product facts only. No personal usage or outcome numbers anywhere.
 
 The social preview, uploaded in the repository settings on release day:
 
-![Openings: every new job, filtered, prepared and ranked. You just apply.](../images/social-preview.png)
+![Openings: set up your job search once. Your AI agent works it by your rules. You just apply. Your career, rules and templates, set up once; fresh jobs from your searches and 12 hiring platforms; your agent tailors each CV and letter, ranked best first.](../images/social-preview.png)
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="../images/flow-dark.svg">
-  <img alt="Fresh jobs, no duplicates; your agent prepares; you apply, best first" src="../images/flow.svg">
+  <img alt="You set it up: Profile, Preferences, Templates and Sources. Openings brings in fresh jobs. Your agent decides and prepares. You apply, best first. By hand, REST or MCP" src="../images/flow.svg">
 </picture>
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="../images/agent-vs-you-dark.svg">
-  <img alt="What your agent does over MCP and what stays yours. Nothing in Openings can submit an application to an employer" src="../images/agent-vs-you.svg">
+  <img alt="What Openings holds: your career, rules, templates and sources. What your agent does over MCP, and what stays yours. Nothing in Openings can submit to an employer" src="../images/agent-vs-you.svg">
 </picture>
 
 <picture>
