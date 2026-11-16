@@ -24,6 +24,7 @@ import {
   type NavItem,
 } from "../ui/Shell";
 import { ToastProvider } from "../ui/Toast";
+import { AddressNotice } from "./AddressNotice";
 import { ShellContext, type ShellApi } from "./context";
 import { BOTTOM, NAV, NEEDS_LABEL, type NavDef } from "./nav";
 import { href, navigate, useRoute } from "./router";
@@ -246,6 +247,7 @@ export function Shell({ onSignOut }: { onSignOut: () => void }) {
             />
           }
         >
+          <AddressNotice />
           <Screen key={screenKey} id={route.id} />
         </AppFrame>
         <Suspense fallback={null}>

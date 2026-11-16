@@ -4,6 +4,7 @@ import json
 
 from fastapi.testclient import TestClient
 
+from document_fixtures import PDF
 from openings import __version__
 from openings.app import create_app
 from openings.mcp_server import INSTRUCTIONS
@@ -122,6 +123,61 @@ def test_both_mcp_paths_preserve_auth_origin_host_and_maintenance_checks(tmp_pat
             app.state.workspace.maintenance = True
             assert client.post(endpoint, json=message, headers=headers).status_code == 503
             app.state.workspace.maintenance = False
+
+
+def test_a_nas_host_is_refused_by_name_until_the_public_url_names_it(tmp_path, monkeypatch):
+    message = {"jsonrpc": "2.0", "id": 1, "method": "tools/list"}
+
+    def serve(name):
+        app = create_app(tmp_path / f"{name}.sqlite", start_worker=False)
+        app.state.auth.setup("synthetic-password")
+        token = app.state.auth.create_token("Synthetic NAS agent")["token"]
+        headers = {
+            "Authorization": "Bearer " + token,
+            "Accept": "application/json, text/event-stream",
+        }
+        return TestClient(app, base_url="http://nas.example:8080"), headers
+
+    monkeypatch.delenv("OPENINGS_PUBLIC_URL", raising=False)
+    client, headers = serve("default")
+    with client:
+        refused = client.post("/mcp/", json=message, headers=headers)
+        assert refused.status_code == 421
+        error = refused.json()["error"]
+        assert error["code"] == "mcp_host" and "nas.example:8080" in error["message"]
+        assert "OPENINGS_PUBLIC_URL=http://nas.example:8080" in error["message"]
+
+    monkeypatch.setenv("OPENINGS_PUBLIC_URL", "http://nas.example:8080")
+    client, headers = serve("public")
+    with client:
+        assert client.post("/mcp/", json=message, headers=headers).status_code == 200
+        # An upload grant made there names the public URL and takes the file.
+        workspace = client.app.state.workspace
+        job = workspace.ingest_job({"title": "Synthetic engineer", "posting": "Build services."})
+        application = workspace.create_application({"job_id": job["id"]})
+        call = client.post(
+            "/mcp/",
+            headers=headers,
+            json={
+                "jsonrpc": "2.0",
+                "id": 2,
+                "method": "tools/call",
+                "params": {
+                    "name": "documents_create",
+                    "arguments": {
+                        "application_id": application["id"],
+                        "kind": "cv",
+                        "pdf": {"name": "cv.pdf", "size": len(PDF)},
+                    },
+                },
+            },
+        ).json()["result"]
+        assert not call.get("isError"), call
+        created = call.get("structuredContent") or json.loads(call["content"][0]["text"])
+        grant = created["uploads"]["pdf"]
+        assert grant["url"] == "http://nas.example:8080/api/v1/transfers"
+        stored = client.put(grant["url"], headers=grant["headers"], content=PDF)
+        assert stored.status_code == 200
 
 
 CAPABILITIES = {

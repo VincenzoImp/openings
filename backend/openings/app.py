@@ -49,6 +49,27 @@ def error_response(error):
     )
 
 
+def host_allowed(host, allowed):
+    """Whether MCP answers at ``host``, as the transport's own check reads ``allowed``."""
+    return any(
+        host == pattern
+        or (pattern.endswith(":*") and (host == pattern[:-2] or host.startswith(pattern[:-1])))
+        for pattern in allowed
+    )
+
+
+def refused_host(host, scheme, public_url):
+    """Why an agent's request to a host Openings does not answer at is refused, in words."""
+    reached = public_url or "http://127.0.0.1:8080"
+    return DomainError(
+        421,
+        "mcp_host",
+        f"Agents reach Openings at {reached}, not at {host}. To use this address, set "
+        f"OPENINGS_PUBLIC_URL={scheme}://{host} and restart Openings.",
+        {"host": host, "public_url": public_url or None, "variable": "OPENINGS_PUBLIC_URL"},
+    )
+
+
 def create_app(database=None, start_worker=True):
     workspace = Workspace(database or os.environ.get("OPENINGS_DATABASE", "data/openings.sqlite"))
     workspace.maintenance = False
@@ -139,6 +160,9 @@ def create_app(database=None, start_worker=True):
                 else:
                     actor = auth.authorize(request)
             if path.startswith("/mcp"):
+                host = request.headers.get("host", "")
+                if not host_allowed(host, allowed_hosts):
+                    raise refused_host(host, request.url.scheme, public_url)
                 actor = auth.authorize(request, mcp=True)
             sign_in = path == "/api/v1/auth/login" and request.method == "POST"
             if path.startswith("/api/v1/auth/") and request.method == "POST" and path in public:

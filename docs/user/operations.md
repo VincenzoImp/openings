@@ -35,7 +35,9 @@ OPENINGS_PUBLIC_URL=http://openings.example:8080
 ```
 
 `OPENINGS_PUBLIC_URL` controls MCP host checks and the file-transfer links agents
-use; it must match the origin clients use. Set the owner password first, and use
+use; it must match the origin clients use. An agent that calls another host is
+refused with a message naming the variable, and a dashboard opened at another
+address says which value to set. Set the owner password first, and use
 HTTPS through a trusted reverse proxy on any untrusted network. Behind a proxy, set
 `OPENINGS_TRUSTED_PROXIES` to its address as the container sees it, so sign-in
 limits and secure cookies use each browser's real address. Without it every client
