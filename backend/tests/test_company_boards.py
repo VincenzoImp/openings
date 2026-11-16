@@ -780,6 +780,46 @@ def test_a_greenhouse_board_too_large_for_one_listing_reads_details():
     assert rows[0]["posting"] and calls[-1].endswith("/jobs/9000")
 
 
+# #388 -----------------------------------------------------------------------
+
+
+def test_greenhouse_labels_drop_placeholder_and_repeated_offices():
+    def office(id, name, location, job, parent=None):
+        return {
+            "id": id,
+            "name": name,
+            "location": location,
+            "parent_id": parent,
+            "departments": [{"id": 7, "name": "Engineering", "jobs": [{"id": job}]}],
+        }
+
+    listing = greenhouse_jobs(3)
+    listing["jobs"][0]["location"] = {"name": "Remote, Poland"}
+    listing["jobs"][1]["location"] = {"name": "No Office"}
+    listing["jobs"][2]["location"] = {"name": "Hybrid"}
+    offices = {
+        "offices": [
+            office(1, "No Office", None, 9000),
+            office(2, "Poland", "Poland", 9000),
+            office(3, "Turkey", "Istanbul, Turkey", 9000),
+            office(4, "Berlin", "Berlin, Germany", 9001),
+            # The region and its city both list the role: the city names it.
+            office(5, "EMEA", None, 9002),
+            office(6, "Zurich", "Zurich, Switzerland", 9002, parent=5),
+            office(7, "Zurich HQ", "Zurich", 9002, parent=5),
+        ]
+    }
+    rows, _, _ = collect("greenhouse", [("/jobs", listing), ("/offices", offices)])
+    assert [row["location"] for row in rows] == [
+        "Remote, Poland · Istanbul, Turkey",
+        "Berlin, Germany",
+        "Hybrid · Zurich, Switzerland",
+    ]
+    assert company.places(" Paris ", "N/A", "Paris", "New York", "York") == (
+        "Paris · New York · York"
+    )
+
+
 # #367 -----------------------------------------------------------------------
 
 BILLION_LAUGHS = b"""<?xml version="1.0"?>

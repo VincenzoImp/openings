@@ -96,10 +96,27 @@ def location(value):
     )
 
 
+# Names boards give a posting or office that has no place.
+PLACEHOLDERS = frozenset(
+    {"no office", "no location", "none", "n/a", "na", "tbd", "unassigned", "unknown", "-"}
+)
+
+
 def places(*values):
-    """Every location of a posting once, the primary first: "Paris · Zurich"."""
-    named = [str(place).strip() for place in values if place and str(place).strip()]
-    return " · ".join(dict.fromkeys(named))
+    """Every location of a posting once, the primary first: "Paris · Zurich".
+
+    Placeholders ("No Office") go, and so does a place an earlier one already
+    names: "Poland" after "Remote, Poland".
+    """
+    named = {}
+    for place in values:
+        place = " ".join(str(place or "").split())
+        parts = {part.strip().casefold() for part in place.split(",")}
+        if place.casefold() not in PLACEHOLDERS | {""} and not any(
+            parts <= seen for seen in named.values()
+        ):
+            named[place] = parts
+    return " · ".join(named)
 
 
 def board_error(error, kind, board):
@@ -331,12 +348,20 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
         for office in (offices.get("offices") if isinstance(offices, dict) else None) or []:
             for department in office.get("departments") or []:
                 for job in department.get("jobs") or []:
-                    cities.setdefault(job.get("id"), []).append(
-                        office.get("location") or office.get("name")
-                    )
+                    cities.setdefault(job.get("id"), []).append(office)
 
         def place(row):
-            return places(location(row.get("location")), *cities.get(row.get("id"), []))
+            # A region office ("EMEA") says less than its listed child office ("London").
+            mine = cities.get(row.get("id"), [])
+            parents = {office.get("parent_id") for office in mine}
+            return places(
+                location(row.get("location")),
+                *(
+                    location(office.get("location")) or office.get("name")
+                    for office in mine
+                    if office.get("id") not in parents
+                ),
+            )
 
         rows = select(rows, lambda row: row.get("title"), place)
         for row in ordered(rows, lambda row: f"{kind}:{board}:{row.get('id')}"):
