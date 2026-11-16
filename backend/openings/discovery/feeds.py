@@ -6,7 +6,6 @@ import hashlib
 import html
 import json
 import re
-import xml.etree.ElementTree as ET
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from functools import partial
@@ -260,14 +259,7 @@ def fetch_postings(source: dict) -> list[dict]:
             )
     elif kind == "rss":
         body = fetch_bytes(config["url"], maximum=2 * 1024 * 1024)
-        if b"<!DOCTYPE" in body.upper() or b"<!ENTITY" in body.upper():
-            raise DomainError(
-                422, "source_format", "RSS declarations with entities are not supported."
-            )
-        try:
-            root = ET.fromstring(body)
-        except ET.ParseError as error:
-            raise DomainError(502, "source_format", "The feed returned invalid XML.") from error
+        root = company_collectors.xml(body, "The feed returned invalid XML.")
         if root.tag not in (
             "rss",
             "{http://www.w3.org/2005/Atom}feed",
