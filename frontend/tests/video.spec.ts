@@ -292,6 +292,8 @@ test("video footage", async ({ page, session }) => {
       await reel.click(employer);
       await (await popup).close();
       await page.bringToFront();
+      // Back in front, the viewer draws the PDFs again.
+      await settled(page);
       await reel.pause(500);
     }
     await reel.focus(markApplied);

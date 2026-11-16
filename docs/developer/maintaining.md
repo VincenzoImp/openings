@@ -68,6 +68,16 @@ the repository by its numeric id and reads the token from `GITHUB_TOKEN`,
 
 Never commit its output.
 
+## Capture browser
+
+The screenshots, the social preview, the reel and the video show the Ready
+application's CV and letter in the browser's own PDF viewer
+(`frontend/scripts/capture.mjs`). They use Google Chrome when it is installed,
+otherwise Playwright's Chromium in the new headless mode
+(`npx --prefix frontend playwright install chromium`);
+`OPENINGS_CAPTURE_CHANNEL` names another Playwright channel. A capture fails when
+the browser has no PDF viewer, or when a PDF does not fill its well.
+
 ## Demo reel
 
 `npm --prefix frontend run reel` (and `-- --dark`) builds the dashboard, records

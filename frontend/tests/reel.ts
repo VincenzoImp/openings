@@ -3,6 +3,7 @@
 // own clock, and the track of scenes, focal regions, cursor, clicks and keys.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { expectPdfsShown } from "../scripts/capture.mjs";
 import { expect, type Locator, type Page } from "./fixtures";
 
 export const SIZE = { width: 1280, height: 800 };
@@ -339,12 +340,14 @@ declare global {
 }
 
 /**
- * The screen's requests are answered, its skeleton rows are gone and its
- * transitions have ended, so the next beat starts on the finished screen in
- * every run. It is off the reel's clock: it takes no time in the reel.
+ * The screen's requests are answered, its skeleton rows are gone, its
+ * transitions have ended and its PDFs are drawn, so the next beat starts on
+ * the finished screen in every run. It is off the reel's clock: it takes no
+ * time in the reel.
  */
 export async function settled(page: Page) {
   await page.waitForLoadState("networkidle");
   await expect(page.locator(".ui-skeleton-rows")).toHaveCount(0);
   await page.waitForTimeout(300);
+  await expectPdfsShown(page);
 }
