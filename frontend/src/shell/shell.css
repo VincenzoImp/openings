@@ -143,6 +143,11 @@
     font: var(--t-xs);
     text-overflow: ellipsis;
   }
+  .shell-palette-state {
+    flex: none;
+    color: var(--text-3);
+    font: var(--t-xs);
+  }
   .shell-palette-empty {
     padding: 0 var(--s-4);
     color: var(--text-3);

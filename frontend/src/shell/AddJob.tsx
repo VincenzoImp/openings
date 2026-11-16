@@ -7,6 +7,7 @@ import { Field, Input, Textarea } from "../ui/Field";
 import { Callout } from "../ui/Page";
 import { useToast } from "../ui/Toast";
 import { Layers } from "lucide-react";
+import { jobLink } from "../screens/jobs/link";
 import { href, navigate } from "./router";
 
 const URL_ONLY = /^https?:\/\/\S+$/;
@@ -59,9 +60,9 @@ export function AddJob({
     reset();
   }, [open, reset]);
 
-  function openJob(id: string) {
+  function openJob(id: string, triage?: string | null) {
     onClose();
-    navigate(href("jobs", {}, { job: id }));
+    navigate(href("jobs", {}, jobLink(id, triage)));
   }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -79,7 +80,7 @@ export function AddJob({
       message: `Added “${job.title || "Untitled role"}”`,
       tone: "success",
     });
-    openJob(job.id);
+    openJob(job.id, job.triage);
   }
   const error = add.error?.message;
   const empty = !value.trim() && !details.title.trim();
@@ -134,7 +135,7 @@ export function AddJob({
             icon={Layers}
             title="Already in your workspace"
             actions={
-              <Button size="sm" onClick={() => openJob(known.id)}>
+              <Button size="sm" onClick={() => openJob(known.id, known.triage)}>
                 Open it
               </Button>
             }

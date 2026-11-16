@@ -12,6 +12,8 @@ import {
   isoDay,
 } from "../../ui/format.ts";
 
+export { jobLink } from "./link.ts";
+
 export type JobSummary = Schema<"JobSummary">;
 export type Job = Schema<"Job">;
 export type ListQuery = NonNullable<

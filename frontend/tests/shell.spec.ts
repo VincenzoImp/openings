@@ -221,6 +221,65 @@ test("g and a letter go to a screen; ? shows the shortcuts; n adds a job", async
   await expect(add).toBeHidden();
 });
 
+test("a palette hit opens the job in the tab that lists it, even with New empty", async ({
+  page,
+}) => {
+  // Everything triaged: New is empty, as for an owner who is all caught up.
+  for (;;) {
+    const { items } = await call(page, "/jobs?triage=new&limit=200");
+    if (!items.length) break;
+    await call(page, "/jobs/bulk", "POST", {
+      action: "dismissed",
+      reason: "Synthetic: triaged.",
+      items: items.map((item: { id: string; version: number }) => ({
+        id: item.id,
+        expected_version: item.version,
+      })),
+    });
+  }
+  const [applied] = (await call(page, "/applications?stage=applied&limit=1"))
+    .items;
+  const [dismissed] = (
+    await call(page, "/jobs?triage=dismissed&sort=newest&limit=1")
+  ).items;
+  const palette = page.getByRole("dialog", { name: "Search and commands" });
+  for (const [target, section] of [
+    [applied.job, "all"],
+    [dismissed, "dismissed"],
+  ] as const) {
+    // A title no other job has, so the hit is this job.
+    const { version } = await call(page, `/jobs/${target.id}`);
+    const job = await call(page, `/jobs/${target.id}`, "PATCH", {
+      title: `Palette target ${section}`,
+      expected_version: version,
+    });
+    await page.keyboard.press(`${mod(page)}+k`);
+    await palette.getByRole("combobox").fill(job.title);
+    const hit = palette
+      .getByRole("group", { name: "Jobs" })
+      .getByRole("option", { name: new RegExp(job.title) })
+      .first();
+    // The hit names its state, so it differs from the application's.
+    await expect(hit).toContainText(
+      section === "all" ? "Shortlisted" : "Dismissed",
+    );
+    await hit.click();
+    await expect(page).toHaveURL(
+      new RegExp(`#jobs\\?section=${section}&job=${job.id}$`),
+    );
+    const title = isPhone(page)
+      ? heading(page)
+      : page.locator(".ui-split-detail h2").first();
+    await expect(title).toHaveText(job.title);
+    await expect(page.getByText("You're all caught up.")).toBeHidden();
+    if (!isPhone(page)) {
+      const row = page.locator(`.jobs-list [data-row-id="${job.id}"]`);
+      await expect(row).toBeVisible();
+      await expect(row).toHaveAttribute("aria-current", "true");
+    }
+  }
+});
+
 test("⌘K and / open the palette: jobs, applications and commands", async ({
   page,
 }) => {

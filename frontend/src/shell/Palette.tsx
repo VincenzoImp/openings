@@ -7,6 +7,7 @@ import {
   type KeyboardEvent,
 } from "react";
 import {
+  ArrowRight,
   Briefcase,
   Keyboard,
   LogOut,
@@ -19,8 +20,9 @@ import {
 } from "lucide-react";
 import { usePaletteSearch } from "../query/shell";
 import { Kbd } from "../ui/Button";
-import { Icon, type LucideIcon } from "../ui/Icon";
+import { Icon, STAGES, type LucideIcon, type Stage } from "../ui/Icon";
 import type { ThemeMode } from "../ui/theme";
+import { jobLink } from "../screens/jobs/link";
 import { NAV_ITEMS } from "./nav";
 import { href, navigate } from "./router";
 
@@ -34,10 +36,19 @@ function useSettled<T>(value: T, ms: number) {
   return settled;
 }
 
+/** A job's triage, as its tab names it. */
+const TRIAGE: Record<string, string> = {
+  new: "New",
+  shortlisted: "Shortlisted",
+  dismissed: "Dismissed",
+};
+
 interface Command {
   id: string;
   label: string;
   sub?: string;
+  /** A record's triage or stage, so a job and its application differ. */
+  state?: string;
   icon: LucideIcon;
   kbd?: string;
   run: () => void;
@@ -47,7 +58,7 @@ interface Group {
   items: Command[];
 }
 
-/** The ⌘K palette: jobs and applications by title or company, and commands. */
+/** The ⌘K palette: jobs and applications, best match first, and commands. */
 export function Palette({
   open,
   onClose,
@@ -87,20 +98,39 @@ export function Palette({
     const term = q.trim().toLowerCase();
     const matches = (command: Command) =>
       !term || command.label.toLowerCase().includes(term);
+    const query = q.trim();
     const jobs: Command[] = search.jobs.map((job) => ({
       id: `job-${job.id}`,
       label: job.title || "Untitled role",
       sub: [job.company, job.location].filter(Boolean).join(" · "),
+      state: job.unlisted
+        ? `${TRIAGE[job.triage] ?? job.triage}, no longer listed`
+        : (TRIAGE[job.triage] ?? job.triage),
       icon: Briefcase,
-      run: () => navigate(href("jobs", {}, { job: job.id })),
+      run: () => navigate(href("jobs", {}, jobLink(job.id, job.triage))),
     }));
+    if (search.totals.jobs > jobs.length)
+      jobs.push({
+        id: "jobs-all",
+        label: `Show all ${search.totals.jobs} jobs`,
+        icon: ArrowRight,
+        run: () => navigate(href("jobs", {}, { section: "all", q: query })),
+      });
     const applications: Command[] = search.applications.map((item) => ({
       id: `application-${item.id}`,
       label: item.title,
       sub: item.company,
+      state: item.stage in STAGES ? STAGES[item.stage as Stage] : item.stage,
       icon: Send,
       run: () => navigate(href("application", { id: item.id })),
     }));
+    if (search.totals.applications > applications.length)
+      applications.push({
+        id: "applications-all",
+        label: `Show all ${search.totals.applications} applications`,
+        icon: ArrowRight,
+        run: () => navigate(href("applications", {}, { q: query })),
+      });
     const go: Command[] = NAV_ITEMS.map((item) => ({
       id: `go-${item.id}`,
       label: `Go to ${item.label}`,
@@ -154,6 +184,8 @@ export function Palette({
     q,
     search.jobs,
     search.applications,
+    search.totals.jobs,
+    search.totals.applications,
     onAddJob,
     onShortcuts,
     onTheme,
@@ -260,6 +292,11 @@ export function Palette({
                           </span>
                         )}
                       </span>
+                      {command.state && (
+                        <span className="shell-palette-state">
+                          {command.state}
+                        </span>
+                      )}
                       {command.kbd && <Kbd>{command.kbd}</Kbd>}
                     </div>
                   );

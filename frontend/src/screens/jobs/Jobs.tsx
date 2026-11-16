@@ -743,7 +743,7 @@ export default function Jobs() {
         </Button>
       }
     >
-      Search looks at titles, companies and posting text.
+      Search looks at titles, companies, locations and posting text.
     </EmptyState>
   ) : view.section === "new" ? (
     <EmptyState
@@ -783,6 +783,9 @@ export default function Jobs() {
       Add a posting by its address, or set up a source that finds jobs.
     </EmptyState>
   );
+  // A job asked for by its address is shown even when the list around it is
+  // empty: the empty message then takes the list's place only.
+  const emptyPanel = <div className="jobs-empty">{emptyState}</div>;
 
   return (
     <div className="jobs" data-pushed={(!wide && open) || undefined}>
@@ -858,8 +861,8 @@ export default function Jobs() {
         role="tabpanel"
         aria-labelledby={`jobs-tab-${view.section}`}
       >
-        {empty ? (
-          <div className="jobs-empty">{emptyState}</div>
+        {empty && !view.job ? (
+          emptyPanel
         ) : (
           <SplitPane
             open={open}
@@ -868,6 +871,8 @@ export default function Jobs() {
             list={
               list.isPending ? (
                 <SkeletonRows rows={8} />
+              ) : empty ? (
+                emptyPanel
               ) : (
                 <JobList
                   view={view}

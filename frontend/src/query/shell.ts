@@ -58,55 +58,80 @@ export function useAccountName() {
 export type JobHit = Pick<
   Schema<"JobSummary">,
   "id" | "title" | "company" | "location" | "triage"
->;
+> & { unlisted: boolean };
 export interface ApplicationHit {
   id: string;
   title: string;
   company: string;
+  /** The stage, or "ready" for a Shortlisted application that is Ready. */
   stage: string;
 }
 
-/** Jobs and applications whose title or company matches, for ⌘K. */
+/** How many of each kind ⌘K shows; "Show all" opens the rest in their list. */
+export const PALETTE_LIMIT = 8;
+
+/**
+ * Jobs and applications for ⌘K, in the server's relevance order (the same as
+ * jobs_list and applications_list): the exact title first, then title,
+ * company, location and state matches, then words found only in a posting.
+ */
 export function usePaletteSearch(q: string) {
   const enabled = q.trim().length >= 2;
   const jobs = useQuery({
     queryKey: shellKeys.searchJobs(q),
     enabled,
     staleTime: 30_000,
-    queryFn: async ({ signal }): Promise<JobHit[]> =>
-      (
-        await call(
-          api.GET("/api/v1/jobs", {
-            params: { query: { q, limit: 5 } },
-            signal,
-          }),
-        )
-      ).items,
+    queryFn: async ({ signal }) => {
+      const page = await call(
+        api.GET("/api/v1/jobs", {
+          params: { query: { q, limit: PALETTE_LIMIT } },
+          signal,
+        }),
+      );
+      return {
+        total: page.total,
+        items: page.items.map((row): JobHit => ({
+          id: row.id,
+          title: row.title,
+          company: row.company,
+          location: row.location,
+          triage: row.triage,
+          unlisted: row.signals.no_longer_listed,
+        })),
+      };
+    },
   });
   const applications = useQuery({
     queryKey: shellKeys.searchApplications(q),
     enabled,
     staleTime: 30_000,
-    queryFn: async ({ signal }): Promise<ApplicationHit[]> =>
-      (
-        await call(
-          api.GET("/api/v1/applications", {
-            params: { query: { q, limit: 5 } },
-            signal,
-          }),
-        )
-      ).items.map((row) => ({
-        id: row.id,
-        title: String(row.job.title ?? "Untitled role"),
-        company: String(row.job.company ?? ""),
-        stage: row.stage,
-      })),
+    queryFn: async ({ signal }) => {
+      const page = await call(
+        api.GET("/api/v1/applications", {
+          params: { query: { q, limit: PALETTE_LIMIT } },
+          signal,
+        }),
+      );
+      return {
+        total: page.total,
+        items: page.items.map((row): ApplicationHit => ({
+          id: row.id,
+          title: String(row.job.title ?? "Untitled role"),
+          company: String(row.job.company ?? ""),
+          stage: row.stage === "shortlisted" && row.ready ? "ready" : row.stage,
+        })),
+      };
+    },
   });
   return {
     enabled,
     loading: enabled && (jobs.isFetching || applications.isFetching),
-    jobs: enabled ? (jobs.data ?? []) : [],
-    applications: enabled ? (applications.data ?? []) : [],
+    jobs: enabled ? (jobs.data?.items ?? []) : [],
+    applications: enabled ? (applications.data?.items ?? []) : [],
+    totals: {
+      jobs: enabled ? (jobs.data?.total ?? 0) : 0,
+      applications: enabled ? (applications.data?.total ?? 0) : 0,
+    },
   };
 }
 
