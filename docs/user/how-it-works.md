@@ -24,13 +24,15 @@ restore, stay with you.
 
 ## The daily loop
 
-**New** jobs arrive, from your sources or by hand. You **shortlist** the ones you
-want. For each, you or your agent **prepare** the CV and letter. When the
-application shows **Ready**, you check it, send it on the employer's site and
-choose **Mark applied**. Later you **record the reply**, or close the application
-as **No reply**.
+**New** jobs arrive from your sources, deduplicated, or by hand. You or your
+agent **shortlist** the ones that fit your Preferences and career, and
+**prepare** the CV and letter for each. **Ready** applications are ranked by
+priority and deadline: you apply on the employer's site, best first, and choose
+**Mark applied**. Later you **record the reply**, or close the application as
+**No reply**.
 
-Only you mark an application applied. No agent, source or upload does.
+You decide when an application counts as applied: you mark it, or your agent
+does when you tell it or a standing rule says how.
 
 ## Who does what
 
