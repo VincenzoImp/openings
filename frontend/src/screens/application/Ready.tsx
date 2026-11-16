@@ -238,7 +238,7 @@ export function ReadyView({
   const open = (app.requirements ?? []).filter((item) => !item.resolved);
   const check = (
     <section className="apg-check" aria-labelledby="apg-check-title">
-      <h2 className="ap-section-title" id="apg-check-title">
+      <h2 className="ui-section-title" id="apg-check-title">
         Before you send
       </h2>
       <div className="apg-check-links">

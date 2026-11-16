@@ -86,7 +86,10 @@
     flex: 1;
   }
   .tpl-file {
-    font: 500 12.5px/18px var(--mono);
+    font: var(--t-sm);
+    font-size: var(--fs-control-sm);
+    font-family: var(--mono);
+    font-weight: var(--w-medium);
     color: var(--text);
     overflow-wrap: anywhere;
   }
@@ -188,8 +191,8 @@
       padding: var(--s-4);
     }
     .tpl-title {
-      font-size: 20px;
-      line-height: 26px;
+      font: var(--t-phone-title);
+      font-weight: var(--w-semibold);
     }
     .tpl-tabs {
       margin-top: var(--s-4);

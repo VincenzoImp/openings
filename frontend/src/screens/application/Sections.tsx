@@ -9,7 +9,7 @@ import { Checkbox, Input, Textarea, Field } from "../../ui/Field";
 import { formatDate, formatFull } from "../../ui/format";
 import { copyText } from "../../ui/CodeBlock";
 import { Icon } from "../../ui/Icon";
-import { Skeleton } from "../../ui/Page";
+import { SectionHeader, Skeleton } from "../../ui/Page";
 import { ReadEdit } from "../../ui/ReadEdit";
 import { Switch } from "../../ui/Field";
 import { useToast } from "../../ui/Toast";
@@ -38,12 +38,12 @@ export function Section({
 }) {
   return (
     <section className="ap-section" aria-labelledby={`ap-${id}`}>
-      <header className="ap-section-head">
-        <h2 className="ap-section-title" id={`ap-${id}`}>
-          {title}
-        </h2>
-        {aside}
-      </header>
+      <SectionHeader
+        id={`ap-${id}`}
+        className="ap-section-head"
+        title={title}
+        action={aside}
+      />
       {children}
     </section>
   );

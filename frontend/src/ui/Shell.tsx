@@ -108,7 +108,13 @@ export function Sidebar({
       <div className="ui-sidebar-brand">
         <BrandMark />
         <span className="ui-sidebar-name">Openings</span>
-        <IconButton icon={Plus} label="Add job" shortcut="N" onClick={onAdd} />
+        <IconButton
+          icon={Plus}
+          label="Add job"
+          shortcut="N"
+          tipAlign="end"
+          onClick={onAdd}
+        />
       </div>
       <button
         type="button"

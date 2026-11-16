@@ -262,7 +262,7 @@
     width: min(100%, 72ch);
     padding: 52px var(--s-5) var(--s-6);
     color: var(--text);
-    font: 13.5px/1.65 var(--font);
+    font: var(--fs-row) / 1.65 var(--font);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }
@@ -289,7 +289,7 @@
     padding: var(--s-2) 0;
     border: 1px solid var(--border);
     border-radius: var(--r-md);
-    font: 12.5px/1.6 var(--mono);
+    font: var(--fs-control-sm) / 1.6 var(--mono);
     list-style: none;
   }
   .ap-diff li {
@@ -460,7 +460,7 @@
     gap: var(--s-3) var(--s-6);
     align-items: start;
   }
-  .apg-check > .ap-section-title {
+  .apg-check > .ui-section-title {
     align-self: center;
   }
   .apg-check-links {
@@ -638,7 +638,7 @@
       border-left: 1px solid var(--border);
       overflow: auto;
     }
-    .apg-side .ap-section-title {
+    .apg-side .ui-section-title {
       margin-bottom: var(--s-3);
     }
     .apg-posting-fold {
@@ -687,6 +687,17 @@
     }
     .apg-queue {
       padding: var(--s-1) var(--s-4) var(--s-1) var(--s-2);
+    }
+    .apg-queue .ui-icon-btn {
+      width: var(--touch);
+      height: var(--touch);
+    }
+    /* Before you send: the title on its line, the links under it. */
+    .apg-check {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .apg-check-links {
+      justify-content: flex-start;
     }
     .apg-queue-label {
       display: none;

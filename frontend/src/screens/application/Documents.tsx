@@ -600,7 +600,7 @@ export function SentDocuments({ current }: { current: Current }) {
   const open = docs.find((item) => item.kind === shown);
   return (
     <section className="ap-section" aria-labelledby="ap-sent-title">
-      <h2 className="ap-section-title" id="ap-sent-title">
+      <h2 className="ui-section-title" id="ap-sent-title">
         Sent documents
       </h2>
       <ul className="ap-sent">

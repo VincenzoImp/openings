@@ -88,11 +88,6 @@
     flex-direction: column;
     min-width: 0;
   }
-  .set-title {
-    font: var(--t-xl);
-    font-weight: var(--w-semibold);
-    letter-spacing: var(--tr-xl);
-  }
   .set-lead {
     margin-top: var(--s-1);
     color: var(--text-2);
@@ -194,7 +189,8 @@
     min-width: 0;
   }
   .set-item-title {
-    font: 500 13.5px/18px var(--font);
+    font: var(--t-row);
+    font-weight: var(--w-medium);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -278,7 +274,8 @@
     accent-color: var(--accent);
   }
   .set-code {
-    font: 12px/16px var(--mono);
+    font: var(--t-xs);
+    font-family: var(--mono);
     overflow-wrap: anywhere;
   }
   .set-nowrap {
@@ -310,7 +307,8 @@
     border-bottom: 1px solid var(--border);
   }
   .set-ask-name {
-    font: 500 13.5px/18px var(--font);
+    font: var(--t-row);
+    font-weight: var(--w-medium);
   }
   .set-ask-summary {
     color: var(--text-2);

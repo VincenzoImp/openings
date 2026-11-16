@@ -26,7 +26,7 @@ import {
   Tabs,
   useToast,
 } from "../../ui";
-import { SheetMenu } from "../../ui";
+import { SheetMenu, usePushed } from "../../ui";
 import {
   useDeleteTemplate,
   useDuplicateTemplate,
@@ -71,6 +71,8 @@ export function TemplateDetail({
   const [renaming, setRenaming] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const kind = kindLabel(template.kind);
+  // On a phone the detail is the page: its title is the h1.
+  const Heading = usePushed() ? "h1" : "h2";
   const files = template.file_count ?? 0;
   const fail = (cause: unknown) =>
     toast.show({
@@ -143,7 +145,7 @@ export function TemplateDetail({
       </DetailBar>
       <DetailBody className="tpl-detail">
         <header className="tpl-head">
-          <h2 className="tpl-title">{template.name}</h2>
+          <Heading className="tpl-title">{template.name}</Heading>
           <MetaLine
             items={[
               { icon: FileText, text: kind, label: "Kind" },

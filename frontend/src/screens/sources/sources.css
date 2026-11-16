@@ -109,7 +109,8 @@
     border: 0;
     background: none;
     color: var(--text);
-    font: 500 13.5px/18px var(--font);
+    font: var(--t-row);
+    font-weight: var(--w-medium);
     text-align: left;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -330,7 +331,8 @@
     border-bottom: 1px solid var(--border);
   }
   .src-test-job {
-    font: 500 13px/18px var(--font);
+    font: var(--t-sm);
+    font-weight: var(--w-medium);
     overflow-wrap: anywhere;
   }
   .src-test-where {

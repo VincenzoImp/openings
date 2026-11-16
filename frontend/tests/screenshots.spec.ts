@@ -672,3 +672,52 @@ if (!DOCS)
         await capture(page, session, screen, path);
       });
   });
+
+// The favicon at 16 px in a browser's tab strip, beside other tabs, in both
+// schemes and at 1x and 2x: the size at which a mark must still read.
+if (!DOCS)
+  for (const scheme of ["light", "dark"] as const)
+    for (const scale of [1, 2])
+      test.describe(`tab strip ${scheme} ${scale}x`, () => {
+        test.use({
+          viewport: { width: 560, height: 56 },
+          deviceScaleFactor: scale,
+          colorScheme: scheme,
+          workspace: "demo",
+        });
+        test("favicon", async ({ page }) => {
+          await page.goto("/");
+          const icon = await page
+            .locator('link[rel="icon"][type="image/svg+xml"]')
+            .getAttribute("href");
+          const src = new URL(icon!, page.url()).href;
+          const dark = scheme === "dark";
+          const tab = (title: string, mark: string, active = false) =>
+            `<div class="tab${active ? " on" : ""}">${mark}<span>${title}</span></div>`;
+          const dot = (color: string) => `<i style="background:${color}"></i>`;
+          await page.setContent(`<!doctype html><style>
+            body { margin: 0; font: 12px system-ui, sans-serif;
+              color-scheme: ${scheme}; background: ${dark ? "#202124" : "#dee1e6"}; }
+            .strip { display: flex; gap: 2px; padding: 8px 8px 0; }
+            .tab { display: flex; align-items: center; gap: 8px; width: 120px;
+              height: 34px; padding: 0 10px; border-radius: 8px 8px 0 0;
+              color: ${dark ? "#e8eaed" : "#3c4043"}; }
+            .tab.on { background: ${dark ? "#35363a" : "#ffffff"}; }
+            .tab img, .tab i { flex: none; width: 16px; height: 16px; }
+            .tab i { border-radius: 50%; }
+          </style><div class="strip">
+            ${tab("Inbox (3)", dot("#1a73e8"))}
+            ${tab("Openings", `<img src="${src}" alt="">`, true)}
+            ${tab("Calendar", dot("#188038"))}
+            ${tab("Docs", dot("#f9ab00"))}
+          </div>`);
+          await page.waitForLoadState("networkidle");
+          await page.screenshot({
+            path: join(
+              ROOT,
+              "frontend/screenshots/tab-strip",
+              `${scheme}-${scale}x.png`,
+            ),
+          });
+        });
+      });

@@ -109,6 +109,22 @@
     .ui-detail-body {
       padding: var(--s-4) var(--s-4) var(--s-12);
     }
+    /* An open detail is a pushed page: its own bar on top with touch-size
+       buttons, its actions at the bottom; the shell's bars step aside. */
+    .ui-app:has(.ui-split[data-open]) :is(.ui-topbar, .ui-app-bottom) {
+      display: none;
+    }
+    .ui-split[data-open] .ui-detail-bar {
+      height: var(--bar-top);
+      padding-right: var(--s-1);
+    }
+    .ui-split[data-open] .ui-detail-bar .ui-btn {
+      min-width: var(--touch);
+      height: var(--touch);
+    }
+    .ui-split[data-open] .ui-detail-pos {
+      margin-left: 0;
+    }
   }
   @container app (max-width: 719px) {
     .ui-split-detail {
@@ -132,7 +148,7 @@
     .ui-actionbar .ui-btn {
       flex: 1;
       height: var(--touch);
-      font-size: 14px;
+      font-size: var(--fs-md);
     }
     .ui-actionbar .ui-icon-btn {
       flex: none;

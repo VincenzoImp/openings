@@ -75,7 +75,7 @@ export function FollowUp({ context }: { context: PageContext }) {
           )}
         </div>
         <aside className="apg-side" aria-label="Posting">
-          <h2 className="ap-section-title">Posting</h2>
+          <h2 className="ui-section-title">Posting</h2>
           <PostingText text={posting} />
         </aside>
       </div>

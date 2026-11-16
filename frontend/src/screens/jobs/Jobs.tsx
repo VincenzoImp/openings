@@ -30,7 +30,7 @@ import { BulkBar, useSelection } from "../../ui/List";
 import { LoadError } from "../../ui/LoadError";
 import { Menu, Popover, type MenuEntry } from "../../ui/Menu";
 import { EmptyState, PageHeader, SkeletonRows } from "../../ui/Page";
-import { SplitPane } from "../../ui/Split";
+import { SplitPane, useMedia } from "../../ui/Split";
 import { FilterChips, Tabs, Toolbar } from "../../ui/Tabs";
 import { useToast } from "../../ui/Toast";
 import {
@@ -70,18 +70,6 @@ import { useSeen } from "./seen";
 import "./jobs.css";
 
 const PAGE = 200;
-
-function useMedia(query: string) {
-  const [matches, setMatches] = useState(() => matchMedia(query).matches);
-  useEffect(() => {
-    const list = matchMedia(query);
-    const change = () => setMatches(list.matches);
-    change();
-    list.addEventListener("change", change);
-    return () => list.removeEventListener("change", change);
-  }, [query]);
-  return matches;
-}
 
 const title = (job: { title?: string }) => `“${job.title || "Untitled role"}”`;
 /** What a decision is called in a sentence: "Couldn't dismiss …". */

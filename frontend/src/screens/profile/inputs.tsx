@@ -3,6 +3,7 @@
 import { useId, useRef, useState } from "react";
 import { FileText, Plus, X } from "lucide-react";
 import { Checkbox, Input, Select } from "../../ui/Field";
+import { Chip } from "../../ui/Tabs";
 import { Icon } from "../../ui/Icon";
 import { fileSize, type EntryFile } from "./data";
 import { MONTH_NAMES, addSkills, type DateDraft } from "./model";
@@ -127,16 +128,13 @@ export function SkillsInput({
       </label>
       <div className="pf-skills-input" onClick={() => input.current?.focus()}>
         {value.map((skill) => (
-          <span className="ui-tag pf-skill" key={skill}>
+          <Chip
+            key={skill}
+            removeLabel={`Remove ${skill}`}
+            onRemove={() => onChange(value.filter((item) => item !== skill))}
+          >
             {skill}
-            <button
-              type="button"
-              aria-label={`Remove ${skill}`}
-              onClick={() => onChange(value.filter((item) => item !== skill))}
-            >
-              <Icon icon={X} size="sm" />
-            </button>
-          </span>
+          </Chip>
         ))}
         <input
           ref={input}

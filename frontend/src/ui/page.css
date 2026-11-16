@@ -18,11 +18,43 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  /* The action box is the h1's line high, so no action (a 32 px button, a
+     segmented control) makes one page's header taller than another's. */
   .ui-page-action {
     display: flex;
+    align-items: flex-end;
     gap: var(--s-2);
     flex: none;
+    height: 28px;
     padding-bottom: 2px;
+  }
+
+  /* A section's head (SectionHeader); every section title has this size. */
+  .ui-section-head {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    min-width: 0;
+  }
+  .ui-section-title {
+    display: flex;
+    flex: 1;
+    align-items: baseline;
+    gap: var(--s-2);
+    min-width: 0;
+    font: var(--t-md);
+    font-weight: var(--w-semibold);
+    letter-spacing: var(--tr-md);
+    outline: none;
+  }
+  .ui-section-title[data-level="page"] {
+    font: var(--t-xl);
+    font-weight: var(--w-semibold);
+    letter-spacing: var(--tr-xl);
+  }
+  .ui-section-action {
+    display: flex;
+    flex: none;
   }
   .ui-breadcrumb ol {
     display: flex;
@@ -125,7 +157,7 @@
 
   .ui-prose {
     max-width: var(--measure);
-    font: 14.5px/23px var(--font);
+    font: var(--t-prose);
     color: var(--text);
   }
   .ui-prose > * + * {
@@ -151,7 +183,7 @@
   }
   .ui-prose mark {
     padding: 0 2px;
-    border-radius: 3px;
+    border-radius: var(--r-xs);
     background: var(--accent-soft);
     color: inherit;
   }

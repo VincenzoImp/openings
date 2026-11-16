@@ -93,7 +93,7 @@ export function StatsView({ period }: { period: Period }) {
         ))}
       </dl>
       <section aria-labelledby="ap-funnel-title">
-        <h2 className="ap-section-title" id="ap-funnel-title">
+        <h2 className="ui-section-title" id="ap-funnel-title">
           From applied to offer
         </h2>
         <p className="ap-caption ap-funnel-note">
@@ -120,7 +120,7 @@ export function StatsView({ period }: { period: Period }) {
       </section>
       {sources.length > 0 && (
         <section aria-labelledby="ap-sources-title">
-          <h2 className="ap-section-title" id="ap-sources-title">
+          <h2 className="ui-section-title" id="ap-sources-title">
             Replies by saved source
           </h2>
           <Table

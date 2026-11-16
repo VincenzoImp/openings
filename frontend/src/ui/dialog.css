@@ -60,7 +60,8 @@
   .ui-modal-head h2 {
     flex: 1;
     min-width: 0;
-    font: 600 15px/22px var(--font);
+    font: var(--t-title-sm);
+    font-weight: var(--w-semibold);
     letter-spacing: -0.01em;
   }
   .ui-modal-body {

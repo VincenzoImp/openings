@@ -3,7 +3,7 @@
 // Approve. In the entry's form: add, reword, approve, star, remove and
 // reorder (drag the handle, or its menu: Move up / Move down).
 import { useLayoutEffect, useRef, useState } from "react";
-import { Menu as Grip, Plus, Star, Trash } from "lucide-react";
+import { GripVertical, Plus, Star, Trash2 } from "lucide-react";
 import { Button, IconButton } from "../../ui/Button";
 import { Icon } from "../../ui/Icon";
 import { Menu } from "../../ui/Menu";
@@ -201,7 +201,7 @@ export function HighlightsEditor({
                     onPointerDown={() => setArmed(item.key)}
                     onPointerUp={() => setArmed(null)}
                   >
-                    <Icon icon={Grip} size="sm" />
+                    <Icon icon={GripVertical} size="sm" />
                   </button>
                 )}
               />
@@ -231,7 +231,7 @@ export function HighlightsEditor({
                   onClick={() => patch(item.key, { always: !item.always })}
                 />
                 <IconButton
-                  icon={Trash}
+                  icon={Trash2}
                   size="sm"
                   label={`Remove highlight ${index + 1}`}
                   tooltip="above"

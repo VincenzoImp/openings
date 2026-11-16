@@ -1,9 +1,25 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronDown, ChevronLeft, ChevronUp } from "lucide-react";
 import { IconButton } from "./Button";
 import { cx } from "./cx";
 import { formatNumber } from "./format";
 import "./split.css";
+
+/** Whether the window matches a media query, following its changes. */
+export function useMedia(query: string) {
+  const [matches, setMatches] = useState(() => matchMedia(query).matches);
+  useEffect(() => {
+    const list = matchMedia(query);
+    const change = () => setMatches(list.matches);
+    change();
+    list.addEventListener("change", change);
+    return () => list.removeEventListener("change", change);
+  }, [query]);
+  return matches;
+}
+
+/** A detail is a pushed full-screen page: its title is the page's h1. */
+export const usePushed = () => useMedia("(max-width: 719px)");
 
 /**
  * List and detail side by side at full height, each scrolling on its own.
@@ -86,6 +102,7 @@ export function DetailBar({
           label="Previous"
           shortcut="K"
           size="sm"
+          tipAlign="start"
           onClick={onPrevious}
           disabled={position === 1}
         />

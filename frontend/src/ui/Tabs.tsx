@@ -178,6 +178,61 @@ export function Toolbar({
   );
 }
 
+/**
+ * A value as a 26 px pill, the one chip of the system: removable with
+ * `onRemove` (a filter, a language, a skill), or a toggle with `onPress` and
+ * `pressed`. On a phone its button reaches 44 px.
+ */
+export function Chip({
+  children,
+  field,
+  onRemove,
+  removeLabel,
+  onPress,
+  pressed = false,
+  disabled,
+}: {
+  children: ReactNode;
+  /** The filter's name before its value, in the secondary colour. */
+  field?: string;
+  onRemove?: () => void;
+  removeLabel?: string;
+  onPress?: () => void;
+  pressed?: boolean;
+  disabled?: boolean;
+}) {
+  if (onPress)
+    return (
+      <button
+        type="button"
+        className="ui-chip"
+        data-toggle=""
+        aria-pressed={pressed}
+        disabled={disabled}
+        onClick={onPress}
+      >
+        {children}
+      </button>
+    );
+  return (
+    <span className="ui-chip" data-removable={onRemove ? "" : undefined}>
+      {field && <span className="ui-chip-field">{field}</span>}
+      <span>{children}</span>
+      {onRemove && (
+        <button
+          type="button"
+          className="ui-chip-remove"
+          aria-label={removeLabel}
+          disabled={disabled}
+          onClick={onRemove}
+        >
+          <Icon icon={X} size="sm" />
+        </button>
+      )}
+    </span>
+  );
+}
+
 export interface FilterChip {
   key: string;
   field: string;
@@ -204,18 +259,14 @@ export function FilterChips({
   return (
     <div className="ui-chips" role="group" aria-label="Active filters">
       {chips.map((chip) => (
-        <span className="ui-chip" key={chip.key}>
-          <span className="ui-chip-field">{chip.field}</span>
-          <span>{chip.value}</span>
-          <button
-            type="button"
-            className="ui-chip-remove"
-            aria-label={`Remove filter ${chip.field} ${chip.value}`}
-            onClick={() => onRemove(chip.key)}
-          >
-            <Icon icon={X} size="sm" />
-          </button>
-        </span>
+        <Chip
+          key={chip.key}
+          field={chip.field}
+          removeLabel={`Remove filter ${chip.field} ${chip.value}`}
+          onRemove={() => onRemove(chip.key)}
+        >
+          {chip.value}
+        </Chip>
       ))}
       {children}
       <button type="button" className="ui-chips-clear" onClick={onClear}>

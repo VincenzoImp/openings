@@ -27,27 +27,15 @@
 
   /* Toolbar: the stage tabs scroll, with a fade where they do not fit; the
      tools keep their room. */
-  .ap-toolbar {
-    gap: var(--s-4);
-  }
   .ap-stages {
-    flex: 1;
+    flex: 0 1 auto;
+    min-width: 0;
     padding-right: var(--s-8);
     mask-image: linear-gradient(
       to right,
       black calc(100% - var(--s-8)),
       transparent
     );
-  }
-  .ap-tools {
-    display: flex;
-    align-items: center;
-    flex: none;
-    gap: var(--s-1);
-  }
-  .ap-tools .ui-search {
-    width: 200px;
-    margin-right: var(--s-1);
   }
   .ap-search-row {
     display: none;
@@ -121,11 +109,6 @@
     font-weight: var(--w-medium);
     letter-spacing: 0;
   }
-  .ap-section-title {
-    font: var(--t-md);
-    font-weight: var(--w-semibold);
-    letter-spacing: var(--tr-md);
-  }
   .ap-funnel {
     display: flex;
     flex-direction: column;
@@ -191,19 +174,7 @@
     text-decoration: underline;
   }
 
-  @container app (max-width: 1100px) {
-    .ap-tools .ui-search {
-      width: 150px;
-    }
-  }
-
   @container app (max-width: 719px) {
-    .ap-toolbar {
-      padding: 0 var(--s-4);
-    }
-    .ap-tools {
-      display: none;
-    }
     .ap-search-row {
       display: block;
       padding: var(--s-2) var(--s-4);

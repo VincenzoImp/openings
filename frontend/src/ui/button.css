@@ -67,12 +67,12 @@
   .ui-btn[data-size="sm"] {
     height: var(--control-h-sm);
     padding: 0 10px;
-    font-size: 12.5px;
+    font-size: var(--fs-control-sm);
   }
   .ui-btn[data-size="touch"] {
     height: var(--touch);
     padding: 0 var(--s-4);
-    font-size: 14px;
+    font-size: var(--fs-md);
   }
   .ui-btn:focus-visible {
     box-shadow: var(--focus-ring);
@@ -155,6 +155,23 @@
   .ui-icon-btn[data-tip]:focus-visible::after {
     transition-delay: 0ms;
   }
+  /* At a pane's edge the tooltip ends at the button, inside the pane. */
+  .ui-icon-btn[data-tip-align]::after {
+    transform: translateY(-2px);
+  }
+  .ui-icon-btn[data-tip-align][data-tip="above"]::after {
+    transform: translateY(2px);
+  }
+  .ui-icon-btn[data-tip-align="start"]::after {
+    left: 0;
+  }
+  .ui-icon-btn[data-tip-align="end"]::after {
+    left: auto;
+    right: 0;
+  }
+  .ui-icon-btn[data-tip-align]:is(:hover, :focus-visible)::after {
+    transform: none;
+  }
   .ui-icon-btn[aria-expanded="true"]::after {
     display: none;
   }
@@ -175,7 +192,8 @@
     border-radius: var(--r-sm);
     background: var(--bg-subtle);
     color: var(--text-3);
-    font: 500 11px/1 var(--font);
+    font: var(--t-micro);
+    font-weight: var(--w-medium);
     letter-spacing: 0;
   }
   .ui-btn[data-variant="primary"] .ui-kbd {

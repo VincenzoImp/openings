@@ -415,6 +415,7 @@ export function ListRow({
                   raised
                   tabIndex={selected ? 0 : -1}
                   tooltip="above"
+                  tipAlign="end"
                   onClick={action.onClick}
                 />
               ))}

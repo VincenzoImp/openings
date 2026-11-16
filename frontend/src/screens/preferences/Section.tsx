@@ -158,7 +158,7 @@ export function PreferenceSection({
 
   return (
     <section className="pref-section" aria-labelledby={`${id}-title`}>
-      <h2 id={`${id}-title`} className="pref-title">
+      <h2 id={`${id}-title`} className="ui-section-title pref-title">
         {info.title}
       </h2>
       {conflict && (

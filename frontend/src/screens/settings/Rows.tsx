@@ -13,7 +13,7 @@ export function SettingsSection({
   const id = useId();
   return (
     <section className="set-section" aria-labelledby={id}>
-      <h2 id={id} className="set-title">
+      <h2 id={id} className="ui-section-title set-title" data-level="page">
         {title}
       </h2>
       {lead && <p className="set-lead">{lead}</p>}

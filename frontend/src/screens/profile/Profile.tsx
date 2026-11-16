@@ -6,7 +6,7 @@ import { useState, type ReactNode } from "react";
 import { List, Plus, Upload, UserRound } from "lucide-react";
 import { Button, IconButton } from "../../ui/Button";
 import { Menu } from "../../ui/Menu";
-import { EmptyState, PageHeader, Skeleton } from "../../ui/Page";
+import { EmptyState, PageHeader, SectionHeader, Skeleton } from "../../ui/Page";
 import { Tag } from "../../ui/Badge";
 import { TopBarActions } from "../../shell/context";
 import { EditingProvider, useEditing } from "./Block";
@@ -276,13 +276,14 @@ function Section({
 }) {
   return (
     <section id={`pf-${id}`} aria-labelledby={`pf-${id}-h`}>
-      <div className="pf-section-head">
-        <h2 id={`pf-${id}-h`} tabIndex={-1}>
-          {title}
-          {!!count && <span className="pf-count">{count}</span>}
-        </h2>
-        {action}
-      </div>
+      <SectionHeader
+        id={`pf-${id}-h`}
+        className="pf-section-head"
+        title={title}
+        count={!!count && <span className="pf-count">{count}</span>}
+        action={action}
+        focusable
+      />
       {children}
     </section>
   );

@@ -52,28 +52,11 @@
 
   /* A section: heading and count, one action on the right, then rows. */
   .today-section-head {
-    display: flex;
-    align-items: center;
-    gap: var(--s-3);
     min-height: var(--control-h);
     margin-bottom: var(--s-2);
   }
-  .today-section-head h2 {
-    display: flex;
-    flex: 1;
-    align-items: baseline;
-    gap: var(--s-2);
-    min-width: 0;
-    font: var(--t-md);
-    font-weight: var(--w-semibold);
-    letter-spacing: var(--tr-md);
-  }
-  .today-section-action {
-    display: flex;
-    flex: none;
-  }
   /* A ghost action's text ends where a bordered button's edge does. */
-  .today-section-action .ui-btn[data-variant="ghost"] {
+  .today-section-head .ui-section-action .ui-btn[data-variant="ghost"] {
     margin-right: -10px;
   }
   .today-note {
@@ -262,7 +245,7 @@
     .today-section:has(.today-start) .today-section-head {
       flex-wrap: wrap;
     }
-    .today-section-action:has(.today-start) {
+    .today-section-head .ui-section-action:has(.today-start) {
       order: 3;
       flex-basis: 100%;
       margin-top: var(--s-2);
