@@ -113,29 +113,23 @@ export function connectSnippet(client: ClientId, origin: string) {
 }
 
 /** How to see that the agent reached Openings, per client. */
-const CLAUDE_CHECK = "Check it: claude mcp list shows openings ✔ Connected.";
-export const CHECKS: Partial<Record<ClientId, string>> = {
-  plugin: CLAUDE_CHECK,
-  claude: CLAUDE_CHECK,
-  codex: "Check it: codex mcp list shows openings.",
-};
+export const CLAUDE_CHECK =
+  "Check it: claude mcp list shows openings ✔ Connected.";
 
 /** The first session: three prompts, in order, and what each one does. */
 export const FIRST_SESSION = [
   {
     prompt: "Set up my Openings workspace from my CV",
     result:
-      "Fills your Profile from the CV you give it and Preferences from a few questions, then sets up templates and sources.",
+      "Fills your Profile from your CV and Preferences from a few questions.",
   },
   {
     prompt: "Go through my new jobs",
-    result:
-      "Shortlists or dismisses each new job, with a reason you can read in Jobs.",
+    result: "Shortlists or dismisses each new job, with a reason.",
   },
   {
     prompt: "Prepare CV and letter for my shortlist",
-    result:
-      "Tailors a CV and letter for each one; complete applications appear under Ready.",
+    result: "Tailors a CV and letter for each; finished ones are Ready.",
   },
 ] as const;
 
@@ -144,19 +138,10 @@ export const REPOSITORY = "https://github.com/VincenzoImp/openings-job-search";
 
 /** Where to go with a problem, a question or a vulnerability. */
 export const HELP_LINKS = [
-  {
-    label: "Report a problem",
-    href: `${REPOSITORY}/issues/new/choose`,
-  },
-  {
-    label: "Ask a question",
-    href: `${REPOSITORY}/discussions`,
-  },
-  {
-    label: "Security",
-    href: `${REPOSITORY}/security/policy`,
-  },
-] as const;
+  { label: "Report a problem", href: `${REPOSITORY}/issues/new/choose` },
+  { label: "Ask a question", href: `${REPOSITORY}/discussions` },
+  { label: "Security", href: `${REPOSITORY}/security/policy` },
+];
 
 /** A request gate's state for one job site: a dot and a word. */
 export function gateOf(

@@ -66,7 +66,7 @@ under **Jobs**. Nothing is kept when the demo stops.
    **Other clients**: Settings › API & agents shows the JSON configuration.
 4. Check it: `claude mcp list` shows `openings: … ✔ Connected`.
 
-![Settings, API & agents: the three steps, the tokens and the client configuration](../images/agents.png)
+![Settings, API & agents: the four steps, the tokens and the client configuration](../images/agents.png)
 
 ### 3. Your first session
 

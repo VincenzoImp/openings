@@ -43,9 +43,11 @@ test("first run: about you, a search and a job, a CV and the example template, t
   await spoken.getByLabel("Add a language").selectOption("other");
   const other = spoken.getByLabel("Other language");
   await other.fill("Klingon");
-  await other.press("Enter");
-  await expect(spoken.getByText(/No language goes by that name/)).toBeVisible();
+  await expect(
+    spoken.getByRole("button", { name: "Add", exact: true }),
+  ).toBeDisabled();
   await other.fill("Yoruba");
+  await expect(spoken.getByText("Adds Yoruba.")).toBeVisible();
   await other.press("Enter");
   await expect(
     spoken.getByRole("button", { name: "Remove Yoruba" }),
@@ -104,10 +106,8 @@ test("first run: about you, a search and a job, a CV and the example template, t
       "Kept as one entry. Your agent can split it into roles and education (“Split my CV into career entries”).",
     ),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Add it to your Profile" }).click();
-  await expect(
-    page.getByText("Added your CV to your Profile as one entry."),
-  ).toBeVisible();
+  await page.getByRole("button", { name: "Add 1 entry" }).click();
+  await expect(page.getByText("Added 1 entry to your Profile.")).toBeVisible();
   expect((await call(page, "/career/entries?limit=1")).total).toBeGreaterThan(
     entries,
   );

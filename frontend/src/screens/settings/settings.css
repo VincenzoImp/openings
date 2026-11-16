@@ -331,20 +331,17 @@
     align-items: center;
     min-height: var(--touch);
     padding: var(--s-2) 0;
-    color: inherit;
+    color: var(--accent-text);
+    font: var(--t-row);
+    font-weight: var(--w-medium);
     text-decoration: none;
   }
-  .set-help a:hover .set-help-label {
+  .set-help a:hover {
     text-decoration: underline;
   }
   .set-help a:focus-visible {
     outline: none;
     box-shadow: var(--focus-ring);
-  }
-  .set-help-label {
-    color: var(--accent-text);
-    font: var(--t-row);
-    font-weight: var(--w-medium);
   }
   .set-ask-title {
     color: var(--text-2);

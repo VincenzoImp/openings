@@ -49,14 +49,8 @@ export function Advanced() {
           {HELP_LINKS.map((link) => (
             <li key={link.label}>
               <a href={link.href} target="_blank" rel="noreferrer">
-                <span className="set-help-label">
-                  {link.label}
-                  <Icon
-                    icon={ExternalLink}
-                    size="sm"
-                    className="set-external"
-                  />
-                </span>
+                {link.label}
+                <Icon icon={ExternalLink} size="sm" className="set-external" />
               </a>
             </li>
           ))}

@@ -501,7 +501,7 @@ export function CvStep({
     if (!preview) return;
     const done = await save.mutateAsync(preview).catch(() => null);
     if (done) {
-      setImported(whole ? 0 : entries.length);
+      setImported(entries.length);
       setText("");
       read.reset();
     }
@@ -518,11 +518,7 @@ export function CvStep({
       <section className="setup-block" aria-labelledby="setup-paste">
         <h2 id="setup-paste">Paste your CV</h2>
         {imported != null && (
-          <Done>
-            {imported
-              ? `Added ${plural(imported, "entry", "entries")} to your Profile.`
-              : "Added your CV to your Profile as one entry."}
-          </Done>
+          <Done>{`Added ${plural(imported, "entry", "entries")} to your Profile.`}</Done>
         )}
         <form
           className="setup-form"
@@ -583,9 +579,7 @@ export function CvStep({
           <div className="setup-actions">
             {preview && entries.length > 0 ? (
               <Button disabled={save.isPending} onClick={importIt}>
-                {whole
-                  ? "Add it to your Profile"
-                  : `Add ${plural(entries.length, "entry", "entries")}`}
+                {`Add ${plural(entries.length, "entry", "entries")}`}
               </Button>
             ) : (
               <Button type="submit" disabled={!text.trim() || read.isPending}>

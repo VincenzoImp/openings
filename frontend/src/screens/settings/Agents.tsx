@@ -13,10 +13,9 @@ import { useToast } from "../../ui/Toast";
 import { ago } from "../sources/model";
 import {
   ACCESS,
-  CHECKS,
+  CLAUDE_CHECK,
   CLIENTS,
   FIRST_SESSION,
-  TOKEN_PLACEHOLDER,
   accessOf,
   connectSnippet,
   exportLines,
@@ -76,26 +75,27 @@ export function Agents() {
   );
 }
 
+/** A copy's toast: "Lines copied", or how to copy by hand. */
+function useCopied(what: string) {
+  const toast = useToast();
+  return (ok: boolean) =>
+    toast.show(
+      ok
+        ? { message: `${what} copied`, tone: "success" }
+        : { message: "Select the text and copy it.", tone: "error" },
+    );
+}
+
 /** Step 2: the export lines for ~/.zshrc or ~/.bashrc. */
 function ShellLines({ origin }: { origin: string }) {
-  const toast = useToast();
+  const copied = useCopied("Lines");
   const lines = exportLines(origin);
   return (
     <div className="set-connect">
-      <CodeBlock
-        code={lines}
-        label="Shell lines"
-        onCopied={(ok) =>
-          toast.show(
-            ok
-              ? { message: "Lines copied", tone: "success" }
-              : { message: "Select the lines and copy them.", tone: "error" },
-          )
-        }
-      />
+      <CodeBlock code={lines} label="Shell lines" onCopied={copied} />
       <p className="set-row-desc">
-        Add these lines to ~/.zshrc or ~/.bashrc with your token in place of{" "}
-        {TOKEN_PLACEHOLDER}, then open a new terminal.
+        Add them to ~/.zshrc or ~/.bashrc with your token, then open a new
+        terminal.
       </p>
     </div>
   );
@@ -118,12 +118,10 @@ function FirstSession() {
 function Step({
   number,
   title,
-  note,
   children,
 }: {
   number: number;
   title: string;
-  note?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -135,7 +133,6 @@ function Step({
         <h3 className="set-step-title">
           <span className="ui-sr">Step {number}: </span>
           {title}
-          {note}
         </h3>
         {children}
       </div>
@@ -256,6 +253,7 @@ export function NewTokenDialog({
 }) {
   const create = useCreateToken();
   const toast = useToast();
+  const copied = useCopied("Token line");
   const [name, setName] = useState("");
   const [kind, setKind] = useState<TokenKind>("agent");
   const [submitted, setSubmitted] = useState(false);
@@ -315,17 +313,7 @@ export function NewTokenDialog({
       }
     >
       {secret ? (
-        <CodeBlock
-          code={tokenLine(secret)}
-          label="Token"
-          onCopied={(ok) =>
-            toast.show(
-              ok
-                ? { message: "Token line copied", tone: "success" }
-                : { message: "Select the line and copy it.", tone: "error" },
-            )
-          }
-        />
+        <CodeBlock code={tokenLine(secret)} label="Token" onCopied={copied} />
       ) : (
         <form id="token-form" className="set-form" noValidate onSubmit={save}>
           <Field
@@ -374,7 +362,7 @@ export function NewTokenDialog({
  */
 export function ConnectSnippet({ origin }: { origin: string }) {
   const [client, setClient] = useState<ClientId>("plugin");
-  const toast = useToast();
+  const copied = useCopied("Configuration");
   const base = origin.replace(/\/$/, "");
   return (
     <div className="set-connect">
@@ -397,24 +385,11 @@ export function ConnectSnippet({ origin }: { origin: string }) {
           label={
             client === "plugin" ? "Claude Code commands" : "MCP configuration"
           }
-          onCopied={(ok) =>
-            toast.show(
-              ok
-                ? { message: "Configuration copied", tone: "success" }
-                : {
-                    message: "Select the configuration and copy it.",
-                    tone: "error",
-                  },
-            )
-          }
+          onCopied={copied}
         />
-        {client === "plugin" && (
-          <p className="set-row-desc">
-            Run them in Claude Code: the plugin brings the connection and the
-            skills.
-          </p>
-        )}
-        {CHECKS[client] && <p className="set-row-desc">{CHECKS[client]}</p>}
+        {client === "plugin" || client === "claude" ? (
+          <p className="set-row-desc">{CLAUDE_CHECK}</p>
+        ) : null}
       </div>
       <p className="set-row-desc">
         The token stays in OPENINGS_TOKEN, never in a file. Scripts use the REST

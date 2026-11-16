@@ -179,17 +179,11 @@ type TestState = {
   result: TestResult | null;
   error: string;
   /** While the text arrives: how many postings have it, of how many. */
-  fetched: number;
-  fetching: number;
+  fetched?: number;
+  fetching?: number;
 };
 
-const IDLE: TestState = {
-  phase: "idle",
-  result: null,
-  error: "",
-  fetched: 0,
-  fetching: 0,
-};
+const IDLE: TestState = { phase: "idle", result: null, error: "" };
 
 const refused = (result: TestResult) =>
   (result.diagnostics ?? []).some(
@@ -221,8 +215,7 @@ export function useSourceTest() {
       const waiting = twoSteps
         ? result.items.filter((item) => !hasText(item) && item.source_key)
         : [];
-      let fetched = 0;
-      for (const item of waiting) {
+      for (const [fetched, item] of waiting.entries()) {
         setState({
           ...IDLE,
           phase: "details",
@@ -238,7 +231,6 @@ export function useSourceTest() {
         if (!current()) return;
         // A refusal keeps the titles the listing gave and stops asking.
         result = withText(result, answer);
-        fetched += 1;
         if (refused(answer)) break;
       }
       setState({ ...IDLE, phase: "done", result });

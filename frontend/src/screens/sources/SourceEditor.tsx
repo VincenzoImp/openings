@@ -596,8 +596,8 @@ function TestResults({
   preview: TestResult | null;
   error: string;
   phase: TestPhase;
-  fetched: number;
-  fetching: number;
+  fetched?: number;
+  fetching?: number;
   labels: Record<string, string>;
   /** Offered after an empty or refused search: follow a careers page. */
   onCareers?: () => void;

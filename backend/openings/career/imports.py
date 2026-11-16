@@ -11,6 +11,11 @@ from ..errors import DomainError
 from .models import DEFAULT_PROFILE, CareerImport, EntryCreate, ImportPreview, ProfileUpdate
 from .records import values
 
+KEPT_WHOLE = (
+    "Kept as one entry. Your agent can split it into roles and education "
+    "(“Split my CV into career entries”)."
+)
+
 
 class ImportOperations:
     """Previewing and applying a career import."""
@@ -24,10 +29,7 @@ class ImportOperations:
             return {
                 "entries": [item.model_dump()],
                 # Said in words: the whole text is one entry, and an agent can split it.
-                "warnings": [
-                    "Kept as one entry. Your agent can split it into roles and education "
-                    "(“Split my CV into career entries”)."
-                ],
+                "warnings": [KEPT_WHOLE],
             }
         if isinstance(data, list):
             data = {"entries": data}

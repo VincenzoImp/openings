@@ -1,16 +1,15 @@
-import { useState, type KeyboardEvent, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Button } from "./Button";
 import { Field, Input, Select } from "./Field";
 import { Chip } from "./Tabs";
 import { LANGUAGES, languageCode, languageName } from "./languages";
 import "./languages.css";
 
-const OTHER = "other";
-
 /**
  * The languages someone speaks, shared by Setup and Preferences: a removable
  * chip for each, the same list to add from, and "Other language…" for any
- * other, by its name or its ISO 639-1 code.
+ * other, by its English name or its ISO 639-1 code; the hint names the
+ * language it reads.
  */
 export function LanguagePicker({
   value,
@@ -25,29 +24,15 @@ export function LanguagePicker({
   children?: ReactNode;
 }) {
   const [other, setOther] = useState<string | null>(null);
-  const [invalid, setInvalid] = useState(false);
-  const offered = LANGUAGES.filter(([code]) => !value.includes(code));
-  function addOther() {
-    const code = languageCode(other ?? "");
-    if (!code) return setInvalid(true);
+  const code = other ? languageCode(other) : null;
+  const add = (code: string) => {
     if (!value.includes(code)) onChange([...value, code]);
     setOther(null);
-    setInvalid(false);
-  }
-  function onKey(event: KeyboardEvent<HTMLInputElement>) {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      addOther();
-    } else if (event.key === "Escape") {
-      event.stopPropagation();
-      setOther(null);
-      setInvalid(false);
-    }
-  }
+  };
   return (
     <div className="ui-lang-picker">
       {value.length > 0 && (
-        <ul className="ui-lang-chips" aria-label="Languages you speak">
+        <ul className="ui-lang-chips">
           {value.map((code) => (
             <li key={code}>
               <Chip
@@ -67,19 +52,21 @@ export function LanguagePicker({
             aria-label="Add a language"
             value=""
             disabled={disabled}
-            onChange={(event) => {
-              const code = event.target.value;
-              if (code === OTHER) setOther("");
-              else if (code) onChange([...value, code]);
-            }}
+            onChange={(event) =>
+              event.target.value === "other"
+                ? setOther("")
+                : event.target.value && add(event.target.value)
+            }
           >
             <option value="">Add a language…</option>
-            {offered.map(([code, name]) => (
-              <option key={code} value={code}>
-                {name}
-              </option>
-            ))}
-            <option value={OTHER}>Other language…</option>
+            {LANGUAGES.filter(([code]) => !value.includes(code)).map(
+              ([code, name]) => (
+                <option key={code} value={code}>
+                  {name}
+                </option>
+              ),
+            )}
+            <option value="other">Other language…</option>
           </Select>
           {children}
         </div>
@@ -87,11 +74,10 @@ export function LanguagePicker({
         <div className="ui-lang-other">
           <Field
             label="Other language"
-            hint="Its English name or its two-letter ISO code, such as Yoruba or yo."
-            error={
-              invalid
-                ? "No language goes by that name or code; try its English name."
-                : undefined
+            hint={
+              code
+                ? `Adds ${languageName(code)}.`
+                : "Its English name or ISO code, such as Yoruba or yo."
             }
           >
             <Input
@@ -99,29 +85,23 @@ export function LanguagePicker({
               maxLength={60}
               autoFocus
               autoComplete="off"
-              onChange={(event) => {
-                setOther(event.target.value);
-                setInvalid(false);
+              onChange={(event) => setOther(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key !== "Enter") return;
+                event.preventDefault();
+                if (code) add(code);
               }}
-              onKeyDown={onKey}
             />
           </Field>
           <div className="ui-lang-add">
             <Button
               size="sm"
-              disabled={disabled || !other.trim()}
-              onClick={addOther}
+              disabled={disabled || !code}
+              onClick={() => code && add(code)}
             >
               Add
             </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => {
-                setOther(null);
-                setInvalid(false);
-              }}
-            >
+            <Button size="sm" variant="ghost" onClick={() => setOther(null)}>
               Cancel
             </Button>
           </div>

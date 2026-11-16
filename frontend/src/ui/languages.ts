@@ -4,24 +4,14 @@
 // come from the browser (Intl.DisplayNames, in English). No React and no
 // imports: tested directly (tests/languages.test.mjs).
 
-let names: Intl.DisplayNames | null | undefined;
+const names = new Intl.DisplayNames(["en"], {
+  type: "language",
+  fallback: "none",
+});
 
-function displayName(code: string) {
-  if (names === undefined)
-    try {
-      names = new Intl.DisplayNames(["en"], {
-        type: "language",
-        fallback: "none",
-      });
-    } catch {
-      names = null;
-    }
-  try {
-    return names?.of(code);
-  } catch {
-    return undefined;
-  }
-}
+/** A two-letter code's English name, or nothing for a code no language has. */
+const displayName = (code: string) =>
+  /^[a-z]{2}$/.test(code) ? names.of(code) : undefined;
 
 /** A code's English name: "de" is German, "yo" Yoruba; else the code itself. */
 export const languageName = (code: string) =>
@@ -45,7 +35,7 @@ export const REQUIREMENT_LANGUAGES =
   "en de fr it es nl pt pl sv da no fi cs ru ja zh ar tr ko".split(" ");
 
 /** What hiding the jobs that require another language can read. */
-export const REQUIREMENT_LIMIT = `Jobs reads a language requirement in ${REQUIREMENT_LANGUAGES.length} languages; a posting that requires any other is never hidden.`;
+export const REQUIREMENT_LIMIT = `Jobs reads requirements in ${REQUIREMENT_LANGUAGES.length} languages; one requiring another is never hidden.`;
 
 /**
  * What a person typed as another language, as a code to store: a two-letter
@@ -54,7 +44,7 @@ export const REQUIREMENT_LIMIT = `Jobs reads a language requirement in ${REQUIRE
  */
 export function languageCode(typed: string) {
   const value = typed.trim().toLowerCase();
-  if (/^[a-z]{2}$/.test(value)) return displayName(value) ? value : null;
+  if (value.length < 3) return displayName(value) ? value : null;
   for (let first = 97; first <= 122; first += 1)
     for (let second = 97; second <= 122; second += 1) {
       const code = String.fromCharCode(first, second);
