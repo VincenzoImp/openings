@@ -5366,6 +5366,11 @@ export interface components {
       feedback: {
         [key: string]: unknown;
       }[];
+      /**
+       * Feedback More
+       * @description true: more corrections matched than feedback lists (the newest 30); read the earlier ones with feedback_since.
+       */
+      feedback_more?: boolean | null;
       /** Preferences */
       preferences: {
         [key: string]: unknown;

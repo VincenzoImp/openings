@@ -118,6 +118,10 @@ class WorkspaceContext(Out):
     feedback: list[Json] = Field(
         default=[], description="The owner's corrections of agent work since the previous read."
     )
+    feedback_more: bool | None = Field(
+        default=None,
+        description="true: more corrections matched than feedback lists (the newest 30); read the earlier ones with feedback_since.",
+    )
 
 
 class Event(Out):
