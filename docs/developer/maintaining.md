@@ -125,3 +125,6 @@ equal to it.
 The `ghcr.io/vincenzoimp/openings` package is public. The release jobs push to
 Docker Hub with the `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` secrets and to GHCR
 with the workflow's own token (`packages: write` on the publishing jobs only).
+The Docker Hub overview is edited by hand from `docs/dockerhub.md`; set the
+repository variable `DOCKERHUB_DESCRIPTION_SYNC` to `true` and add a Read, Write,
+Delete token as `DOCKERHUB_DESCRIPTION_TOKEN` to sync it on every final release.

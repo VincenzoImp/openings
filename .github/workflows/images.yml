@@ -336,9 +336,14 @@ jobs:
 
   # The Docker Hub overview follows the newest final release: docs/dockerhub.md
   # and the short description below (scripts/check_package.py checks both sizes).
+  # The Docker Hub page is edited by hand unless the repository variable
+  # DOCKERHUB_DESCRIPTION_SYNC is "true"; the sync needs a Docker Hub token with
+  # Read, Write, Delete in DOCKERHUB_DESCRIPTION_TOKEN.
   hub-description:
     needs: [version, publish]
-    if: needs.version.outputs.prerelease == 'false' && needs.version.outputs.latest == 'true'
+    if: >-
+      vars.DOCKERHUB_DESCRIPTION_SYNC == 'true' &&
+      needs.version.outputs.prerelease == 'false' && needs.version.outputs.latest == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
