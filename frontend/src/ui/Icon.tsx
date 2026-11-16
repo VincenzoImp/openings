@@ -113,21 +113,16 @@ export function StatusGlyph({ stage }: { stage: Stage }) {
   );
 }
 
-/** The brand mark: a ring with a notch, on the primary fill. */
+/**
+ * The brand mark, "Doorway": the tile is a wall, the mark the light through
+ * an opening at its foot. The primary fill with the opening in on-primary,
+ * so it inverts with the theme; the favicon (favicon.svg) is the same figure.
+ */
 export function BrandMark({ size = 24 }: { size?: number }) {
   return (
     <span className="ui-mark" style={{ width: size, height: size }}>
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="3"
-        strokeLinecap="round"
-        aria-hidden="true"
-        focusable="false"
-      >
-        <circle cx="12" cy="12" r="7" />
-        <path d="M12 5v4" />
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M8 24V11.5a4 4 0 0 1 8 0V24Z" fill="currentColor" />
       </svg>
     </span>
   );

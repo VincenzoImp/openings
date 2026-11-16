@@ -483,6 +483,7 @@ export function JobDetail({
               {...props}
               icon={Ellipsis}
               label="More actions"
+              tipAlign="end"
               size="sm"
             />
           )}

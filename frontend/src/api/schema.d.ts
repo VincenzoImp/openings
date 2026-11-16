@@ -5559,7 +5559,9 @@ export interface operations {
         priority?: number | null;
         q?: string;
         ready?: boolean | null;
+        /** @description relevance: q's best matches first, then updated. */
         sort?:
+          | "relevance"
           | "updated"
           | "newest"
           | "oldest"
@@ -8780,8 +8782,9 @@ export interface operations {
               | "pending"
             )
           | null;
-        /** @description dismissed: latest dismissal first. */
-        sort?: "newest" | "oldest" | "company" | "title" | "dismissed";
+        /** @description relevance: q's best matches first, then newest; dismissed: latest dismissal first. */
+        sort?:
+          "relevance" | "newest" | "oldest" | "company" | "title" | "dismissed";
         /** @description The source a job summary names: a board or ATS (such as greenhouse), or manual. */
         source?: string | null;
         /** @description Jobs this saved source found. */

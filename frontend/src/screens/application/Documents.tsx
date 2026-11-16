@@ -207,7 +207,7 @@ export function useDocumentUpload(
       hidden
       multiple
       accept=".pdf,application/pdf,.tex,.ltx"
-      aria-label={`Upload PDF of the ${KIND_LABEL[kind]}`}
+      aria-label={`Upload PDF of the ${kind === "cv" ? "CV" : "letter"}`}
       onChange={(event) => {
         if (event.target.files?.length) send(event.target.files);
         event.target.value = "";
@@ -600,7 +600,7 @@ export function SentDocuments({ current }: { current: Current }) {
   const open = docs.find((item) => item.kind === shown);
   return (
     <section className="ap-section" aria-labelledby="ap-sent-title">
-      <h2 className="ap-section-title" id="ap-sent-title">
+      <h2 className="ui-section-title" id="ap-sent-title">
         Sent documents
       </h2>
       <ul className="ap-sent">

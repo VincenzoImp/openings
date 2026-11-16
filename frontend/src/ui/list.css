@@ -100,7 +100,8 @@
     white-space: nowrap;
   }
   .ui-row-title {
-    font: 500 13.5px/18px var(--font);
+    font: var(--t-row);
+    font-weight: var(--w-medium);
   }
   .ui-row-sub {
     font: var(--t-xs);

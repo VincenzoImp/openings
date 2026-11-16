@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { ArrowRight, EyeOff, Pencil, Plus, X } from "lucide-react";
-import { Button, Tag, Select, Icon, useToast } from "../../ui";
+import { Button, Chip, Tag, Select, Icon, useToast } from "../../ui";
 import { isConflict } from "../../query/mutation";
 import {
   useSaveSettings,
@@ -71,19 +71,15 @@ export function Languages({ settings }: { settings: Settings }) {
             <ul className="pref-chips" aria-label="Languages I speak">
               {spoken.map((code) => (
                 <li key={code}>
-                  <span className="pref-chip">
+                  <Chip
+                    removeLabel={`Remove ${languageName(code)}`}
+                    disabled={save.isPending}
+                    onRemove={() =>
+                      change(spoken.filter((other) => other !== code))
+                    }
+                  >
                     {languageName(code)}
-                    <button
-                      type="button"
-                      aria-label={`Remove ${languageName(code)}`}
-                      disabled={save.isPending}
-                      onClick={() =>
-                        change(spoken.filter((other) => other !== code))
-                      }
-                    >
-                      <Icon icon={X} size="sm" />
-                    </button>
-                  </span>
+                  </Chip>
                 </li>
               ))}
             </ul>
@@ -184,7 +180,7 @@ export function FollowingUp({ settings }: { settings: Settings }) {
   };
   return (
     <section className="pref-section" aria-labelledby={`${id}-title`}>
-      <h2 id={`${id}-title`} className="pref-title">
+      <h2 id={`${id}-title`} className="ui-section-title pref-title">
         Following up
       </h2>
       {draft === null ? (

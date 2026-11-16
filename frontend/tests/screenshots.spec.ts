@@ -8,10 +8,10 @@ import { blockButton, call, go } from "./session";
 
 // Images of every screen for visual review, not a pixel comparison: `npm run
 // screenshots` writes them to frontend/screenshots/ (desktop 1440×1000 and
-// mobile 390×844, light and dark), and CI uploads them as the `screenshots`
-// artifact of a pull request that changes the dashboard. `npm run screenshots
-// -- --docs` writes the images the user documentation and the README embed to
-// docs/images/ instead. A new screen or a key state (empty, populated, dialog
+// mobile 390×844, light and dark, and the document screens at 1920 px in
+// light), and CI uploads them as the `screenshots` artifact of a pull request
+// that changes the dashboard. `npm run screenshots -- --docs` writes the
+// images the user documentation and the README embed to docs/images/ instead. A new screen or a key state (empty, populated, dialog
 // open) gets one line in SCREENS.
 //
 // The images show a curated synthetic workspace (`dashboard_server.py --demo`:
@@ -134,6 +134,8 @@ type Screen = {
   before?: (page: Page) => Promise<void>;
   /** On a phone the state is a full-screen sheet: capture the viewport. */
   sheet?: boolean;
+  /** Also at 1920 px (light), where a document's centring shows. */
+  wide?: true;
 };
 
 // Job sources and Settings (#227). The browser-test server collects nothing,
@@ -239,7 +241,7 @@ const SOURCES_AND_SETTINGS: Screen[] = [
       await expect(editor.getByText("14 jobs found")).toBeVisible();
     },
   },
-  { name: "settings", route: "settings" },
+  { name: "settings", route: "settings", wide: true },
   { name: "settings-account", route: "settings?section=account" },
   {
     name: "settings-agents",
@@ -340,7 +342,13 @@ const SCREENS: Screen[] = [
   { name: "setup-jobs", route: "setup?step=jobs", workspace: "empty" },
   { name: "setup-cv", route: "setup?step=cv", workspace: "empty" },
   { name: "setup-done", route: "setup?step=done", workspace: "empty" },
-  { name: "today", route: "today", docs: "today", docsDark: "today-dark" },
+  {
+    name: "today",
+    route: "today",
+    docs: "today",
+    docsDark: "today-dark",
+    wide: true,
+  },
   { name: "today-caught-up", route: "today", prepare: caughtUp },
   { name: "today-empty", route: "today", workspace: "empty" },
   {
@@ -391,6 +399,7 @@ const SCREENS: Screen[] = [
       `applications/${await first(page, "/applications?stage=ready&sort=deadline&limit=1")}`,
     docs: "ready",
     open: settledScreen,
+    wide: true,
   },
   {
     name: "application-after-mark-applied",
@@ -412,6 +421,7 @@ const SCREENS: Screen[] = [
     route: async (page) =>
       `applications/${await first(page, "/applications?stage=interview&limit=1")}`,
     open: settledScreen,
+    wide: true,
   },
   {
     name: "application-record-reply",
@@ -432,6 +442,7 @@ const SCREENS: Screen[] = [
     name: "jobs-selected",
     route: async (page) =>
       `jobs?job=${await first(page, "/jobs?signal=likely_duplicate&triage=new&limit=1")}`,
+    wide: true,
   },
   {
     name: "jobs-bulk",
@@ -475,7 +486,7 @@ const SCREENS: Screen[] = [
       await expect(page.locator("dialog[open]")).toBeVisible();
     },
   },
-  { name: "profile", route: "profile", docs: "profile" },
+  { name: "profile", route: "profile", docs: "profile", wide: true },
   {
     name: "profile-edit-header",
     sheet: true,
@@ -516,7 +527,12 @@ const SCREENS: Screen[] = [
     },
   },
   { name: "profile-empty", route: "profile", workspace: "empty" },
-  { name: "preferences", route: "preferences", docs: "preferences" },
+  {
+    name: "preferences",
+    route: "preferences",
+    docs: "preferences",
+    wide: true,
+  },
   {
     name: "preferences-editing",
     route: "preferences",
@@ -549,6 +565,8 @@ const VIEWPORTS = {
   desktop: { width: 1440, height: 1000 },
   mobile: { width: 390, height: 844 },
 };
+// The documents centred in a wide pane, for review in a pull request.
+const WIDE = { width: 1920, height: 1000 };
 const THEMES = ["light", "dark"] as const;
 
 async function capture(
@@ -645,4 +663,75 @@ for (const [size, viewport] of Object.entries(VIEWPORTS))
               animations: "disabled",
             });
           });
+      });
+
+if (!DOCS)
+  test.describe("wide light demo", () => {
+    test.use({ viewport: WIDE, workspace: "demo" });
+    test.setTimeout(200_000);
+    test.beforeEach(async ({ page }) => {
+      await page.addInitScript(() => {
+        try {
+          localStorage.setItem("openings-theme", "light");
+        } catch {}
+      });
+    });
+    for (const screen of SCREENS.filter((item) => item.wide))
+      test(screen.name, async ({ page, session }) => {
+        const path = join(
+          ROOT,
+          "frontend/screenshots/wide-light",
+          `${screen.name}.png`,
+        );
+        await capture(page, session, screen, path);
+      });
+  });
+
+// The favicon at 16 px in a browser's tab strip, beside other tabs, in both
+// schemes and at 1x and 2x: the size at which a mark must still read.
+if (!DOCS)
+  for (const scheme of ["light", "dark"] as const)
+    for (const scale of [1, 2])
+      test.describe(`tab strip ${scheme} ${scale}x`, () => {
+        test.use({
+          viewport: { width: 560, height: 56 },
+          deviceScaleFactor: scale,
+          colorScheme: scheme,
+          workspace: "demo",
+        });
+        test("favicon", async ({ page }) => {
+          await page.goto("/");
+          const icon = await page
+            .locator('link[rel="icon"][type="image/svg+xml"]')
+            .getAttribute("href");
+          const src = new URL(icon!, page.url()).href;
+          const dark = scheme === "dark";
+          const tab = (title: string, mark: string, active = false) =>
+            `<div class="tab${active ? " on" : ""}">${mark}<span>${title}</span></div>`;
+          const dot = (color: string) => `<i style="background:${color}"></i>`;
+          await page.setContent(`<!doctype html><style>
+            body { margin: 0; font: 12px system-ui, sans-serif;
+              color-scheme: ${scheme}; background: ${dark ? "#202124" : "#dee1e6"}; }
+            .strip { display: flex; gap: 2px; padding: 8px 8px 0; }
+            .tab { display: flex; align-items: center; gap: 8px; width: 120px;
+              height: 34px; padding: 0 10px; border-radius: 8px 8px 0 0;
+              color: ${dark ? "#e8eaed" : "#3c4043"}; }
+            .tab.on { background: ${dark ? "#35363a" : "#ffffff"}; }
+            .tab img, .tab i { flex: none; width: 16px; height: 16px; }
+            .tab i { border-radius: 50%; }
+          </style><div class="strip">
+            ${tab("Inbox (3)", dot("#1a73e8"))}
+            ${tab("Openings", `<img src="${src}" alt="">`, true)}
+            ${tab("Calendar", dot("#188038"))}
+            ${tab("Docs", dot("#f9ab00"))}
+          </div>`);
+          await page.waitForLoadState("networkidle");
+          await page.screenshot({
+            path: join(
+              ROOT,
+              "frontend/screenshots/tab-strip",
+              `${scheme}-${scale}x.png`,
+            ),
+          });
+        });
       });

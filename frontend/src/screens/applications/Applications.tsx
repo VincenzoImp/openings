@@ -16,7 +16,7 @@ import { List, ListGroup, ListRows, useSelection } from "../../ui/List";
 import { Menu, type MenuEntry, type MenuGroup } from "../../ui/Menu";
 import { LoadError } from "../../ui/LoadError";
 import { EmptyState, PageHeader, SkeletonRows } from "../../ui/Page";
-import { FilterChips, Segmented, Tabs } from "../../ui/Tabs";
+import { FilterChips, Segmented, Tabs, Toolbar } from "../../ui/Tabs";
 import { useToast } from "../../ui/Toast";
 import { BulkActions } from "./Bulk";
 import {
@@ -322,6 +322,7 @@ export default function ApplicationsScreen() {
     );
     body = (
       <List
+        pageKeys
         label="Applications"
         activeId={active ?? rows[0].id}
         onActiveChange={setActive}
@@ -390,7 +391,9 @@ export default function ApplicationsScreen() {
           <IconButton
             icon={Search}
             label="Search applications"
+            size="touch"
             tooltip="none"
+            data-topbar-search=""
             aria-pressed={searching}
             onClick={() => setSearching((value) => !value)}
           />
@@ -405,26 +408,22 @@ export default function ApplicationsScreen() {
                 {...props}
                 icon={ListFilter}
                 label="Filter"
+                size="touch"
                 tooltip="none"
               />
             )}
           />
         )}
-        <Button
-          variant="ghost"
-          size="sm"
+        <IconButton
           icon={filters.stats ? ListIcon : ChartNoAxesColumn}
+          label={filters.stats ? "List" : "Stats"}
+          size="touch"
+          tooltip="none"
           onClick={() => set({ stats: !filters.stats })}
-        >
-          {filters.stats ? "List" : "Stats"}
-        </Button>
+        />
       </TopBarActions>
       {filters.stats ? (
-        <div
-          className="ui-toolbar ap-toolbar"
-          role="toolbar"
-          aria-label="Period"
-        >
+        <Toolbar label="Period">
           <Segmented
             label="Period"
             value={period}
@@ -433,60 +432,59 @@ export default function ApplicationsScreen() {
             }
             options={PERIODS}
           />
-        </div>
+        </Toolbar>
       ) : selected.length ? (
         <BulkActions selected={selected} onClear={selection.clear} />
       ) : (
-        <div
-          className="ui-toolbar ap-toolbar"
-          role="toolbar"
-          aria-label="Applications"
+        <Toolbar
+          label="Applications"
+          tools={
+            <>
+              <SearchField
+                label="Search applications"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+              />
+              <Menu
+                label="Filter"
+                placement="bottom-end"
+                items={filterMenu(filters, sources, set, false)}
+                trigger={(props) => (
+                  <Button {...props} variant="ghost" icon={ListFilter}>
+                    Filter
+                  </Button>
+                )}
+              />
+              <Menu
+                label="Sort"
+                placement="bottom-end"
+                items={SORTS.map((sort) => ({
+                  id: sort.id,
+                  label: sort.label,
+                  kind: "radio",
+                  checked: filters.sort === sort.id,
+                  onSelect: () => set({ sort: sort.id }),
+                }))}
+                trigger={(props) => (
+                  <Button
+                    {...props}
+                    variant="ghost"
+                    icon={ArrowDownUp}
+                    aria-label={`Sort: ${sortLabel}`}
+                  >
+                    {sortLabel}
+                  </Button>
+                )}
+              />
+            </>
+          }
         >
           <StageTabs
             value={filters.stage}
             counts={list.data && !list.isError ? list.counts : null}
             onChange={(stage) => set({ stage })}
           />
-          <div className="ap-tools">
-            <SearchField
-              label="Search applications"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-            />
-            <Menu
-              label="Filter"
-              placement="bottom-end"
-              items={filterMenu(filters, sources, set, false)}
-              trigger={(props) => (
-                <Button {...props} variant="ghost" size="sm" icon={ListFilter}>
-                  Filter
-                </Button>
-              )}
-            />
-            <Menu
-              label="Sort"
-              placement="bottom-end"
-              items={SORTS.map((sort) => ({
-                id: sort.id,
-                label: sort.label,
-                kind: "radio",
-                checked: filters.sort === sort.id,
-                onSelect: () => set({ sort: sort.id }),
-              }))}
-              trigger={(props) => (
-                <Button
-                  {...props}
-                  variant="ghost"
-                  size="sm"
-                  icon={ArrowDownUp}
-                  aria-label={`Sort: ${sortLabel}`}
-                >
-                  {sortLabel}
-                </Button>
-              )}
-            />
-          </div>
-        </div>
+        </Toolbar>
       )}
       {!filters.stats && searching && (
         <div className="ap-search-row">

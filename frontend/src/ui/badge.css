@@ -16,7 +16,8 @@
     border-radius: var(--r-full);
     background: var(--accent);
     color: var(--on-accent);
-    font: 600 11px/1 var(--font);
+    font: var(--t-micro);
+    font-weight: var(--w-semibold);
     letter-spacing: 0;
     font-variant-numeric: tabular-nums;
   }

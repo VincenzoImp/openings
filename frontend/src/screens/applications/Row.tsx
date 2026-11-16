@@ -87,7 +87,8 @@ export function rowMenu(
 /**
  * One application: role, company and place, then its one status phrase. The
  * stage glyph shows only where stages mix (`mixed`); in a stage tab or group
- * the phrase says the rest (a Ready row: its deadline). On hover, focus or
+ * the phrase says the rest (a Ready row: its deadline, and the salary to
+ * state when one is set). On hover, focus or
  * selection the phrase gives way to the stage's action (Apply, Record reply)
  * and the `…` menu.
  */
@@ -143,6 +144,11 @@ export function ApplicationRowView({
             <span className="ap-sub-status">
               {" · "}
               <ToneText tone={phrase.tone}>{phrase.text}</ToneText>
+            </span>
+          )}
+          {stage === "ready" && app.salary && (
+            <span className="ap-sub-salary">
+              {" · "}Salary {app.salary}
             </span>
           )}
         </>

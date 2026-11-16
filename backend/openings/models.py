@@ -538,8 +538,9 @@ class JobQuery(Input):
         default=None,
         description="true hides jobs requiring a language outside spoken_languages; unspoken_required counts them.",
     )
-    sort: Literal["newest", "oldest", "company", "title", "dismissed"] = Field(
-        default="newest", description="dismissed: latest dismissal first."
+    sort: Literal["relevance", "newest", "oldest", "company", "title", "dismissed"] = Field(
+        default="relevance",
+        description="relevance: q's best matches first, then newest; dismissed: latest dismissal first.",
     )
     limit: int = Field(default=50, ge=1, le=200)
     offset: int = Field(default=0, ge=0)
@@ -585,6 +586,7 @@ class ApplicationQuery(Input):
     applied_since: Since | None = None
     applied_until: Until | None = None
     sort: Literal[
+        "relevance",
         "updated",
         "newest",
         "oldest",
@@ -594,7 +596,7 @@ class ApplicationQuery(Input):
         "deadline",
         "priority",
         "needs",
-    ] = "updated"
+    ] = Field(default="relevance", description="relevance: q's best matches first, then updated.")
     limit: int = Field(default=100, ge=1, le=200)
     offset: int = Field(default=0, ge=0)
 

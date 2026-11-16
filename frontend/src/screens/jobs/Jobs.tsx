@@ -30,7 +30,7 @@ import { BulkBar, useSelection } from "../../ui/List";
 import { LoadError } from "../../ui/LoadError";
 import { Menu, Popover, type MenuEntry } from "../../ui/Menu";
 import { EmptyState, PageHeader, SkeletonRows } from "../../ui/Page";
-import { SplitPane } from "../../ui/Split";
+import { SplitPane, useMedia } from "../../ui/Split";
 import { FilterChips, Tabs, Toolbar } from "../../ui/Tabs";
 import { useToast } from "../../ui/Toast";
 import {
@@ -70,18 +70,6 @@ import { useSeen } from "./seen";
 import "./jobs.css";
 
 const PAGE = 200;
-
-function useMedia(query: string) {
-  const [matches, setMatches] = useState(() => matchMedia(query).matches);
-  useEffect(() => {
-    const list = matchMedia(query);
-    const change = () => setMatches(list.matches);
-    change();
-    list.addEventListener("change", change);
-    return () => list.removeEventListener("change", change);
-  }, [query]);
-  return matches;
-}
 
 const title = (job: { title?: string }) => `“${job.title || "Untitled role"}”`;
 /** What a decision is called in a sentence: "Couldn't dismiss …". */
@@ -743,7 +731,7 @@ export default function Jobs() {
         </Button>
       }
     >
-      Search looks at titles, companies and posting text.
+      Search looks at titles, companies, locations and posting text.
     </EmptyState>
   ) : view.section === "new" ? (
     <EmptyState
@@ -783,6 +771,9 @@ export default function Jobs() {
       Add a posting by its address, or set up a source that finds jobs.
     </EmptyState>
   );
+  // A job asked for by its address is shown even when the list around it is
+  // empty: the empty message then takes the list's place only.
+  const emptyPanel = <div className="jobs-empty">{emptyState}</div>;
 
   return (
     <div className="jobs" data-pushed={(!wide && open) || undefined}>
@@ -793,6 +784,7 @@ export default function Jobs() {
           label="Search jobs"
           size="touch"
           tooltip="none"
+          data-topbar-search=""
           aria-pressed={searching}
           onClick={() => setSearching((value) => !value)}
         />
@@ -858,8 +850,8 @@ export default function Jobs() {
         role="tabpanel"
         aria-labelledby={`jobs-tab-${view.section}`}
       >
-        {empty ? (
-          <div className="jobs-empty">{emptyState}</div>
+        {empty && !view.job ? (
+          emptyPanel
         ) : (
           <SplitPane
             open={open}
@@ -868,6 +860,8 @@ export default function Jobs() {
             list={
               list.isPending ? (
                 <SkeletonRows rows={8} />
+              ) : empty ? (
+                emptyPanel
               ) : (
                 <JobList
                   view={view}
@@ -950,10 +944,12 @@ export default function Jobs() {
         onClose={() => setForgetting(null)}
         onConfirm={() => forgetting && void decide(forgetting, "forget")}
       >
-        {forgetting?.length === 1 ? "The job is" : "The jobs are"} deleted with
-        their applications, notes and files, and cannot be restored. If a source
-        finds one again, it comes back as a new job. To stop seeing a job and
-        keep its history, dismiss it instead.
+        {forgetting?.length === 1
+          ? "The job is deleted with its"
+          : "The jobs are deleted with their"}{" "}
+        applications, notes and files, and cannot be restored. If a source finds
+        one again, it comes back as a new job. To stop seeing a job and keep its
+        history, dismiss it instead.
       </ConfirmDialog>
     </div>
   );

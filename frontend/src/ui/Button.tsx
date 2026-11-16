@@ -69,6 +69,8 @@ export const IconButton = forwardRef<
     size?: "md" | "sm" | "touch";
     raised?: boolean;
     tooltip?: "below" | "above" | "none";
+    /** The tooltip starts or ends with the button, for a button at a pane's edge. */
+    tipAlign?: "start" | "end";
   }
 >(function IconButton(
   {
@@ -78,6 +80,7 @@ export const IconButton = forwardRef<
     size = "md",
     raised = false,
     tooltip = "below",
+    tipAlign,
     className,
     type = "button",
     ...rest
@@ -95,6 +98,7 @@ export const IconButton = forwardRef<
       aria-keyshortcuts={shortcut}
       data-tip={tooltip === "none" ? undefined : tooltip}
       data-tip-text={shortcut ? `${label}  ${shortcut}` : label}
+      data-tip-align={tipAlign}
       {...rest}
     >
       <Icon

@@ -64,8 +64,3 @@ export const NAV_ITEMS = NAV.flatMap((section) => section.items);
 
 /** The phone's bottom bar; the rest is under More. */
 export const BOTTOM: RouteId[] = ["today", "jobs", "applications", "profile"];
-
-export const NEEDS_LABEL = {
-  newJobs: "new jobs",
-  readyApplications: "ready applications",
-};

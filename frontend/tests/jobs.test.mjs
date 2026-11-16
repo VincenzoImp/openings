@@ -65,6 +65,29 @@ test("the address gives the tab, the order and the filters, and only differences
   assert.equal(view("section=shortlisted").section, "new");
 });
 
+test("a link to a job opens the tab that lists it", () => {
+  const cases = [
+    ["new", "new"],
+    ["shortlisted", "all"],
+    ["dismissed", "dismissed"],
+    [undefined, "all"],
+  ];
+  for (const [triage, section] of cases) {
+    const link = model.jobLink("j7", triage);
+    const query = new URLSearchParams(
+      Object.entries(link).filter(([, value]) => value),
+    );
+    const read = model.readView(query);
+    assert.equal(read.section, section, triage);
+    assert.equal(read.job, "j7");
+    // Written back, the address is the same link.
+    const written = Object.fromEntries(
+      Object.entries(model.viewQuery(read)).filter(([, value]) => value),
+    );
+    assert.deepEqual(written, link);
+  }
+});
+
 test("the list request names the tab, the filters and always the languages switch", () => {
   const fresh = model.listQuery(view("q=rust&source=linkedin"), 200);
   assert.equal(fresh.triage, "new");

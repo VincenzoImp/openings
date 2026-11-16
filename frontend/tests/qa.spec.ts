@@ -45,7 +45,6 @@ test("every stage tab of Applications is visible at tablet widths (#421)", async
     test.info().project.name !== "chromium",
     "Widths are set by the test; one project is enough.",
   );
-  test.fail(true, "#421: the stage tabs are cut off below about 1280 px.");
   for (const width of [768, 1024]) {
     await page.setViewportSize({ width, height: 900 });
     await go(page, "applications");
@@ -72,7 +71,6 @@ test("j and x act on Applications without focusing a row first (#422)", async ({
     (page.viewportSize()?.width ?? 1440) < 720,
     "A phone has no list keys.",
   );
-  test.fail(true, "#422: the list keys need a focused row.");
   await go(page, "applications");
   await settled(page);
   await expect(heading(page)).toHaveText("Applications");

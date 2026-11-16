@@ -61,6 +61,9 @@ test("a new workspace starts a working CV in one click", async ({ page }) => {
 
   // The letter example and an uploaded .tex file, from New template.
   const create = async (item: string | RegExp) => {
+    // On a phone the open template is the whole page: back to the list.
+    if (isPhone(page))
+      await page.getByRole("button", { name: "Back to templates" }).click();
     await page
       .getByRole("button", { name: "New template" })
       .filter({ visible: true })

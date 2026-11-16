@@ -1,15 +1,20 @@
 """Application reads: computed Ready, preparation summaries, lists and history."""
 
-import re
-
 from ..common import decode_record
 from ..errors import DomainError, missing
 from ..models import OUTCOMES
 from ..outcomes import last_replies, no_reply_cutoff, no_reply_period, replies_of
 from .jobs import JOB_SOURCE_SQL
 from .readiness import MISSING_DOCUMENTS_SQL, READY_SQL, readiness
+from .search import search_sql
 
 STAGES = ("shortlisted", "applied", "interview", "offer", "closed")
+
+# The words that name a stage in a search: "interview" finds the interviews.
+APPLICATION_STATES = {
+    **{stage: f"app.status='{stage}'" for stage in STAGES},
+    "ready": READY_SQL,
+}
 
 REQUIREMENT_COUNTS_SQL = (
     "(SELECT count(*) FROM json_each(app.requirements) r WHERE NOT coalesce(json_extract(r.value,'$.resolved'),0)) AS open_requirements,"
@@ -80,7 +85,7 @@ class ApplicationReads:
         q="",
         outcome=None,
         company=None,
-        sort="updated",
+        sort="relevance",
         job_id=None,
         needs=None,
         applied_since=None,
@@ -131,17 +136,11 @@ class ApplicationReads:
             args.append(priority)
         if has_deadline is not None:
             conditions.append("app.deadline IS " + ("NOT NULL" if has_deadline else "NULL"))
-        terms = re.findall(r"\w+", q)
-        if terms:
-            # As jobs are searched: words that start with each term, in the job's title,
-            # company or posting, or in the application's pinned note.
-            match = " AND ".join('"' + term + '"*' for term in terms[:15])
-            conditions.append(
-                "(j.rowid IN (SELECT rowid FROM jobs_fts WHERE jobs_fts MATCH ?) OR EXISTS("
-                "SELECT 1 FROM notes n WHERE n.application_id=app.id AND n.pinned_at IS NOT NULL "
-                "AND " + " AND ".join("(' '||lower(n.body)) LIKE ?" for _ in terms[:15]) + "))"
-            )
-            args.extend([match, *("% " + term.lower() + "%" for term in terms[:15])])
+        # As jobs are searched, plus the application's stage and its pinned note.
+        found = search_sql(q, APPLICATION_STATES, notes=True)
+        if found:
+            conditions.append(found[0])
+            args.extend(found[1])
         # Stage counts follow every filter but the stage itself.
         counted = " WHERE " + " AND ".join(conditions) if conditions else ""
         counted_args = list(args)
@@ -172,6 +171,9 @@ class ApplicationReads:
             "app.deadline IS NULL,app.deadline,app.priority IS NULL,app.priority,app.updated_at DESC",
         }.get(sort, "app.updated_at DESC")
         order_args = [cutoff] if sort == "needs" else []
+        # relevance: with words to search, the best matches first, then the latest updated.
+        if found and sort == "relevance":
+            order, order_args = found[2] + "," + order, found[3]
         with self.db.connect() as connection:
             projection = "app.id,app.job_id,app.status,app.outcome,app.version,app.applied_at,app.created_at,app.updated_at,app.concluded_on,"
             projection += "app.priority,app.deadline,app.salary,app.required_documents,"

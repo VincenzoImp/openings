@@ -2,10 +2,14 @@
    rows, the three steps of API & agents, and the lists of tokens and kept
    backups. */
 @layer screens {
+  /* The section list and the section centre as one block, title included. */
   .set-screen {
     display: flex;
     flex-direction: column;
+    width: 100%;
     min-width: 0;
+    max-width: calc(200px + var(--s-8) + 720px + var(--pane-pad) + var(--s-6));
+    margin-inline: auto;
   }
   .set {
     display: grid;
@@ -83,11 +87,6 @@
     display: flex;
     flex-direction: column;
     min-width: 0;
-  }
-  .set-title {
-    font: var(--t-xl);
-    font-weight: var(--w-semibold);
-    letter-spacing: var(--tr-xl);
   }
   .set-lead {
     margin-top: var(--s-1);
@@ -190,7 +189,8 @@
     min-width: 0;
   }
   .set-item-title {
-    font: 500 13.5px/18px var(--font);
+    font: var(--t-row);
+    font-weight: var(--w-medium);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -274,7 +274,8 @@
     accent-color: var(--accent);
   }
   .set-code {
-    font: 12px/16px var(--mono);
+    font: var(--t-xs);
+    font-family: var(--mono);
     overflow-wrap: anywhere;
   }
   .set-nowrap {
@@ -306,7 +307,8 @@
     border-bottom: 1px solid var(--border);
   }
   .set-ask-name {
-    font: 500 13.5px/18px var(--font);
+    font: var(--t-row);
+    font-weight: var(--w-medium);
   }
   .set-ask-summary {
     color: var(--text-2);
@@ -380,10 +382,32 @@
   .set-restore dd {
     margin: 0;
   }
+  /* A file picker drawn as the other uploads: a button and the name. The
+     field's own input stays the labelled control, out of sight. */
   .set-file {
-    height: auto;
-    padding: 6px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    min-width: 0;
+  }
+  .set-file-input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+  }
+  .set-file-input:focus-visible + .ui-btn {
+    box-shadow: var(--focus-ring);
+  }
+  .set-file-name {
+    overflow: hidden;
+    color: var(--text-2);
     font: var(--t-sm);
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   /* Advanced: request limits */

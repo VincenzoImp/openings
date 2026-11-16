@@ -7,7 +7,7 @@ import {
 } from "react";
 import { Ellipsis, GripVertical, Pencil, Trash2 } from "lucide-react";
 import { Button, IconButton, Segmented, Tag, type MenuEntry } from "../../ui";
-import { SheetMenu } from "../../ui";
+import { Icon, SheetMenu } from "../../ui";
 import type { Scope, SectionName, Statement } from "../../query/preferences";
 import { SCOPES, SECTIONS, itemName, scopeLabels } from "./model";
 
@@ -111,7 +111,7 @@ export function Line({
             }
           }}
         >
-          <GripVertical size={14} strokeWidth={1.75} aria-hidden="true" />
+          <Icon icon={GripVertical} size="sm" />
         </button>
       </span>
       <p className="pref-text">{item.text}</p>

@@ -77,5 +77,5 @@ export default function App() {
         />
       </Suspense>
     );
-  return <Shell onSignOut={signOut} />;
+  return <Shell onSignOut={signOut} demo={!!session.demo} />;
 }

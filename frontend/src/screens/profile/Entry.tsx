@@ -1,7 +1,7 @@
 // A career entry as a CV item (title, organization, dates and place, its
 // description, highlights, skills and files) and its form.
 import { useRef, useState } from "react";
-import { FileText, Trash } from "lucide-react";
+import { FileText, Trash2 } from "lucide-react";
 import { Tag } from "../../ui/Badge";
 import { ConfirmDialog } from "../../ui/Dialog";
 import { Field, Input, Select, Textarea } from "../../ui/Field";
@@ -133,7 +133,7 @@ export function EntryBlock({
           {
             id: "delete",
             label: "Delete permanently…",
-            icon: Trash,
+            icon: Trash2,
             danger: true,
             onSelect: () => setDeleting(true),
           },

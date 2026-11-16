@@ -2,6 +2,30 @@
    the screen frame, the phone's top-bar slots, the ⌘K palette, the Add job
    form and the shortcut sheet. */
 @layer screens {
+  /* The demo's line above every screen. */
+  .shell-demo {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: var(--s-2);
+    min-height: 32px;
+    padding: 0 var(--s-1) 0 var(--pane-pad);
+    border-bottom: 1px solid var(--border);
+    background: var(--accent-soft);
+    color: var(--accent-text);
+    font: var(--t-sm);
+  }
+  .shell-demo p {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+  }
+  .shell-demo strong {
+    font-weight: var(--w-semibold);
+  }
+  .shell-demo .ui-icon-btn {
+    color: inherit;
+  }
   .shell-skip {
     position: fixed;
     top: var(--s-2);
@@ -45,6 +69,11 @@
   }
   .shell-defaults {
     display: flex;
+  }
+  /* Search comes first on every screen; a screen with its own search (a
+     list's field) shows that one in its place. */
+  .ui-topbar-actions:has([data-topbar-search]) .shell-search {
+    display: none;
   }
 
   /* ⌘K */
@@ -142,6 +171,11 @@
     color: var(--text-3);
     font: var(--t-xs);
     text-overflow: ellipsis;
+  }
+  .shell-palette-state {
+    flex: none;
+    color: var(--text-3);
+    font: var(--t-xs);
   }
   .shell-palette-empty {
     padding: 0 var(--s-4);

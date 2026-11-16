@@ -26,7 +26,9 @@ import {
 import { ToastProvider } from "../ui/Toast";
 import { AddressNotice } from "./AddressNotice";
 import { ShellContext, type ShellApi } from "./context";
-import { BOTTOM, NAV, NEEDS_LABEL, type NavDef } from "./nav";
+import { DemoBanner } from "./DemoBanner";
+import { BOTTOM, NAV, type NavDef } from "./nav";
+import { needsLabel } from "./needs";
 import { href, navigate, useRoute } from "./router";
 import { ROUTES } from "./routes";
 import { Screen, preload } from "./Screens";
@@ -54,7 +56,14 @@ const ShortcutSheet = lazy(() =>
  * bars on phones, the routed screen, the ⌘K palette, the Add job dialog, the
  * shortcut sheet and the global keyboard.
  */
-export function Shell({ onSignOut }: { onSignOut: () => void }) {
+export function Shell({
+  onSignOut,
+  demo = false,
+}: {
+  onSignOut: () => void;
+  /** A demo workspace: every screen says so (DemoBanner). */
+  demo?: boolean;
+}) {
   const route = useRoute();
   const counts = useNeedsCounts();
   const name = useAccountName();
@@ -150,7 +159,9 @@ export function Shell({ onSignOut }: { onSignOut: () => void }) {
     icon: nav.icon,
     href: href(nav.id),
     needs: nav.needs ? counts[nav.needs] : undefined,
-    needsLabel: nav.needs ? NEEDS_LABEL[nav.needs] : undefined,
+    needsLabel: nav.needs
+      ? needsLabel(nav.needs, counts[nav.needs])
+      : undefined,
   });
   // Until server facts say setup is done, the last group offers to finish it.
   const finish: NavDef = {
@@ -190,6 +201,7 @@ export function Shell({ onSignOut }: { onSignOut: () => void }) {
         </a>
         <AppFrame
           className="shell"
+          banner={demo ? <DemoBanner /> : undefined}
           sidebar={
             <div
               className="shell-side"
@@ -218,15 +230,16 @@ export function Shell({ onSignOut }: { onSignOut: () => void }) {
               }
               actions={
                 <>
+                  <IconButton
+                    icon={Search}
+                    label="Search"
+                    size="touch"
+                    tooltip="none"
+                    className="shell-search"
+                    onClick={() => setOverlay("palette")}
+                  />
                   <span className="shell-slot" ref={setActionsSlot} />
                   <span className="shell-defaults">
-                    <IconButton
-                      icon={Search}
-                      label="Search"
-                      size="touch"
-                      tooltip="none"
-                      onClick={() => setOverlay("palette")}
-                    />
                     <IconButton
                       icon={Plus}
                       label="Add job"

@@ -26,7 +26,9 @@ application returns the job to New.
 
 The keyboard does it all: `j` and `k` (or the arrows) move, `s`, `d` and `r`
 decide, `z` undoes, `o` opens the posting, `e` corrects the details, Enter moves
-to the job, `/` searches and `?` lists every shortcut. Select several jobs (`x`,
+to the job, `/` searches and `?` lists every shortcut. ⌘K (Ctrl+K) searches jobs and
+applications from any screen, best match first: the title, then company, location
+and state, then the posting text. Select several jobs (`x`,
 shift+`j`/`k`, or shift-click for a range) to shortlist, dismiss, restore or
 forget them at once; each job succeeds or fails on its own. On a phone a job
 opens full screen with **Dismiss** and **Shortlist** at the bottom; swipe a row
