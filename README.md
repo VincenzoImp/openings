@@ -1,9 +1,9 @@
 # Openings
 
-[![CI](https://img.shields.io/github/actions/workflow/status/VincenzoImp/openings/ci.yml?branch=main&label=CI)](https://github.com/VincenzoImp/openings/actions/workflows/ci.yml)
-[![Latest release](https://img.shields.io/github/v/release/VincenzoImp/openings?sort=semver)](https://github.com/VincenzoImp/openings/releases/latest)
+[![CI](https://img.shields.io/github/actions/workflow/status/VincenzoImp/openings-job-search/ci.yml?branch=main&label=CI)](https://github.com/VincenzoImp/openings-job-search/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/VincenzoImp/openings-job-search?sort=semver)](https://github.com/VincenzoImp/openings-job-search/releases/latest)
 [![Docker image](https://img.shields.io/docker/v/vincenzoimp/openings?sort=semver&label=docker)](https://hub.docker.com/r/vincenzoimp/openings)
-[![License: MIT](https://img.shields.io/github/license/VincenzoImp/openings)](LICENSE)
+[![License: MIT](https://img.shields.io/github/license/VincenzoImp/openings-job-search)](LICENSE)
 
 **A self-hosted job-search workspace: collect jobs, prepare applications and
 track replies, by hand or with your own AI agent.**
@@ -44,8 +44,8 @@ application applied.
 You need Docker with Compose v2 (amd64 or arm64) and a browser.
 
 ```bash
-git clone https://github.com/VincenzoImp/openings.git
-cd openings
+git clone https://github.com/VincenzoImp/openings-job-search.git
+cd openings-job-search
 docker compose up -d
 ```
 

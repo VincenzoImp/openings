@@ -1,7 +1,7 @@
 # Security
 
 Report vulnerabilities privately through
-[GitHub security advisories](https://github.com/VincenzoImp/openings/security/advisories/new).
+[GitHub security advisories](https://github.com/VincenzoImp/openings-job-search/security/advisories/new).
 Do not include personal databases, API tokens or CVs in public issues.
 
 **Supported versions:** only the latest release receives fixes. Upgrade to it

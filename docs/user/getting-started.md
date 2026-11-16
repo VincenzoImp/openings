@@ -8,8 +8,8 @@ agent. [How it works](how-it-works.md) explains the words used here.
 You need Docker with Compose v2. The host needs no Python, Node or TeX.
 
 ```bash
-git clone https://github.com/VincenzoImp/openings.git
-cd openings
+git clone https://github.com/VincenzoImp/openings-job-search.git
+cd openings-job-search
 docker compose up -d
 ```
 

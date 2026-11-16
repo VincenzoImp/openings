@@ -8,7 +8,7 @@ body:
         Thanks for reporting a problem. Use synthetic examples only: never paste
         personal databases, CVs, API tokens, `.env` files or real postings you
         cannot share. Report security vulnerabilities privately through
-        [SECURITY.md](https://github.com/VincenzoImp/openings/blob/main/SECURITY.md).
+        [SECURITY.md](https://github.com/VincenzoImp/openings-job-search/blob/main/SECURITY.md).
   - type: input
     id: version
     attributes:

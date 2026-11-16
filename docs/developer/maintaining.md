@@ -43,4 +43,4 @@ Dependabot proposes updates weekly. Two are made by hand:
 `main` is protected by a ruleset: pull requests only, required checks `backend`,
 `frontend`, `e2e` and `container (amd64)` passing on a branch up to date with
 `main`, no force-push, deletion or bypass; no review is required. A change that
-renames those jobs updates the ruleset (`gh api repos/VincenzoImp/openings/rulesets`).
+renames those jobs updates the ruleset (`gh api repos/VincenzoImp/openings-job-search/rulesets`).

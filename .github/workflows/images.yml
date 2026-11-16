@@ -205,7 +205,7 @@ jobs:
           if [ -n "$MINOR" ]; then tags+=(--tag "$IMAGE:$MINOR"); fi
           docker buildx imagetools create "${tags[@]}" \
             --annotation 'index:org.opencontainers.image.description=A self-hosted job-search workspace: collect jobs, prepare applications and track replies, by hand or with your own AI agent.' \
-            --annotation 'index:org.opencontainers.image.source=https://github.com/VincenzoImp/openings' \
+            --annotation 'index:org.opencontainers.image.source=https://github.com/VincenzoImp/openings-job-search' \
             --annotation 'index:org.opencontainers.image.licenses=MIT' \
             --annotation "index:org.opencontainers.image.version=$VERSION" \
             "${sources[@]}"
