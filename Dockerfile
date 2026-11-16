@@ -26,7 +26,7 @@ ARG VCS_REF=unknown
 ARG BUILD_DATE=unknown
 # The description equals pyproject.toml's (scripts/check_package.py checks it).
 LABEL org.opencontainers.image.title="Openings" \
-      org.opencontainers.image.description="Self-hosted job search: every new job, filtered, prepared and ranked. You just apply. Use it by hand, over a REST API, or with your own AI agent over MCP. One container, one SQLite file." \
+      org.opencontainers.image.description="Self-hosted job-search app. Set up your career, rules, templates and sources once; your own AI agent (Claude Code, Codex, any MCP client) works it by your rules. You apply." \
       org.opencontainers.image.url="https://github.com/VincenzoImp/openings-job-search" \
       org.opencontainers.image.documentation="https://github.com/VincenzoImp/openings-job-search/blob/main/docs/README.md" \
       org.opencontainers.image.source="https://github.com/VincenzoImp/openings-job-search" \
