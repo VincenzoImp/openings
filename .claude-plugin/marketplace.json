@@ -1,0 +1,17 @@
+{
+  "name": "openings-job-search",
+  "description": "Openings, the self-hosted job-search app, for Claude Code: its MCP server and skills.",
+  "owner": {
+    "name": "Vincenzo Imperati",
+    "url": "https://github.com/VincenzoImp"
+  },
+  "plugins": [
+    {
+      "name": "openings",
+      "source": "./",
+      "description": "Connect Claude Code to your Openings workspace over MCP, with the skills that ship with the app.",
+      "category": "productivity",
+      "tags": ["job-search", "mcp", "self-hosted"]
+    }
+  ]
+}
