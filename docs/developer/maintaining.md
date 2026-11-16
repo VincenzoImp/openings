@@ -78,7 +78,7 @@ Never commit its output.
 
 ## Capture browser
 
-The screenshots, the social preview, the reel and the video show the Ready
+The screenshots, the social preview and the video footage show the Ready
 application's CV and letter in the browser's own PDF viewer
 (`frontend/scripts/capture.mjs`). They use Google Chrome when it is installed,
 otherwise Playwright's Chromium in the new headless mode
@@ -88,28 +88,25 @@ the browser has no PDF viewer, or when a PDF does not fill its well.
 
 ## Demo reel
 
-`npm --prefix frontend run reel` (and `-- --dark`) builds the dashboard, records
-about 20 seconds of it on the demo workspace (`frontend/tests/reel.spec.ts`, its
-own Playwright project, never run in CI) and encodes `docs/images/demo.gif` and
-`demo-dark.gif` with ffmpeg, which must be on `PATH`. It fails when a GIF is over
-5 MB. Everything on screen is the dashboard except the cursor, the key chips, the
-captions and the end card. The reel keeps its own clock, so two runs differ only in
-encoder noise. `frontend/reel/` (ignored by Git) receives the MP4 master and the
-track the video is cut from: each scene's caption and focal regions, the cursor,
-the clicks and the keys. Re-render both after a change to a screen it shows.
+`docs/images/demo.gif` is cut from the walkthrough video's render: six windows
+of its first act (the Ready application with both PDFs, a Preferences line,
+Claude Code running the search, a dismissal that quotes the rule, Ready ranked
+best first, Mark applied), about 17 seconds with hard cuts, each with a short
+label. It is 960 px wide at 10 fps and at most 5 MB. There is no dark variant.
 
-The `video` Playwright project (`frontend/tests/video.spec.ts`) records the same
-kind of track and the bare frames, at three times the pixels, on the desktop
-layout or the phone layout (390×844), from a running `openings demo` that an
-agent works on at the same time: before the agent, live while it works, and
-after. A capture script outside the repository starts the
-demo and the agent session and sets its variables (see the spec's header); the
-recorder both specs share is `frontend/tests/reel.ts`.
+The video's footage comes from the `video` Playwright project
+(`frontend/tests/video.spec.ts`, never run in CI). It records each beat of the
+script as its own shot, the bare dashboard at three times the pixels, on the
+desktop layout (1440×810) or the phone layout (390×585), from a running
+`openings demo` before and after a real agent session works on it. Each shot
+keeps a track: the cursor, the clicks, the keys and the DOM rectangles the
+video aims its close-ups and underlines at. The recorder is
+`frontend/tests/reel.ts`. A capture script and a render pipeline outside the
+repository start the demo and the agent session, set the spec's variables (see
+its header), and render the video, the GIF and the covers. Capture again after
+a change to a screen the video shows.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="../images/demo-dark.gif">
-  <img alt="The demo reel: sources, Jobs › New, the agent's dismissals, a Ready application, Mark applied and Today" src="../images/demo.gif">
-</picture>
+<img alt="Openings on the demo workspace: a Ready application with its PDFs, a Preferences line, Claude Code running the search, a dismissal that quotes the rule, Ready ranked best first, Mark applied" src="../images/demo.gif">
 
 ## Dependencies
 

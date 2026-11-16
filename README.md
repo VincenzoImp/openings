@@ -12,7 +12,7 @@
 
 </div>
 
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/demo-dark.gif"><img alt="Openings on the demo workspace: sources, Jobs › New, the agent's decisions, a Ready application, Mark applied and Today" src="docs/images/demo.gif"></picture>
+<img alt="Openings on the demo workspace: a Ready application with its PDFs, a Preferences line, Claude Code running the search, a dismissal that quotes the rule, Ready ranked best first, Mark applied" src="docs/images/demo.gif">
 
 ## Self-hosted job search, in three steps
 

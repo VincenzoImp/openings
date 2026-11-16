@@ -14,7 +14,6 @@ frontend/dist/
 frontend/playwright-report/
 frontend/test-results/
 frontend/screenshots/
-frontend/reel/
 frontend/tests/qa/
 *.tsbuildinfo
 
