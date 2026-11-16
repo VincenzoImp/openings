@@ -118,4 +118,4 @@ All guides: [docs](docs/README.md). Start with
 Bug reports and pull requests are welcome: start with
 [CONTRIBUTING.md](CONTRIBUTING.md). [Architecture](docs/developer/architecture.md) ·
 [Code of conduct](CODE_OF_CONDUCT.md) · [Security](SECURITY.md) ·
-[Changelog](CHANGELOG.md) · [MIT license](LICENSE)
+[Changelog](CHANGELOG.md) · [Brand](docs/brand/README.md) · [MIT license](LICENSE)
