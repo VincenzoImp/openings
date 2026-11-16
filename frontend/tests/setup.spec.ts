@@ -124,7 +124,7 @@ test("first run: about you, a search and a job, a CV and the example template, t
   // Step 4: how Openings is used, and the agent as an option, last.
   await expect(current(page)).toContainText("Done");
   await expect(page.locator("#content")).toContainText(
-    "Openings has no AI of its own; nothing happens until you ask your agent.",
+    "Openings has no AI of its own: your agent works when you ask it, or on a schedule you set.",
   );
   await expect(
     page.getByRole("link", { name: "Set it up in Settings" }),

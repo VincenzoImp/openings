@@ -7,7 +7,8 @@ body:
       value: |
         Openings reads company careers pages on Greenhouse, Lever, Ashby, Recruitee,
         Personio, Workable, SmartRecruiters, BambooHR, Rippling, Workday, Oracle and
-        join.com, searches LinkedIn, Indeed and Glassdoor, and follows RSS feeds
+        join.com, searches LinkedIn, Indeed and Glassdoor, reads the Hacker News
+        "Who is hiring?" thread and follows RSS feeds
         ([Jobs and sources](https://github.com/VincenzoImp/openings-job-search/blob/main/docs/user/jobs-and-sources.md)).
         Before asking, try the careers page's link in **Sources › Add source**: many
         companies use one of these platforms behind their own domain.

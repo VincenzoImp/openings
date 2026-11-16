@@ -8,7 +8,7 @@ restore, stay with you.
 ## The concepts
 
 1. **Job.** A posting you might apply to: title, company, location, text and where it came from.
-2. **Source.** A search, company careers page or RSS feed that collects jobs on a schedule. Jobs you add by hand have no source.
+2. **Source.** A search, company careers page, RSS feed or the Hacker News "Who is hiring?" thread that collects jobs on a schedule. Jobs you add by hand have no source.
 3. **Triage.** Where a job stands in review: **New**, **Shortlisted** or **Dismissed**. Dismissing keeps the job, remembers it and can be undone.
 4. **Label.** A mark computed without a model: the posting's language, the languages it requires, a likely duplicate, or no longer listed. Labels describe and filter; they never dismiss.
 5. **Application.** Your attempt to get one job. A job has at most one open application. Shortlisting a job starts it.

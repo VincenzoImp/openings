@@ -153,8 +153,8 @@ while nothing has been added to it.
 
 Jobs can also arrive by themselves. Under **Sources**, choose **Add source**: a
 **Search** (a query and a place on LinkedIn, Indeed or Glassdoor), a **Company
-careers page** or an **RSS feed**. **Test** shows the first results and saves
-nothing. **Save** adds the source and checks it at once, then on the schedule.
+careers page**, an **RSS feed** or **HN Who is hiring**. **Test** shows the first
+results and saves nothing. **Save** adds the source and checks it at once, then on the schedule.
 [Jobs and sources](jobs-and-sources.md) explains every setting.
 
 ## Prepare your first application

@@ -48,7 +48,7 @@ export function Agents() {
   return (
     <SettingsSection
       title="API & agents"
-      lead="Openings has no AI of its own; nothing happens until you ask your agent."
+      lead="Openings has no AI of its own: your agent works when you ask it, or on a schedule you set."
     >
       <ol className="set-steps">
         <Step number={1} title="Create a token">
@@ -94,8 +94,8 @@ function ShellLines({ origin }: { origin: string }) {
     <div className="set-connect">
       <CodeBlock code={lines} label="Shell lines" onCopied={copied} />
       <p className="set-row-desc">
-        Add them to ~/.zshrc or ~/.bashrc with your token, then open a new
-        terminal.
+        Add {lines.includes("\n") ? "them" : "it"} to ~/.zshrc or ~/.bashrc with
+        your token, then open a new terminal.
       </p>
     </div>
   );

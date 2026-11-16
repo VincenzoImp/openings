@@ -14,7 +14,7 @@ body:
     attributes:
       label: Openings version
       description: Shown in Settings, by `GET /api/v1/capabilities`, or the image tag you run.
-      placeholder: "0.24.2"
+      placeholder: "0.28.0"
     validations:
       required: true
   - type: dropdown

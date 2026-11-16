@@ -129,7 +129,7 @@ test("API & agents: three steps, an Agent token by default, copy, revoke", async
     "Your first agent session",
   ]);
   await expect(page.locator("#content")).toContainText(
-    "Openings has no AI of its own; nothing happens until you ask your agent.",
+    "Openings has no AI of its own: your agent works when you ask it, or on a schedule you set.",
   );
 
   // A new token: Agent is preselected; the secret is shown once.

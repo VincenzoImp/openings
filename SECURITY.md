@@ -18,8 +18,8 @@ Openings is a single-owner workspace that your own AI agent drives over MCP.
   API tokens, restore, the career import and the kept backups (list, download,
   delete). Any token can read your personal data, including a backup or the
   records export, which hold no credentials.
-- **Nothing submits.** Openings has no operation that sends an application or
-  contacts an employer.
+- **Nothing submits.** Openings has no operation that sends an application to an
+  employer or contacts one. Marking an application applied only records it.
 - **Instructions, attribution, undo.** The MCP instructions and the skills tell
   the agent to mark applied, record replies, close and delete permanently only on
   the owner's word or a standing instruction, and to delete after a backup; the

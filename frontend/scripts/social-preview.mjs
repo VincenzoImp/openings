@@ -36,7 +36,7 @@ const TAGLINE = [
 ];
 const STEPS = ["Collect", "Prepare", "Rank", "You apply"];
 const CLAIMS = [
-  "Nothing in Openings can submit an application.",
+  "Nothing in Openings submits to an employer.",
   "No AI inside, no account, no telemetry.",
   "One container, one SQLite file, on your machine.",
 ];

@@ -18,7 +18,7 @@
 
 Job hunting is mostly busywork: checking the same boards every day, skipping reposts, rewriting the CV for every role. Openings does that part and leaves you the step that matters.
 
-1. **Fresh jobs, no duplicates.** Your searches and watched companies, on your schedule: LinkedIn, Indeed and Glassdoor searches (no login), careers pages on 12 hiring platforms, RSS feeds and job links, into **Jobs › New**.
+1. **Fresh jobs, no duplicates.** Your searches and watched companies, on your schedule: LinkedIn, Indeed and Glassdoor searches (no login), careers pages on 12 hiring platforms, the Hacker News "Who is hiring?" thread, RSS feeds and job links, into **Jobs › New**.
 2. **Your agent prepares.** It shortlists by fit, with a reason you can read, and tailors each CV and letter from your career record.
 3. **You apply, best first.** Ready is ranked by priority and deadline. You send each application on the employer's site; your agent (or you) then tracks replies, follow-ups and deadlines, and prepares you for each interview.
 
@@ -103,7 +103,7 @@ In **Settings › API & agents**, create an agent token and put it in your shell
 
 Any other client connects to `http://127.0.0.1:8080/mcp/` with the token as a bearer header; [Work with an agent](docs/user/agents.md) has the lines for Claude Code without the plugin, Codex and the rest. Then ask, in order: **"Set up my Openings workspace from my CV."**, **"Go through my new jobs."** and **"Prepare CV and letter for my shortlist."** Afterwards, **"Run my job search"** does it all in one go, also [on a schedule](docs/user/agents.md#run-it-on-a-schedule).
 
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/agent-vs-you-dark.svg"><img alt="What your agent does over MCP and what stays yours. Nothing in Openings can apply for you" src="docs/images/agent-vs-you.svg"></picture>
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/agent-vs-you-dark.svg"><img alt="What your agent does over MCP and what stays yours. Nothing in Openings can submit an application to an employer" src="docs/images/agent-vs-you.svg"></picture>
 
 ## Compared
 
@@ -112,7 +112,7 @@ Any other client connects to `http://127.0.0.1:8080/mcp/` with the token as a be
 | Runs on your machine | Yes: one container, one SQLite file | No: hosted services | Yes | Yes: in your AI CLI |
 | AI | Bring your own agent, over MCP | Built in, on paid plans | Built in | Your CLI's agent |
 | Collects from company job boards | 12 platforms, on your schedule | No: a browser extension saves jobs | Not documented | Ashby, Greenhouse, Lever, Wellfound |
-| Applies for you | No: you send each one | Autofill; Simplify+ "Autopilot" | Yes: fills and submits forms | No |
+| Auto-apply | No: you send each one | Autofill; Simplify+ "Autopilot" | Yes: fills and submits forms | No |
 
 career-ops and Openings work well together. Sources, dates and more tools (JobSync, job-ops, a spreadsheet): [Openings compared](docs/comparison.md).
 
@@ -134,11 +134,11 @@ Everything lives in one SQLite file in a Docker volume on your machine, with eve
 
 **Which agents work?** Any MCP client: Claude Code (with the plugin), Codex, Cursor, Gemini CLI and others. The skills ship with the app.
 
-**How is this different from auto-apply?** Nothing in Openings can submit an application or contact an employer: no such operation exists. Every application is tailored, one per job is enforced, and you send each one yourself.
+**How is this different from auto-apply?** Nothing in Openings can submit an application to an employer or contact one: no such operation exists. Every application is tailored, one per job is enforced, and you send each one yourself.
 
 **What does it cost?** Openings is free and MIT-licensed. Your agent costs what your plan already costs, and the whole app works by hand without one.
 
-**Which countries and sites?** LinkedIn searches anywhere; Indeed and Glassdoor by country. Careers pages on Greenhouse, Lever, Ashby, Workday, SmartRecruiters, Personio, Recruitee, Workable, BambooHR, Rippling, Oracle and JOIN, and any RSS feed. Missing one? [Request a job site](https://github.com/VincenzoImp/openings-job-search/issues/new?template=job_site_request.yml).
+**Which countries and sites?** LinkedIn searches anywhere; Indeed and Glassdoor by country. Careers pages on Greenhouse, Lever, Ashby, Workday, SmartRecruiters, Personio, Recruitee, Workable, BambooHR, Rippling, Oracle and JOIN, the monthly Hacker News "Who is hiring?" thread, and any RSS feed. Missing one? [Request a job site](https://github.com/VincenzoImp/openings-job-search/issues/new?template=job_site_request.yml).
 
 **What if LinkedIn blocks me?** Searches use the sites' public guest pages, spaced out through one rate gate. A refused site is paused and retried later; careers pages are not affected ([details](docs/user/operations.md#a-job-site-refused-requests)).
 
@@ -150,7 +150,7 @@ Everything lives in one SQLite file in a Docker volume on your machine, with eve
 
 **What about prompt injection in postings?** Posting text is treated as data, and the skills tell your agent when to ask first. Agent writes are attributed, non-destructive changes can be undone, and backups run daily. See the [security model](docs/user/agents.md#security-model).
 
-**Is it vibe-coded?** The rules that matter are enforced in the services and in SQLite, not in prompts: one open application per job, version checks, no operation that submits. Tests cover each of them, and complete workflows run in a browser.
+**Is it vibe-coded?** The rules that matter are enforced in the services and in SQLite, not in prompts: one open application per job, version checks, no operation that submits to an employer. Tests cover each of them, and complete workflows run in a browser.
 
 I built Openings for my own job search and use it every day. I built it with AI coding agents, mainly Claude Code: I decide what it does and how it behaves, and every change passes the full test suite before it ships.
 

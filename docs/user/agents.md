@@ -203,7 +203,7 @@ only after a backup.
 
 ### What nothing in Openings can do
 
-Openings has no operation that submits an application or contacts an employer, so
+Openings has no operation that submits an application to an employer or contacts one, so
 no token and no agent can do that through it. You apply on the employer's site.
 
 ### Attribution and undo

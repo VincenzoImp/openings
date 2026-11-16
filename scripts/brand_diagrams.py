@@ -95,8 +95,9 @@ STEPS = (
         "from your searches and watched companies",
         [
             "LinkedIn, Indeed and Glassdoor searches,",
-            "careers pages on 12 hiring platforms, RSS",
-            "and job links, into Jobs › New.",
+            "careers pages on 12 hiring platforms,",
+            "HN Who is hiring, RSS and job links,",
+            "into Jobs › New.",
         ],
     ),
     (
@@ -161,7 +162,7 @@ def flow(palette):
     d.text(
         50,
         397,
-        "Nothing in Openings can submit an application or contact an employer.",
+        "Nothing in Openings can submit an application to an employer or contact one.",
         size=15,
         colour="text-2",
     )
@@ -201,7 +202,8 @@ def agent_vs_you(palette):
         "Your agent and you. Your agent, over MCP: triages with reasons, writes and "
         "compiles, sets priority, deadline and salary range, records what you tell it and "
         "reports back. You: say what you want, apply on the employer's site, decide what "
-        "it may do on its own, own the data. Nothing in Openings can apply for you.",
+        "it may do on its own, own the data. Nothing in Openings can submit an application "
+        "to an employer.",
         palette,
     )
     d.rect(20, 20, 680, 500, fill="accent-soft", stroke="accent", radius=12)
@@ -232,12 +234,18 @@ def agent_vs_you(palette):
         d.text(784, y + 25, body, size=15, colour="text-2", lead=22)
         y += 38 + 22 * len(body)
     d.rect(20, 544, WIDTH - 40, 100, fill="bg-subtle", stroke="border", radius=12)
-    d.text(52, 580, "Nothing in Openings can apply for you.", size=18, weight=SEMIBOLD)
+    d.text(
+        52,
+        580,
+        "Nothing in Openings can submit an application to an employer.",
+        size=18,
+        weight=SEMIBOLD,
+    )
     d.text(
         52,
         608,
         [
-            "No operation sends anything to an employer, by you or by your agent.",
+            "No operation sends anything to an employer, whether you or your agent calls it.",
             "Non-destructive changes can be undone, and permanent deletes happen only when you ask.",
         ],
         size=15,

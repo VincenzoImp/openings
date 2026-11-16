@@ -83,11 +83,11 @@ its `…` pauses every automatic check. **Recent checks**, collapsed at the
 bottom, lists the last 20 checks with Stop and Retry.
 
 **Add source** opens a form: the kind first (**Search**, **Company careers page**,
-**RSS feed** or **HN Who is hiring**), then its fields. **Test** shows the first ten results and saves
-nothing; on a careers page it lists the titles first, then fetches their text. When
-a site refuses or finds nothing, Test says why and until when, and suggests a
-careers page; **Save** adds the source and checks it at once, then on the
-schedule. A source added over REST or MCP starts paused unless it says
+**RSS feed** or **HN Who is hiring**), then its fields. **Test** shows the first
+ten results and saves nothing; on a careers page it lists the titles first, then
+fetches their text. When a site refuses or finds nothing, Test says why and until
+when, and suggests a careers page; **Save** adds the source and checks it at
+once, then on the schedule. A source added over REST or MCP starts paused unless it says
 otherwise. A paused source can still be checked by hand.
 
 | Source | What it collects |
@@ -97,8 +97,8 @@ otherwise. A paused source can still be checked by hand.
 | RSS feed | An RSS or Atom feed of jobs |
 | HN Who is hiring | The latest monthly Hacker News "Ask HN: Who is hiring?" thread |
 
-Jobs you add under Jobs have no source. Breezy pages can be previewed but not collected automatically; add their postings
-by hand.
+Jobs you add under Jobs have no source. Breezy pages can be previewed but not
+collected automatically; add their postings by hand.
 
 ### Searches
 

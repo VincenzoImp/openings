@@ -10,13 +10,13 @@ REST API.
 
 ![Openings: new jobs arrive, the agent prepares the applications, you apply best first](https://raw.githubusercontent.com/VincenzoImp/openings-job-search/main/docs/images/demo.gif)
 
-1. **It collects.** Fresh jobs from LinkedIn, Indeed and Glassdoor searches (no
-   login), company careers pages on 12 hiring platforms and RSS feeds, with no
-   duplicates.
+1. **Fresh jobs, no duplicates.** From LinkedIn, Indeed and Glassdoor searches
+   (no login), company careers pages on 12 hiring platforms, the Hacker News "Who
+   is hiring?" thread and RSS feeds.
 2. **Your agent prepares.** It shortlists by fit and writes a tailored CV and
    letter for each application.
 3. **You apply, best first.** Ready applications are ranked by priority and
-   deadline. Openings never sends anything for you.
+   deadline. Openings never sends anything to an employer.
 
 One container, one SQLite file, no account, no telemetry. Source, documentation
 and issues: [github.com/VincenzoImp/openings-job-search](https://github.com/VincenzoImp/openings-job-search).

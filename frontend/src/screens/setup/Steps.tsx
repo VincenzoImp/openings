@@ -614,9 +614,12 @@ export function CvStep({
 }
 
 const USE: { icon: LucideIcon; text: string }[] = [
-  { icon: Inbox, text: "Go through new jobs as they come in." },
-  { icon: Bookmark, text: "Shortlist the ones worth applying to." },
-  { icon: Send, text: "Apply when an application is Ready." },
+  { icon: Inbox, text: "New jobs arrive in Jobs › New, without duplicates." },
+  {
+    icon: Bookmark,
+    text: "Shortlist the ones that fit, or let your agent do it.",
+  },
+  { icon: Send, text: "Apply when an application is Ready, best first." },
 ];
 
 /** Step 4: how Openings is used, and connecting an agent, optionally. */
@@ -650,8 +653,8 @@ export function DoneStep({
             Connect an AI agent <span className="setup-muted">Optional</span>
           </h2>
           <p>
-            Openings has no AI of its own; nothing happens until you ask your
-            agent.
+            Openings has no AI of its own: your agent works when you ask it, or
+            on a schedule you set.
           </p>
           <a className="setup-link" href={href("settings")}>
             Set it up in Settings

@@ -69,8 +69,9 @@ Product facts only. No personal usage or outcome numbers anywhere.
 
 **Allowed, true today:**
 
-- Nothing in Openings can submit an application or contact an employer: no such
-  operation exists.
+- Nothing in Openings can submit an application to an employer or contact one: no
+  such operation exists. Mark applied only records what you did, and agents may
+  use it.
 - Every agent write is attributed, and History names the token.
 - Non-destructive changes can be undone: dismiss ↔ New; close ↔ reopen; Applied →
   Shortlisted while there is no reply; pause ↔ resume.
@@ -81,7 +82,8 @@ Product facts only. No personal usage or outcome numbers anywhere.
 - One container, one SQLite file, amd64 and arm64, an image of about 70 MB.
 - It collects from LinkedIn, Indeed and Glassdoor searches (guest endpoints, no
   login), company careers pages on 12 platforms that collect automatically (13
-  adapters; Breezy is preview-only), RSS, and job links.
+  adapters; Breezy is preview-only), the Hacker News "Who is hiring?" thread,
+  RSS, and job links.
 
 **True once 0.28.0 ships:**
 
@@ -123,7 +125,7 @@ The social preview, uploaded in the repository settings on release day:
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="../images/agent-vs-you-dark.svg">
-  <img alt="What your agent does over MCP and what stays yours. Nothing in Openings can apply for you" src="../images/agent-vs-you.svg">
+  <img alt="What your agent does over MCP and what stays yours. Nothing in Openings can submit an application to an employer" src="../images/agent-vs-you.svg">
 </picture>
 
 <picture>

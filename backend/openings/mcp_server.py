@@ -27,7 +27,7 @@ openings and the skill for the task (skills_get, the prompts or openings://skill
 hold the method; tool descriptions hold the fields.
 
 Rules:
-- Never submit an application or contact an employer.
+- Never submit an application to an employer or contact one.
 - Record applied and replies only from the owner: their word, or a source of theirs that Working \
 with me names.
 - Give every dismissal a reason the owner will read. Delete permanently only on the owner's \
