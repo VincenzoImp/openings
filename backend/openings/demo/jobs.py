@@ -527,7 +527,7 @@ class DemoJobs:
             self.dismiss(
                 agency,
                 self.agent,
-                "Frontend role at an agency; both are ruled out in your Preferences.",
+                "Frontend role at an agency; you rule out pure frontend roles and agencies.",
             )
         with self.moment(days=4):
             self.dismiss(london, OWNER, "On site in London five days a week.")
