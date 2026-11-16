@@ -1,7 +1,8 @@
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { screenshotWithPdfs } from "../scripts/capture.mjs";
 import { test as base, expect, type Page } from "./fixtures";
 import { startServer, type Server } from "./server";
 import { blockButton, call, go } from "./session";
@@ -591,7 +592,13 @@ async function capture(
   if (!viewportOnly) await page.addStyleTag({ content: FULL_PAGE });
   const fullPage =
     !viewportOnly && !(screen.sheet && (page.viewportSize()?.width ?? 0) < 720);
-  await page.screenshot({ path, fullPage, animations: "disabled" });
+  // An application's PDFs must show in the image, page and all.
+  const image = await screenshotWithPdfs(page, {
+    fullPage,
+    animations: "disabled",
+  });
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, image);
 }
 
 const FULL_PAGE = `

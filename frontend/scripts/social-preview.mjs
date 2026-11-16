@@ -1,7 +1,8 @@
 // `node scripts/social-preview.mjs [--small <file.png>]`: render the GitHub
 // social preview, docs/images/social-preview.png (1280×640, under 1 MB).
 //
-// The card is an HTML page drawn by Playwright's Chromium: the wordmark with
+// The card is an HTML page drawn by the capture browser (capture.mjs, which
+// fails without a PDF viewer, as the screenshots do): the wordmark with
 // the Doorway mark (docs/brand/), the tagline, the short form, three claims of
 // the register (docs/brand/README.md) and the slug, beside a crop of the real
 // Ready screen of the demo workspace. That crop is docs/images/ready.png, which
@@ -12,6 +13,7 @@
 // --small also writes the card at 600 px wide, the size of a LinkedIn or X
 // card, to check that it reads there.
 import { chromium } from "@playwright/test";
+import { CAPTURE_CHANNEL, expectPdfViewer } from "./capture.mjs";
 import { readFileSync, statSync } from "node:fs";
 
 const at = (path) => new URL(`../../${path}`, import.meta.url);
@@ -79,8 +81,9 @@ const args = process.argv.slice(2);
 const small = args.includes("--small")
   ? args[args.indexOf("--small") + 1]
   : null;
-const browser = await chromium.launch();
+const browser = await chromium.launch({ channel: CAPTURE_CHANNEL });
 try {
+  await expectPdfViewer(browser);
   for (const [path, scale] of [
     [OUT, 1],
     ...(small ? [[small, 600 / 1280]] : []),

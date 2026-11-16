@@ -241,11 +241,20 @@
     gap: var(--s-2);
     padding: var(--s-5);
   }
+  /* The first page fills the well's width with no dark viewer margin. The
+     object is one A4 page tall, less a little of its bottom margin, and later
+     pages scroll inside it. Chrome's viewer insets a page that scrolls by
+     about 8px + 0.6% at each side and 0.5% at the top: the object is that
+     much wider, and the well clips it. */
+  .ap-well:has(> .ap-pdf) {
+    overflow-x: hidden;
+  }
   .ap-pdf {
     display: block;
-    flex: 1;
-    width: 100%;
-    min-height: 360px;
+    flex: none;
+    width: calc(100% + 16px + 1.5%);
+    margin: -0.6% calc(-8px - 0.75%) 0;
+    aspect-ratio: 1 / 1.31;
     border: 0;
   }
   .ap-pdf-missing {

@@ -6,8 +6,9 @@
 // which Git ignores. Fails when a GIF is larger than LIMIT.
 //
 // Needs ffmpeg on PATH and the installed Playwright (`npm ci` first; see
-// screenshots.mjs for why npx's own copy does not do). Re-render after every
-// change to the screens it shows.
+// screenshots.mjs for why npx's own copy does not do), with a browser that
+// shows the application's PDFs (capture.mjs). Re-render after every change to
+// the screens it shows.
 import { spawnSync } from "node:child_process";
 import {
   copyFileSync,

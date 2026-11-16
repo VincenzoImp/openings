@@ -188,6 +188,8 @@ test("demo reel", async ({ page, session }) => {
   await reel.click(employer);
   await (await popup).close();
   await page.bringToFront();
+  // Back in front, the viewer draws the PDFs again.
+  await settled(page);
   await reel.pause(400);
   await reel.focus(page.getByRole("button", { name: /Mark applied/ }));
   await reel.press("Shift+Enter", "⇧ ↵");

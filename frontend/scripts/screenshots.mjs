@@ -8,7 +8,8 @@
 // npx would download is another copy of the test runner, and the spec's
 // `test.describe()` then fails with "did not expect test.describe() to be
 // called here". The server serves frontend/dist, so the dashboard is built
-// first when it is missing.
+// first when it is missing. The browser shows the application's PDFs in its
+// own viewer, and the run fails without one (capture.mjs).
 import { spawnSync } from "node:child_process";
 import { existsSync, rmSync } from "node:fs";
 import { fileURLToPath } from "node:url";
