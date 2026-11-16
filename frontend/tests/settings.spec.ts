@@ -313,6 +313,19 @@ test("Advanced: request limits of the sites in use save on blur", async ({
   await expect(page.locator("#content")).toContainText(
     String(workspace.schema_version),
   );
+  // Help: three links to the repository, each in a new tab.
+  const help = page.getByRole("list", { name: "Help" }).getByRole("link");
+  await expect(help).toHaveCount(3);
+  const repository = "https://github.com/VincenzoImp/openings-job-search";
+  for (const [name, href] of [
+    ["Report a problem", `${repository}/issues/new/choose`],
+    ["Ask a question", `${repository}/discussions`],
+    ["Security", `${repository}/security/policy`],
+  ]) {
+    const link = page.getByRole("link", { name: new RegExp(`^${name}`) });
+    await expect(link).toHaveAttribute("href", href);
+    await expect(link).toHaveAttribute("target", "_blank");
+  }
 });
 
 test("Settings with its dialogs open has no serious accessibility finding", async ({

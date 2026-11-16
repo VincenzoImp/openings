@@ -71,6 +71,28 @@ export function connectSnippet(client: ClientId, origin: string) {
   return `claude mcp add --transport http openings ${endpoint} \\\n  --header 'Authorization: Bearer \${OPENINGS_TOKEN}'`;
 }
 
+/** The project's repository, where help is asked for. */
+export const REPOSITORY = "https://github.com/VincenzoImp/openings-job-search";
+
+/** Where to go with a problem, a question or a vulnerability. */
+export const HELP_LINKS = [
+  {
+    label: "Report a problem",
+    detail: "Issues on GitHub",
+    href: `${REPOSITORY}/issues/new/choose`,
+  },
+  {
+    label: "Ask a question",
+    detail: "Discussions on GitHub",
+    href: `${REPOSITORY}/discussions`,
+  },
+  {
+    label: "Security",
+    detail: "Report a vulnerability privately",
+    href: `${REPOSITORY}/security/policy`,
+  },
+] as const;
+
 /** A request gate's state for one job site: a dot and a word. */
 export function gateOf(
   provider: {
