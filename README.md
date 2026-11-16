@@ -12,7 +12,7 @@
 
 </div>
 
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/demo-dark.gif"><img alt="Openings on the demo workspace: a Ready application with its PDFs, a Preferences line, Claude Code running the search, a dismissal that quotes the rule, Ready ranked best first, Mark applied" src="docs/images/demo.gif"></picture>
+<img alt="Openings on the demo workspace: a Ready application with its PDFs, a Preferences line, Claude Code running the search, a dismissal that quotes the rule, Ready ranked best first, Mark applied" src="docs/images/demo.gif">
 
 <p align="center"><!-- video-link --><a href="#">▶ Watch the walkthrough, with voice</a></p>
 

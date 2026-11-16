@@ -1,4 +1,4 @@
-// The browser of every capture: the screenshots, the demo reel, the video
+// The browser of every capture: the screenshots, the video
 // footage (playwright.config.ts) and the social preview. The Ready
 // application shows its CV and letter in the browser's own PDF viewer, which
 // Playwright's default headless shell does not have. Google Chrome is used
