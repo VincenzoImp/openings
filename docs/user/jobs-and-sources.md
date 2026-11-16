@@ -82,8 +82,8 @@ The top line sets how often every source is checked and has **Check all now**;
 its `…` pauses every automatic check. **Recent checks**, collapsed at the
 bottom, lists the last 20 checks with Stop and Retry.
 
-**Add source** opens a form: the kind first (**Search**, **Company careers page**
-or **RSS feed**), then its fields. **Test** shows the first ten results and saves
+**Add source** opens a form: the kind first (**Search**, **Company careers page**,
+**RSS feed** or **HN Who is hiring**), then its fields. **Test** shows the first ten results and saves
 nothing; on a careers page it lists the titles first, then fetches their text. When
 a site refuses or finds nothing, Test says why and until when, and suggests a
 careers page; **Save** adds the source and checks it at once, then on the
@@ -95,6 +95,7 @@ otherwise. A paused source can still be checked by hand.
 | Search | One query and place on LinkedIn, Indeed and Glassdoor |
 | Company careers page | The jobs of one company on Greenhouse, Lever, Ashby, Recruitee, Personio, Workable, SmartRecruiters, BambooHR, Rippling, Workday, Oracle or join.com |
 | RSS feed | An RSS or Atom feed of jobs |
+| HN Who is hiring | The latest monthly Hacker News "Ask HN: Who is hiring?" thread |
 
 Jobs you add under Jobs have no source. Breezy pages can be previewed but not collected automatically; add their postings
 by hand.
@@ -130,6 +131,13 @@ example by location) and paste that URL: its facets (such as
 `?locationHierarchy1=…`) are kept in `config.facets`, so only those roles are
 read. Careers pages and feeds can hold undated jobs, so **Posted within** does not
 apply to them.
+
+**HN Who is hiring** (`hnhiring`) needs no address: each check reads the newest
+thread through the HN Algolia API. Every top-level comment is one job; replies
+are skipped. Title, company and place come from the comment's first line
+("Company | Role | Place | …"), and the whole comment is the posting. The
+result limit is 1000 (`max_results`). When a new month's thread appears, the
+previous month's jobs are marked no longer listed.
 
 ### Schedule
 
