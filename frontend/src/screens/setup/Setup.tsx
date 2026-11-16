@@ -1,10 +1,11 @@
-import { usePreferences, useProfile } from "../../query/setup";
+import { usePreferences, useProfile, useSetup } from "../../query/setup";
 import { useTitle } from "../../shell/context";
 import { href, navigate, useRoute } from "../../shell/router";
 import { LoadError } from "../../ui/LoadError";
 import { SkeletonRows } from "../../ui/Page";
 import { Stepper } from "./Frame";
 import { AboutStep, CvStep, DoneStep, JobsStep } from "./Steps";
+import { resumeStep } from "./checklist";
 import { STEPS, stepOf, type StepId } from "./model";
 import "./setup.css";
 
@@ -13,10 +14,18 @@ import "./setup.css";
  * It opens after the password is set on a new workspace and again from
  * Today's checklist or Settings. Every step writes through an existing
  * operation; Find jobs and Your CV can be skipped, About you needs a name.
+ * Without a step in the address it opens the first step not done yet.
  */
 export default function Setup() {
   const route = useRoute();
-  const step = stepOf(route.query.get("step"));
+  const setup = useSetup();
+  const asked = route.query.get("step");
+  const step =
+    asked !== null
+      ? stepOf(asked)
+      : setup.loaded
+        ? resumeStep(setup.items)
+        : "about";
   const index = STEPS.findIndex((item) => item.id === step);
   // On a phone the top bar names the step.
   useTitle(STEPS[index].label);
@@ -27,7 +36,10 @@ export default function Setup() {
   const next = () => go(STEPS[index + 1]?.id ?? "today");
   const back = index > 0 ? () => go(STEPS[index - 1].id) : undefined;
 
-  const ready = profile.data && preferences.data;
+  const ready =
+    profile.data &&
+    preferences.data &&
+    (asked !== null || setup.loaded || !!setup.error);
   const error = profile.error ?? preferences.error;
   return (
     <div className="setup">

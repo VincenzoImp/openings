@@ -61,3 +61,12 @@ export function progress(facts: SetupFacts) {
     empty: done === 0 && !facts.name,
   };
 }
+
+/**
+ * Where the guide opens without a step in its address: the first step not
+ * done yet, so a reload or a later visit resumes there. With every step done,
+ * the guide starts again from the first.
+ */
+export function resumeStep(items: ChecklistItem[]): SetupStep {
+  return items.find((item) => !item.done)?.step ?? "about";
+}
