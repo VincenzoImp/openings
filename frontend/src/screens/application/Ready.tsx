@@ -268,9 +268,11 @@ export function ReadyView({
             href={job.url}
             target="_blank"
             rel="noreferrer noopener"
+            title="Apply on the employer's site (opens a new tab)"
+            aria-label="Apply on the employer's site (opens a new tab)"
           >
             <Icon icon={ExternalLink} />
-            <span className="ui-btn-label">Apply on employer's site</span>
+            <span className="ui-btn-label">Apply</span>
           </a>
         )}
         {kinds.map((kind) => (

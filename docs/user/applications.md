@@ -11,11 +11,11 @@ Shortlisting a job starts its application in **Shortlisted**. From there:
 per stage, with its count, and **Ready**, the Shortlisted applications that are
 ready to send. Search finds words that start with what you type in the role,
 the company, the location, the posting or the pinned note, as the Jobs search does,
-and a stage name ("interview") finds that stage; **Filter** by
-priority, deadline, job site or outcome. The default order, **Most urgent first**, puts Ready ones first (best
-first: by priority, then deadline), then Shortlisted ones with a deadline, then sent ones waiting longer
-than the no-reply period, then the rest; you can also sort by deadline, last
-change or the day it was sent.
+and a stage name ("interview") finds that stage; **Filter** by priority,
+deadline, job site or outcome. The default order, **Most urgent first**, puts
+Ready ones first (best first: by priority, then deadline), then Shortlisted ones
+with a deadline, then sent ones waiting longer than the no-reply period, then
+the rest; you can also sort by deadline, last change or the day it was sent.
 
 Each row shows the role and company, the stage and one phrase about it ("Missing:
 letter", "Ready · due Fri", "Applied 12 Oct · no reply 32 days"). A Ready row
@@ -63,10 +63,10 @@ head shows the role, company, stage, deadline and priority, **Open posting** and
 - **Ready:** the posting, CV and letter side by side, each document with a
   PDF/Text switch; on a phone, tabs **Check**, **Posting**, **CV**, **Letter**.
   **Before you send** lists the salary expectation your agent recorded, open
-  requirements (tick them there), the form's answers with copy buttons, **Apply on employer's site** and **Download CV +
-  Letter**. The page shows its place in Today's order ("2 of 5 ready · best
-  first · Next: …");
-  `[` and `]` move between them.
+  requirements (tick them there), the form's answers with copy buttons,
+  **Apply** (the employer's site, in a new tab) and **Download CV + Letter**.
+  The page shows its place in Today's order ("2 of 5 ready · best first ·
+  Next: …"); `[` and `]` move between them.
 - **Applied, Interview, Offer:** where it stands first ("Applied 12 Oct · no
   reply for 32 days") and **Record reply**, then the notes, the history, the
   documents that were sent, and the posting, requirements and answers folded.
