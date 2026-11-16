@@ -10,18 +10,23 @@ export type SourceView = components["schemas"]["Source"];
 /** A collection run (a check) as Recent checks reads it. */
 export type CheckView = components["schemas"]["CollectionRun"];
 
-/** The three kinds a person chooses between. */
-export type SourceKind = "search" | "company" | "feed";
+/** The kinds a person chooses between. */
+export type SourceKind = "search" | "company" | "feed" | "hn";
 
 export const KIND_LABELS: Record<SourceKind, string> = {
   search: "Search",
   company: "Company careers page",
   feed: "RSS feed",
+  hn: "HN Who is hiring",
 };
+/** What an HN source reads, in its row and its form. */
+export const HN_HINT =
+  "Each top-level comment of the latest monthly Ask HN: Who is hiring? thread is a job.";
 
 export function kindOf(source: { kind: string }): SourceKind {
   if (source.kind === "jobspy") return "search";
   if (source.kind === "rss") return "feed";
+  if (source.kind === "hnhiring") return "hn";
   return "company";
 }
 
@@ -105,7 +110,8 @@ export function sitesLine(source: SourceView) {
 
 /**
  * What a source searches, in one line, without empty parts:
- * "Data engineer · Zurich · LinkedIn, Indeed", "Greenhouse" or "RSS feed · example.test".
+ * "Data engineer · Zurich · LinkedIn, Indeed", "Greenhouse", "RSS feed · example.test"
+ * or "Hacker News · latest thread".
  * A board's internal slug is not shown; the source's name says which board.
  */
 export function describeSource(
@@ -121,6 +127,7 @@ export function describeSource(
     ]
       .filter(Boolean)
       .join(" · ");
+  if (kind === "hn") return "Hacker News · latest thread";
   const where = source.url
     ? shortUrl(source.url)
     : text(source.config.url)
@@ -298,6 +305,7 @@ export function suggestedName(
     return [values.query?.trim(), values.location?.trim()]
       .filter(Boolean)
       .join(" · ");
+  if (kind === "hn") return KIND_LABELS.hn;
   const url = values.url?.trim();
   if (!url) return "";
   const detected = detectBoard(url);

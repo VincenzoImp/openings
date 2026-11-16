@@ -249,7 +249,11 @@ export function MergeDialog({
   );
 }
 
-const KINDS: Record<string, string> = { jobspy: "Search", rss: "Feed" };
+const KINDS: Record<string, string> = {
+  jobspy: "Search",
+  rss: "Feed",
+  hnhiring: "HN thread",
+};
 
 /** Where the job was seen: each source, when, and whether it still lists it. */
 export function SourcesDialog({

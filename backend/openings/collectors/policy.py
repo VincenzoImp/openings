@@ -43,6 +43,11 @@ PROVIDERS = {
         "JobSpy 1.4.1 search, location lookup and batched posting details.",
     ),
     "rss": ("RSS / Atom", "feed", "Explicit feed URL; locations absent from feeds remain unknown."),
+    "hnhiring": (
+        "HN Who is hiring",
+        "feed",
+        "Latest monthly Hacker News thread through the HN Algolia API; one job per top comment.",
+    ),
     "manual": (
         "Manual URL / board detection",
         "manual",

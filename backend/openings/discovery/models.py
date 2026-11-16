@@ -10,7 +10,7 @@ from ..collectors.catalog import COMPANY_KINDS
 from ..collectors.policy import ProviderPatch
 from ..scheduling import IntervalSchedule, Schedule
 
-SourceKind = Literal["auto", "jobspy", "rss", *COMPANY_KINDS]
+SourceKind = Literal["auto", "jobspy", "rss", "hnhiring", *COMPANY_KINDS]
 
 
 class Input(BaseModel):

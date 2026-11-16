@@ -1,6 +1,6 @@
 """The documentation stays short, linked and in one vocabulary.
 
-User docs are at most 12,500 words, the README at most 1,000, CONTRIBUTING at most 80
+User docs are at most 12,500 words, the README at most 1,500, CONTRIBUTING at most 80
 lines and the architecture guide at most 150. Every relative link and image resolves,
 the changelog's too, and every image in docs/images is embedded. The MCP endpoint is
 spelled `/mcp/`, and no earlier vocabulary appears outside the changelog: not in the
@@ -23,6 +23,7 @@ PAGES = [
     ROOT / "SECURITY.md",
     ROOT / "docs" / "README.md",
     ROOT / "docs" / "comparison.md",
+    ROOT / "docs" / "brand" / "README.md",
     *sorted((ROOT / "docs" / "developer").glob("*.md")),
     ROOT / "examples" / "README.md",
     ROOT / "examples" / "operator-workspace" / "README.md",
@@ -50,7 +51,9 @@ def test_the_docs_fit_their_limits():
     # agent quick start, the security model and the scheduling recipe (about 2,500
     # words) to pages that held 9,600.
     assert sum(words(path) for path in USER_DOCS) <= 12_500
-    assert words(ROOT / "README.md") <= 1_000
+    # 1,500 since 0.28 (#391): the README carries the quick start's eight command
+    # blocks, a comparison table, the FAQ visitors ask and the screenshot gallery.
+    assert words(ROOT / "README.md") <= 1_500
     assert len((ROOT / "CONTRIBUTING.md").read_text().splitlines()) <= 80
     assert len((ROOT / "docs/developer/architecture.md").read_text().splitlines()) <= 150
 

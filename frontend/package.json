@@ -15,6 +15,7 @@
     "test:e2e": "playwright test --project=chromium --project=chromium-mobile",
     "test:e2e:all": "playwright test --project=webkit --project=webkit-mobile --project=chromium-performance",
     "screenshots": "node scripts/screenshots.mjs",
+    "reel": "node scripts/reel.mjs",
     "api:gen": "node scripts/api.mjs",
     "api:check": "node scripts/api.mjs --check"
   },

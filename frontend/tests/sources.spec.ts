@@ -118,6 +118,62 @@ test("add a search: Test shows the first ten results, then Save adds it", async 
   );
 });
 
+test("add the HN Who is hiring thread: Test reads it, Save adds it", async ({
+  page,
+}) => {
+  const asked: { kind?: string; details?: boolean }[] = [];
+  await page.route("**/api/v1/sources/preview", (route) => {
+    asked.push(route.request().postDataJSON());
+    return route.fulfill({
+      json: {
+        kind: "hnhiring",
+        total: 2,
+        listed: 2,
+        preview_limit: 20,
+        items: [
+          {
+            title: "Senior Backend Engineer",
+            company: "Northwind Labs",
+            location: "Berlin, Germany",
+            posting: "Synthetic logistics software in Python.",
+          },
+          {
+            title: "Data Scientist",
+            company: "Example Robotics",
+            location: "Remote",
+            posting: "Model fleets of synthetic robots.",
+          },
+        ],
+        diagnostics: [],
+      },
+    });
+  });
+  const name = unique("Synthetic HN");
+  await go(page, "sources");
+  await page.getByRole("button", { name: "Add source" }).first().click();
+  const form = editor(page);
+  await form.getByLabel("Kind").selectOption("hn");
+  await expect(form.getByText(/latest monthly Ask HN/)).toBeVisible();
+  await form.getByLabel(/^Name/).fill(name);
+  await form.getByRole("button", { name: "Test" }).click();
+  const results = form.getByRole("region", { name: /jobs found/ });
+  await expect(results).toContainText("2 jobs found");
+  await expect(results).toContainText("Northwind Labs · Berlin, Germany");
+  // One step: the thread carries every posting's text.
+  expect(asked).toEqual([
+    expect.objectContaining({ kind: "hnhiring", details: true }),
+  ]);
+  await fitsViewport(page);
+  await form.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(toast(page)).toContainText(`Added “${name}”`);
+  expect(await sourceNamed(page, name)).toMatchObject({
+    kind: "hnhiring",
+    enabled: true,
+    config: { max_results: 1000 },
+  });
+  await expect(row(page, name)).toContainText("Hacker News · latest thread");
+});
+
 test("Test lists a board's titles first, then counts the text it fetched", async ({
   page,
 }) => {

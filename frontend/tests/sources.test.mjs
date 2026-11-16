@@ -66,6 +66,10 @@ test("what a source searches leaves out empty parts and never shows quotes", () 
     describe(source({ kind: "rss", url: "https://example.test/jobs.rss" })),
     "RSS feed · example.test/jobs.rss",
   );
+  const hn = source({ kind: "hnhiring", config: { max_results: 1000 } });
+  assert.equal(sources.kindOf(hn), "hn");
+  assert.equal(describe(hn), "Hacker News · latest thread");
+  assert.equal(sources.suggestedName("hn", {}), "HN Who is hiring");
 });
 
 test("a source's status: checking, failed, checked with what was new, paused", () => {

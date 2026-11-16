@@ -178,6 +178,7 @@ const PROVIDERS: Record<string, string> = {
   ashby: "Ashby",
   workable: "Workable",
   rss: "Feed",
+  hnhiring: "HN Who is hiring",
   manual: "Added by hand",
 };
 const capital = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);

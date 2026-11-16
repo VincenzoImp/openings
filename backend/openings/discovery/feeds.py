@@ -1,4 +1,4 @@
-"""Reading postings from a source: HTML text, Lever, Ashby and RSS, and adapters."""
+"""Reading postings from a source: HTML text, Lever, Ashby, RSS, HN and adapters."""
 
 from __future__ import annotations
 
@@ -12,7 +12,11 @@ from functools import partial
 from html.parser import HTMLParser
 from urllib.parse import quote, urljoin, urlsplit
 
-from ..collectors import company as company_collectors, jobspy as jobspy_collector
+from ..collectors import (
+    company as company_collectors,
+    hnhiring as hnhiring_collector,
+    jobspy as jobspy_collector,
+)
 from ..errors import DomainError
 from ..posting import matches_filters
 from .network import HTTP_BUDGET, MAX_LISTING_BYTES, fetch_bytes
@@ -158,6 +162,10 @@ def fetch_postings(source: dict) -> list[dict]:
         )
         source["streamed"] = source.get("on_item") is not None
         source["diagnostic"] = diagnostic
+    elif kind == "hnhiring":
+        items = hnhiring_collector.collect(
+            partial(fetch_bytes, maximum=MAX_LISTING_BYTES), html_text, config, source
+        )
     elif kind not in ("lever", "ashby", "rss"):
         source["streamed"] = source.get("on_item") is not None
         items = company_collectors.collect(

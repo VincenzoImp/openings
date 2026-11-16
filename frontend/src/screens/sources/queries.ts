@@ -193,8 +193,8 @@ const refused = (result: TestResult) =>
 /**
  * Test a source in steps: the board's listing first (its titles show at
  * once), then the posting text of the first few, one at a time, so the
- * heading counts "fetched N of M". A search or a feed answers in one step.
- * Every step goes through the shared request gate; nothing is saved.
+ * heading counts "fetched N of M". A search, a feed or HN answers in one
+ * step. Every step goes through the shared request gate; nothing is saved.
  */
 export function useSourceTest() {
   const preview = usePreview();
@@ -204,7 +204,7 @@ export function useSourceTest() {
   async function run(body: Omit<Schema<"SourceTest">, "details" | "only">) {
     const question = ++asked.current;
     const current = () => asked.current === question;
-    const twoSteps = body.kind !== "jobspy" && body.kind !== "rss";
+    const twoSteps = !["jobspy", "rss", "hnhiring"].includes(body.kind ?? "");
     setState({ ...IDLE, phase: "listing" });
     try {
       let result = (await preview.mutateAsync({

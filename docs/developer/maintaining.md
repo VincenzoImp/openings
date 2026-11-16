@@ -1,6 +1,6 @@
 # Maintaining
 
-Notes for the maintainer: releases and repository settings.
+Notes for the maintainer: releases, the demo reel and repository settings.
 
 ## Release
 
@@ -67,6 +67,23 @@ the repository by its numeric id and reads the token from `GITHUB_TOKEN`,
 ```
 
 Never commit its output.
+
+## Demo reel
+
+`npm --prefix frontend run reel` (and `-- --dark`) builds the dashboard, records
+about 20 seconds of it on the demo workspace (`frontend/tests/reel.spec.ts`, its
+own Playwright project, never run in CI) and encodes `docs/images/demo.gif` and
+`demo-dark.gif` with ffmpeg, which must be on `PATH`. It fails when a GIF is over
+5 MB. Everything on screen is the dashboard except the cursor, the key chips, the
+captions and the end card. The reel keeps its own clock, so two runs differ only in
+encoder noise. `frontend/reel/` (ignored by Git) receives the MP4 master and the
+track the video is cut from: each scene's caption and focal regions, the cursor,
+the clicks and the keys. Re-render both after a change to a screen it shows.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../images/demo-dark.gif">
+  <img alt="The demo reel: sources, Jobs › New, the agent's dismissals, a Ready application, Mark applied and Today" src="../images/demo.gif">
+</picture>
 
 ## Dependencies
 

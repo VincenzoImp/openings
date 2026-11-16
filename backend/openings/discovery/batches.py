@@ -94,7 +94,7 @@ class SourceBatches:
                 "filters": source["filters"],
             }
             given = {**saved, **given}
-        elif not given.get("url") and not given.get("config"):
+        elif not given.get("url") and not given.get("config") and given.get("kind") != "hnhiring":
             raise _missing("url", "Preview a saved source (source_id) or give url or config.")
         try:
             preview = SourcePreview.model_validate(given, strict=False)
