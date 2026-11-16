@@ -285,6 +285,7 @@ class RunOperations:
         overrides=None,
         planned_at=None,
     ):
+        self.providers.require_open()
         options = (
             overrides
             if isinstance(overrides, RunOverrides)
@@ -418,6 +419,9 @@ class RunOperations:
         return {**self.get_task(task_ids[0]), "task_ids": task_ids, "run_id": run_id}
 
     def schedule_due(self, stopping=None):
+        # A closed gate schedules nothing; the sources keep their state.
+        if self.providers.closed:
+            return
         moment = datetime.now(UTC)
         for row in (
             self.db.all("SELECT * FROM sources WHERE enabled=1 ORDER BY created_at LIMIT 2000")

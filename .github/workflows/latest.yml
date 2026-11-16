@@ -1,0 +1,92 @@
+name: Point latest
+
+# Moves `latest` on Docker Hub (and on the GHCR mirror, when it has the version)
+# to an already published final release, without a local login. The release
+# workflow (images.yml) moves it on every final release; this repairs it:
+#
+#   gh workflow run latest.yml -f version=X.Y.Z
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'A published final release, for example 1.2.3'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: latest
+  cancel-in-progress: false
+
+jobs:
+  latest:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write # the GHCR mirror
+    steps:
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Tag the release's index as latest
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+          IMAGE: docker.io/${{ vars.DOCKERHUB_NAMESPACE || github.repository_owner }}/openings
+          MIRROR: ghcr.io/${{ github.repository_owner }}/openings
+        run: |
+          set -euo pipefail
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::'$VERSION' is not a final release version (X.Y.Z)."
+            exit 1
+          fi
+          digest_of() {
+            docker buildx imagetools inspect "$1" --format '{{json .Manifest}}' | jq -r .digest
+          }
+          for image in "${IMAGE,,}" "${MIRROR,,}"; do
+            if ! docker buildx imagetools inspect "$image:$VERSION" --raw > "$RUNNER_TEMP/index.json" 2> /dev/null; then
+              if [ "$image" = "${IMAGE,,}" ]; then
+                echo "::error::$image:$VERSION is not published."
+                exit 1
+              fi
+              echo "::notice::$image:$VERSION is not published; its latest is unchanged."
+              continue
+            fi
+            jq -e '[.manifests[].platform | select(. != null) | "\(.os)/\(.architecture)"] as $p
+              | ($p | index("linux/amd64")) != null and ($p | index("linux/arm64")) != null' \
+              "$RUNNER_TEMP/index.json" > /dev/null
+            # One source and no annotation: the index is pushed unchanged.
+            docker buildx imagetools create --tag "$image:latest" "$image:$VERSION"
+            expected="$(digest_of "$image:$VERSION")"
+            found="$(digest_of "$image:latest")"
+            if [ "$found" != "$expected" ]; then
+              echo "::error::$image:latest is $found, not $expected."
+              exit 1
+            fi
+            echo "$image:latest -> $VERSION ($found)" >> "$GITHUB_STEP_SUMMARY"
+          done
+      - name: latest answers with the version
+        env:
+          VERSION: ${{ inputs.version }}
+          IMAGE: docker.io/${{ vars.DOCKERHUB_NAMESPACE || github.repository_owner }}/openings
+        run: |
+          set -euo pipefail
+          image="${IMAGE,,}:latest"
+          docker run -d --name latest --publish 127.0.0.1:18080:8080 "$image"
+          trap 'docker rm -f latest > /dev/null' EXIT
+          for _ in {1..60}; do
+            if curl --silent --fail http://127.0.0.1:18080/health > "$RUNNER_TEMP/health.json"; then break; fi
+            sleep 1
+          done
+          jq -e --arg version "$VERSION" '.status == "ok" and .version == $version' "$RUNNER_TEMP/health.json"

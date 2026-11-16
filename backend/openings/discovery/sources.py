@@ -254,6 +254,7 @@ class SourceOperations:
 
     def preview_source(self, value: SourcePreview):
         details = getattr(value, "details", True)
+        self.providers.require_open()
         resolved = self._resolve_source(value.model_dump(exclude={"details"}))
         source = {**resolved, "name": value.name or resolved["config"].get("board", "RSS source")}
         config = {
@@ -354,6 +355,8 @@ class SourceOperations:
         It takes the scheduler's path, so the global switch and the provider gate's
         spacing apply, and the next scheduled check follows one interval later.
         """
+        if self.providers.closed:
+            return  # the demo's closed gate: nothing to check, and nothing failed
         try:
             self.queue_collection(source_id, manual=False, planned_at=stamp)
         except DomainError as error:

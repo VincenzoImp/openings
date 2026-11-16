@@ -26,6 +26,8 @@ from .text import is_tex_source
 # Columns of a revision summary; the full record adds content, text and evidence.
 SUMMARY_COLUMNS = "id,application_id,kind,title,previous_id,text_from,version,created_at"
 TEX = "application/x-tex"
+# A current revision: no other revision names it as the one it replaces.
+CURRENT_SQL = "NOT EXISTS(SELECT 1 FROM documents child WHERE child.previous_id=documents.id)"
 
 
 def readable_lines(row) -> list[str]:
@@ -342,8 +344,9 @@ class RevisionOperations:
         offset: int = 0,
         summary: bool = True,
         q: str = "",
+        current: bool = False,
     ) -> dict:
-        """List revisions by application and kind (cv, letter, answers, other), each with complete (a CV or letter whose PDF is stored); q searches titles, notes and readable text. summary=true (default) omits text, content and file entries; summary=false includes them."""
+        """List revisions by application and kind (cv, letter, answers, other), each with complete (a CV or letter whose PDF is stored); q searches titles, notes and readable text; current keeps the revisions no other replaces. summary=true (default) omits text, content and file entries; summary=false includes them."""
         check_page(limit, offset)
         where, params = [], []
         if application_id:
@@ -355,6 +358,8 @@ class RevisionOperations:
         if q:
             where.append("(title LIKE ? OR note LIKE ? OR text LIKE ?)")
             params.extend([f"%{q}%"] * 3)
+        if current:
+            where.append(CURRENT_SQL)
         clause = " WHERE " + " AND ".join(where) if where else ""
         columns = SUMMARY_COLUMNS if summary else "*"
         rows = self.db.all(

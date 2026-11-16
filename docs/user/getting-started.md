@@ -3,6 +3,18 @@
 This page takes you from nothing to your first application, by hand, without an
 agent. [How it works](how-it-works.md) explains the words used here.
 
+## Try the demo
+
+To look around first, start a disposable workspace of fictional data:
+
+```bash
+docker run --rm -p 127.0.0.1:8080:8080 vincenzoimp/openings demo
+```
+
+It prints a sign-in link that works once, an agent token and the
+`claude mcp add` line. It contacts no job site, and everything is deleted when
+it stops. From a clone, `uv run openings demo` does the same.
+
 ## Install
 
 You need Docker with Compose v2. The host needs no Python, Node or TeX.

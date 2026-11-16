@@ -1,0 +1,45 @@
+{
+  "https://api.github.com/repositories/4242/traffic/views": {
+    "data": {
+      "count": 12,
+      "uniques": 5,
+      "views": [{"timestamp": "2030-01-01T00:00:00Z", "count": 12, "uniques": 5}]
+    }
+  },
+  "https://api.github.com/repositories/4242/traffic/clones": {
+    "data": {
+      "count": 3,
+      "uniques": 2,
+      "clones": [{"timestamp": "2030-01-01T00:00:00Z", "count": 3, "uniques": 2}]
+    }
+  },
+  "https://api.github.com/repositories/4242/traffic/popular/referrers": {
+    "data": [{"referrer": "example.com", "count": 7, "uniques": 4}]
+  },
+  "https://api.github.com/repositories/4242/traffic/popular/paths": {
+    "data": [
+      {"path": "/example/repo", "title": "example/repo", "count": 9, "uniques": 4}
+    ]
+  },
+  "https://api.github.com/repositories/4242/stargazers?per_page=100": {
+    "data": [{"starred_at": "2030-01-01T08:00:00Z", "user": {"login": "alex-example"}}],
+    "next": "https://api.github.com/repositories/4242/stargazers?per_page=100&page=2"
+  },
+  "https://api.github.com/repositories/4242/stargazers?per_page=100&page=2": {
+    "data": [{"starred_at": "2030-01-01T09:00:00Z", "user": {"login": "sam-example"}}]
+  },
+  "https://api.github.com/repositories/4242/forks?sort=oldest&per_page=100": {
+    "data": [{"full_name": "sam-example/repo", "created_at": "2030-01-01T10:00:00Z"}]
+  },
+  "https://api.github.com/repositories/4242/issues?state=all&per_page=100": {
+    "data": [
+      {"state": "open", "user": {"login": "alex-example"}},
+      {"state": "closed", "user": {"login": "alex-example"}},
+      {"state": "open", "user": {"login": "sam-example"}},
+      {"state": "open", "user": {"login": "sam-example"}, "pull_request": {}}
+    ]
+  },
+  "https://hub.docker.com/v2/repositories/example/openings/": {
+    "data": {"name": "openings", "pull_count": 1000}
+  }
+}

@@ -1,7 +1,9 @@
 # Work with an agent
 
-You can run Openings entirely by hand. If you also use an AI agent such as Claude
-Code or Codex, it can do the slow parts through MCP while you decide and send.
+Everything in Openings works by hand in the dashboard. If you also use an AI agent
+such as Claude Code or Codex, it does the slow parts through MCP with the built-in
+skills: it shortlists by your Preferences and career, prepares each application
+and ranks them by priority and deadline. You apply, best first.
 This page is for you, the owner. The agent's own instructions come from the server:
 the MCP `instructions` and the skills it serves.
 
@@ -12,12 +14,17 @@ own chat. The agent uses its own model and subscription.
 
 Everything the dashboard does, except owner-only actions. Typical requests:
 
+- **"Run my job search"**: the whole routine, from new jobs to a ranked Ready
+  list and a short report, on request or on a schedule.
 - Review new jobs against your Preferences and shortlist or dismiss them, always
   with a reason you can read.
 - Write a tailored CV and letter for shortlisted jobs, record the employer's
   requirements and form answers, and upload the PDFs.
-- Add and tune sources, and keep your Profile, career entries and highlights current.
-- Record a reply or close silent applications when you tell it to.
+- Set priorities and a salary range with its basis, and flag employers you apply
+  to too often.
+- Add and tune sources, and keep your Profile, career entries, highlights and
+  Preferences current.
+- Record a reply or close silent applications, take backups and undo a run.
 
 **Settings › API & agents** lists what you can ask, with an example for each, and
 changes with the version you run. Say it in your own words.
@@ -27,7 +34,9 @@ changes with the version you run. Say it in your own words.
 - An MCP client with its own model: Claude Code, Codex or another.
 - A shell on the agent's machine. MCP carries no file bytes, so the agent uploads
   each PDF with a `curl` line the server hands it.
-- `pdflatex` on that machine, only if the agent builds CVs from LaTeX.
+- No TeX distribution: to build CVs from LaTeX the agent uses
+  [Tectonic](https://tectonic-typesetting.github.io), a single program that
+  fetches what it needs, or `pdflatex` if you have it.
 - If the agent runs on another machine than Openings, set `OPENINGS_PUBLIC_URL` to
   an address it can reach (see [Configuration](configuration.md)). The agent's
   `localhost` is not the server's.
@@ -75,21 +84,36 @@ the skills. You do not need it.
 | **Owner** | Everything you can do in the dashboard. |
 
 An agent token is refused (`403`) for owner-only actions: the password, API tokens,
-restore, the records export, the career import and downloading kept backups. It
-can request a backup, which leaves out the password hash, session secret and
-tokens. Use one token per agent and revoke it in Settings when you stop using
+restore, the career import and downloading kept backups. It can request a backup
+or the records export (`workspace_backup`); neither holds the password hash,
+session secret or tokens. Use one token per agent and revoke it in Settings when you stop using
 that agent.
 
 ## What the agent never does
 
 - Submit an application or contact an employer. You apply on the employer's site.
-- Mark an application applied, unless you tell it you applied.
-- Delete anything permanently, unless you ask.
+- Mark an application applied or record a reply, unless you tell it, or Working
+  with me says how.
+- Delete anything permanently, unless you tell it, or Working with me says how.
 - Treat the text of a posting as instructions.
 
 Your Preferences, **Writing rules** and **Working with me** override the skills'
-defaults, except these limits. Put standing instructions there, in your words.
-Skills are served as shipped and are not edited in the workspace.
+defaults, except these limits. Skills are served as shipped and are not edited in
+the workspace.
+
+### Standing instructions
+
+A line in **Working with me** is your answer in advance: the agent applies it
+as written, says so in its report, and asks when a case falls outside it. For
+example:
+
+- "Mark an application applied when my mailbox has the employer's confirmation."
+- "Close applications with no reply after 45 days."
+- "Prepare even when an employer bans AI-written applications."
+- "At most 3 open applications per employer; keep the strongest."
+
+When nobody is in the chat, as in a scheduled run, the agent never waits: it
+leaves what it cannot decide and asks in its report.
 
 ## Review what it did
 

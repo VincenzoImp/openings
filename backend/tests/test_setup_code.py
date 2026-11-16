@@ -10,11 +10,11 @@ from openings.app import create_app
 PASSWORD = "synthetic-password"
 
 
-def start(path, caplog):
+def start(path, caplog, demo=False):
     """One start of the server on ``path``: the app and the code it logged, if any."""
     caplog.clear()
     with caplog.at_level(logging.WARNING, logger="openings.auth"):
-        app = create_app(path, start_worker=False)
+        app = create_app(path, start_worker=False, demo=demo)
     logged = [record.getMessage() for record in caplog.records if "Setup code" in record.message]
     return app, logged
 
@@ -26,7 +26,6 @@ def setup(client, code=None):
 
 def test_the_right_code_claims_the_workspace_once(tmp_path, caplog, monkeypatch):
     monkeypatch.delenv("OPENINGS_PASSWORD", raising=False)
-    monkeypatch.delenv("OPENINGS_DEMO", raising=False)
     app, logged = start(tmp_path / "claim.sqlite", caplog)
     code = app.state.auth.setup_code
     assert logged == [
@@ -50,7 +49,6 @@ def test_the_right_code_claims_the_workspace_once(tmp_path, caplog, monkeypatch)
 
 def test_repeated_wrong_codes_are_throttled_like_sign_in(tmp_path, monkeypatch):
     monkeypatch.delenv("OPENINGS_PASSWORD", raising=False)
-    monkeypatch.delenv("OPENINGS_DEMO", raising=False)
     app = create_app(tmp_path / "guess.sqlite", start_worker=False)
     with TestClient(app) as client:
         codes = [setup(client, f"WRNG-{index:04d}").status_code for index in range(11)]
@@ -60,7 +58,6 @@ def test_repeated_wrong_codes_are_throttled_like_sign_in(tmp_path, monkeypatch):
 
 def test_a_restart_before_the_claim_replaces_the_code(tmp_path, caplog, monkeypatch):
     monkeypatch.delenv("OPENINGS_PASSWORD", raising=False)
-    monkeypatch.delenv("OPENINGS_DEMO", raising=False)
     path = tmp_path / "restart.sqlite"
     first, _ = start(path, caplog)
     old = first.state.auth.setup_code
@@ -75,14 +72,13 @@ def test_a_restart_before_the_claim_replaces_the_code(tmp_path, caplog, monkeypa
     assert third.state.auth.setup_code is None and logged == []
 
 
-@pytest.mark.parametrize("variable", ["OPENINGS_PASSWORD", "OPENINGS_DEMO"])
-def test_a_preset_password_or_the_demo_needs_no_code(tmp_path, caplog, monkeypatch, variable):
+@pytest.mark.parametrize("preset", ["password", "demo"])
+def test_a_preset_password_or_the_demo_needs_no_code(tmp_path, caplog, monkeypatch, preset):
     monkeypatch.delenv("OPENINGS_PASSWORD", raising=False)
-    monkeypatch.delenv("OPENINGS_DEMO", raising=False)
-    monkeypatch.setenv(variable, PASSWORD if variable == "OPENINGS_PASSWORD" else "1")
-    app, logged = start(tmp_path / "preset.sqlite", caplog)
+    if preset == "password":
+        monkeypatch.setenv("OPENINGS_PASSWORD", PASSWORD)
+    app, logged = start(tmp_path / "preset.sqlite", caplog, demo=preset == "demo")
     assert app.state.auth.setup_code is None and logged == []
     with TestClient(app) as client:
-        assert client.get("/api/v1/auth/session").json()["setup_code"] is False
-        if variable == "OPENINGS_DEMO":
-            assert setup(client).status_code == 200
+        session = client.get("/api/v1/auth/session").json()
+        assert session["setup_code"] is False and session["demo"] is (preset == "demo")

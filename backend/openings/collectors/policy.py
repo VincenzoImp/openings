@@ -2,7 +2,9 @@
 
 Requests share one configurable spacing and durable server cooldowns.
 Attempts count even when transport fails. Internal batches yield the worker;
-they do not impose an hourly or daily acquisition quota.
+they do not impose an hourly or daily acquisition quota. A demo workspace
+closes the gate (``ProviderStore.closed``): every request is refused with
+``providers_closed`` before its address is checked or resolved.
 """
 
 from __future__ import annotations
@@ -16,7 +18,7 @@ from urllib.parse import urljoin, urlsplit
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..common import check_version, encode, now
-from ..errors import DomainError, missing
+from ..errors import DomainError, missing, providers_closed
 from .catalog import COMPANY_KINDS
 from .pinning import pin_session
 
@@ -162,6 +164,8 @@ class ProviderDeferred(DomainError):
 class ProviderStore:
     def __init__(self, db):
         self.db = db
+        # Set only by demo mode: no request leaves, whatever the policy says.
+        self.closed = False
         with db.transaction() as connection:
             for provider in PROVIDERS:
                 policy = ProviderPolicy().model_dump()
@@ -169,6 +173,11 @@ class ProviderStore:
                     "INSERT OR IGNORE INTO providers(id,policy,runtime,updated_at) VALUES(?,?,?,?)",
                     (provider, encode(policy), "{}", now()),
                 )
+
+    def require_open(self):
+        """Refuse every provider request of a closed gate, before any name lookup."""
+        if self.closed:
+            raise providers_closed()
 
     def _row(self, provider):
         if provider not in PROVIDERS:
@@ -272,6 +281,7 @@ class ProviderBudget:
             raise self.blocked
 
     def before(self, method, url):
+        self.store.require_open()
         self._check_active()
         target_provider = provider_for_url(url)
         if target_provider not in ("manual", self.provider):
@@ -371,6 +381,7 @@ class ProviderBudget:
         self.responses.append({"status": status, "retry_after": headers.get("retry-after")})
 
     def request(self, send, method, url, **kwargs):
+        self.store.require_open()
         kwargs["allow_redirects"] = False
         owner = getattr(send, "__self__", None)
         is_curl = any(cls.__module__.startswith("curl_cffi") for cls in type(owner).__mro__)

@@ -108,8 +108,8 @@ def sources_list(ws: WS, query: Q[SourceQuery]) -> SourcePage:
 def sources_save(ws: WS, body: SourcesSave) -> BatchResult:
     """Add or update up to 50 sources (saved searches, company boards, feeds).
 
-    source_id with expected_version updates; enabled false pauses. Preview a new source
-    with sources_run first.
+    source_id with expected_version updates. A new source is paused unless enabled true.
+    Preview a new source with sources_run first.
     """
     return ws.discovery.save_sources(body)
 

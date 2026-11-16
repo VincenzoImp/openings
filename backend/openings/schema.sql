@@ -63,7 +63,8 @@ CREATE INDEX posting_details_job ON posting_details(job_id);
 -- concluded_on is the day an application closed as no_response was concluded.
 -- required_documents lists the document kinds Ready needs (workspace/readiness.py);
 -- from_shortlist marks an application a job's shortlist started, which undoing the
--- shortlist removes while it is empty.
+-- shortlist removes while it is empty. salary is the owner's expectation for this
+-- application as text (a range or a figure); no document carries it.
 CREATE TABLE applications (
  id TEXT PRIMARY KEY, job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
  status TEXT NOT NULL DEFAULT 'shortlisted' CHECK(status IN ('shortlisted','applied','interview','offer','closed')),
@@ -77,7 +78,8 @@ CREATE TABLE applications (
  concluded_on TEXT CHECK(concluded_on IS NULL OR (length(concluded_on)=10 AND date(concluded_on)=concluded_on)),
  required_documents TEXT NOT NULL DEFAULT '["cv","letter"]'
   CHECK(required_documents IN ('["cv","letter"]','["cv"]','["letter"]','[]')),
- from_shortlist INTEGER NOT NULL DEFAULT 0 CHECK(from_shortlist IN (0,1))
+ from_shortlist INTEGER NOT NULL DEFAULT 0 CHECK(from_shortlist IN (0,1)),
+ salary TEXT CHECK(salary IS NULL OR length(salary) BETWEEN 1 AND 300)
 );
 -- One record per change. job_id/application_id keep the owning timeline (and its
 -- deletion); subject_* names the changed record of any type. actor is the actor
@@ -258,4 +260,4 @@ CREATE TABLE idempotency_keys (
  record_id TEXT NOT NULL, created_at TEXT NOT NULL,
  PRIMARY KEY(scope,key)
 );
-PRAGMA user_version=15;
+PRAGMA user_version=16;

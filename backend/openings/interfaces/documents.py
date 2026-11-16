@@ -1,6 +1,6 @@
 """Operations of document revisions and files. Raw bytes use transfer routes (transport.py).
 
-An application's revisions are listed by applications_get; the file listings of a
+An application's revisions are also listed by applications_get; the file listings of a
 career entry and a template come with career_get and templates_get.
 """
 
@@ -19,9 +19,12 @@ from .core import Version, with_curl
 from .operation import DESTRUCTIVE, READ, WRITE, WS, Q, operation
 
 
-@operation("GET /documents", tags=["documents"], mcp="applications_get")
+@operation("GET /documents", tags=["documents"])
 def documents_list(ws: WS, query: Q[DocumentQuery]) -> DocumentPage:
-    """List document revisions by application and kind; q searches their text."""
+    """Search revisions across applications, newest first.
+
+    Each says whether it is complete (its PDF stored).
+    """
     return ws.documents.list_documents(**query.model_dump())
 
 
@@ -30,7 +33,7 @@ def documents_create(ws: WS, body: DocumentCreate) -> NewDocument:
     """Create a CV, letter or answers revision of an application.
 
     CV/letter: pdf {name, size}, optional TeX source; PUT the PDF to uploads.pdf's absolute
-    url (curl line given). Complete once its PDF is stored. Never sends.
+    url (curl line given) at once: Ready counts complete revisions only. Never sends.
     """
     document = ws.documents.create_document(body)
     names = {"pdf": body.pdf.name if body.pdf else "", "source": "source.tex"}

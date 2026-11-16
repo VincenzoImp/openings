@@ -70,13 +70,21 @@ def refused_host(host, scheme, public_url):
     )
 
 
-def create_app(database=None, start_worker=True):
+def create_app(database=None, start_worker=True, demo=False):
+    """The application of one workspace.
+
+    ``demo`` (``openings demo``) serves a disposable demo workspace: its provider gate
+    is closed, its printed link signs in once, and the session, ``/health``,
+    ``workspace_context`` and the workspace info say ``demo``.
+    """
     workspace = Workspace(database or os.environ.get("OPENINGS_DATABASE", "data/openings.sqlite"))
     workspace.maintenance = False
+    workspace.demo = demo
     auth = Auth(workspace)
     career = CareerService(workspace)
     documents = DocumentService(workspace)
     discovery = DiscoveryService(workspace)
+    discovery.providers.closed = demo
     events = EventLog(workspace)
     preferences = PreferencesService(workspace)
     stats = StatsService(workspace)
@@ -145,6 +153,7 @@ def create_app(database=None, start_worker=True):
                 "/api/v1/auth/session",
                 "/api/v1/auth/setup",
                 "/api/v1/auth/login",
+                "/api/v1/auth/demo",
                 "/api/v1/transfers",
             }
             actor = SYSTEM

@@ -32,11 +32,6 @@ COOKIE = "openings_session"
 CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 
 
-def demo_mode():
-    """Whether this process serves the disposable demo workspace (OPENINGS_DEMO)."""
-    return os.environ.get("OPENINGS_DEMO", "").strip().lower() in ("1", "true", "yes", "on")
-
-
 def setup_code():
     """A new one-time code, such as ``K7QM-3XPA``."""
     letters = "".join(secrets.choice(CODE_ALPHABET) for _ in range(8))
@@ -69,12 +64,17 @@ class Auth:
     def __init__(self, workspace):
         self.workspace = workspace
         self.used_operations = UsedNonces()
+        # The SHA-256 of the demo's one-time sign-in ticket, until it is used.
+        self.link = None
+        self.link_lock = threading.Lock()
         password = os.environ.get("OPENINGS_PASSWORD")
         if password and not self.configured():
             self.setup(password)
         # Until an owner exists, claiming the workspace needs a code printed to the
         # log of this start, so the first visitor on a network cannot take it.
-        self.setup_code = None if self.configured() or demo_mode() else setup_code()
+        # The demo (openings demo) sets its own password and signs in by its link.
+        demo = getattr(self.workspace, "demo", False)
+        self.setup_code = None if self.configured() or demo else setup_code()
         if self.setup_code:
             LOG.warning(
                 "Setup code: %s · find it again with `docker compose logs openings` (or `docker logs openings`)",
@@ -134,6 +134,29 @@ class Auth:
         data = self.workspace.get_settings("auth")["data"]
         if not password_matches(password, data.get("password_hash", "")):
             raise DomainError(401, "login_failed", "The password is incorrect.")
+        return self._signed_session(data)
+
+    def sign_in_link(self):
+        """A new single-use ticket for the demo's printed sign-in link; it replaces any other."""
+        ticket = secrets.token_urlsafe(32)
+        with self.link_lock:
+            self.link = hashlib.sha256(ticket.encode()).hexdigest()
+        return ticket
+
+    def redeem_link(self, ticket):
+        """Sign the browser in with the demo's ticket, once; any later use is refused."""
+        digest = hashlib.sha256((ticket or "").encode()).hexdigest()
+        with self.link_lock:
+            if not self.link or not hmac.compare_digest(digest, self.link):
+                raise DomainError(
+                    401,
+                    "link_used",
+                    "This sign-in link was already used. Start the demo again for a new one.",
+                )
+            self.link = None
+        return self._signed_session(self.workspace.get_settings("auth")["data"])
+
+    def _signed_session(self, data):
         session = {
             "owner": True,
             "csrf": secrets.token_urlsafe(24),
