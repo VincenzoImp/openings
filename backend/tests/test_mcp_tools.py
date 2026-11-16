@@ -5,6 +5,8 @@ import asyncio
 import json
 from datetime import UTC, datetime, timedelta
 
+from document_fixtures import source_revision
+from openings.discovery.models import SourceCreate
 from openings.interfaces import OPERATIONS
 from openings.outcomes import today
 
@@ -246,6 +248,152 @@ def test_application_fields_change_only_with_the_version_read(app, mcp):
         )
     )
     assert moved["items"][0]["result"]["stage"] == "applied"
+
+
+async def test_answers_and_questions_replace_the_whole_value_as_described(app, mcp):
+    """The descriptions say "Replaces all answers" and "Replaces the list": the code does."""
+    (job,) = jobs(app, 1)
+    questions = [{"id": "notice", "label": "Notice period"}, {"id": "permit", "label": "Permit"}]
+    application = app.state.workspace.create_application(
+        {"job_id": job["id"], "questions": questions}
+    )
+    application = app.state.workspace.update_application(
+        application["id"],
+        {
+            "expected_version": application["version"],
+            "answers": {"notice": "One month.", "permit": "Yes."},
+        },
+    )
+    item = {"application_id": application["id"], "expected_version": application["version"]}
+    ok(mcp.call("applications_update", {"items": [item | {"answers": {"notice": "Two months."}}]}))
+    read = ok(mcp.call("applications_get", {"ids": [application["id"]]}))["items"][0]
+    assert read["answers"] == {"notice": "Two months."}
+    item["expected_version"] = read["version"]
+    ok(mcp.call("applications_update", {"items": [item | {"questions": questions[:1]}]}))
+    read = ok(mcp.call("applications_get", {"ids": [application["id"]]}))["items"][0]
+    assert [question["id"] for question in read["questions"]] == ["notice"]
+    tools = {tool.name: tool for tool in await app.state.mcp.list_tools()}
+    fields = tools["applications_update"].input_schema["properties"]["items"]["items"]
+    assert fields["properties"]["answers"]["description"].startswith("Replaces all answers")
+
+
+def test_jobs_list_tells_two_searches_on_one_site_apart(app, mcp):
+    """source is the site; source_id is the saved source that found the job."""
+    workspace = app.state.workspace
+    first, second = (
+        workspace.discovery.create_source(
+            SourceCreate(
+                name=name, kind="jobspy", config={"query": name, "providers": ["linkedin"]}
+            )
+        )
+        for name in ("Data engineer", "Platform engineer")
+    )
+    found = {}
+    for source in (first, second):
+        for n in range(2):
+            job = workspace.ingest_job(
+                {
+                    "title": f"{source['name']} {n}",
+                    "company": "Example",
+                    "posting": f"Synthetic {source['name']} {n}.",
+                    "url": f"https://jobs.example.com/{source['id']}/{n}",
+                    "metadata": {"source": "linkedin"},
+                    "source_id": source["id"],
+                }
+            )
+            found.setdefault(source["id"], []).append(job)
+    for jobs_of_source in found.values():
+        job = jobs_of_source[0]
+        workspace.set_triage(job["id"], "dismissed", job["version"], "Too senior.")
+    site = ok(mcp.call("jobs_list", {"source": "linkedin", "triage": "dismissed"}))
+    assert site["total"] == 2
+    listed = ok(mcp.call("jobs_list", {"source_id": first["id"], "triage": "dismissed"}))
+    assert [item["id"] for item in listed["items"]] == [found[first["id"]][0]["id"]]
+    rest = mcp.client.get(
+        "/api/v1/jobs", params={"source_id": first["id"]}, headers=mcp.token["headers"]
+    ).json()
+    assert {item["id"] for item in rest["items"]} == {job["id"] for job in found[first["id"]]}
+
+
+def test_an_application_keeps_a_salary_expectation_under_its_version(app, mcp):
+    first, second = jobs(app, 2)
+    workspace = app.state.workspace
+    workspace.set_triage(second["id"], "shortlisted", second["version"])
+    created = ok(
+        mcp.call(
+            "applications_create",
+            {
+                "items": [
+                    {"job_id": first["id"], "salary": " CHF 95-105k a year "},
+                    # A shortlist's application takes the salary of the item.
+                    {"job_id": second["id"], "salary": "EUR 4,000 a month"},
+                ]
+            },
+        )
+    )
+    new, started = (item["id"] for item in created["items"])
+    read = ok(mcp.call("applications_get", {"ids": [new, started]}))["items"]
+    assert [item["salary"] for item in read] == ["CHF 95-105k a year", "EUR 4,000 a month"]
+    # A change needs the version read; a stale one is refused (409) and changes nothing.
+    item = {"application_id": new, "salary": "CHF 100k a year"}
+    _, error = mcp.call("applications_update", {"items": [item]})
+    assert error["code"] == "validation"
+    owner = workspace.update_application(
+        new, {"expected_version": read[0]["version"], "priority": 2}
+    )
+    stale = ok(mcp.call("applications_update", {"items": [item | {"expected_version": 1}]}))
+    assert stale["items"][0]["error"]["status"] == 409
+    assert workspace.get_application(new)["salary"] == "CHF 95-105k a year"
+    fresh = item | {"expected_version": owner["version"]}
+    ok(mcp.call("applications_update", {"items": [fresh]}))
+    changed = workspace.get_application(new)
+    assert changed["salary"] == "CHF 100k a year"
+    assert changed["version"] == owner["version"] + 1
+    # Listed beside the other fields, over REST and MCP; null clears it.
+    listed = ok(mcp.call("applications_list", {"job_id": first["id"]}))["items"][0]
+    assert listed["salary"] == "CHF 100k a year"
+    clear = {"application_id": new, "expected_version": changed["version"], "salary": None}
+    ok(mcp.call("applications_update", {"items": [clear]}))
+    assert workspace.get_application(new)["salary"] is None
+    _, error = mcp.call(
+        "applications_update",
+        {"items": [clear | {"expected_version": changed["version"] + 1, "salary": "x" * 301}]},
+    )
+    assert error["code"] == "validation"
+
+
+async def test_documents_list_searches_revision_text_over_mcp(app, mcp):
+    """A fix pass finds every letter that says something without downloading PDFs."""
+    assert "documents_list" in {tool.name for tool in await app.state.mcp.list_tools()}
+    first, second = jobs(app, 2)
+    documents, put = app.state.documents, mcp.client.put
+    workspace = app.state.workspace
+    applications = [workspace.create_application({"job_id": job["id"]}) for job in (first, second)]
+    replaced = source_revision(
+        documents, put, applications[0]["id"], "letter", "I admire your synthetic mission."
+    )
+    current = source_revision(
+        documents,
+        put,
+        applications[0]["id"],
+        "letter",
+        "I admire your synthetic mission and its tooling.",
+        previous_id=replaced["id"],
+    )
+    source_revision(documents, put, applications[1]["id"], "cv", "Built synthetic services.")
+    found = ok(mcp.call("documents_list", {"q": "your synthetic mission"}))
+    assert {item["id"] for item in found["items"]} == {replaced["id"], current["id"]}
+    found = ok(mcp.call("documents_list", {"q": "your synthetic mission", "current": True}))
+    assert [(item["id"], item["complete"]) for item in found["items"]] == [(current["id"], True)]
+    full = ok(mcp.call("documents_list", {"kind": "cv", "summary": False}))
+    assert full["items"][0]["text"] == "Built synthetic services."
+    # The REST route answers as before.
+    rest = mcp.client.get(
+        "/api/v1/documents",
+        params={"application_id": applications[0]["id"]},
+        headers=mcp.token["headers"],
+    ).json()
+    assert rest["total"] == 2 and "text" not in rest["items"][0]
 
 
 def test_career_and_highlights_are_saved_in_batches_with_versions(app, mcp):

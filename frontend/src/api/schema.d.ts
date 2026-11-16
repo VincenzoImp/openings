@@ -118,6 +118,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/auth/demo": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Demo Link
+     * @description Sign the browser in with the link openings demo prints; it works once.
+     */
+    get: operations["auth_demo"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/auth/login": {
     parameters: {
       query?: never;
@@ -190,6 +210,8 @@ export interface paths {
     /**
      * Session
      * @description Read the browser session state and its CSRF token.
+     *
+     *     demo is true in a disposable demo workspace (openings demo).
      */
     get: operations["auth_session"];
     put?: never;
@@ -253,8 +275,8 @@ export interface paths {
     get?: never;
     put?: never;
     /**
-     * Reserve a backup download; take one before any permanent bulk clean-up.
-     * @description A two-minute GET grant (curl line given). An agent's copy holds no credentials.
+     * Reserve a download; take a backup before any permanent bulk clean-up.
+     * @description backup: the SQLite file with files; export: the JSON records. A two-minute GET grant (curl line given); an agent's copy holds no credentials.
      */
     post: operations["workspace_backup"];
     delete?: never;
@@ -657,14 +679,14 @@ export interface paths {
       cookie?: never;
     };
     /**
-     * List document revisions by application and kind; q searches their text.
-     * @description List document revisions by application and kind; q searches their text.
+     * Search revisions across applications, newest first.
+     * @description Each says whether it is complete (its PDF stored).
      */
     get: operations["documents_list"];
     put?: never;
     /**
      * Create a CV, letter or answers revision of an application.
-     * @description CV/letter: pdf {name, size}, optional TeX source; PUT the PDF to uploads.pdf's absolute url (curl line given). Complete once its PDF is stored. Never sends.
+     * @description CV/letter: pdf {name, size}, optional TeX source; PUT the PDF to uploads.pdf's absolute url (curl line given) at once: Ready counts complete revisions only. Never sends.
      */
     post: operations["documents_create"];
     delete?: never;
@@ -766,9 +788,7 @@ export interface paths {
     };
     /**
      * Export
-     * @description Download the workspace records as JSON, without file bytes or credentials (owner only).
-     *
-     *     Owner only: an agent token is refused with 403 forbidden; not an MCP tool.
+     * @description Download the workspace records as JSON, without file bytes or credentials.
      */
     get: operations["export_download"];
     put?: never;
@@ -789,10 +809,8 @@ export interface paths {
     get?: never;
     put?: never;
     /**
-     * Reserve a records export (owner only).
+     * Reserve a records export.
      * @description A two-minute GET grant for the JSON records, without file bytes or credentials.
-     *
-     *     Owner only: an agent token is refused with 403 forbidden; not an MCP tool.
      */
     post: operations["workspace_export"];
     delete?: never;
@@ -940,8 +958,8 @@ export interface paths {
     put?: never;
     post?: never;
     /**
-     * Delete a job permanently, only on the owner's explicit request.
-     * @description With its applications, documents and files; collecting it again makes a new job.
+     * Delete a job permanently, only on the owner's request or standing rule.
+     * @description With its applications, documents and files; a source that finds it again makes a new job, so dismissing keeps the memory.
      */
     delete: operations["jobs_delete"];
     options?: never;
@@ -984,7 +1002,7 @@ export interface paths {
     put?: never;
     /**
      * Decide a likely duplicate.
-     * @description same merges job_id into other_id (other_id survives, with postings, applications and notes); different clears the flag for good. Returns the job that remains.
+     * @description same merges job_id into other_id (other_id survives with postings, applications and notes); different clears the flag for good. Both open with work: close one first.
      */
     post: operations["jobs_link"];
     delete?: never;
@@ -1420,7 +1438,7 @@ export interface paths {
     put?: never;
     /**
      * Add or update up to 50 sources (saved searches, company boards, feeds).
-     * @description source_id with expected_version updates; enabled false pauses. Preview a new source with sources_run first.
+     * @description source_id with expected_version updates. A new source is paused unless enabled true. Preview a new source with sources_run first.
      */
     post: operations["sources_save"];
     delete?: never;
@@ -1839,6 +1857,11 @@ export interface components {
        * @default []
        */
       requirements: components["schemas"]["EmployerRequirement"][];
+      /**
+       * Salary
+       * @description The owner's pay expectation.
+       */
+      salary?: string | null;
       /** Stage */
       stage: string;
       /** Updated At */
@@ -1959,6 +1982,11 @@ export interface components {
        * @default []
        */
       requirements: components["schemas"]["EmployerRequirement"][];
+      /**
+       * Salary
+       * @description The owner's pay expectation.
+       */
+      salary?: string | null;
       /** Stage */
       stage: string;
       /** Updated At */
@@ -1979,7 +2007,10 @@ export interface components {
       idempotency_key?: string | null;
       /** Job Id */
       job_id: string;
-      /** Priority */
+      /**
+       * Priority
+       * @description 1 is the highest, 5 the lowest; applications_list sort=priority is the sending order.
+       */
       priority?: number | null;
       /** Questions */
       questions?: components["schemas"]["Question"][];
@@ -1994,10 +2025,18 @@ export interface components {
       required_documents: ("cv" | "letter")[];
       /** Requirements */
       requirements?: components["schemas"]["Requirement"][];
+      /**
+       * Salary
+       * @description Expected pay as text (range, currency); never in a document.
+       */
+      salary?: string | null;
     };
     /** ApplicationItem */
     ApplicationItem: {
-      /** Answers */
+      /**
+       * Answers
+       * @description Replaces all answers: include those to keep.
+       */
       answers?: {
         [key: string]: unknown;
       } | null;
@@ -2014,7 +2053,7 @@ export interface components {
       deadline?: string | null;
       /**
        * Expected Version
-       * @description The version read; required to change priority, deadline, documents, requirements, questions or answers.
+       * @description The version read; required to change priority, deadline, documents, requirements, questions, answers or salary.
        */
       expected_version?: number | null;
       /** Outcome */
@@ -2022,9 +2061,12 @@ export interface components {
         ("accepted" | "rejected" | "not_pursued" | "no_response") | null;
       /** Priority */
       priority?: number | null;
-      /** Questions */
+      /**
+       * Questions
+       * @description Replaces the list; keep ids to keep items.
+       */
       questions?: components["schemas"]["Question"][] | null;
-      /** @description An employer reply: interview, offer and rejection move the stage; other never does. */
+      /** @description An employer reply to a sent application: interview, offer and rejection move the stage; other never does. Not with stage. */
       reply?: components["schemas"]["NewReply"] | null;
       /** @description Correct or delete a recorded reply. */
       reply_fix?: components["schemas"]["ReplyFix"] | null;
@@ -2036,8 +2078,13 @@ export interface components {
        */
       requirements?: components["schemas"]["Requirement"][] | null;
       /**
+       * Salary
+       * @description Expected pay as text (range, currency); never in a document.
+       */
+      salary?: string | null;
+      /**
        * Stage
-       * @description applied only when the owner says they applied; closed needs outcome.
+       * @description applied when the owner says they applied or a standing rule allows; closed needs outcome; shortlisted undoes applied while no reply; from closed it reopens.
        */
       stage?:
         ("shortlisted" | "applied" | "interview" | "offer" | "closed") | null;
@@ -2107,6 +2154,11 @@ export interface components {
        * @description Replaces the whole requirement list; include existing ids to keep them.
        */
       requirements?: components["schemas"]["Requirement"][] | null;
+      /**
+       * Salary
+       * @description Expected pay as text (range, currency); never in a document.
+       */
+      salary?: string | null;
       /**
        * Stage
        * @description applied is Mark applied (applied_at defaults to now); shortlisted again undoes it while the application has no reply, clearing applied_at. Record an employer reply with reply, which sets the stage itself.
@@ -2183,6 +2235,11 @@ export interface components {
       ready: boolean;
       /** Required Documents */
       required_documents: string[];
+      /**
+       * Salary
+       * @description The owner's pay expectation.
+       */
+      salary?: string | null;
       /** Stage */
       stage: string;
       /** Updated At */
@@ -2757,7 +2814,7 @@ export interface components {
       pdf?: components["schemas"]["FileSpec"] | null;
       /**
        * Previous Id
-       * @description The revision this one replaces.
+       * @description The revision this one replaces; it stops being current now.
        */
       previous_id?: string | null;
       /**
@@ -3010,7 +3067,7 @@ export interface components {
     };
     /**
      * Error
-     * @description Every error response. Codes by status: 401 unauthorized: sign in or send a valid bearer token (also transfer_token, transfer_expired, transfer_used: a grant works once). 403 forbidden: an agent token on an owner-only operation; csrf: a browser write without its X-CSRF-Token header. 404 not_found: the record or route does not exist, including a record the body names (application_id, career_id...). 409 conflict: the record changed (details.current_version and details.id); also constraint, application_has_work and similar rule conflicts. 413 request_size or file_size: the body or file is over its limit. 422 validation: details lists {field, message, type} per invalid field; other codes name a rule. 429 rate_limited: the shared provider gate is waiting; details.retry_after_seconds and the Retry-After header give the wait.
+     * @description Every error response. Codes by status: 401 unauthorized: sign in or send a valid bearer token (also transfer_token, transfer_expired, transfer_used: a grant works once). 403 forbidden: an agent token on an owner-only operation; csrf: a browser write without its X-CSRF-Token header. 404 not_found: the record or route does not exist, including a record the body names (application_id, career_id...). 409 conflict: the record changed (details.current_version and details.id); also constraint, application_has_work and similar rule conflicts; providers_closed: a demo workspace contacts no job site. 413 request_size or file_size: the body or file is over its limit. 422 validation: details lists {field, message, type} per invalid field; other codes name a rule. 429 rate_limited: the shared provider gate is waiting; details.retry_after_seconds and the Retry-After header give the wait.
      */
     Error: {
       error: components["schemas"]["ErrorBody"];
@@ -3649,7 +3706,7 @@ export interface components {
       expected_version?: number | null;
       /**
        * Other Id
-       * @description The job flagged as its likely duplicate.
+       * @description The job to keep: the one job_id's duplicate signal names.
        */
       other_id: string;
       /**
@@ -5298,7 +5355,7 @@ export interface components {
       reason?: string | null;
       /**
        * To
-       * @description new, shortlisted (starts its application) or dismissed.
+       * @description new, shortlisted (starts its application) or dismissed (needs a reason); a shortlisted job whose application has work is undone by closing the application.
        * @enum {string}
        */
       to: "new" | "shortlisted" | "dismissed";
@@ -5357,6 +5414,11 @@ export interface components {
       feedback: {
         [key: string]: unknown;
       }[];
+      /**
+       * Feedback More
+       * @description true: more corrections matched than feedback lists (the newest 30); read the earlier ones with feedback_since.
+       */
+      feedback_more?: boolean | null;
       /** Preferences */
       preferences: {
         [key: string]: unknown;
@@ -5420,6 +5482,12 @@ export interface components {
       actor: string;
       /** Api Base */
       api_base: string;
+      /**
+       * Demo
+       * @description A disposable demo workspace: fictional data, nothing kept, no job site contacted.
+       * @default false
+       */
+      demo: boolean;
       /** Mcp Endpoint */
       mcp_endpoint: string;
       /** Name */
@@ -5452,6 +5520,7 @@ export interface operations {
       query?: {
         applied_since?: string | null;
         applied_until?: string | null;
+        /** @description Exactly this company name. */
         company?: string | null;
         deadline_since?: string | null;
         deadline_until?: string | null;
@@ -6070,6 +6139,44 @@ export interface operations {
       };
     };
   };
+  auth_demo: {
+    parameters: {
+      query?: {
+        ticket?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      307: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description not_found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+    };
+  };
   auth_login: {
     parameters: {
       query?: never;
@@ -6265,7 +6372,9 @@ export interface operations {
   };
   workspace_backup: {
     parameters: {
-      query?: never;
+      query?: {
+        kind?: "backup" | "export";
+      };
       header?: never;
       path?: never;
       cookie?: never;
@@ -7518,6 +7627,7 @@ export interface operations {
         /** @description Also the system's changes (left out unless actor=system). */
         include_system?: boolean;
         job_id?: string | null;
+        /** @description Such as triage_changed, application_created, application_updated, reply_added, document_created. */
         kind?: string | null;
         limit?: number;
         offset?: number;
@@ -7833,10 +7943,15 @@ export interface operations {
     parameters: {
       query?: {
         application_id?: string;
+        /** @description Only revisions no other replaces. */
+        current?: boolean;
+        /** @description cv, letter, answers or other. */
         kind?: string;
         limit?: number;
         offset?: number;
+        /** @description A phrase in the title, note or readable text. */
         q?: string;
+        /** @description false adds text, content and files. */
         summary?: boolean;
       };
       header?: never;
@@ -8264,15 +8379,6 @@ export interface operations {
           "application/json": components["schemas"]["Error"];
         };
       };
-      /** @description conflict */
-      409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
       /** @description request_size or file_size */
       413: {
         headers: {
@@ -8657,6 +8763,8 @@ export interface operations {
           "relevance" | "newest" | "oldest" | "company" | "title" | "dismissed";
         /** @description The source a job summary names: a board or ATS (such as greenhouse), or manual. */
         source?: string | null;
+        /** @description Jobs this saved source found. */
+        source_id?: string | null;
         /** @description new, shortlisted, dismissed or active (not dismissed). */
         triage?: ("new" | "shortlisted" | "dismissed" | "active") | null;
         /** @description Jobs posted at this URL (board and redirect variants too). */

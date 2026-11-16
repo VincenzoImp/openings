@@ -4,16 +4,14 @@ Each is listed in ``TRANSPORT_ONLY`` with the reason it is not an operation
 (``test_parity.py`` checks the list against the served routes).
 """
 
-import os
-from pathlib import Path
-
 from fastapi import Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from starlette.background import BackgroundTask
 
 from .. import __version__, backups
 from ..actors import current_actor, require_owner
 from ..auth import COOKIE, MAX_AGE
+from ..common import examples_dir
 from ..db import SCHEMA_VERSION
 from ..errors import DomainError
 from ..operations import backup_file_for, restore_upload
@@ -27,11 +25,12 @@ TRANSPORT_ONLY = (
     ("POST", "/auth/setup", "Sets the first owner password and signs the browser in."),
     ("POST", "/auth/login", "Signs the browser in with a session cookie."),
     ("POST", "/auth/logout", "Ends every browser session; API and MCP tokens stay valid."),
+    ("GET", "/auth/demo", "Demo only: the printed one-time link sets the session cookie."),
     ("GET", "/capabilities", "A small REST summary of the operations; tools/list serves MCP."),
     ("GET", "/backup", "Streams a SQLite backup, with a session, a token or a grant."),
     ("POST", "/backup/restore", "Owner only: receives a raw SQLite upload that replaces data."),
     ("GET", "/backups/{name}", "Owner only: streams a kept backup file."),
-    ("GET", "/export", "Owner only: streams the JSON records, with a session, a token or a grant."),
+    ("GET", "/export", "Streams the JSON records, with a session, a token or a grant."),
     ("GET", "/examples", "Lists the shipped example files, not workspace records."),
     ("GET", "/examples/{name}", "Downloads a shipped example file."),
     ("PUT", "/transfers", "Receives raw file bytes under an upload grant (files_upload)."),
@@ -46,14 +45,16 @@ EXAMPLES = ("career.json", "preferences.json", "cv.tex", "letter.tex")
 NOT_FOUND = {404: {"description": "not_found"}}
 
 
-def _examples():
-    default = Path(__file__).resolve().parents[3] / "examples"
-    return Path(os.environ.get("OPENINGS_EXAMPLES", default))
-
-
 def register_transport(app, router, public_url):
     """Add the hand-written routes to ``router`` under ``API_PREFIX`` and ``/health``."""
     workspace, auth = app.state.workspace, app.state.auth
+
+    def with_cookie(request, response, token):
+        secure = request.url.scheme == "https" or public_url.startswith("https://")
+        response.set_cookie(
+            COOKIE, token, max_age=MAX_AGE, httponly=True, secure=secure, samesite="strict"
+        )
+        return response
 
     def signed_in(request, password, setup=False):
         if setup:
@@ -62,11 +63,7 @@ def register_transport(app, router, public_url):
         response = JSONResponse(
             {"configured": True, "authenticated": True, "csrf_token": session["csrf"]}
         )
-        secure = request.url.scheme == "https" or public_url.startswith("https://")
-        response.set_cookie(
-            COOKIE, token, max_age=MAX_AGE, httponly=True, secure=secure, samesite="strict"
-        )
-        return response
+        return with_cookie(request, response, token)
 
     @router.get(
         API_PREFIX + "/auth/session",
@@ -75,13 +72,32 @@ def register_transport(app, router, public_url):
         openapi_extra={"security": []},
     )
     def session(request: Request):
-        """Read the browser session state and its CSRF token."""
+        """Read the browser session state and its CSRF token.
+
+        demo is true in a disposable demo workspace (openings demo).
+        """
         state = auth.session(request)
         return {
             "configured": auth.configured(),
             "authenticated": bool(state),
             "csrf_token": state["csrf"] if state else None,
+            "demo": workspace.demo,
         }
+
+    @router.get(
+        API_PREFIX + "/auth/demo",
+        tags=["workspace"],
+        operation_id="auth_demo",
+        response_class=RedirectResponse,
+        responses=NOT_FOUND,
+        openapi_extra={"security": []},
+    )
+    def demo_link(request: Request, ticket: str = ""):
+        """Sign the browser in with the link openings demo prints; it works once."""
+        if not workspace.demo:
+            raise DomainError(404, "not_found", "This endpoint does not exist.")
+        token, _ = auth.redeem_link(ticket)
+        return with_cookie(request, RedirectResponse("/", status_code=303), token)
 
     @router.post(
         API_PREFIX + "/auth/setup",
@@ -169,21 +185,15 @@ def register_transport(app, router, public_url):
         _, path = backups.find(workspace.db, name)
         return FileResponse(path, media_type="application/vnd.sqlite3", filename=path.name)
 
-    @router.get(
-        API_PREFIX + "/export",
-        tags=["owner"],
-        operation_id="export_download",
-        openapi_extra={"x-openings-access": "owner"},
-    )
+    @router.get(API_PREFIX + "/export", tags=["workspace"], operation_id="export_download")
     def export():
-        """Download the workspace records as JSON, without file bytes or credentials (owner only)."""
-        require_owner("export the records")
+        """Download the workspace records as JSON, without file bytes or credentials."""
         return RecordsResponse(export_records(workspace.db))
 
     @router.get(API_PREFIX + "/examples", tags=["workspace"], operation_id="examples_list")
     def examples():
         """List the shipped example files."""
-        directory = _examples()
+        directory = examples_dir()
         return {
             "items": [
                 {"name": name, "url": "/api/v1/examples/" + name}
@@ -201,7 +211,7 @@ def register_transport(app, router, public_url):
     )
     def example_file(name: str):
         """Download a shipped example file."""
-        path = _examples() / name
+        path = examples_dir() / name
         if name not in EXAMPLES or not path.is_file():
             raise DomainError(404, "not_found", "Example not found.")
         return FileResponse(path, filename=name)
@@ -260,6 +270,7 @@ def register_transport(app, router, public_url):
         body = {
             "status": "ok",
             "version": __version__,
+            "demo": workspace.demo,
             "backup": {key: backup[key] for key in ("last_at", "age_hours", "ok")},
             "worker": {"heartbeat_age_seconds": None if age is None else round(age, 1)},
         }

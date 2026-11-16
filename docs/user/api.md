@@ -23,7 +23,7 @@ Send it as `Authorization: Bearer <token>`. Revoke it independently of any other
 | `owner` | Everything, like your dashboard session |
 
 An agent token is refused with `403 forbidden` for the owner password, API tokens,
-restore, the records export, the career import and kept backups. `POST /tokens`
+restore, the career import and kept backups. `POST /tokens`
 takes `{"name": "...", "kind": "agent"}`. Browser sessions are for the dashboard:
 their writes need the `X-CSRF-Token` from `GET /auth/session`; scripts use a token.
 

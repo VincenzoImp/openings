@@ -4,6 +4,7 @@ import sqlite3
 from contextlib import closing
 
 from openings.discovery.sources import SOURCE_COUNTS
+from openings.workspace.jobs import SAVED_SOURCE_SQL
 
 QUERIES = [
     (
@@ -24,6 +25,9 @@ QUERIES = [
     ("SELECT id FROM postings WHERE source_id=?", "postings"),
     # Per-source counts of sources_list (#211).
     (SOURCE_COUNTS.format(ids="?"), "p"),
+    # jobs_list source_id: the jobs one saved source found.
+    (f"SELECT j.id FROM jobs j WHERE {SAVED_SOURCE_SQL}", "postings"),
+    (f"SELECT j.id FROM jobs j WHERE {SAVED_SOURCE_SQL}", "j"),
     # The default order of the jobs list (jobs_list sort=newest).
     ("SELECT j.id FROM jobs j ORDER BY j.created_at DESC,j.id LIMIT 50 OFFSET 0", "j"),
     # Attribution: the changes of one call, and of one record.

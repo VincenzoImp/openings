@@ -102,6 +102,10 @@ class WorkspaceInfo(Out):
     actor: str = Field(description="owner, agent:<token name> or system: the label of changes.")
     storage: Storage
     workflow: str
+    demo: bool = Field(
+        default=False,
+        description="A disposable demo workspace: fictional data, nothing kept, no job site contacted.",
+    )
 
 
 class WorkspaceContext(Out):
@@ -117,6 +121,10 @@ class WorkspaceContext(Out):
     skills: list[Json]
     feedback: list[Json] = Field(
         default=[], description="The owner's corrections of agent work since the previous read."
+    )
+    feedback_more: bool | None = Field(
+        default=None,
+        description="true: more corrections matched than feedback lists (the newest 30); read the earlier ones with feedback_since.",
     )
 
 
@@ -360,6 +368,7 @@ class ApplicationRow(Record):
     outcome: str | None = None
     priority: int | None = None
     deadline: str | None = None
+    salary: str | None = Field(default=None, description="The owner's pay expectation.")
     applied_at: str | None = None
     concluded_on: str | None = None
     required_documents: list[str]

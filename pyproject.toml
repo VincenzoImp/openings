@@ -1,7 +1,7 @@
 [project]
 name = "openings"
 version = "0.27.3"
-description = "A self-hosted job-search workspace: collect jobs, prepare applications and track replies, by hand or with your own AI agent."
+description = "Self-hosted job search: every new job, filtered, prepared and ranked. You just apply. Use it by hand, over a REST API, or with your own AI agent over MCP. One container, one SQLite file."
 readme = "README.md"
 requires-python = ">=3.14"
 license = {text = "MIT"}

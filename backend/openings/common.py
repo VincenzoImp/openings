@@ -1,5 +1,7 @@
 import json
+import os
 from datetime import UTC, datetime
+from pathlib import Path
 from uuid import uuid4
 
 from .actors import current_batch
@@ -12,6 +14,12 @@ def now():
 
 def new_id():
     return uuid4().hex
+
+
+def examples_dir():
+    """The shipped example files: ``$OPENINGS_EXAMPLES``, else the checkout's ``examples/``."""
+    default = Path(__file__).resolve().parents[2] / "examples"
+    return Path(os.environ.get("OPENINGS_EXAMPLES", default))
 
 
 def encode(value):

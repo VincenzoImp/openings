@@ -115,14 +115,14 @@ Records and fields the release no longer keeps are written to
 file. If a check fails, the start stops with the reason and the original is
 untouched.
 
-**Roll back** with the copy, here from the upgrade to 0.24:
+**Roll back** with the copy, here from the upgrade to 0.28:
 
 ```bash
 docker compose down
 cd "$(docker volume inspect openings_workspace --format '{{ .Mountpoint }}')"
 mv openings.sqlite openings.failed-upgrade.sqlite
 rm -f openings.sqlite-wal openings.sqlite-shm
-cp -p openings.pre-0.24.sqlite openings.sqlite
+cp -p openings.pre-0.28.sqlite openings.sqlite
 # Set OPENINGS_IMAGE in .env to the previous release, then:
 docker compose up -d
 ```
@@ -164,6 +164,12 @@ shows the size, free space and retention.
 | The core cannot create SQLite | Make `/data` writable by UID/GID 10001. |
 
 ## Container details
+
+The image is `vincenzoimp/openings` on Docker Hub for linux/amd64 and arm64:
+`X.Y.Z` is one release, `X.Y` the newest patch of a minor and `latest` the newest
+release. From 0.28.0 the same image, with the same tags and digest, is at
+`ghcr.io/vincenzoimp/openings`, for when Docker Hub's anonymous pull limit gets in
+the way; to use it, set `OPENINGS_IMAGE=ghcr.io/vincenzoimp/openings:X.Y.Z` in `.env`.
 
 The single `openings` container has a Compose budget of 0.5 CPU and 512 MiB; leave
 room for the host. The `workspace` volume holds `/data/openings.sqlite`, its

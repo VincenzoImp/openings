@@ -22,3 +22,8 @@ def invalid(error):
         for item in error.errors(include_url=False, include_context=False)
     ]
     return DomainError(422, "validation", "Some fields need attention.", details)
+
+
+def providers_closed():
+    """The closed provider gate of a demo workspace: refused before any name lookup."""
+    return DomainError(409, "providers_closed", "This demo workspace contacts no job site.")

@@ -107,5 +107,27 @@ def test_feedback_lists_the_owners_corrections_of_agent_work_once(app, mcp):
     )
     # Read once: the next read starts after it, unless feedback_since asks again.
     assert "feedback" not in ok(mcp.call("workspace_context", {}))
-    since = ok(mcp.call("workspace_context", {"feedback_since": "2000-01-01"}))["feedback"]
-    assert len(since) == 3
+    since = ok(mcp.call("workspace_context", {"feedback_since": "2000-01-01"}))
+    assert len(since["feedback"]) == 3 and "feedback_more" not in since
+
+
+def test_feedback_says_when_more_matched_than_one_read_lists(app, mcp):
+    workspace = app.state.workspace
+    job = workspace.ingest_job({"title": "Synthetic role", "posting": "Build."})
+    ok(mcp.call("workspace_context", {}))
+    dismissal = {"job_id": job["id"], "to": "dismissed", "reason": "Not a fit."}
+    ok(mcp.call("jobs_triage", {"items": [dismissal]}))
+    with acting_as(OWNER):
+        # 31 corrections: the oldest restores the agent's dismissal, then 30 Preferences edits.
+        job = workspace.get_job(job["id"])
+        workspace.set_triage(job["id"], "new", job["version"])
+        for version in range(30):
+            app.state.preferences.update_preferences(
+                "ruled_out", {"expected_version": version, "items": [{"text": f"Rule {version}."}]}
+            )
+    context = ok(mcp.call("workspace_context", {}))
+    assert context["feedback_more"] is True and len(context["feedback"]) == 30
+    assert {item["what"] for item in context["feedback"]} == {"edited Preferences ruled_out"}
+    # feedback_since pages to the earlier ones; a read that lists every match has no flag.
+    newest = ok(mcp.call("workspace_context", {"feedback_since": context["feedback"][-1]["at"]}))
+    assert len(newest["feedback"]) == 29 and "feedback_more" not in newest

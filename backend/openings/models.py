@@ -127,6 +127,19 @@ RequirementKind = Literal[
 Priority = Annotated[int, Field(ge=1, le=5, description="1 is the highest priority, 5 the lowest.")]
 
 
+def salary_field():
+    """An application's salary expectation: text, blank or null clears it (#348)."""
+    return Field(
+        default=None,
+        max_length=300,
+        description="Expected pay as text (range, currency); never in a document.",
+    )
+
+
+def blank_as_none(value):
+    return (value.strip() or None) if isinstance(value, str) else value
+
+
 class Requirement(Input):
     """An employer requirement from the posting or the form."""
 
@@ -201,6 +214,7 @@ PastDay = Annotated[str, AfterValidator(past_day)]  # YYYY-MM-DD, not in the fut
 Since = Annotated[str, AfterValidator(normalized_date)]  # a date or timestamp, from its start
 Until = Annotated[str, AfterValidator(lambda value: normalized_date(value, end=True))]
 NonBlank = Annotated[str, AfterValidator(not_blank)]  # stripped, not empty
+Salary = Annotated[str, AfterValidator(blank_as_none)]  # stripped; blank is none
 
 
 class SubjectRef(Input):
@@ -239,9 +253,13 @@ class ApplicationInput(Input):
     job_id: str
     required_documents: list[DocumentKindRequired] = required_documents_field(["cv", "letter"])
     questions: list[Question] = Field(default_factory=list, max_length=100)
-    priority: Priority | None = None
+    priority: Priority | None = Field(
+        default=None,
+        description="1 is the highest, 5 the lowest; applications_list sort=priority is the sending order.",
+    )
     deadline: Day | None = Field(default=None, description="Closing date as YYYY-MM-DD.")
     requirements: list[Requirement] = Field(default_factory=list, max_length=100)
+    salary: Salary | None = salary_field()
     idempotency_key: str | None = Field(default=None, min_length=1, max_length=200)
 
 
@@ -301,6 +319,7 @@ class ApplicationFields(Input):
         default=None,
         description="With outcome no_response: the day it was concluded that no reply will come (YYYY-MM-DD, not in the future); today (UTC) when omitted.",
     )
+    salary: Salary | None = salary_field()
     reply: ReplyChange | None = Field(
         default=None,
         description="Record an employer reply (kind, date, note) and move the stage with it in the same change: interview moves an Applied application to Interview, offer moves it to Offer, rejection closes it as rejected; other never moves the stage. A Closed application without a reply (no_response) is reopened the same way. With id: correct a reply's kind, date or note, or remove it (remove=true); a correction never moves the stage.",
@@ -467,6 +486,9 @@ class JobQuery(Input):
         max_length=300,
         description="The source a job summary names: a board or ATS (such as greenhouse), or manual.",
     )
+    source_id: str | None = Field(
+        default=None, max_length=100, description="Jobs this saved source found."
+    )
     remote: bool | None = Field(default=None, description="Remote (true) or on site (false).")
     complete: bool | None = Field(
         default=None,
@@ -553,7 +575,9 @@ class ApplicationQuery(Input):
     )
     ready: bool | None = None
     outcome: Outcome | None = None
-    company: str | None = Field(default=None, max_length=300)
+    company: str | None = Field(
+        default=None, max_length=300, description="Exactly this company name."
+    )
     source: str | None = Field(default=None, max_length=100)
     priority: int | None = Field(default=None, ge=1, le=5)
     has_deadline: bool | None = None
@@ -594,7 +618,9 @@ class ApplicationIds(Input):
 
 class TriageItem(Input):
     job_id: Identifier
-    to: Triage = Field(description="new, shortlisted (starts its application) or dismissed.")
+    to: Triage = Field(
+        description="new, shortlisted (starts its application) or dismissed (needs a reason); a shortlisted job whose application has work is undone by closing the application."
+    )
     reason: str | None = Field(
         default=None,
         max_length=500,
@@ -607,7 +633,9 @@ class JobTriage(Input):
 
 
 class LinkInput(Input):
-    other_id: Identifier = Field(description="The job flagged as its likely duplicate.")
+    other_id: Identifier = Field(
+        description="The job to keep: the one job_id's duplicate signal names."
+    )
     decision: Literal["same", "different"] = Field(
         description="same merges job_id into other_id (other_id survives); different clears the flag."
     )
@@ -645,6 +673,7 @@ VERSIONED_FIELDS = (
     "requirements",
     "questions",
     "answers",
+    "salary",
 )
 
 
@@ -653,11 +682,11 @@ class ApplicationItem(Input):
     expected_version: int | None = Field(
         default=None,
         ge=1,
-        description="The version read; required to change priority, deadline, documents, requirements, questions or answers.",
+        description="The version read; required to change priority, deadline, documents, requirements, questions, answers or salary.",
     )
     stage: Stage | None = Field(
         default=None,
-        description="applied only when the owner says they applied; closed needs outcome.",
+        description="applied when the owner says they applied or a standing rule allows; closed needs outcome; shortlisted undoes applied while no reply; from closed it reopens.",
     )
     outcome: Outcome | None = None
     applied_on: PastDay | None = Field(
@@ -666,7 +695,7 @@ class ApplicationItem(Input):
     concluded_on: PastDay | None = None
     reply: NewReply | None = Field(
         default=None,
-        description="An employer reply: interview, offer and rejection move the stage; other never does.",
+        description="An employer reply to a sent application: interview, offer and rejection move the stage; other never does. Not with stage.",
     )
     reply_fix: ReplyFix | None = Field(
         default=None, description="Correct or delete a recorded reply."
@@ -677,8 +706,13 @@ class ApplicationItem(Input):
     requirements: list[Requirement] | None = Field(
         default=None, max_length=100, description="Replaces the list; keep ids to keep items."
     )
-    questions: list[Question] | None = Field(default=None, max_length=100)
-    answers: dict[str, Any] | None = None
+    questions: list[Question] | None = Field(
+        default=None, max_length=100, description="Replaces the list; keep ids to keep items."
+    )
+    answers: dict[str, Any] | None = Field(
+        default=None, description="Replaces all answers: include those to keep."
+    )
+    salary: Salary | None = salary_field()
 
     @model_validator(mode="after")
     def version_for_fields(self):

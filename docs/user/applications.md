@@ -61,8 +61,8 @@ head shows the role, company, stage, deadline and priority, **Open posting** and
   the Ready page.
 - **Ready:** the posting, CV and letter side by side, each document with a
   PDF/Text switch; on a phone, tabs **Check**, **Posting**, **CV**, **Letter**.
-  **Before you send** lists open requirements (tick them there), the form's
-  answers with copy buttons, **Apply on employer's site** and **Download CV +
+  **Before you send** lists the salary expectation your agent recorded, open
+  requirements (tick them there), the form's answers with copy buttons, **Apply on employer's site** and **Download CV +
   Letter**. The page shows its place in Today's order ("2 of 5 ready · Next: …");
   `[` and `]` move between them.
 - **Applied, Interview, Offer:** where it stands first ("Applied 12 Oct · no

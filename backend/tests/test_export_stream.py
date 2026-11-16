@@ -162,7 +162,7 @@ async def test_export_preserves_nullable_career_dates_and_scoped_mcp_download(ap
     archive = client.get("/api/v1/export").json()
     assert archive["sources"][0]["config"]["query"] == "engineer"
     assert all(isinstance(provider["policy"], dict) for provider in archive["providers"])
-    # The owner's export grant (workspace_export, owner only).
+    # An export grant (workspace_backup kind export, or POST /export/grant).
     ticket = grant(app.state.workspace, "export")
     client.cookies.clear()
     assert client.get("/api/v1/export").status_code == 401

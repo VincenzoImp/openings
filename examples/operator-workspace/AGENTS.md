@@ -14,19 +14,23 @@ The skills match the server's version.
 
 | The owner asks | Skill |
 |---|---|
+| Anything else; the rules every skill follows | `openings` |
 | Set up the workspace, import a CV | `setup-openings` |
+| Run the whole job search, now or on a schedule; a weekly report | `run-job-search` |
 | Go through the new jobs | `triage-jobs` |
-| Prepare CVs and letters for shortlisted jobs | `prepare-applications` |
+| Prepare CVs and letters for shortlisted jobs, or redo them | `prepare-applications` |
+| Set priorities, a salary range, employer caps; fix every letter | `review-applications` |
 | Record a reply, "I applied", what is waiting | `track-applications` |
-| Update the Profile, career entries, highlights or templates | `maintain-career` |
+| Update the Profile, career entries, highlights, templates or Preferences | `maintain-career` |
 | Add, tune or pause job sources | `manage-sources` |
 | Prepare for an interview | `prepare-interview` |
+| Back up, export, clean up, undo a run | `maintain-workspace` |
 
 The owner's own instructions for you live in Openings, under Preferences ›
 Working with me and Writing rules, not in this file: they override the skills'
 defaults, never the hard limits in the `openings` skill. You never submit an
-application, contact an employer or mark one applied unless the owner says they
-applied, and you never invent career facts.
+application or contact an employer, you mark one applied only on the owner's word
+or a standing instruction in Working with me, and you never invent career facts.
 
 ## Directory boundary
 
