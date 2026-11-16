@@ -504,7 +504,9 @@ const SCREENS: Screen[] = [
     // The dismissal whose reason quotes a line of the Preferences.
     open: async (page) => {
       await page.getByText("Staff Backend Engineer").first().click();
-      await expect(page.getByText(/remote within Europe/).first()).toBeVisible();
+      await expect(
+        page.getByText(/remote within Europe/).first(),
+      ).toBeVisible();
     },
   },
   { name: "jobs-all", route: "jobs?section=all" },
