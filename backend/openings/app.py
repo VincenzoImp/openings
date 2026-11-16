@@ -1,7 +1,10 @@
 """HTTP host for shared workspace REST, MCP and the compiled dashboard."""
 
 import asyncio
+import base64
+import hashlib
 import os
+import re
 import sqlite3
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -32,6 +35,44 @@ from .skills import SkillLibrary
 from .stats import StatsService
 from .worker import Worker
 from .workspace import Workspace
+
+# The dashboard runs only its own scripts, styles, fonts and frames; the inline
+# style elements of index.html are allowed by their hashes (``dashboard_policy``).
+DASHBOARD_POLICY = (
+    "default-src 'self'; script-src 'self'; style-src 'self'{styles}; img-src 'self' data:; "
+    "font-src 'self'; connect-src 'self'; frame-src 'self'; object-src 'self'; "
+    "base-uri 'none'; form-action 'self'; frame-ancestors 'self'"
+)
+# API answers are data: nothing in them may run or be framed. A file's content sets
+# its own sandboxed policy, which the dashboard's preview may frame.
+API_POLICY = "default-src 'none'; frame-ancestors 'none'"
+STYLE = re.compile(r"<style>(.*?)</style>", re.DOTALL)
+
+
+def dashboard_policy(index):
+    """The dashboard's Content-Security-Policy, with the hash of each inline style."""
+    text = index.read_text(encoding="utf-8") if index.is_file() else ""
+    hashes = "".join(
+        " 'sha256-" + base64.b64encode(hashlib.sha256(body.encode()).digest()).decode() + "'"
+        for body in STYLE.findall(text)
+    )
+    return DASHBOARD_POLICY.format(styles=hashes)
+
+
+def protect(response, path, dashboard):
+    """The security headers of every answer, an early refusal included."""
+    api = path.startswith(("/api", "/mcp"))
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "same-origin"
+    response.headers["X-Frame-Options"] = "SAMEORIGIN"
+    response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+    response.headers["Cache-Control"] = "no-store" if api else "no-cache"
+    # The interactive API reference (/api/docs) loads its own scripts.
+    if path.startswith(("/api/v1", "/mcp")):
+        response.headers.setdefault("Content-Security-Policy", API_POLICY)
+    elif not api:
+        response.headers.setdefault("Content-Security-Policy", dashboard)
+    return response
 
 
 def error_response(error):
@@ -119,11 +160,17 @@ def create_app(database=None, start_worker=True, demo=False):
     # (OPENINGS_TRUSTED_PROXIES); otherwise every proxied client shares one bucket.
     login_guard = app.state.login_guard = LoginGuard()
     semaphore = asyncio.Semaphore(24)
+    static = Path(
+        os.environ.get(
+            "OPENINGS_FRONTEND", Path(__file__).resolve().parents[2] / "frontend" / "dist"
+        )
+    )
+    dashboard_csp = dashboard_policy(static / "index.html")
 
     @app.middleware("http")
     async def boundary(request: Request, call_next):
+        path = request.url.path.rstrip("/")
         try:
-            path = request.url.path.rstrip("/")
             if workspace.maintenance and path.startswith(("/api/v1", "/mcp")):
                 raise DomainError(
                     503, "restoring", "A workspace restore is in progress. Retry shortly."
@@ -179,15 +226,9 @@ def create_app(database=None, start_worker=True, demo=False):
                     login_guard.failed()
                 elif response.status_code == 200:
                     login_guard.succeeded()
-            response.headers["X-Content-Type-Options"] = "nosniff"
-            response.headers["Referrer-Policy"] = "same-origin"
-            response.headers["X-Frame-Options"] = "SAMEORIGIN"
-            response.headers["Cache-Control"] = (
-                "no-store" if path.startswith(("/api", "/mcp")) else "no-cache"
-            )
-            return response
+            return protect(response, path, dashboard_csp)
         except DomainError as error:
-            return error_response(error)
+            return protect(error_response(error), path, dashboard_csp)
 
     @app.exception_handler(DomainError)
     async def domain_error(request, error):
@@ -226,11 +267,6 @@ def create_app(database=None, start_worker=True, demo=False):
         ),
     )
 
-    static = Path(
-        os.environ.get(
-            "OPENINGS_FRONTEND", Path(__file__).resolve().parents[2] / "frontend" / "dist"
-        )
-    )
     if (static / "assets").is_dir():
         app.mount("/assets", StaticFiles(directory=static / "assets"), name="assets")
 
