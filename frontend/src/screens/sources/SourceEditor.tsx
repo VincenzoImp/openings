@@ -11,6 +11,7 @@ import { CountrySelect } from "./CountrySelect";
 import { useToast } from "../../ui/Toast";
 import {
   CAREERS_ADVICE,
+  HN_HINT,
   KIND_LABELS,
   NATIONAL_SITES,
   POSTED_WITHIN,
@@ -93,7 +94,11 @@ function problems(draft: Draft, board: boolean) {
       !draft.country.trim()
     )
       found.country = "Indeed and Glassdoor need a country.";
-  } else if (!(board && !draft.url.trim()) && !httpUrl(draft.url))
+  } else if (
+    draft.kind !== "hn" && // the latest thread: nothing to fill in
+    !(board && !draft.url.trim()) &&
+    !httpUrl(draft.url)
+  )
     found.url =
       draft.kind === "feed"
         ? "Paste the feed's address, starting with https://."
@@ -224,6 +229,16 @@ function Editor({
     const sameAddress = source && url === (source.url || text(kept.url));
     if (draft.kind === "feed")
       return { kind: "rss" as const, url, config: { url }, filters };
+    if (draft.kind === "hn")
+      return {
+        kind: "hnhiring" as const,
+        url: "",
+        config:
+          typeof kept.max_results === "number"
+            ? { max_results: kept.max_results }
+            : {},
+        filters,
+      };
     return {
       kind: (sameAddress
         ? source.kind
@@ -367,6 +382,8 @@ function Editor({
           )}
           {draft.kind === "search" ? (
             <SearchFields draft={draft} set={set} errors={errors} />
+          ) : draft.kind === "hn" ? (
+            <p className="ui-field-hint">{HN_HINT}</p>
           ) : (
             <Field
               label={
@@ -439,7 +456,7 @@ function Editor({
               />
             </Field>
           </div>
-          {draft.kind === "search" && (
+          {(draft.kind === "search" || draft.kind === "hn") && (
             <Field
               label="Skip companies"
               optional
@@ -643,14 +660,15 @@ function TestResults({
           Nothing was saved. Check the address or the words, then test again.
         </Callout>
       )}
-      {preview?.kind && preview.kind !== "jobspy" && preview.kind !== "rss" && (
-        <p className="src-test-note">
-          Job board: {labels[preview.kind] ?? capitalize(preview.kind)}
-          {typeof preview.url === "string" && preview.url
-            ? ` · ${shortUrl(preview.url)}`
-            : ""}
-        </p>
-      )}
+      {preview?.kind &&
+        !["jobspy", "rss", "hnhiring"].includes(preview.kind) && (
+          <p className="src-test-note">
+            Job board: {labels[preview.kind] ?? capitalize(preview.kind)}
+            {typeof preview.url === "string" && preview.url
+              ? ` · ${shortUrl(preview.url)}`
+              : ""}
+          </p>
+        )}
       {preview?.automatic_collection === false && (
         <p className="src-test-note src-danger">
           This site gives titles without the posting text, so it cannot be

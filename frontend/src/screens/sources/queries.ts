@@ -179,7 +179,7 @@ const hasText = (item: Record<string, unknown>) =>
 
 /**
  * Test a source in two steps: the board's listing first (its titles show at
- * once), then the posting text of the first few. A search or a feed answers
+ * once), then the posting text of the first few. A search, a feed or HN answers
  * in one step. Both go through the shared request gate; nothing is saved.
  */
 export function useSourceTest() {
@@ -194,7 +194,7 @@ export function useSourceTest() {
   async function run(body: Omit<Schema<"SourceTest">, "details">) {
     const question = ++asked.current;
     const current = () => asked.current === question;
-    const twoSteps = body.kind !== "jobspy" && body.kind !== "rss";
+    const twoSteps = !["jobspy", "rss", "hnhiring"].includes(body.kind ?? "");
     setState({ phase: "listing", result: null, error: "" });
     try {
       let result = (await preview.mutateAsync({

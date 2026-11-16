@@ -2,6 +2,7 @@ import {
   Building2,
   Copy,
   Ellipsis,
+  MessagesSquare,
   Pause,
   Pencil,
   Play,
@@ -23,11 +24,17 @@ import {
   type SourceView,
 } from "./model";
 
-const KIND_ICONS = { search: Search, company: Building2, feed: Rss };
+const KIND_ICONS = {
+  search: Search,
+  company: Building2,
+  feed: Rss,
+  hn: MessagesSquare,
+};
 const KIND_NAMES = {
   search: "Search",
   company: "Company page",
   feed: "Feed",
+  hn: "HN thread",
 };
 
 export interface SourceActions {
