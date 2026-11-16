@@ -248,6 +248,33 @@ def test_application_fields_change_only_with_the_version_read(app, mcp):
     assert moved["items"][0]["result"]["stage"] == "applied"
 
 
+async def test_answers_and_questions_replace_the_whole_value_as_described(app, mcp):
+    """The descriptions say "Replaces all answers" and "Replaces the list": the code does."""
+    (job,) = jobs(app, 1)
+    questions = [{"id": "notice", "label": "Notice period"}, {"id": "permit", "label": "Permit"}]
+    application = app.state.workspace.create_application(
+        {"job_id": job["id"], "questions": questions}
+    )
+    application = app.state.workspace.update_application(
+        application["id"],
+        {
+            "expected_version": application["version"],
+            "answers": {"notice": "One month.", "permit": "Yes."},
+        },
+    )
+    item = {"application_id": application["id"], "expected_version": application["version"]}
+    ok(mcp.call("applications_update", {"items": [item | {"answers": {"notice": "Two months."}}]}))
+    read = ok(mcp.call("applications_get", {"ids": [application["id"]]}))["items"][0]
+    assert read["answers"] == {"notice": "Two months."}
+    item["expected_version"] = read["version"]
+    ok(mcp.call("applications_update", {"items": [item | {"questions": questions[:1]}]}))
+    read = ok(mcp.call("applications_get", {"ids": [application["id"]]}))["items"][0]
+    assert [question["id"] for question in read["questions"]] == ["notice"]
+    tools = {tool.name: tool for tool in await app.state.mcp.list_tools()}
+    fields = tools["applications_update"].input_schema["properties"]["items"]["items"]
+    assert fields["properties"]["answers"]["description"].startswith("Replaces all answers")
+
+
 def test_career_and_highlights_are_saved_in_batches_with_versions(app, mcp):
     saved = ok(
         mcp.call(

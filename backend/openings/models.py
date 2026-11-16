@@ -239,7 +239,10 @@ class ApplicationInput(Input):
     job_id: str
     required_documents: list[DocumentKindRequired] = required_documents_field(["cv", "letter"])
     questions: list[Question] = Field(default_factory=list, max_length=100)
-    priority: Priority | None = None
+    priority: Priority | None = Field(
+        default=None,
+        description="1 is the highest, 5 the lowest; applications_list sort=priority is the sending order.",
+    )
     deadline: Day | None = Field(default=None, description="Closing date as YYYY-MM-DD.")
     requirements: list[Requirement] = Field(default_factory=list, max_length=100)
     idempotency_key: str | None = Field(default=None, min_length=1, max_length=200)
@@ -552,7 +555,9 @@ class ApplicationQuery(Input):
     )
     ready: bool | None = None
     outcome: Outcome | None = None
-    company: str | None = Field(default=None, max_length=300)
+    company: str | None = Field(
+        default=None, max_length=300, description="Exactly this company name."
+    )
     source: str | None = Field(default=None, max_length=100)
     priority: int | None = Field(default=None, ge=1, le=5)
     has_deadline: bool | None = None
@@ -592,7 +597,9 @@ class ApplicationIds(Input):
 
 class TriageItem(Input):
     job_id: Identifier
-    to: Triage = Field(description="new, shortlisted (starts its application) or dismissed.")
+    to: Triage = Field(
+        description="new, shortlisted (starts its application) or dismissed (needs a reason); a shortlisted job whose application has work is undone by closing the application."
+    )
     reason: str | None = Field(
         default=None,
         max_length=500,
@@ -605,7 +612,9 @@ class JobTriage(Input):
 
 
 class LinkInput(Input):
-    other_id: Identifier = Field(description="The job flagged as its likely duplicate.")
+    other_id: Identifier = Field(
+        description="The job to keep: the one job_id's duplicate signal names."
+    )
     decision: Literal["same", "different"] = Field(
         description="same merges job_id into other_id (other_id survives); different clears the flag."
     )
@@ -655,7 +664,7 @@ class ApplicationItem(Input):
     )
     stage: Stage | None = Field(
         default=None,
-        description="applied only when the owner says they applied; closed needs outcome.",
+        description="applied when the owner says they applied or a standing rule allows; closed needs outcome; shortlisted undoes applied while no reply; from closed it reopens.",
     )
     outcome: Outcome | None = None
     applied_on: PastDay | None = Field(
@@ -664,7 +673,7 @@ class ApplicationItem(Input):
     concluded_on: PastDay | None = None
     reply: NewReply | None = Field(
         default=None,
-        description="An employer reply: interview, offer and rejection move the stage; other never does.",
+        description="An employer reply to a sent application: interview, offer and rejection move the stage; other never does. Not with stage.",
     )
     reply_fix: ReplyFix | None = Field(
         default=None, description="Correct or delete a recorded reply."
@@ -675,8 +684,12 @@ class ApplicationItem(Input):
     requirements: list[Requirement] | None = Field(
         default=None, max_length=100, description="Replaces the list; keep ids to keep items."
     )
-    questions: list[Question] | None = Field(default=None, max_length=100)
-    answers: dict[str, Any] | None = None
+    questions: list[Question] | None = Field(
+        default=None, max_length=100, description="Replaces the list; keep ids to keep items."
+    )
+    answers: dict[str, Any] | None = Field(
+        default=None, description="Replaces all answers: include those to keep."
+    )
 
     @model_validator(mode="after")
     def version_for_fields(self):

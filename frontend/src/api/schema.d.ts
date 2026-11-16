@@ -664,7 +664,7 @@ export interface paths {
     put?: never;
     /**
      * Create a CV, letter or answers revision of an application.
-     * @description CV/letter: pdf {name, size}, optional TeX source; PUT the PDF to uploads.pdf's absolute url (curl line given). Complete once its PDF is stored. Never sends.
+     * @description CV/letter: pdf {name, size}, optional TeX source; PUT the PDF to uploads.pdf's absolute url (curl line given) at once: Ready counts complete revisions only. Never sends.
      */
     post: operations["documents_create"];
     delete?: never;
@@ -940,8 +940,8 @@ export interface paths {
     put?: never;
     post?: never;
     /**
-     * Delete a job permanently, only on the owner's explicit request.
-     * @description With its applications, documents and files; collecting it again makes a new job.
+     * Delete a job permanently, only on the owner's request or standing rule.
+     * @description With its applications, documents and files; a source that finds it again makes a new job, so dismissing keeps the memory.
      */
     delete: operations["jobs_delete"];
     options?: never;
@@ -984,7 +984,7 @@ export interface paths {
     put?: never;
     /**
      * Decide a likely duplicate.
-     * @description same merges job_id into other_id (other_id survives, with postings, applications and notes); different clears the flag for good. Returns the job that remains.
+     * @description same merges job_id into other_id (other_id survives with postings, applications and notes); different clears the flag for good. Both open with work: close one first.
      */
     post: operations["jobs_link"];
     delete?: never;
@@ -1420,7 +1420,7 @@ export interface paths {
     put?: never;
     /**
      * Add or update up to 50 sources (saved searches, company boards, feeds).
-     * @description source_id with expected_version updates; enabled false pauses. Preview a new source with sources_run first.
+     * @description source_id with expected_version updates. A new source is paused unless enabled true. Preview a new source with sources_run first.
      */
     post: operations["sources_save"];
     delete?: never;
@@ -1979,7 +1979,10 @@ export interface components {
       idempotency_key?: string | null;
       /** Job Id */
       job_id: string;
-      /** Priority */
+      /**
+       * Priority
+       * @description 1 is the highest, 5 the lowest; applications_list sort=priority is the sending order.
+       */
       priority?: number | null;
       /** Questions */
       questions?: components["schemas"]["Question"][];
@@ -1997,7 +2000,10 @@ export interface components {
     };
     /** ApplicationItem */
     ApplicationItem: {
-      /** Answers */
+      /**
+       * Answers
+       * @description Replaces all answers: include those to keep.
+       */
       answers?: {
         [key: string]: unknown;
       } | null;
@@ -2022,9 +2028,12 @@ export interface components {
         ("accepted" | "rejected" | "not_pursued" | "no_response") | null;
       /** Priority */
       priority?: number | null;
-      /** Questions */
+      /**
+       * Questions
+       * @description Replaces the list; keep ids to keep items.
+       */
       questions?: components["schemas"]["Question"][] | null;
-      /** @description An employer reply: interview, offer and rejection move the stage; other never does. */
+      /** @description An employer reply to a sent application: interview, offer and rejection move the stage; other never does. Not with stage. */
       reply?: components["schemas"]["NewReply"] | null;
       /** @description Correct or delete a recorded reply. */
       reply_fix?: components["schemas"]["ReplyFix"] | null;
@@ -2037,7 +2046,7 @@ export interface components {
       requirements?: components["schemas"]["Requirement"][] | null;
       /**
        * Stage
-       * @description applied only when the owner says they applied; closed needs outcome.
+       * @description applied when the owner says they applied or a standing rule allows; closed needs outcome; shortlisted undoes applied while no reply; from closed it reopens.
        */
       stage?:
         ("shortlisted" | "applied" | "interview" | "offer" | "closed") | null;
@@ -2757,7 +2766,7 @@ export interface components {
       pdf?: components["schemas"]["FileSpec"] | null;
       /**
        * Previous Id
-       * @description The revision this one replaces.
+       * @description The revision this one replaces; it stops being current now.
        */
       previous_id?: string | null;
       /**
@@ -3649,7 +3658,7 @@ export interface components {
       expected_version?: number | null;
       /**
        * Other Id
-       * @description The job flagged as its likely duplicate.
+       * @description The job to keep: the one job_id's duplicate signal names.
        */
       other_id: string;
       /**
@@ -5298,7 +5307,7 @@ export interface components {
       reason?: string | null;
       /**
        * To
-       * @description new, shortlisted (starts its application) or dismissed.
+       * @description new, shortlisted (starts its application) or dismissed (needs a reason); a shortlisted job whose application has work is undone by closing the application.
        * @enum {string}
        */
       to: "new" | "shortlisted" | "dismissed";
@@ -5452,6 +5461,7 @@ export interface operations {
       query?: {
         applied_since?: string | null;
         applied_until?: string | null;
+        /** @description Exactly this company name. */
         company?: string | null;
         deadline_since?: string | null;
         deadline_until?: string | null;
@@ -7516,6 +7526,7 @@ export interface operations {
         /** @description Also the system's changes (left out unless actor=system). */
         include_system?: boolean;
         job_id?: string | null;
+        /** @description Such as triage_changed, application_created, application_updated, reply_added, document_created. */
         kind?: string | null;
         limit?: number;
         offset?: number;

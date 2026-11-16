@@ -30,7 +30,7 @@ def documents_create(ws: WS, body: DocumentCreate) -> NewDocument:
     """Create a CV, letter or answers revision of an application.
 
     CV/letter: pdf {name, size}, optional TeX source; PUT the PDF to uploads.pdf's absolute
-    url (curl line given). Complete once its PDF is stored. Never sends.
+    url (curl line given) at once: Ready counts complete revisions only. Never sends.
     """
     document = ws.documents.create_document(body)
     names = {"pdf": body.pdf.name if body.pdf else "", "source": "source.tex"}

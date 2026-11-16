@@ -107,7 +107,9 @@ class DocumentCreate(Input):
         description="Career entries the revision uses.",
     )
     note: str = Field(default="", max_length=5000)
-    previous_id: str | None = Field(default=None, description="The revision this one replaces.")
+    previous_id: str | None = Field(
+        default=None, description="The revision this one replaces; it stops being current now."
+    )
 
     @field_validator("content")
     @classmethod

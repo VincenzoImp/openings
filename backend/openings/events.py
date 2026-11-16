@@ -121,7 +121,11 @@ class EventQuery(SubjectRef):
     )
     job_id: str | None = Field(default=None, max_length=100)
     application_id: str | None = Field(default=None, max_length=100)
-    kind: str | None = Field(default=None, max_length=100)
+    kind: str | None = Field(
+        default=None,
+        max_length=100,
+        description="Such as triage_changed, application_created, application_updated, reply_added, document_created.",
+    )
     since: Since | None = None
     until: Until | None = None
     limit: int = Field(default=50, ge=1, le=200)
