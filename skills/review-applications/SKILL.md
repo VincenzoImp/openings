@@ -55,7 +55,7 @@ stage ready, sort priority).
 Use only Facts about me (the owner's targets or policy) and the posting: a
 stated band or scale, the job's metadata salary, a pay-transparency range.
 Never invent a market figure; with no basis, ask. Give a range and a single
-figure in the posting's currency, and store it in the application's salary
+figure in the posting's currency, and store it in the application's `salary`
 field with the version read, plus an unpinned note "Salary basis: ..." (key
 salary-<application id>). Put salary into a document only when the employer
 asks for it there.
@@ -74,7 +74,7 @@ cap in Working with me (flag above 3 when there is none):
 
 For "fix X in every letter" or a check of everything Ready:
 
-- find the current revisions that contain it with documents_list and q;
+- find the current revisions that contain it with `documents_list` and `q`;
 - edit the TeX minimally; never restyle for taste;
 - compile and check as [prepare-applications](../prepare-applications/SKILL.md)
   says, and store a new revision with previous_id;
