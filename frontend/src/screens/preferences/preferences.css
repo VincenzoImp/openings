@@ -2,7 +2,8 @@
   /* One reading column: the page reads as a document, not a form. */
   .prefs {
     width: 100%;
-    max-width: calc(var(--content) + 2 * var(--pane-pad));
+    max-width: var(--document);
+    margin-inline: auto;
     padding-bottom: var(--s-16);
   }
   .prefs-state {

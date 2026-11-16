@@ -523,7 +523,8 @@
 
   /* Sent stages */
   .apg-follow {
-    max-width: calc(var(--content) + 2 * var(--pane-pad));
+    min-width: 0;
+    max-width: var(--document);
     padding: var(--s-5) var(--pane-pad) 0;
   }
   .apg-statusline {

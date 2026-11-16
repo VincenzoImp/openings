@@ -5,9 +5,15 @@
   .pf-body {
     padding: var(--s-4) var(--pane-pad) var(--s-16);
   }
+  /* The CV, its header and the rail centre as one block. */
+  .pf {
+    width: 100%;
+    max-width: calc(var(--document) + 160px + var(--s-12));
+    margin-inline: auto;
+  }
   /* Its actions end where the CV does, above it rather than the rail. */
   .pf > .ui-page-header {
-    max-width: calc(var(--content) + 2 * var(--pane-pad));
+    max-width: var(--document);
   }
   .pf-layout {
     display: grid;
@@ -556,6 +562,9 @@
   }
 
   @container app (max-width: 1279px) {
+    .pf {
+      max-width: var(--document);
+    }
     .pf-layout {
       grid-template-columns: minmax(0, var(--content));
     }

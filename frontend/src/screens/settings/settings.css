@@ -2,10 +2,14 @@
    rows, the three steps of API & agents, and the lists of tokens and kept
    backups. */
 @layer screens {
+  /* The section list and the section centre as one block, title included. */
   .set-screen {
     display: flex;
     flex-direction: column;
+    width: 100%;
     min-width: 0;
+    max-width: calc(200px + var(--s-8) + 720px + var(--pane-pad) + var(--s-6));
+    margin-inline: auto;
   }
   .set {
     display: grid;
