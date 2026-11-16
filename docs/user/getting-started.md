@@ -32,27 +32,36 @@ docker compose ps
 curl --fail http://127.0.0.1:8080/health
 ```
 
-Every setting has a default. To change one, copy `.env.example` to `.env` first
+Port 8080 taken? `OPENINGS_PORT=18080 docker compose up -d`; agent links follow
+the port. Every setting has a default. To change one, copy `.env.example` to `.env` first
 (see [Configuration](configuration.md)). To reach Openings from other devices,
 see [Operations](operations.md#reach-it-from-other-devices).
 
 ## Set up your workspace
 
-Open **http://127.0.0.1:8080** and choose an owner password of at least 10
-characters (or set `OPENINGS_PASSWORD` in `.env` before the first start). A new
+Open **http://127.0.0.1:8080**, enter the **setup code** and choose an owner
+password of at least 10 characters. The code is printed to the server's log at
+each start until the workspace has an owner, so nobody else on your network can
+claim it first: `docker compose logs openings` (or `docker logs openings` after
+`docker run`) shows `Setup code: XXXX-XXXX`. With
+`OPENINGS_PASSWORD` set in `.env` before the first start, no code is needed. A new
 installation then opens the **setup guide**, four short steps about you:
 
 1. **About you.** Your name, the roles you are after and where (saved as
    statements under Preferences, *What I'm looking for*), and the languages you
    speak. Only the name is required.
-2. **Find jobs.** A search, prefilled from step 1, that you can **Test**
-   before you save it; or one job added by its link.
+2. **Find jobs.** A company's careers page, read directly from its job board,
+   with **Title must include** prefilled from your roles; or a search of
+   LinkedIn (with a country, also Indeed and Glassdoor) prefilled from step 1;
+   or one job added by its link. **Test** shows what each finds before you
+   save it, and a saved source is checked at once.
 3. **Your CV.** Paste your CV text and add the career entries read from it, or
    start from the example CV template.
 4. **Done.** How every day works, and connecting an AI agent, which is
    optional: Openings has no AI of its own.
 
-Find jobs and Your CV can be skipped. Until the workspace has a name and what
+Find jobs and Your CV can be skipped; opened again, the guide resumes at the
+first step not done. Until the workspace has a name and what
 you look for, a job or a source, and a career entry or template, Today shows a
 three-item **setup checklist** and the sidebar a **Finish setup** link. Both
 are read from the workspace, so every browser shows the same state.
@@ -91,7 +100,7 @@ while nothing has been added to it.
 Jobs can also arrive by themselves. Under **Sources**, choose **Add source**: a
 **Search** (a query and a place on LinkedIn, Indeed or Glassdoor), a **Company
 careers page** or an **RSS feed**. **Test** shows the first results and saves
-nothing. **Save** adds the source, and it is checked on the schedule.
+nothing. **Save** adds the source and checks it at once, then on the schedule.
 [Jobs and sources](jobs-and-sources.md) explains every setting.
 
 ## Prepare your first application

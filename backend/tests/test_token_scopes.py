@@ -243,7 +243,10 @@ def test_a_session_write_needs_its_csrf_header_and_a_revoked_token_is_refused(tm
     app = create_app(tmp_path / "auth.sqlite", start_worker=False)
     with TestClient(app) as client:
         assert client.get("/api/v1/jobs").status_code == 401
-        setup = client.post("/api/v1/auth/setup", json={"password": PASSWORD})
+        setup = client.post(
+            "/api/v1/auth/setup",
+            json={"password": PASSWORD, "setup_code": app.state.auth.setup_code},
+        )
         assert setup.status_code == 200
         assert client.post("/api/v1/jobs", json={"posting": "Text"}).status_code == 403
         client.headers["X-CSRF-Token"] = setup.json()["csrf_token"]

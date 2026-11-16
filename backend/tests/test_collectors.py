@@ -16,6 +16,7 @@ from openings.collectors.policy import (
     MAX_RETRY_AFTER,
     ProviderDeferred,
     ProviderPatch,
+    deferred_message,
     retry_after,
 )
 from openings.common import now
@@ -26,6 +27,7 @@ from openings.discovery import (
     SourceBulk,
     SourceCreate,
     SourcePreview,
+    SourceTest,
     SourceVersion,
     feeds,
 )
@@ -221,6 +223,75 @@ def test_preview_manual_and_worker_share_provider_gate(collection, monkeypatch):
     assert deferred["result"]["diagnostics"][0]["state"] == "deferred"
     assert service.get_source(source["id"])["next_run_at"] == deferred["next_run_at"]
     assert len(calls) == 1
+
+
+def test_a_test_lists_a_large_board_first_then_fetches_its_text(collection, monkeypatch):
+    _, service = collection
+    policy(service, "greenhouse", min_interval_seconds=0)
+    calls = []
+    listing = {"jobs": [{"id": n, "title": f"Engineer {n}", "location": {}} for n in range(1, 255)]}
+
+    def send(request):
+        calls.append(request.url.path)
+        if request.url.path.endswith("/jobs"):
+            return httpx.Response(200, json=listing)
+        if request.url.path.endswith("/offices"):
+            return httpx.Response(200, json={"offices": []})
+        return httpx.Response(200, json={"content": "<p>Build reliable services.</p>"})
+
+    mock_http(monkeypatch, send)
+    board = {"name": "Example", "kind": "greenhouse", "config": {"board": "example"}}
+    # The listing alone: one request, its titles and how many jobs it lists.
+    first = service.preview_source(SourceTest(**board, details=False))
+    assert len(calls) == 1 and first["listed"] == 254
+    assert [item["title"] for item in first["items"]] == ["Engineer 1", "Engineer 2", "Engineer 3"]
+    # Then the posting text of the first few.
+    second = service.preview_source(SourceTest(**board))
+    assert len(calls) == 1 + 2 + 3 and second["listed"] == 254
+    assert all(item["posting"] for item in second["items"])
+
+
+def test_a_check_counts_what_it_fetched_of_what_the_board_lists(collection, monkeypatch):
+    _, service = collection
+    policy(service, "greenhouse", min_interval_seconds=0)
+    listing = {"jobs": [{"id": n, "title": f"Engineer {n}", "location": {}} for n in range(1, 6)]}
+    mock_http(
+        monkeypatch,
+        lambda request: httpx.Response(
+            200,
+            json=listing
+            if request.url.path.endswith("/jobs")
+            else {"offices": []}
+            if request.url.path.endswith("/offices")
+            else {"content": "<p>Build reliable services.</p>"},
+        ),
+    )
+    source = service.create_source(
+        SourceCreate(name="Example", kind="greenhouse", config={"board": "example"})
+    )
+    task = service.queue_collection(source["id"])
+    service.run_task(service.claim_task("owner", "collect"), "owner")
+    counts = service.get_run(task["run_id"])["counts"]
+    assert counts["listed"] == 5 and counts["received"] == 5
+
+
+def test_a_refused_request_is_explained_with_its_time(collection, monkeypatch):
+    _, service = collection
+    policy(service, "greenhouse", min_interval_seconds=0)
+    mock_http(monkeypatch, lambda request: httpx.Response(429, headers={"Retry-After": "600"}))
+    preview = service.preview_source(
+        SourceTest(name="Example", kind="greenhouse", config={"board": "example"})
+    )
+    [diagnostic] = preview["diagnostics"]
+    until = datetime.fromisoformat(diagnostic["next_run_at"]).astimezone(UTC)
+    assert diagnostic["message"] == (
+        f"Greenhouse asked Openings to slow down; it waits until {until:%H:%M} UTC and tries again."
+    )
+    stamp = "2026-11-16T14:05:00+00:00"
+    assert deferred_message("linkedin", "provider_cooldown", stamp) == (
+        "LinkedIn refused this request from your network; Openings waits until 14:05 UTC "
+        "and tries again. Careers pages are not affected."
+    )
 
 
 def test_feed_unknown_location_is_retained_when_location_filters_are_set(monkeypatch):

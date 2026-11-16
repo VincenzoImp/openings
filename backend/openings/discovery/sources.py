@@ -253,8 +253,9 @@ class SourceOperations:
         return self._source(source_id)
 
     def preview_source(self, value: SourcePreview):
+        details = getattr(value, "details", True)
         self.providers.require_open()
-        resolved = self._resolve_source(value.model_dump())
+        resolved = self._resolve_source(value.model_dump(exclude={"details"}))
         source = {**resolved, "name": value.name or resolved["config"].get("board", "RSS source")}
         config = {
             key: val for key, val in source["config"].items() if key not in ("url", "filters")
@@ -276,13 +277,15 @@ class SourceOperations:
                 "note": "Listing pagination, redirects and retries may add requests; cached text can reduce detail fetches.",
             }
 
-        items, diagnostics = [], []
+        items, diagnostics, listed = [], [], None
         for provider in providers:
             budget = self.http_budget(provider)
             token = HTTP_BUDGET.set(budget)
-            attempt = {**source, "provider": provider, "preview": True}
+            attempt = {**source, "provider": provider, "preview": True, "details": details}
             try:
                 items.extend(fetch_postings(attempt))
+                if attempt.get("listed") is not None:
+                    listed = (listed or 0) + attempt["listed"]
                 diagnostics.append(attempt.get("diagnostic") or budget.diagnostics())
             except DomainError as error:
                 diagnostic = budget.diagnostics()
@@ -299,6 +302,7 @@ class SourceOperations:
                 {key: val for key, val in item.items() if key != "raw"} for item in items[:20]
             ],
             "total": len(items),
+            "listed": listed,
             "preview_limit": 20,
             "request_estimate": estimate(True),
             "full_request_estimate": estimate(False),
@@ -341,7 +345,24 @@ class SourceOperations:
                     connection, "source_created", ("source", record_id), {"kind": resolved["kind"]}
                 )
                 remember(connection, "sources", value.idempotency_key, digest, record_id)
+        if replayed is None and value.enabled:
+            self._queue_first_check(record_id, stamp)
         return self._source(replayed or record_id)
+
+    def _queue_first_check(self, source_id, stamp):
+        """Queue a new or re-enabled source's first check as its current schedule slot.
+
+        It takes the scheduler's path, so the global switch and the provider gate's
+        spacing apply, and the next scheduled check follows one interval later.
+        """
+        if self.providers.closed:
+            return  # the demo's closed gate: nothing to check, and nothing failed
+        try:
+            self.queue_collection(source_id, manual=False, planned_at=stamp)
+        except DomainError as error:
+            self.db.execute(
+                "UPDATE sources SET last_error=? WHERE id=?", (error.message[:1000], source_id)
+            )
 
     def update_source(self, source_id, value: SourcePatch):
         old = self._source(source_id)
@@ -374,6 +395,8 @@ class SourceOperations:
         schedule = schedule_adapter.validate_python(
             merged["schedule"] or {"kind": "interval"}
         ).model_dump()
+        stamp = now()
+        enabling = merged["enabled"] and not old["enabled"]
         with self.db.transaction() as connection:
             row = connection.execute("SELECT * FROM sources WHERE id=?", (source_id,)).fetchone()
             check_version(row, value.expected_version)
@@ -385,10 +408,8 @@ class SourceOperations:
                     encode(resolved["config"]),
                     int(merged["enabled"]),
                     encode(schedule),
-                    now()
-                    if "schedule" in updates or (merged["enabled"] and not old["enabled"])
-                    else old["last_scheduled_at"],
-                    now(),
+                    stamp if "schedule" in updates or enabling else old["last_scheduled_at"],
+                    stamp,
                     source_id,
                 ),
             )
@@ -401,6 +422,8 @@ class SourceOperations:
                     "version": row["version"] + 1,
                 },
             )
+        if enabling:
+            self._queue_first_check(source_id, stamp)
         return self._source(source_id)
 
     def delete_source(self, source_id, expected_version=None):

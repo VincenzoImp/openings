@@ -2,6 +2,7 @@
 
 import gzip
 import json
+import re
 
 import httpx
 import pytest
@@ -189,11 +190,12 @@ async def test_throttled_import_is_deferred_with_a_durable_cooldown(web):
     # The page is not requested while the provider asks to wait; manual input is preserved.
     assert web.calls == [api]
     assert result.title == "Kept title" and not result.posting
-    assert result.metadata == {
-        "extraction": "deferred",
-        "extraction_error": "Lever: provider cooldown.",
-        "note": "kept",
-    }
+    error = result.metadata.pop("extraction_error")
+    assert result.metadata == {"extraction": "deferred", "note": "kept"}
+    assert re.fullmatch(
+        r"Lever asked Openings to slow down; it waits until \d\d:\d\d UTC and tries again\.",
+        error,
+    )
     assert runtime(web, "lever")["cooldown_until"]
     again = await complete_input(value, web)
     assert again.metadata["extraction"] == "deferred" and web.calls == [api]

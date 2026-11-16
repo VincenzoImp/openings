@@ -123,12 +123,38 @@ def retry_after(value: str | None, moment: float) -> float | None:
     return moment + min(seconds, MAX_RETRY_AFTER)
 
 
+def deferred_message(provider, reason, next_run_at=None):
+    """Why a provider's request waits, in words a person reads (Test, Sources, agents).
+
+    A time is given as HH:MM UTC; the dashboard shows it in the viewer's time zone.
+    """
+    name, kind, _ = PROVIDERS[provider]
+    until = (
+        f"until {datetime.fromisoformat(next_run_at).astimezone(UTC):%H:%M} UTC "
+        if next_run_at
+        else ""
+    )
+    if reason == "provider_cooldown":
+        if kind == "search":
+            return (
+                f"{name} refused this request from your network; Openings waits {until}"
+                "and tries again. Careers pages are not affected."
+            )
+        return f"{name} asked Openings to slow down; it waits {until}and tries again."
+    if reason == "provider_interval":
+        return f"{name} was asked a moment ago; Openings waits {until}to space its requests."
+    if reason == "collection_batch":
+        return f"{name}: this check continues in its next batch of requests."
+    # provider_paused keeps its words: queued work is found again by them (runs.py).
+    return f"{name}: {reason.replace('_', ' ')}."
+
+
 class ProviderDeferred(DomainError):
     def __init__(self, provider, reason, next_run_at=None):
         super().__init__(
             429,
             reason,
-            f"{PROVIDERS[provider][0]}: {reason.replace('_', ' ')}.",
+            deferred_message(provider, reason, next_run_at),
             {"provider": provider, "next_run_at": next_run_at},
         )
         self.provider = provider

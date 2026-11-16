@@ -23,7 +23,10 @@ def test_temp_copies_live_beside_the_database_and_leave_nothing_behind(tmp_path)
 
     system_temp = set(Path(tempfile.gettempdir()).glob("openings-backup-*"))
     with TestClient(app) as client:
-        session = client.post("/api/v1/auth/setup", json={"password": "synthetic-password"})
+        session = client.post(
+            "/api/v1/auth/setup",
+            json={"password": "synthetic-password", "setup_code": app.state.auth.setup_code},
+        )
         client.headers["X-CSRF-Token"] = session.json()["csrf_token"]
         response = client.get("/api/v1/backup")
         assert response.status_code == 200

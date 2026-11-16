@@ -218,6 +218,14 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  .setup-advice {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-2);
+    margin-top: var(--s-2);
+    color: var(--text-2);
+  }
   .setup-muted {
     color: var(--text-3);
     font-weight: var(--w-regular);
