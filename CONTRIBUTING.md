@@ -59,7 +59,8 @@ npm --prefix frontend run format:check && npm --prefix frontend test
 - **MCP budget:** `test_mcp_budget.py` caps the tool list; add a tool last.
 - **Docs:** `test_docs.py` caps `docs/user` at 10,000 words and checks links,
   vocabulary and the routes and tools they name. Screenshots:
-  `npm --prefix frontend run screenshots -- --docs`.
+  `npm --prefix frontend run screenshots -- --docs`; the demo GIFs:
+  `npm --prefix frontend run reel` and `-- --dark`.
 - **Schema:** change `schema.sql`, the unreleased migration and its tests together.
 
 ## Changelog
