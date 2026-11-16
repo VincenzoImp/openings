@@ -45,8 +45,10 @@ export function useTitle(title: string | null | undefined) {
 }
 
 /**
- * Up to three icon buttons on the phone's top bar (Search, Filter, Add),
- * replacing the shell's own Search and Add job while the screen is shown.
+ * The phone's top bar: Search first on every screen, then at most two of
+ * the screen's own actions as icon buttons, which replace the shell's Add
+ * job. A screen whose list has its own search marks that button
+ * `data-topbar-search`, and it takes Search's place.
  */
 export function TopBarActions({ children }: { children: ReactNode }) {
   const { actionsSlot } = useShell();

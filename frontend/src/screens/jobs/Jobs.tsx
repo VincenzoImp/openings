@@ -784,6 +784,7 @@ export default function Jobs() {
           label="Search jobs"
           size="touch"
           tooltip="none"
+          data-topbar-search=""
           aria-pressed={searching}
           onClick={() => setSearching((value) => !value)}
         />

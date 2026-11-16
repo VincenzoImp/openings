@@ -391,7 +391,9 @@ export default function ApplicationsScreen() {
           <IconButton
             icon={Search}
             label="Search applications"
+            size="touch"
             tooltip="none"
+            data-topbar-search=""
             aria-pressed={searching}
             onClick={() => setSearching((value) => !value)}
           />
@@ -406,19 +408,19 @@ export default function ApplicationsScreen() {
                 {...props}
                 icon={ListFilter}
                 label="Filter"
+                size="touch"
                 tooltip="none"
               />
             )}
           />
         )}
-        <Button
-          variant="ghost"
-          size="sm"
+        <IconButton
           icon={filters.stats ? ListIcon : ChartNoAxesColumn}
+          label={filters.stats ? "List" : "Stats"}
+          size="touch"
+          tooltip="none"
           onClick={() => set({ stats: !filters.stats })}
-        >
-          {filters.stats ? "List" : "Stats"}
-        </Button>
+        />
       </TopBarActions>
       {filters.stats ? (
         <Toolbar label="Period">

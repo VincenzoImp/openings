@@ -226,15 +226,16 @@ export function Shell({
               }
               actions={
                 <>
+                  <IconButton
+                    icon={Search}
+                    label="Search"
+                    size="touch"
+                    tooltip="none"
+                    className="shell-search"
+                    onClick={() => setOverlay("palette")}
+                  />
                   <span className="shell-slot" ref={setActionsSlot} />
                   <span className="shell-defaults">
-                    <IconButton
-                      icon={Search}
-                      label="Search"
-                      size="touch"
-                      tooltip="none"
-                      onClick={() => setOverlay("palette")}
-                    />
                     <IconButton
                       icon={Plus}
                       label="Add job"

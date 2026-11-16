@@ -229,6 +229,36 @@ test("g and a letter go to a screen; ? shows the shortcuts; n adds a job", async
   await expect(add).toBeHidden();
 });
 
+test("the phone's top bar: Search first everywhere, a pushed page hides the bottom bar", async ({
+  page,
+}) => {
+  test.skip(!isPhone(page), "The top bar is a phone's.");
+  const bar = page.locator(".ui-topbar");
+  for (const route of [
+    "today",
+    "jobs",
+    "applications",
+    "profile",
+    "preferences",
+    "templates",
+    "sources",
+    "settings",
+  ]) {
+    await go(page, route);
+    const buttons = bar.getByRole("button").filter({ visible: true });
+    await expect(buttons.first(), route).toHaveAccessibleName(/^Search/);
+    // Search and at most two of the screen's actions, all 44 px icons.
+    expect(await buttons.count(), route).toBeLessThanOrEqual(3);
+    for (const box of await buttons.evaluateAll((all) =>
+      all.map((button) => button.getBoundingClientRect().height),
+    ))
+      expect(box, route).toBe(44);
+  }
+  const [ready] = (await call(page, "/applications?stage=ready&limit=1")).items;
+  await go(page, `applications/${ready.id}`);
+  await expect(page.locator(".ui-app-bottom")).toBeHidden();
+});
+
 test("a demo workspace says so on every screen until put away for the session", async ({
   page,
 }) => {
