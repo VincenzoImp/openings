@@ -1,6 +1,6 @@
 [project]
 name = "openings"
-version = "0.27.3"
+version = "0.28.0"
 description = "Self-hosted job search: every new job, filtered, prepared and ranked. You just apply. Use it by hand, over a REST API, or with your own AI agent over MCP. One container, one SQLite file."
 readme = "README.md"
 requires-python = ">=3.14"

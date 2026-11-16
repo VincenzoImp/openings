@@ -3,7 +3,7 @@ name: openings
 services:
   openings:
     # The newest patch of this minor release: `docker compose pull` brings fixes.
-    image: ${OPENINGS_IMAGE:-docker.io/vincenzoimp/openings:0.27}
+    image: ${OPENINGS_IMAGE:-docker.io/vincenzoimp/openings:0.28}
     init: true
     restart: unless-stopped
     ports:
