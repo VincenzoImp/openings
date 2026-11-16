@@ -166,6 +166,7 @@ export function JobList({
   selection,
   seen,
   on,
+  header,
   footer,
 }: {
   view: View;
@@ -176,6 +177,8 @@ export function JobList({
   selection: Selection;
   seen: ReadonlySet<string>;
   on: RowHandlers;
+  /** Above the rows: the bar of jobs that arrived while New is triaged. */
+  header?: ReactNode;
   footer?: ReactNode;
 }) {
   const groups = groupRows(rows, view);
@@ -205,6 +208,7 @@ export function JobList({
   };
   return (
     <div className="jobs-list">
+      {header}
       <List
         label={LABELS[view.section]}
         activeId={activeId || null}

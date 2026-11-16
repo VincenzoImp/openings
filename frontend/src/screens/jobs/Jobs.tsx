@@ -56,6 +56,7 @@ import {
   narrowed,
   neighbour,
   readView,
+  stillRows,
   sortsOf,
   viewQuery,
   type FilterKey,
@@ -210,12 +211,25 @@ export default function Jobs() {
       return next.size === current.size ? current : next;
     });
   }, [items]);
-  const rows = useMemo(
+  const present = useMemo(
     () => (items ?? []).filter((item) => !hidden.has(item.id)),
     [items, hidden],
   );
+  const gone = (items?.length ?? 0) - present.length;
+  // New stays still while it is triaged: arrivals wait in a bar until Show,
+  // so the selection never moves under the keyboard.
+  const still = view.section === "new";
+  const scope = JSON.stringify([view.section, view.q, view.filters, view.sort]);
+  const [screen, setScreen] = useState<{
+    scope: string;
+    ids: ReadonlySet<string>;
+  } | null>(null);
+  const onScreen = screen?.scope === scope ? screen.ids : null;
+  const { rows, held } = useMemo(
+    () => (still ? stillRows(present, onScreen) : { rows: present, held: [] }),
+    [still, present, onScreen],
+  );
   const ids = useMemo(() => rows.map((row) => row.id), [rows]);
-  const gone = (items?.length ?? 0) - rows.length;
   const total = Math.max(0, (list.data?.total ?? 0) - gone);
   const open = !!view.job;
   const selected = view.job || (wide ? (ids[0] ?? "") : "");
@@ -247,12 +261,23 @@ export default function Jobs() {
   }, [search, view.q, setView]);
 
   // A new tab or filter starts without a selection and from the first page.
-  const scope = JSON.stringify([view.section, view.q, view.filters, view.sort]);
   const clearPicked = picked.clear;
   useEffect(() => {
     clearPicked();
     setLimit(PAGE);
   }, [scope, clearPicked]);
+  // The rows on screen: the first read of New, and each next page.
+  const settled = !!items && !list.isPlaceholderData;
+  useEffect(() => {
+    if (still && settled && ids.some((id) => !onScreen?.has(id)))
+      setScreen({ scope, ids: new Set([...(onScreen ?? []), ...ids]) });
+  }, [still, settled, ids, onScreen, scope]);
+  /** Show the jobs that arrived; the selected job stays selected. */
+  function showArrivals() {
+    if (wide && !view.job && selected) setView({ job: selected });
+    else if (!wide && !open && active) setCursor(active);
+    setScreen({ scope, ids: new Set(present.map((item) => item.id)) });
+  }
 
   // The job on screen is read; the next one is read ahead.
   const shown = wide || open ? selected : "";
@@ -872,15 +897,25 @@ export default function Jobs() {
                   selection={picked}
                   seen={seen}
                   on={handlers}
+                  header={
+                    held.length > 0 ? (
+                      <div className="jobs-arrivals" role="status">
+                        <span>{plural(held.length, "new job")}</span>
+                        <Button size="sm" onClick={showArrivals}>
+                          Show
+                        </Button>
+                      </div>
+                    ) : null
+                  }
                   footer={
-                    total > rows.length ? (
+                    total > rows.length + held.length ? (
                       <div className="jobs-more">
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => setLimit((value) => value + PAGE)}
                         >
-                          Show more ({total - rows.length})
+                          Show more ({total - rows.length - held.length})
                         </Button>
                       </div>
                     ) : null

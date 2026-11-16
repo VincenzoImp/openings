@@ -277,3 +277,17 @@ test("history entries are named in words", () => {
     "hides 3 of 40",
   );
 });
+
+test("New stays still: arrivals above the rows on screen wait for Show", () => {
+  const rows = (...ids) => ids.map((id) => ({ id }));
+  const ids = (list) => list.map((row) => row.id);
+  // The first read: everything shows.
+  assert.deepEqual(ids(model.stillRows(rows("a", "b"), null).rows), ["a", "b"]);
+  // Two jobs arrive at the top, one lands between, a next page adds "z".
+  const { rows: shown, held } = model.stillRows(
+    rows("n1", "n2", "a", "n3", "b", "z"),
+    new Set(["a", "b"]),
+  );
+  assert.deepEqual(ids(shown), ["a", "b", "z"]);
+  assert.deepEqual(ids(held), ["n1", "n2", "n3"]);
+});

@@ -47,6 +47,44 @@ async function jobs(page: Page, tag: string, count: number) {
 const triageOf = async (page: Page, id: string) =>
   (await call(page, `/jobs/${id}`)).triage as string;
 
+test("New stays still while jobs arrive: d acts on the job on screen, Show inserts them", async ({
+  page,
+}) => {
+  test.skip(isPhone(page), "The keyboard flow is the desktop's.");
+  const tag = unique("Still");
+  const made = await jobs(page, tag, 3);
+  // A clock the test moves: the list's next read comes when it says.
+  await page.clock.install();
+  await page.goto("about:blank");
+  await go(page, `jobs?q=${encodeURIComponent(tag)}`);
+  await expect(rows(page)).toHaveCount(3);
+  await expect(title(page)).toHaveText(made[0].title);
+  // Two jobs arrive at the top while New is triaged; the list reads again.
+  const arrived = [
+    await job(page, `${tag} arrival 1`),
+    await job(page, `${tag} arrival 2`),
+  ];
+  await page.clock.fastForward(31_000);
+  const bar = page.locator(".jobs-arrivals");
+  await expect(bar).toContainText("2 new jobs");
+  await expect(rows(page)).toHaveCount(3);
+  await expect(rows(page).first()).toContainText(made[0].title);
+  await expect(title(page)).toHaveText(made[0].title);
+  // d dismisses the job on screen, never one that arrived.
+  await page.keyboard.press("d");
+  await expect(toast(page)).toContainText(`Dismissed “${made[0].title}”`);
+  await expect.poll(() => triageOf(page, made[0].id)).toBe("dismissed");
+  for (const item of arrived) expect(await triageOf(page, item.id)).toBe("new");
+  await expect(title(page)).toHaveText(made[1].title);
+  await expect(bar).toContainText("2 new jobs");
+  // Show inserts them; the selection stays.
+  await bar.getByRole("button", { name: "Show" }).click();
+  await expect(bar).toHaveCount(0);
+  await expect(rows(page)).toHaveCount(4);
+  await expect(rows(page).first()).toContainText(`${tag} arrival 2`);
+  await expect(title(page)).toHaveText(made[1].title);
+});
+
 test("twenty jobs are triaged by keyboard in at most 25 keys, each with its next job and Undo", async ({
   page,
 }) => {

@@ -148,21 +148,8 @@ export function listQuery(view: View, limit: number): ListQuery {
 /* ------------------------------------------------------------- languages */
 
 export { REQUIREMENT_LANGUAGES, languageName };
-/** The languages a posting's own language is recognised in. */
-export const POSTING_LANGUAGES = [
-  "en",
-  "de",
-  "fr",
-  "it",
-  "es",
-  "pt",
-  "nl",
-  "pl",
-  "sv",
-  "da",
-  "no",
-  "fi",
-];
+/** The languages a posting's own language is recognised in: the first 12. */
+export const POSTING_LANGUAGES = REQUIREMENT_LANGUAGES.slice(0, 12);
 const either = (codes: string[]) => codes.map(languageName).join(" or ");
 
 /* ------------------------------------------------------------ the filters */
@@ -287,6 +274,29 @@ function dayBucket(value: string | null | undefined, now: Date) {
   start.setDate(start.getDate() - 1);
   return date >= start ? 1 : 2;
 }
+
+/**
+ * New stays still while it is triaged: a job that arrives above a row already
+ * on screen waits (`held`) until Show; one below the last row on screen (the
+ * next page) joins at once. Without rows on screen yet, every row shows.
+ */
+export function stillRows<Row extends { id: string }>(
+  items: Row[],
+  onScreen: ReadonlySet<string> | null,
+) {
+  if (!onScreen) return { rows: items, held: [] as Row[] };
+  let last = -1;
+  items.forEach((item, index) => {
+    if (onScreen.has(item.id)) last = index;
+  });
+  const rows: Row[] = [];
+  const held: Row[] = [];
+  items.forEach((item, index) =>
+    (onScreen.has(item.id) || index > last ? rows : held).push(item),
+  );
+  return { rows, held };
+}
+
 /**
  * The rows of a list by day, when the list is in time order: by when a job
  * was found, or in Dismissed by when it was dismissed. In alphabetical order
