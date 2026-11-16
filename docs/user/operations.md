@@ -46,7 +46,7 @@ through. Opening any older format directly is planned for 1.0.0.
 Releases come at most once a week unless a fix unblocks someone. No 0.28.x
 release changes the data format.
 
-### What an upgrade does
+### Upgrades
 
 When a release changes the format, the upgrade builds a new file with the data
 copied in, so an upgraded workspace has exactly the layout of a new one. It needs

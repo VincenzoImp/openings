@@ -22,6 +22,7 @@ PAGES = [
     ROOT / "CONTRIBUTING.md",
     ROOT / "SECURITY.md",
     ROOT / "docs" / "README.md",
+    ROOT / "docs" / "comparison.md",
     *sorted((ROOT / "docs" / "developer").glob("*.md")),
     ROOT / "examples" / "README.md",
     ROOT / "examples" / "operator-workspace" / "README.md",
