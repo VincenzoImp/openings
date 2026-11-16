@@ -5,7 +5,7 @@ Each is listed in ``TRANSPORT_ONLY`` with the reason it is not an operation
 """
 
 from fastapi import Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from starlette.background import BackgroundTask
 
 from .. import __version__, backups
@@ -25,6 +25,7 @@ TRANSPORT_ONLY = (
     ("POST", "/auth/setup", "Sets the first owner password and signs the browser in."),
     ("POST", "/auth/login", "Signs the browser in with a session cookie."),
     ("POST", "/auth/logout", "Ends every browser session; API and MCP tokens stay valid."),
+    ("GET", "/auth/demo", "Demo only: the printed one-time link sets the session cookie."),
     ("GET", "/capabilities", "A small REST summary of the operations; tools/list serves MCP."),
     ("GET", "/backup", "Streams a SQLite backup, with a session, a token or a grant."),
     ("POST", "/backup/restore", "Owner only: receives a raw SQLite upload that replaces data."),
@@ -48,6 +49,13 @@ def register_transport(app, router, public_url):
     """Add the hand-written routes to ``router`` under ``API_PREFIX`` and ``/health``."""
     workspace, auth = app.state.workspace, app.state.auth
 
+    def with_cookie(request, response, token):
+        secure = request.url.scheme == "https" or public_url.startswith("https://")
+        response.set_cookie(
+            COOKIE, token, max_age=MAX_AGE, httponly=True, secure=secure, samesite="strict"
+        )
+        return response
+
     def signed_in(request, password, setup=False):
         if setup:
             auth.setup(password)
@@ -55,11 +63,7 @@ def register_transport(app, router, public_url):
         response = JSONResponse(
             {"configured": True, "authenticated": True, "csrf_token": session["csrf"]}
         )
-        secure = request.url.scheme == "https" or public_url.startswith("https://")
-        response.set_cookie(
-            COOKIE, token, max_age=MAX_AGE, httponly=True, secure=secure, samesite="strict"
-        )
-        return response
+        return with_cookie(request, response, token)
 
     @router.get(
         API_PREFIX + "/auth/session",
@@ -68,13 +72,32 @@ def register_transport(app, router, public_url):
         openapi_extra={"security": []},
     )
     def session(request: Request):
-        """Read the browser session state and its CSRF token."""
+        """Read the browser session state and its CSRF token.
+
+        demo is true in a disposable demo workspace (openings demo).
+        """
         state = auth.session(request)
         return {
             "configured": auth.configured(),
             "authenticated": bool(state),
             "csrf_token": state["csrf"] if state else None,
+            "demo": workspace.demo,
         }
+
+    @router.get(
+        API_PREFIX + "/auth/demo",
+        tags=["workspace"],
+        operation_id="auth_demo",
+        response_class=RedirectResponse,
+        responses=NOT_FOUND,
+        openapi_extra={"security": []},
+    )
+    def demo_link(request: Request, ticket: str = ""):
+        """Sign the browser in with the link openings demo prints; it works once."""
+        if not workspace.demo:
+            raise DomainError(404, "not_found", "This endpoint does not exist.")
+        token, _ = auth.redeem_link(ticket)
+        return with_cookie(request, RedirectResponse("/", status_code=303), token)
 
     @router.post(
         API_PREFIX + "/auth/setup",
@@ -253,6 +276,7 @@ def register_transport(app, router, public_url):
         body = {
             "status": "ok",
             "version": __version__,
+            "demo": workspace.demo,
             "backup": {key: backup[key] for key in ("last_at", "age_hours", "ok")},
             "worker": {"heartbeat_age_seconds": None if age is None else round(age, 1)},
         }

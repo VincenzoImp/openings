@@ -118,6 +118,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/auth/demo": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Demo Link
+     * @description Sign the browser in with the link openings demo prints; it works once.
+     */
+    get: operations["auth_demo"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/auth/login": {
     parameters: {
       query?: never;
@@ -190,6 +210,8 @@ export interface paths {
     /**
      * Session
      * @description Read the browser session state and its CSRF token.
+     *
+     *     demo is true in a disposable demo workspace (openings demo).
      */
     get: operations["auth_session"];
     put?: never;
@@ -5420,6 +5442,12 @@ export interface components {
       actor: string;
       /** Api Base */
       api_base: string;
+      /**
+       * Demo
+       * @description A disposable demo workspace: fictional data, nothing kept, no job site contacted.
+       * @default false
+       */
+      demo: boolean;
       /** Mcp Endpoint */
       mcp_endpoint: string;
       /** Name */
@@ -6058,6 +6086,44 @@ export interface operations {
         };
       };
       /** @description validation */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+    };
+  };
+  auth_demo: {
+    parameters: {
+      query?: {
+        ticket?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      307: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description not_found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["Error"];
+        };
+      };
+      /** @description Validation Error */
       422: {
         headers: {
           [name: string]: unknown;

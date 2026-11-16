@@ -167,6 +167,9 @@ class ContextService:
                 if since
                 else []
             )
+        if getattr(ws, "demo", False):
+            # Fictional data in a temporary file, and no job site is contacted.
+            result["workspace"]["demo"] = True
         collection = ws.discovery.get_collection()
         result["settings"]["collection"] = {
             "enabled": collection["enabled"],
