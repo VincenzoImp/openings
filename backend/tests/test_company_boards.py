@@ -671,3 +671,53 @@ def test_a_large_listing_is_read_and_a_larger_one_is_named(collection, monkeypat
     assert task["state"] == "failed"
     assert task["result"]["attempt_history"][-1]["reason"] == "source_too_large"
     assert "'example'" in task["error"] and "64 MB" in task["error"]
+
+
+# #367 -----------------------------------------------------------------------
+
+BILLION_LAUGHS = b"""<?xml version="1.0"?>
+<!DOCTYPE lolz [
+  <!ENTITY lol "lol">
+  <!ENTITY lol2 "&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;">
+  <!ENTITY lol3 "&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;">
+  <!ENTITY lol4 "&lol3;&lol3;&lol3;&lol3;&lol3;&lol3;&lol3;&lol3;&lol3;&lol3;">
+]>
+<rss><channel><item><guid>1</guid><title>&lol4;</title></item></channel></rss>"""
+EXTERNAL_ENTITY = b"""<?xml version="1.0"?>
+<!DOCTYPE workzag-jobs [<!ENTITY secret SYSTEM "file:///etc/hostname">]>
+<workzag-jobs><position><id>1</id><name>&secret;</name></position></workzag-jobs>"""
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        BILLION_LAUGHS,
+        EXTERNAL_ENTITY,
+        b'<?xml version="1.0"?><!DOCTYPE rss SYSTEM "https://example.org/rss.dtd"><rss/>',
+    ],
+)
+@pytest.mark.parametrize("kind", ["rss", "personio"])
+def test_xml_declarations_are_refused_with_a_typed_error(monkeypatch, kind, body):
+    monkeypatch.setattr(feeds, "fetch_bytes", lambda *args, **kwargs: body)
+    with pytest.raises(DomainError) as refused:
+        feeds.fetch_postings(
+            {
+                "kind": kind,
+                "name": "Example",
+                "config": {"url": "https://example.org/feed", "board": "example"},
+            }
+        )
+    assert refused.value.code == "source_xml_declarations" and refused.value.status == 422
+
+
+def test_plain_xml_with_character_references_still_parses():
+    # A declaration in another encoding is refused as well.
+    utf16 = BILLION_LAUGHS.replace(b'"1.0"?>', b'"1.0" encoding="UTF-16"?>')
+    with pytest.raises(DomainError) as refused:
+        company.xml(utf16.decode().encode("utf-16"))
+    assert refused.value.code == "source_xml_declarations"
+    root = company.xml(b"<rss><title>R&amp;D &#8212; &lt;Example&gt;</title></rss>")
+    assert root.findtext("title") == "R&D — <Example>"
+    with pytest.raises(DomainError) as invalid:
+        company.xml(b"<rss><title>&undefined;</title></rss>")
+    assert invalid.value.code == "source_format"

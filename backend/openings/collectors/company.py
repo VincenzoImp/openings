@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 from functools import cache
 from typing import Annotated
 from urllib.parse import quote, urlencode
+from xml.parsers import expat
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, create_model
 
@@ -60,17 +61,27 @@ def config_model(kind):
 INLINE_IMAGE = re.compile(rb"data:image/[\w.+-]+;base64,(?:[A-Za-z0-9+/=]|\\/)+")
 
 
-def xml(body):
-    if b"<!DOCTYPE" in body.upper() or b"<!ENTITY" in body.upper():
-        raise DomainError(422, "source_format", "XML entity declarations are unsupported.")
-    try:
-        return ET.fromstring(body)
-    except ET.ParseError as error:
+INVALID_XML = "The source did not return a valid XML feed. Check that its public feed is enabled."
+
+
+def xml(body, invalid=INVALID_XML):
+    """Parse an untrusted feed: a document type, an entity declaration or an external
+    reference stops expat at its declaration, before any expansion, in any encoding."""
+
+    def refuse(*args):
         raise DomainError(
-            502,
-            "source_format",
-            "The source did not return a valid XML feed. Check that its public feed is enabled.",
-        ) from error
+            422, "source_xml_declarations", "XML document types and entities are refused."
+        )
+
+    guard = expat.ParserCreate()
+    guard.SetParamEntityParsing(expat.XML_PARAM_ENTITY_PARSING_NEVER)
+    guard.StartDoctypeDeclHandler = guard.EntityDeclHandler = refuse
+    guard.ExternalEntityRefHandler = refuse
+    try:
+        guard.Parse(body, True)
+        return ET.fromstring(body)
+    except (expat.ExpatError, ET.ParseError) as error:
+        raise DomainError(502, "source_format", invalid) from error
 
 
 def location(value):
