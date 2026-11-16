@@ -8,7 +8,7 @@ export const EXAMPLE_CV: NewTemplate = {
   kind: "cv",
   is_default: false,
   guidance: "",
-  rules: { max_pages: 1 },
+  rules: { max_pages: 1, engine: "tectonic" },
   tex: `\\documentclass[10pt,a4paper]{article}
 \\usepackage[margin=1.7cm]{geometry}
 \\usepackage[T1]{fontenc}
@@ -48,7 +48,7 @@ export const EXAMPLE_LETTER: NewTemplate = {
   kind: "letter",
   is_default: false,
   guidance: "",
-  rules: { max_pages: 1 },
+  rules: { max_pages: 1, engine: "tectonic" },
   tex: `\\documentclass[11pt,a4paper]{article}
 \\usepackage[margin=2.2cm]{geometry}
 \\usepackage[T1]{fontenc}
