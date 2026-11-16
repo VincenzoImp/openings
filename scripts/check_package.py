@@ -35,6 +35,8 @@ def main():
             "openings/demo/demo-cv.tex",
             "openings/demo/demo-letter.pdf",
             "openings/demo/demo-letter.tex",
+            "openings/demo/demo-letter-meridian.pdf",
+            "openings/demo/demo-letter-fernhill.pdf",
         ):
             assert name in package.namelist(), f"Missing package resource: {name}"
     with tempfile.TemporaryDirectory(prefix="openings-installed-") as directory:

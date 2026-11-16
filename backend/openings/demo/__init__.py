@@ -5,6 +5,7 @@ the file as a demo (``is_demo``). The CVs and letters it stores are package data
 beside this module.
 """
 
-from .seed import NotADemo, is_demo, mark_demo, seed_demo, stamp
+from .marker import NotADemo, is_demo, mark_demo, stamp
+from .seed import seed_demo
 
 __all__ = ["NotADemo", "is_demo", "mark_demo", "seed_demo", "stamp"]

@@ -12,8 +12,58 @@ from fastapi.testclient import TestClient
 from openings import __main__ as cli
 from openings.auth import COOKIE
 from openings.demo import NotADemo, is_demo, mark_demo, seed_demo, stamp
+from openings.demo.postings import COMPANIES, FICTIONAL_DOMAINS
 
 MCP_HEADERS = {"Accept": "application/json, text/event-stream"}
+URL = re.compile(r"https?://([^/\s\"'\\)<>{}]+)")
+
+
+def test_the_demo_fills_every_stage_with_fictional_names_only(app):
+    seed_demo(app)
+    workspace = app.state.workspace
+    db = workspace.db
+    jobs = db.all("SELECT company,triage FROM jobs")
+    assert 40 <= len(jobs) <= 60
+    assert sum(job["triage"] == "new" for job in jobs) >= 25
+    applications = workspace.list_applications(limit=1)
+    stages = applications["stage_counts"]
+    assert stages["ready"] >= 3 and stages["shortlisted"] > stages["ready"]
+    assert all(stages[stage] for stage in ("applied", "interview", "offer", "closed"))
+    assert applications["no_reply"]["overdue"]
+    # The agent's dismissal names its reason.
+    reasons = [
+        row["reason"]
+        for row in db.all(
+            "SELECT json_extract(payload,'$.reason') AS reason FROM events "
+            "WHERE kind='triage_changed' AND actor='agent:Claude Code'"
+        )
+    ]
+    assert "Requires fluent German; you speak English and Italian." in reasons
+    # Ready: priorities 1 to 3, deadlines, the agent's CV and letter, a salary basis.
+    ready = workspace.list_applications(stage="ready", limit=50)["items"]
+    assert {item["priority"] for item in ready} >= {1, 2, 3}
+    assert all(item["deadline"] for item in ready)
+    for item in ready:
+        authors = db.all(
+            "SELECT d.kind,e.actor FROM documents d JOIN events e ON e.subject_id=d.id "
+            "AND e.kind='document_created' WHERE d.application_id=?",
+            (item["id"],),
+        )
+        assert {(row["kind"], row["actor"]) for row in authors} >= {
+            ("cv", "agent:Claude Code"),
+            ("letter", "agent:Claude Code"),
+        }
+        notes = db.all("SELECT body FROM notes WHERE application_id=?", (item["id"],))
+        assert any(note["body"].startswith(("Salary basis:", "Salary range:")) for note in notes)
+    # Only invented companies and reserved example domains.
+    assert {job["company"] for job in jobs} <= COMPANIES
+    with db.connect() as conn:
+        dump = "\n".join(conn.iterdump())
+    hosts = {host.split(":")[0].lower() for host in URL.findall(dump)}
+    assert hosts and all(
+        any(host == domain or host.endswith("." + domain) for domain in FICTIONAL_DOMAINS)
+        for host in hosts
+    ), hosts
 
 
 def test_openings_demo_serves_a_temporary_workspace_and_removes_it(tmp_path, monkeypatch, capsys):

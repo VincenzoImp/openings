@@ -1,4 +1,11 @@
-"""The demo's fictional employers and their postings."""
+"""The demo's fictional employers and their postings.
+
+Every company is invented and every address uses a reserved example domain
+(``FICTIONAL_DOMAINS``); a test fails on any other name or domain.
+"""
+
+# Reserved for documentation and tests (RFC 2606, RFC 6761): they never reach a real site.
+FICTIONAL_DOMAINS = ("example.test", "example.org", "example.com", "example")
 
 POSTINGS = {
     "voltline": (
@@ -13,7 +20,7 @@ POSTINGS = {
         "five or more years of backend development with Python and SQL, experience running "
         "services in containers on Linux, and a habit of measuring before you optimize. "
         "Experience with time-series data or the energy sector is welcome but not required. "
-        "Fluent English is required."
+        "Fluent English is required. The salary range is EUR 80,000 to 95,000 a year."
     ),
     "carbon": (
         "The Carbon Ledger Foundation is a nonprofit that publishes open emissions data for "
@@ -108,7 +115,8 @@ POSTINGS = {
         "architects on security and access control. You will also help colleagues from "
         "other teams adopt the new APIs. We look for experience with Python, SQL and REST "
         "APIs and an interest in clear documentation. Experience in insurance is not needed. "
-        "Fluent English is required. The role is hybrid, with two office days a week in Berlin."
+        "Fluent English is required. The role is hybrid, with two office days a week in "
+        "Berlin, and pays EUR 75,000 to 85,000 a year."
     ),
     "fernhill": (
         "Fernhill Mobility runs a booking platform for shared electric vans in eight European "
@@ -161,4 +169,580 @@ POSTINGS = {
         "trading systems. Fluent English is required. The role is on site in London, five "
         "days a week."
     ),
+    "saltmarsh": (
+        "Saltmarsh Analytics forecasts demand for district heating networks in Denmark and "
+        "Sweden. Our forecasting platform team of eight engineers works from Copenhagen, with "
+        "two office days a week.\n\n"
+        "As a backend engineer you will build the Python services that feed weather and "
+        "consumption data to our models and serve forecasts to network operators. We look "
+        "for four or more years of backend experience with Python and SQL and experience "
+        "with asynchronous workers. Fluent English is required; Danish is not. The salary "
+        "range is DKK 620,000 to 700,000 a year, and we help with relocation."
+    ),
+    "lindgren": (
+        "Lindgren Climate Tech helps manufacturers measure the emissions of their supply "
+        "chains. Our team in Stockholm builds the APIs that suppliers use to report data.\n\n"
+        "You will design APIs in Python, keep imports of supplier data correct and help the "
+        "team run its services. We look for three or more years of backend experience, good "
+        "SQL and clear writing. Fluent English is required. The role is hybrid in Stockholm "
+        "and pays SEK 650,000 to 720,000 a year."
+    ),
 }
+
+# New jobs: key, title, company, location, source, days ago, salary (currency, low, high)
+# or None, and the posting's two paragraphs.
+NEW_JOBS = (
+    (
+        "ferrous-sre",
+        "Site Reliability Engineer",
+        "Ferrous Cloud",
+        "Rotterdam, Netherlands (hybrid)",
+        "search",
+        0.2,
+        ("EUR", 70000, 85000),
+        (
+            "Ferrous Cloud runs managed databases for 3,000 small companies across Europe. Our "
+            "reliability team of six keeps them available and fast."
+        ),
+        (
+            "You will automate our fleet operations in Python, improve alerting and take part in "
+            "on-call. We look for experience with Linux, containers and PostgreSQL. Fluent "
+            "English is required."
+        ),
+    ),
+    (
+        "kestrel-clinical-data",
+        "Python Developer, Clinical Data",
+        "Kestrel Health Data",
+        "Utrecht, Netherlands (hybrid)",
+        "search",
+        0.6,
+        ("EUR", 60000, 72000),
+        (
+            "Kestrel Health Data prepares anonymized clinical data for university research "
+            "groups. We are a team of fifteen in Utrecht."
+        ),
+        (
+            "You will build Python pipelines that check, link and anonymize hospital data, and "
+            "APIs that researchers use to request it. Good SQL and care for privacy are required. "
+            "Fluent English is required; Dutch is a plus."
+        ),
+    ),
+    (
+        "tidewater-backend",
+        "Backend Engineer",
+        "Tidewater Energy Software",
+        "Aberdeen, United Kingdom (hybrid)",
+        "europe",
+        1.2,
+        ("GBP", 65000, 78000),
+        (
+            "Tidewater Energy Software plans maintenance for offshore wind farms. Our backend "
+            "team builds the services behind the planning tools of 40 wind farm operators."
+        ),
+        (
+            "You will develop Python APIs, model maintenance schedules in SQL and work with our "
+            "product designers. Four years of backend experience are required. We sponsor work "
+            "visas."
+        ),
+    ),
+    (
+        "gullwing-bookings",
+        "Backend Engineer, Bookings",
+        "Gullwing Travel",
+        "Lisbon, Portugal (hybrid)",
+        "europe",
+        1.5,
+        ("EUR", 50000, 62000),
+        (
+            "Gullwing Travel sells ferry and coach tickets in southern Europe. Our bookings team "
+            "in Lisbon handles about 20,000 bookings a day."
+        ),
+        (
+            "You will improve our booking APIs, make payment flows idempotent and reduce failed "
+            "bookings. We look for experience with Python or Go, SQL and message queues. Fluent "
+            "English is required."
+        ),
+    ),
+    (
+        "marisol-senior-python",
+        "Senior Python Engineer",
+        "Marisol Fintech",
+        "Madrid, Spain (hybrid)",
+        "europe",
+        2.1,
+        ("EUR", 62000, 75000),
+        (
+            "Marisol Fintech offers invoice financing to small companies in Spain and Portugal. "
+            "Our engineering team of 30 works from Madrid."
+        ),
+        (
+            "You will design the services that score invoices and move funds, review code and "
+            "mentor two engineers. We look for six years of Python, strong SQL and experience in "
+            "a regulated environment. Fluent English is required; Spanish is a plus."
+        ),
+    ),
+    (
+        "bramble-platform",
+        "Platform Engineer",
+        "Bramble Commerce",
+        "Manchester, United Kingdom (hybrid)",
+        "europe",
+        2.4,
+        ("GBP", 70000, 82000),
+        (
+            "Bramble Commerce builds online shops for independent grocers. Our platform team "
+            "gives twelve product teams their pipelines, clusters and observability."
+        ),
+        (
+            "You will run our Kubernetes platform, improve deployments and write internal tools "
+            "in Python. Experience with Terraform and a cloud provider is required. Fluent "
+            "English is required."
+        ),
+    ),
+    (
+        "cinder-data-engineer",
+        "Data Engineer",
+        "Cinder Analytics",
+        "Paris, France (hybrid)",
+        "europe",
+        2.8,
+        ("EUR", 58000, 70000),
+        (
+            "Cinder Analytics measures the audience of independent podcasts. Our data team in "
+            "Paris processes 50 million listening events a day."
+        ),
+        (
+            "You will build batch and streaming pipelines in Python and SQL, keep our metrics "
+            "correct and help analysts. Experience with Airflow or a similar scheduler is "
+            "welcome. Fluent English is required."
+        ),
+    ),
+    (
+        "velvetleaf-learning",
+        "Backend Engineer, Learning Platform",
+        "Velvetleaf Learning",
+        "Remote, Europe",
+        "feed",
+        0.9,
+        ("EUR", 65000, 78000),
+        (
+            "Velvetleaf Learning makes a course platform for vocational schools. We are a remote "
+            "company of 60 people across Europe."
+        ),
+        (
+            "You will build Python APIs for course content and progress, improve search and help "
+            "us split a large application into services. Four years of backend experience are "
+            "required. Fluent English is required."
+        ),
+    ),
+    (
+        "polder-sensor-data",
+        "Software Engineer, Sensor Data",
+        "Polder Water Systems",
+        "Delft, Netherlands (hybrid)",
+        "search",
+        1.8,
+        ("EUR", 62000, 74000),
+        (
+            "Polder Water Systems monitors dikes and pumping stations for Dutch water boards. "
+            "Our sensor data team receives readings from 12,000 sensors."
+        ),
+        (
+            "You will develop the Python services that store readings and raise alerts, and APIs "
+            "for our dashboards. Experience with time-series data is a plus. Fluent English is "
+            "required; Dutch is a plus."
+        ),
+    ),
+    (
+        "ashgrove-api",
+        "API Engineer",
+        "Ashgrove Insurance",
+        "Brussels, Belgium (hybrid)",
+        "europe",
+        3.2,
+        ("EUR", 64000, 76000),
+        (
+            "Ashgrove Insurance sells home and travel insurance in Belgium and Luxembourg. Our "
+            "API team connects brokers to our policy systems."
+        ),
+        (
+            "You will design and document REST APIs in Python, work on access control and "
+            "support brokers' developers. Experience with OpenAPI is welcome. Fluent English is "
+            "required; French or Dutch is a plus."
+        ),
+    ),
+    (
+        "fjordline-payments",
+        "Backend Engineer, Payments",
+        "Fjordline Payments",
+        "Oslo, Norway (hybrid)",
+        "europe",
+        3.6,
+        ("NOK", 750000, 880000),
+        (
+            "Fjordline Payments processes card payments for restaurants in the Nordic countries. "
+            "Our payments team works from Oslo."
+        ),
+        (
+            "You will build payment APIs, settlement jobs and reconciliation reports. We look for "
+            "experience with Python or Kotlin, SQL and payment systems. Fluent English is "
+            "required; Norwegian is not."
+        ),
+    ),
+    (
+        "lanterna-streaming",
+        "Backend Engineer, Streaming",
+        "Lanterna Media",
+        "Milan, Italy (hybrid)",
+        "europe",
+        4.1,
+        ("EUR", 48000, 60000),
+        (
+            "Lanterna Media streams regional sports and concerts in Italy. Our backend team in "
+            "Milan serves 300,000 viewers on a busy evening."
+        ),
+        (
+            "You will work on our catalog and entitlement APIs in Python and improve how they "
+            "behave under load. Fluent Italian and English are required."
+        ),
+    ),
+    (
+        "copperleaf-fleet",
+        "Python Engineer, Fleet Software",
+        "Copperleaf Robotics",
+        "Eindhoven, Netherlands",
+        "search",
+        4.5,
+        ("EUR", 65000, 80000),
+        (
+            "Copperleaf Robotics builds autonomous carts for warehouses. Our fleet software team "
+            "assigns tasks to 2,000 carts in 30 warehouses."
+        ),
+        (
+            "You will build the Python services that plan tasks and collect telemetry, and help "
+            "us test them against a simulator. Experience with asynchronous Python is required. "
+            "Fluent English is required."
+        ),
+    ),
+    (
+        "glimmer-live-services",
+        "Backend Engineer, Live Services",
+        "Glimmer Games",
+        "Helsinki, Finland (hybrid)",
+        "europe",
+        5.0,
+        ("EUR", 60000, 72000),
+        (
+            "Glimmer Games makes puzzle games for phones with two million daily players. Our live "
+            "services team runs accounts, events and leaderboards."
+        ),
+        (
+            "You will build backend services in Python and Go and keep them fast during events. "
+            "Experience with Redis and PostgreSQL is welcome. Fluent English is required."
+        ),
+    ),
+    (
+        "stoneharbor-backend",
+        "Backend Engineer",
+        "Stoneharbor Logistics",
+        "Hamburg, Germany (hybrid)",
+        "europe",
+        5.4,
+        ("EUR", 68000, 80000),
+        (
+            "Stoneharbor Logistics schedules container transport between ports and inland "
+            "terminals. Our engineering team in Hamburg works in English."
+        ),
+        (
+            "You will develop Python APIs for terminal operators and integrate partner systems. "
+            "Four years of backend experience and good SQL are required. Fluent English is "
+            "required; German is a plus."
+        ),
+    ),
+    (
+        "arbor-ledger-senior",
+        "Senior Backend Engineer",
+        "Arbor Ledger",
+        "Vienna, Austria (hybrid)",
+        "europe",
+        6.0,
+        ("EUR", 65000, 78000),
+        (
+            "Arbor Ledger makes accounting software for associations and clubs in Austria and "
+            "Germany. Our backend team has eight engineers."
+        ),
+        (
+            "You will lead the design of our booking and reporting services in Python and mentor "
+            "colleagues. Six years of backend experience are required. Fluent English is "
+            "required; German is a plus."
+        ),
+    ),
+    (
+        "quillstone-python",
+        "Python Developer",
+        "Quillstone Legal Tech",
+        "Remote, United Kingdom",
+        "feed",
+        1.1,
+        ("GBP", 60000, 70000),
+        (
+            "Quillstone Legal Tech helps law firms find clauses in contracts. We are a remote "
+            "team of twenty in the United Kingdom."
+        ),
+        (
+            "You will build the services that import documents and serve search results, in "
+            "Python with PostgreSQL. Three years of experience are required. Right to work in "
+            "the United Kingdom is required."
+        ),
+    ),
+    (
+        "halcyon-ground-segment",
+        "Software Engineer, Ground Segment",
+        "Halcyon Satellite Data",
+        "Toulouse, France (hybrid)",
+        "europe",
+        2.2,
+        ("EUR", 55000, 68000),
+        (
+            "Halcyon Satellite Data operates small Earth observation satellites. Our ground "
+            "segment team receives and processes their images."
+        ),
+        (
+            "You will develop Python services that schedule downloads and process images, and "
+            "APIs for our customers. Experience with Linux and containers is required. Fluent "
+            "English is required."
+        ),
+    ),
+    (
+        "brightmoor-core-apis",
+        "Backend Engineer, Core Banking APIs",
+        "Brightmoor Bank",
+        "Warsaw, Poland (hybrid)",
+        "europe",
+        3.0,
+        ("PLN", 260000, 320000),
+        (
+            "Brightmoor Bank is a digital bank with 400,000 customers in Poland. Our core banking "
+            "APIs team opens the bank's systems to the mobile app and to partners."
+        ),
+        (
+            "You will build and secure APIs in Python and Java and improve their tests. Four "
+            "years of backend experience are required. Fluent English is required."
+        ),
+    ),
+    (
+        "kiln-data-platform",
+        "Data Platform Engineer",
+        "Kiln Data",
+        "Prague, Czechia (hybrid)",
+        "europe",
+        3.9,
+        ("EUR", 50000, 62000),
+        (
+            "Kiln Data runs a data platform for online retailers in central Europe. Our team in "
+            "Prague maintains the ingestion and query services."
+        ),
+        (
+            "You will build connectors and ingestion jobs in Python and tune queries. Experience "
+            "with SQL and a cloud data warehouse is required. Fluent English is required."
+        ),
+    ),
+    (
+        "mosswood-carbon",
+        "Backend Engineer, Carbon Accounting",
+        "Mosswood Climate",
+        "Copenhagen, Denmark (hybrid)",
+        "feed",
+        4.3,
+        ("DKK", 600000, 680000),
+        (
+            "Mosswood Climate calculates the carbon footprint of construction projects. Our "
+            "product team of ten works from Copenhagen."
+        ),
+        (
+            "You will build the calculation services and APIs in Python and keep results "
+            "traceable to their sources. Three years of backend experience are required. Fluent "
+            "English is required."
+        ),
+    ),
+    (
+        "silverpine-backend",
+        "Backend Engineer",
+        "Silverpine Health",
+        "Stockholm, Sweden (hybrid)",
+        "europe",
+        4.8,
+        ("SEK", 600000, 700000),
+        (
+            "Silverpine Health runs video appointments for primary care in Sweden. Our backend "
+            "team builds booking and patient record integrations."
+        ),
+        (
+            "You will develop Python services and APIs and work with clinics on integrations. "
+            "Experience with healthcare systems is a plus. Fluent English is required."
+        ),
+    ),
+    (
+        "tallgrass-senior-backend",
+        "Senior Backend Engineer",
+        "Tallgrass Analytics",
+        "Remote, United States",
+        "feed",
+        0.4,
+        ("USD", 150000, 175000),
+        (
+            "Tallgrass Analytics forecasts crop yields for farm cooperatives. We are a remote "
+            "company across the United States."
+        ),
+        (
+            "You will design Python services for satellite and weather data and mentor two "
+            "engineers. Six years of backend experience are required. US work authorization is "
+            "required."
+        ),
+    ),
+    (
+        "wavecrest-pricing",
+        "Backend Engineer, Ride Pricing",
+        "Wavecrest Mobility",
+        "Singapore",
+        "feed",
+        2.6,
+        ("SGD", 110000, 135000),
+        (
+            "Wavecrest Mobility runs bike and scooter sharing in five Asian cities. Our pricing "
+            "team sets fares and promotions in real time."
+        ),
+        (
+            "You will build pricing services in Python and Go and run experiments with the data "
+            "team. Three years of backend experience are required. We sponsor employment passes."
+        ),
+    ),
+    (
+        "ironbark-python",
+        "Python Engineer",
+        "Ironbark Software",
+        "Melbourne, Australia (hybrid)",
+        "feed",
+        3.4,
+        ("AUD", 140000, 160000),
+        (
+            "Ironbark Software makes scheduling software for hospitals in Australia and New "
+            "Zealand. Our team of 25 works from Melbourne."
+        ),
+        (
+            "You will develop rostering services and APIs in Python and improve their "
+            "performance. Four years of backend experience are required. Australian work rights "
+            "are required."
+        ),
+    ),
+    (
+        "lumen-lark-search",
+        "Backend Engineer, Search",
+        "Lumen & Lark",
+        "Dublin, Ireland (hybrid)",
+        "europe",
+        1.4,
+        ("EUR", 70000, 82000),
+        (
+            "Lumen & Lark runs an online marketplace for second-hand books. Our search team "
+            "indexes eight million listings."
+        ),
+        (
+            "You will improve indexing and ranking services in Python and measure search "
+            "quality. Experience with a search engine such as OpenSearch is welcome. Fluent "
+            "English is required."
+        ),
+    ),
+    (
+        "pebblebrook-data",
+        "Data Engineer",
+        "Pebblebrook Insurance",
+        "Edinburgh, United Kingdom (hybrid)",
+        "europe",
+        5.8,
+        ("GBP", 55000, 66000),
+        (
+            "Pebblebrook Insurance offers pet insurance in the United Kingdom. Our data team "
+            "builds the warehouse that pricing and claims teams use."
+        ),
+        (
+            "You will build pipelines in Python and SQL and help analysts model claims data. "
+            "Three years of experience are required. We sponsor work visas."
+        ),
+    ),
+    (
+        "redwing-maintenance-data",
+        "Backend Engineer, Maintenance Data",
+        "Redwing Aviation Systems",
+        "Bilbao, Spain (hybrid)",
+        "europe",
+        6.3,
+        ("EUR", 50000, 60000),
+        (
+            "Redwing Aviation Systems keeps maintenance records for regional airlines. Our "
+            "backend team works from Bilbao."
+        ),
+        (
+            "You will build Python APIs for maintenance records and their audits. Care for "
+            "correctness and good SQL are required. Fluent English is required."
+        ),
+    ),
+    (
+        "sundial-integrations",
+        "Python Engineer, Integrations",
+        "Sundial Scheduling",
+        "Remote, Europe",
+        "feed",
+        0.7,
+        None,
+        (
+            "Sundial Scheduling makes appointment software for hair salons and clinics. We are a "
+            "remote team of 30 within Europe."
+        ),
+        (
+            "You will build integrations with calendars, payment providers and messaging "
+            "services in Python. Three years of experience with APIs are required. Fluent "
+            "English is required."
+        ),
+    ),
+    (
+        "oakhaven-open-data",
+        "Backend Developer, Open Data",
+        "Oakhaven Public Data",
+        "Amsterdam, Netherlands (hybrid)",
+        "search",
+        0.3,
+        ("EUR", 58000, 70000),
+        (
+            "Oakhaven Public Data publishes open data for Dutch municipalities. Our team of nine "
+            "works from Amsterdam."
+        ),
+        (
+            "You will maintain our Python APIs and import pipelines and help municipalities "
+            "publish new datasets. Fluent English is required; Dutch is a plus."
+        ),
+    ),
+)
+
+COMPANIES = frozenset(
+    {
+        "Voltline Grid Analytics",
+        "Carbon Ledger Foundation",
+        "Tessellate Maps",
+        "Lumacare Health",
+        "Larchmont Bank",
+        "Freightwise",
+        "Quayside Payments",
+        "Kelpie Labs",
+        "Meridian Insurance Group",
+        "Fernhill Mobility",
+        "Cobalt Telecom",
+        "Spreeland Energie GmbH",
+        "Pixelwright Studio",
+        "Northpeak Trading",
+        "Saltmarsh Analytics",
+        "Lindgren Climate Tech",
+        *(job[2] for job in NEW_JOBS),
+    }
+)
