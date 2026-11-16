@@ -3,14 +3,14 @@ name: prepare-applications
 title: Prepare CVs and letters
 summary: Have a tailored CV and cover letter written, compiled and checked for each shortlisted job until it is Ready, and redone after a template change.
 example: Prepare a CV and cover letter for every job on my shortlist.
-description: Prepare the CV and cover letter of Openings applications from the owner's career entries, templates and Writing rules - "prepare every shortlisted job", "prepare the application for X", "redo the letter for Y", "redo them with my new template". Compiles PDFs locally, uploads them and leaves each application Ready for the owner to send.
+description: Prepare the CV and cover letter of Openings applications from the owner's career entries, templates and Writing rules - "prepare every shortlisted job", "prepare the application for X", "redo the letter for Y", "redo them with my new template". Compiles PDFs locally, uploads them and leaves each application Ready for the owner to apply.
 ---
 
 # Prepare CVs and letters
 
 Read [openings](../openings/SKILL.md) first, and
 [writing](references/writing.md) before you write. You prepare; the owner
-reviews and sends.
+applies, best first.
 
 ## 1. Gather
 
@@ -112,4 +112,4 @@ applications whose documents predate it, priority first:
 
 The applications now Ready, by title and company, with deadlines; those not
 Ready and why (a requirement, a missing fact, a failed compile); closed
-postings; gaps noted; a reminder that the owner reviews and sends each one.
+postings; gaps noted; that the owner applies to Ready ones, best first.

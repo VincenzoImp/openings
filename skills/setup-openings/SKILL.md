@@ -89,5 +89,5 @@ from the copy's, prefer `skills_get`.
 ## Report back
 
 What is set up (entries, Preferences items, templates, sources); the open
-questions about their career; and their part from now on: review Ready
-applications, send them and tell you, or mark them Applied, when they do.
+questions about their career; and their part from now on: apply to Ready
+applications, best first, and tell you or mark them Applied.

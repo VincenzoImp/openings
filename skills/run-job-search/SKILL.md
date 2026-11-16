@@ -50,7 +50,8 @@ silence.
 Five to ten lines:
 
 - counts per step: triaged, shortlisted, dismissed, prepared, closed;
-- the Ready list in sending order (priority, then deadline), with deadlines;
+- the Ready list to apply to, best first (priority, then deadline), with
+  deadlines;
 - questions for the owner, each with the item it holds back;
 - failures, and what stayed unchanged.
 
