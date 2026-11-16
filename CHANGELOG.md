@@ -30,6 +30,7 @@ No schema change. Upgrade in place from 0.28.0.
 
 **Fixes**
 
+- Focus stays in the field you chose: a profile block that opens as you tap a field, or a dialog that just closed, no longer moves your typing elsewhere.
 - A template's header counts its files. A template's `rules` accept a `statements` key. Stale 0.28.0 notes, old repository links and British spellings are gone.
 
 ## 0.28.0 — 2026-11-16
