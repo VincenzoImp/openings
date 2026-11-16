@@ -81,6 +81,37 @@ The dashboard's tokens, as `frontend/src/ui/tokens.css` defines them. Every bran
 | `--t-md` | `14px/20px var(--font)` | Same |
 | `--t-sm` | `13px/18px var(--font)` | Same |
 | `--t-xs` | `12px/16px var(--font)` | Same |
+| `--t-prose` | `14.5px/23px var(--font)` | Same |
+
+## reading text
+
+| Token | Light | Dark |
+| --- | --- | --- |
+| `--t-row` | `13.5px/18px var(--font)` | Same |
+| `--t-control-sm` | `12.5px/1 var(--font)` | Same |
+| `--t-micro` | `11px/1 var(--font)` | Same |
+
+## badge, kbd
+
+| Token | Light | Dark |
+| --- | --- | --- |
+| `--t-bar` | `17px/22px var(--font)` | Same |
+| `--t-title-sm` | `15px/22px var(--font)` | Same |
+| `--t-tab` | `10.5px/1 var(--font)` | Same |
+| `--t-phone-title` | `20px/26px var(--font)` | Same |
+| `--t-phone-name` | `24px/30px var(--font)` | Same |
+| `--t-code` | `12.5px/19px var(--mono)` | Same |
+| `--fs-micro` | `10px` | Same |
+| `--fs-control-sm` | `12.5px` | Same |
+| `--fs-sm` | `13px` | Same |
+| `--fs-row` | `13.5px` | Same |
+| `--fs-md` | `14px` | Same |
+
+## touch controls
+
+| Token | Light | Dark |
+| --- | --- | --- |
+| `--fs-title-sm` | `15px` | Same |
 | `--tr-3xl` | `-0.022em` | Same |
 | `--tr-2xl` | `-0.018em` | Same |
 | `--tr-xl` | `-0.012em` | Same |
@@ -107,6 +138,7 @@ The dashboard's tokens, as `frontend/src/ui/tokens.css` defines them. Every bran
 | `--s-16` | `64px` | Same |
 | `--pane-pad` | `24px` | Same |
 | `--content` | `760px` | Same |
+| `--document` | `calc(var(--content) + 2 * var(--pane-pad))` | Same |
 
 ## Sizes
 
@@ -129,6 +161,7 @@ The dashboard's tokens, as `frontend/src/ui/tokens.css` defines them. Every bran
 
 | Token | Light | Dark |
 | --- | --- | --- |
+| `--r-xs` | `2px` | Same |
 | `--r-sm` | `4px` | Same |
 | `--r-md` | `6px` | Same |
 | `--r-lg` | `8px` | Same |
