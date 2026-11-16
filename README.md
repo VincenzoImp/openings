@@ -4,13 +4,13 @@
 
 <p align="center">A self-hosted job-search app: fresh jobs from your searches and favorite companies, no duplicates. Your own AI agent (Claude Code, Codex, any MCP client) shortlists, tailors and ranks them. You apply, best first.</p>
 
-<p align="center">
+<div align="center">
 
 [Quick start](#quick-start) · [Try the demo](#look-first) · [Use with your agent](#mcp-server-for-your-ai-agent) · [Compare](#compared) · [Docs](docs/README.md) · [Changelog](CHANGELOG.md)
 
 [![Latest release](https://img.shields.io/github/v/release/VincenzoImp/openings-job-search?sort=semver&label=release)](https://github.com/VincenzoImp/openings-job-search/releases/latest) [![Docker image](https://img.shields.io/docker/v/vincenzoimp/openings?sort=semver&label=docker)](https://hub.docker.com/r/vincenzoimp/openings) [![License: MIT](https://img.shields.io/github/license/VincenzoImp/openings-job-search)](LICENSE)
 
-</p>
+</div>
 
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/demo-dark.gif"><img alt="Openings on the demo workspace: sources, Jobs › New, the agent's decisions, a Ready application, Mark applied and Today" src="docs/images/demo.gif"></picture>
 
