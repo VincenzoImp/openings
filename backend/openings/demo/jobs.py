@@ -5,7 +5,7 @@ the Voltline job), three dismissals (two by the agent "Claude Code" with its
 reasons, one by the owner) and eleven applications: three Ready with the agent's
 CV and letter, priorities 1 to 3, deadlines and a salary range with its basis;
 two Shortlisted that still need work; and Applied (one past its no-reply
-period), Interview, Offer and a rejection.
+period), Interview with the agent's interview brief, Offer and a rejection.
 """
 
 import asyncio
@@ -114,7 +114,7 @@ READY = (
             ("EUR", 80000, 95000),
             POSTINGS["voltline"],
         ),
-        OWNER,
+        "agent",
         1,
         12,
         "demo-letter",
@@ -174,14 +174,54 @@ READY = (
             "for EUR 80,000–85,000."
         ),
         (
-            "Remote within Europe, as your Preferences ask. The letter names the missing "
-            "Terraform experience plainly. Ready to send."
+            "Remote within Europe, as your Preferences ask. The letter leads with the "
+            "deployment workflow; Terraform, a plus in the posting, is not in your record and "
+            "stays out, as your writing rules ask. Ready to send."
         ),
     ),
 )
 
 
-class _Upload:
+# The agent's brief for the Freightwise technical interview, in the sections of the
+# prepare-interview skill; saved as a note, unpinned.
+INTERVIEW_BRIEF = """Interview brief: Freightwise, technical interview with two backend engineers.
+
+What they need
+- APIs for carriers and shippers, in Python with SQL.
+- Slow synchronous work moved to asynchronous workers.
+- Safer deployment and rollback with Docker and continuous delivery.
+- Operations the whole team finds simpler.
+
+Stories
+- Workers: at Example Cloud you moved long-running jobs from request handlers to a queue \
+of workers with retries and idempotent steps.
+- Deployment: your workflow with health checks and automatic rollback cut the manual \
+steps from nine to three; you designed it, the team uses it.
+- Latency: tracing first, then the slowest endpoints; API p95 latency down by 20%.
+- Operations: you documented the services until four colleagues could run them on call.
+
+Likely questions
+- Design an API that accepts a shipment and returns a price quickly. (Workers story.)
+- How do you make a retried job safe to run twice? (Idempotent steps.)
+- Tell us about a deployment that went wrong. (Health checks and rollback.)
+- Why Freightwise? (Simpler operations for a remote team, as in the posting.)
+
+Weak spots
+- No logistics or routing work in your record. Bridge: the APIs and workers you built \
+serve other teams every day, and the domain can be learned on the job.
+
+Logistics
+- Available from February 2027; notice of one month to the end of a month.
+- EU citizen; the role is remote within Europe.
+- Their range is EUR 70,000–85,000; your expectation is EUR 80,000.
+
+Questions to ask
+- Which synchronous work would you move to workers first?
+- How does a release reach production today, and how often do you roll back?
+- How is on-call shared in a team that meets in person twice a year?"""
+
+
+class Upload:
     """The raw PUT of an upload grant, made in process: its headers and its bytes."""
 
     def __init__(self, grant, data):
@@ -250,7 +290,7 @@ class DemoJobs:
                     )
                 )
                 grant = document["uploads"]["pdf"]
-                asyncio.run(self.documents.upload(_Upload(grant, data)))
+                asyncio.run(self.documents.upload(Upload(grant, data)))
 
     def change(self, application, **fields):
         current = self.workspace.get_application(application["id"])
@@ -316,6 +356,8 @@ class DemoJobs:
                         "deployment workflow story and questions about on-call.",
                         application,
                     )
+                with self.moment(days=7), acting_as(self.agent):
+                    self.note(job, INTERVIEW_BRIEF, application)
 
     def ready(self):
         for job_spec, by, priority, deadline, letter, salary, basis, summary in READY:

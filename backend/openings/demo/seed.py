@@ -120,7 +120,7 @@ def seed_demo(app):
             ),
             (
                 "Backend engineer",
-                "Added request tracing to the core endpoints of the platform.",
+                "Ran the team's first load tests before a customer launch.",
                 False,
                 False,
             ),
