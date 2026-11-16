@@ -107,7 +107,9 @@ class DocumentCreate(Input):
         description="Career entries the revision uses.",
     )
     note: str = Field(default="", max_length=5000)
-    previous_id: str | None = Field(default=None, description="The revision this one replaces.")
+    previous_id: str | None = Field(
+        default=None, description="The revision this one replaces; it stops being current now."
+    )
 
     @field_validator("content")
     @classmethod
@@ -156,11 +158,12 @@ class DocumentCreate(Input):
 # The filters, page and detail of each list: MCP's value, REST's query string.
 class DocumentQuery(Input):
     application_id: str = ""
-    kind: str = ""
+    kind: str = Field(default="", description="cv, letter, answers or other.")
     limit: int = 100
     offset: int = 0
-    summary: bool = True
-    q: str = ""
+    summary: bool = Field(default=True, description="false adds text, content and files.")
+    q: str = Field(default="", description="A phrase in the title, note or readable text.")
+    current: bool = Field(default=False, description="Only revisions no other replaces.")
 
 
 class FileQuery(Input):

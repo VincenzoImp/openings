@@ -11,9 +11,10 @@ before reporting a problem.
 
 Openings is a single-owner workspace. The owner's browser session and owner
 tokens can do everything. Agent tokens can do the whole job search but not the
-owner-only actions: the password, API tokens, restore, the records export, the
-career import and downloading kept backups. Any token can read your personal
-data, so give each agent its own token and revoke it when you stop using it.
+owner-only actions: the password, API tokens, restore, the career import and
+downloading kept backups. Any token can read your personal data, including a
+backup or the records export without credentials, so give each agent its own
+token and revoke it when you stop using it.
 
 The default Docker port binds to localhost. Set the owner password before exposing
 it on a LAN, and use HTTPS through a trusted proxy across untrusted networks.

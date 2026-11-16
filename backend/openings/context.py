@@ -71,7 +71,7 @@ SELECT e.*, j.title AS job_title, j.company AS job_company,
 FROM events e LEFT JOIN jobs j ON j.id=e.job_id
 WHERE e.actor='owner' AND e.created_at>? AND e.kind IN ('triage_changed','application_updated',
  'reply_added','reply_edited','reply_removed','document_deleted','preferences_updated')
-ORDER BY e.created_at DESC,e.rowid DESC LIMIT ?
+ORDER BY e.created_at DESC,e.rowid DESC
 """
 
 
@@ -158,15 +158,11 @@ class ContextService:
                 "career": self._career(conn, full="career_full" in include),
                 "templates": self._templates(conn, full="templates_full" in include),
             }
-            result["feedback"] = (
-                [
-                    item
-                    for row in conn.execute(FEEDBACK_SQL, (since, FEEDBACK_LIMIT))
-                    if (item := _feedback_item(row))
-                ]
-                if since
-                else []
-            )
+            result["feedback"] = self._feedback(conn, since) if since else []
+            if len(result["feedback"]) > FEEDBACK_LIMIT:
+                # More matched than one read lists: feedback_since pages to the earlier ones.
+                result["feedback"] = result["feedback"][:FEEDBACK_LIMIT]
+                result["feedback_more"] = True
         collection = ws.discovery.get_collection()
         result["settings"]["collection"] = {
             "enabled": collection["enabled"],
@@ -178,6 +174,17 @@ class ContextService:
         if token_id:
             self.db.execute("UPDATE api_tokens SET context_read_at=? WHERE id=?", (now(), token_id))
         return result
+
+    @staticmethod
+    def _feedback(conn, since):
+        """The newest feedback items since ``since``: one more than listed, to tell if cut."""
+        items = []
+        for row in conn.execute(FEEDBACK_SQL, (since,)):
+            if item := _feedback_item(row):
+                items.append(item)
+                if len(items) > FEEDBACK_LIMIT:
+                    break
+        return items
 
     def _previous_read(self, token_id):
         if not token_id:

@@ -118,6 +118,10 @@ class WorkspaceContext(Out):
     feedback: list[Json] = Field(
         default=[], description="The owner's corrections of agent work since the previous read."
     )
+    feedback_more: bool | None = Field(
+        default=None,
+        description="true: more corrections matched than feedback lists (the newest 30); read the earlier ones with feedback_since.",
+    )
 
 
 class Event(Out):
@@ -360,6 +364,7 @@ class ApplicationRow(Record):
     outcome: str | None = None
     priority: int | None = None
     deadline: str | None = None
+    salary: str | None = Field(default=None, description="The owner's pay expectation.")
     applied_at: str | None = None
     concluded_on: str | None = None
     required_documents: list[str]

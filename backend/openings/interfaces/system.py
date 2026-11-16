@@ -13,6 +13,8 @@ from ..responses import BackupList, Deleted, OperationGrant, PasswordChanged, To
 from .core import absolute, with_curl
 from .operation import OWNER, WS, operation
 
+DOWNLOADS = {"backup": "openings-backup.sqlite", "export": "openings-export.json"}
+
 
 class PasswordInput(Input):
     password: str = Field(min_length=1, max_length=1024)
@@ -47,17 +49,18 @@ def grant(ws, operation):
 
 
 @operation("POST /backup/grant", tags=["workspace"])
-def workspace_backup(ws: WS) -> OperationGrant:
-    """Reserve a backup download; take one before any permanent bulk clean-up.
+def workspace_backup(ws: WS, kind: Literal["backup", "export"] = "backup") -> OperationGrant:
+    """Reserve a download; take a backup before any permanent bulk clean-up.
 
-    A two-minute GET grant (curl line given). An agent's copy holds no credentials.
+    backup: the SQLite file with files; export: the JSON records. A two-minute GET grant
+    (curl line given); an agent's copy holds no credentials.
     """
-    return with_curl(grant(ws, "backup"), "openings-backup.sqlite")
+    return with_curl(grant(ws, kind), DOWNLOADS[kind])
 
 
-@operation("POST /export/grant", access=OWNER, tags=["owner"])
+@operation("POST /export/grant", tags=["workspace"], mcp="workspace_backup")
 def workspace_export(ws: WS) -> OperationGrant:
-    """Reserve a records export (owner only).
+    """Reserve a records export.
 
     A two-minute GET grant for the JSON records, without file bytes or credentials.
     """

@@ -84,9 +84,9 @@ the skills. You do not need it.
 | **Owner** | Everything you can do in the dashboard. |
 
 An agent token is refused (`403`) for owner-only actions: the password, API tokens,
-restore, the records export, the career import and downloading kept backups. It
-can request a backup, which leaves out the password hash, session secret and
-tokens. Use one token per agent and revoke it in Settings when you stop using
+restore, the career import and downloading kept backups. It can request a backup
+or the records export (`workspace_backup`); neither holds the password hash,
+session secret or tokens. Use one token per agent and revoke it in Settings when you stop using
 that agent.
 
 ## What the agent never does

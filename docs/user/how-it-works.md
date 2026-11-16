@@ -42,8 +42,8 @@ does when you tell it or a standing rule says how.
 | REST API | Scripts and your own tools | All dashboard actions, plus the owner-only ones |
 | MCP and skills | An external agent you talk to in its own chat | Everything the dashboard does, except owner-only actions |
 
-Owner-only actions: the password, API tokens, restore, the records export, the
-career import and downloading kept backups.
+Owner-only actions: the password, API tokens, restore, the career import and
+downloading kept backups.
 
 ## Words
 

@@ -258,8 +258,8 @@ def jobs_update(ws: WS, job_id: str, body: JobPatch) -> JobSummary:
 def jobs_link(ws: WS, job_id: str, body: LinkInput) -> JobSummary:
     """Decide a likely duplicate.
 
-    same merges job_id into other_id (other_id survives, with postings, applications and
-    notes); different clears the flag for good. Returns the job that remains.
+    same merges job_id into other_id (other_id survives with postings, applications and
+    notes); different clears the flag for good. Both open with work: close one first.
     """
     return ws.link_jobs(job_id, body)
 
@@ -278,9 +278,10 @@ def jobs_merge(ws: WS, job_id: str, body: MergeInput) -> Job:
 
 @operation("DELETE /jobs/{job_id}", access=DESTRUCTIVE, tags=["jobs"])
 def jobs_delete(ws: WS, job_id: str, expected_version: Version) -> Deleted:
-    """Delete a job permanently, only on the owner's explicit request.
+    """Delete a job permanently, only on the owner's request or standing rule.
 
-    With its applications, documents and files; collecting it again makes a new job.
+    With its applications, documents and files; a source that finds it again makes a new
+    job, so dismissing keeps the memory.
     """
     return ws.forget_job(job_id, expected_version)
 

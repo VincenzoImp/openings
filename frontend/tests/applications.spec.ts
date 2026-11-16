@@ -165,8 +165,13 @@ test("without LaTeX: a PDF CV and letter uploaded on the page make it Ready", as
   page,
 }) => {
   const title = unique("PDF only");
-  const app = await make(page, title);
-  expect(app.missing).toEqual(["cv", "letter"]);
+  const made = await make(page, title);
+  expect(made.missing).toEqual(["cv", "letter"]);
+  // The agent's salary expectation shows in Before you send.
+  const app = await call(page, `/applications/${made.id}`, "PATCH", {
+    expected_version: made.version,
+    salary: "CHF 98,000 a year",
+  });
   await go(page, `applications/${app.id}`);
   await expect(page.getByRole("heading", { name: "Documents" })).toBeVisible();
   for (const [name, file] of [
@@ -186,6 +191,9 @@ test("without LaTeX: a PDF CV and letter uploaded on the page make it Ready", as
   // Nothing is missing: the page is the Ready page.
   await expect(visible(page, "Mark applied")).toBeVisible();
   await expect(page.getByText("Before you send")).toBeAttached();
+  await expect(
+    page.locator(".apg-salary").filter({ hasText: "CHF 98,000 a year" }),
+  ).toBeAttached();
 });
 
 test("a shortlisted page says what is missing once, with one upload each and a requirement field on intent", async ({
