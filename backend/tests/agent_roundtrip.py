@@ -165,7 +165,7 @@ async def exercise(base, agent_token, owner_token, folder, tectonic):
                 },
             )
 
-            # "Empty my inbox using my criteria": the start read, one page, batched reads,
+            # "Clear Jobs › New using my criteria": the start read, one page, batched reads,
             # one batch of decisions.
             start = call.calls
             context = await call("workspace_context", {"include": ["career_full"]})

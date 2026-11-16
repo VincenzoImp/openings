@@ -4,7 +4,7 @@ This page takes you from nothing to your first application, by hand, without an
 agent. [How it works](how-it-works.md) explains the words used here. You need
 Docker; the host needs no Python, Node or TeX.
 
-<!-- quick-start: the README and docs/dockerhub.md repeat these commands (test_docs.py) -->
+<!-- quick-start: README repeats these blocks; dockerhub.md carries the demo, run and Compose lines (test_docs.py) -->
 
 ## Look first
 
@@ -36,7 +36,7 @@ curl -fsSLO https://raw.githubusercontent.com/VincenzoImp/openings-job-search/ma
 ```
 
 Settings go in a `.env` file beside it (see [Configuration](configuration.md)).
-Check that it runs with `curl --fail http://127.0.0.1:8080/health`.
+Check that it runs with `curl -fsS http://127.0.0.1:8080/health`.
 
 ## The setup code
 

@@ -128,7 +128,7 @@ career-ops and Openings work well together. Sources, dates and more tools (JobSy
 
 ## Your data
 
-Everything lives in one SQLite file in a Docker volume on your machine, with every uploaded document. One container (an image of about 70 MB, amd64 and arm64), no account, no API key and no telemetry. Openings writes a verified backup every day and keeps the last three; you can download a backup or restore one in **Settings › Data**. Nothing leaves your machine except the requests to the job sites your sources name, and whatever your own agent sends to its AI service.
+Everything lives in one SQLite file in a Docker volume on your machine, with every uploaded document. One container (an image under 100 MB, amd64 and arm64), no account, no API key and no telemetry. Openings writes a verified backup every day and keeps the last three; you can download a backup or restore one in **Settings › Data**. Nothing leaves your machine except the requests to the job sites your sources name, and whatever your own agent sends to its AI service.
 
 ## FAQ
 

@@ -12,16 +12,19 @@ email, phone and links), a summary, then **Experience**, **Education**,
 fields are not shown. On a wide screen **On this page** jumps to each part; on a
 phone the same list is behind **Jump to**.
 
-Each block is changed on purpose: point at it (or tap it) and choose **Edit**.
-The block becomes its form, in place on a wide screen and as a full-screen sheet
-on a phone; **Save** (⌘↵) stores it and **Cancel** (Esc) leaves it. One block is
-open at a time, and leaving unsaved changes asks first. **Add experience** (and
-the add button of each part) opens an empty entry, placed by its dates. **…** →
-**Delete permanently…** removes an entry after a dialog that lists its
-highlights and files. If a block was saved elsewhere meanwhile, Save says
-**Changed elsewhere** and keeps your draft: **Keep editing** saves your changes
-(fields you did not touch keep their new values), **Reload** shows the stored
-record.
+Each block is changed on purpose:
+
+- **Edit:** point at a block (or tap it) and choose **Edit**. The block becomes
+  its form, in place on a wide screen and as a full-screen sheet on a phone;
+  **Save** (⌘↵) stores it and **Cancel** (Esc) leaves it. One block is open at a
+  time, and leaving unsaved changes asks first.
+- **Add:** **Add experience** (and the add button of each part) opens an empty
+  entry, placed by its dates.
+- **Delete:** **…** → **Delete permanently…** removes an entry after a dialog that
+  lists its highlights and files.
+- **Conflicts:** if a block was saved elsewhere meanwhile, Save says **Changed
+  elsewhere** and keeps your draft: **Keep editing** saves your changes (fields
+  you did not touch keep their new values), **Reload** shows the stored record.
 
 **Import CV text** reads pasted text or Markdown, or a dropped `.txt` or `.md`
 file: headings name the parts, a sub-heading starts an entry, a line with dates

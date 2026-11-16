@@ -17,7 +17,7 @@ export function sectionOf(value: string | null): SectionId | null {
 
 /**
  * What a copy kept before an upgrade was taken before, from its file name
- * ("openings.pre-0.24.sqlite"): "Before 0.24".
+ * ("openings.pre-0.28.sqlite"): "Before 0.28".
  */
 export function upgradeOf(name: string) {
   const match = name.match(/\.pre-(.+?)(?:-\d{8}T\d{6}Z)?\.sqlite$/);
@@ -94,7 +94,7 @@ export function connectSnippet(client: ClientId, origin: string) {
   if (client === "plugin")
     return "/plugin marketplace add VincenzoImp/openings-job-search\n/plugin install openings@openings-job-search";
   if (client === "codex")
-    return `# ~/.codex/config.toml\n[mcp_servers.openings]\nurl = "${endpoint}"\nbearer_token_env_var = "OPENINGS_TOKEN"`;
+    return `codex mcp add openings --url ${endpoint} \\\n  --bearer-token-env-var OPENINGS_TOKEN`;
   if (client === "json")
     return JSON.stringify(
       {

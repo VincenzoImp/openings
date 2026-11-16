@@ -67,7 +67,7 @@ def theme(name, path=TOKENS_CSS):
 
 
 def colours(path=TOKENS_CSS):
-    """Every hex colour the tokens define, in either theme, lower case."""
+    """Every hex color the tokens define, in either theme, lower case."""
     return {value.lower() for value in HEX.findall(path.read_text())}
 
 
@@ -83,7 +83,7 @@ def render(path=TOKENS_CSS):
         "",
         (
             "The dashboard's tokens, as `frontend/src/ui/tokens.css` defines them. Every brand"
-            " asset takes its colours, type, spacing and radii from that file. *Same* means the"
+            " asset takes its colors, type, spacing and radii from that file. *Same* means the"
             " dark theme keeps the light value."
         ),
     ]

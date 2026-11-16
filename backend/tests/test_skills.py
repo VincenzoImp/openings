@@ -101,6 +101,13 @@ def test_skills_name_only_live_tools_and_no_removed_concepts(mcp):
         assert not found, (path.relative_to(ROOT), found and found.group(0))
 
 
+def test_skills_and_the_agent_round_trip_use_no_retired_word():
+    # Unlike the docs check, quoted trigger phrases count too: an agent repeats them.
+    texts = [*files(), Path(__file__).with_name("agent_roundtrip.py")]
+    found = [path.name for path in texts if "inbox" in path.read_text().lower()]
+    assert not found, found
+
+
 def test_library_rejects_paths_outside_a_skill_and_unknown_skills():
     library = SkillLibrary(ROOT)
     # A link to another skill's file reads that skill's file.

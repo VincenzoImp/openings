@@ -37,11 +37,12 @@ container is recreated; `OPENINGS_PASSWORD` never resets an existing owner. See
 
 ### Supported versions
 
-Only the latest release receives fixes. A release opens a workspace of its own
-data format or of the **previous format only**, and upgrades the latter at start.
-An older workspace is refused with the release to open it with first, and a newer
-one is refused too. When you skip releases, the changelog says which one to pass
-through. Opening any older format directly is planned for 1.0.0.
+- Only the latest release receives fixes.
+- A release opens a workspace of its own data format or of the **previous format
+  only**, and upgrades the latter at start.
+- An older workspace is refused with the release to open it with first, and a
+  newer one is refused too. When you skip releases, the changelog says which one
+  to pass through. Opening any older format directly is planned for 1.0.0.
 
 Releases come at most once a week unless a fix unblocks someone. No 0.28.x
 release changes the data format.
@@ -49,20 +50,23 @@ release changes the data format.
 ### Upgrades
 
 When a release changes the format, the upgrade builds a new file with the data
-copied in, so an upgraded workspace has exactly the layout of a new one. It needs
-free space of about 2.2 times the database; if there is not enough, the server
-does not start and changes nothing. The original is kept byte for byte beside the
-database as `openings.pre-<release>.sqlite` and is never deleted automatically;
-delete it under **Settings › Data › Automatic backups** when you no longer need to
-go back. Records and fields the release no longer keeps are written to
-`openings.pre-<release>-archive.json` beside it, readable only by the owner of the
-file. If a check fails, the start stops with the reason and the original is
-untouched.
+copied in, so an upgraded workspace has exactly the layout of a new one.
+
+- **Space:** it needs free space of about 2.2 times the database; if there is not
+  enough, the server does not start and changes nothing.
+- **The original** is kept byte for byte beside the database as
+  `openings.pre-<release>.sqlite` and is never deleted automatically; delete it
+  under **Settings › Data › Automatic backups** when you no longer need to go back.
+- **Dropped data:** records and fields the release no longer keeps are written to
+  `openings.pre-<release>-archive.json` beside it, readable only by the owner of
+  the file.
+- **Failures:** if a check fails, the start stops with the reason and the original
+  is untouched.
 
 ### Roll back
 
-A release that kept the format: run the previous release's tag, such as
-`vincenzoimp/openings:0.28.1`, instead of `latest`, as in Update.
+A release that kept the format: run the previous release's tag,
+`vincenzoimp/openings:X.Y.Z`, instead of `latest`, as in Update.
 
 A release that changed the format, here 0.28: stop the container, put the
 pre-upgrade copy back in place, and start the previous release. With
@@ -242,7 +246,7 @@ shows the size, free space and retention.
 
 1. **Is collection on?** The top line of **Sources** shows whether automatic
    checks are paused.
-2. **Is the source on and checked?** A paused source is greyed; a source added
+2. **Is the source on and checked?** A paused source is grayed; a source added
    over REST or MCP starts paused. Choose **Check now** and read **Recent checks**.
 3. **Did the check fail or wait?** The source row and Recent checks give the
    reason in words, with the time it resumes.
@@ -250,7 +254,7 @@ shows the size, free space and retention.
    apart; a narrow query or **Title must include** can leave nothing new.
 5. **Are new jobs hidden?** **Hide jobs requiring languages I don't speak** and
    the filters of **Jobs › New** hide jobs; the count of hidden jobs is shown.
-6. **Is the worker alive?** `curl --fail http://127.0.0.1:8080/health` answers
+6. **Is the worker alive?** `curl -fsS http://127.0.0.1:8080/health` answers
    503 when the background worker stopped; read the logs.
 
 ### A job site refused requests
@@ -263,7 +267,7 @@ across restarts; nothing needs doing. If it happens every day, check fewer
 searches, less often, or space the requests further under **Settings ›
 Advanced**.
 
-Servers in a data centre or at a VPS provider are refused far more often than a
+Servers in a data center or at a VPS provider are refused far more often than a
 home connection, and some sites refuse them outright. Company careers pages are
 public job-board APIs and are rarely affected: on a server, follow the companies
 you want there first.

@@ -7,7 +7,7 @@ open application and can keep earlier closed ones.
 ## Stages
 
 Shortlisting a job starts its application in **Shortlisted**. From there:
-**Applied**, **Interview**, **Offer** and **Closed**. **Applications** has one chip
+**Applied**, **Interview**, **Offer** and **Closed**. **Applications** has one tab
 per stage, with its count, and **Ready**, the Shortlisted applications that are
 ready to send. Search finds words that start with what you type in the role,
 the company, the location, the posting or the pinned note, as the Jobs search does,
@@ -27,7 +27,7 @@ Closing needs an outcome: **Accepted**, **Rejected**, **Not pursued** or **No
 reply**. A closed application stays in the list with its history and files. You
 can start a new attempt for the job, but never two open ones at once.
 
-![Applications: the stage chips, and the rows grouped by what needs action](../images/applications.png)
+![Applications: the stage tabs, and the rows grouped by what needs action](../images/applications.png)
 
 Pick rows with `x` or ⌘-click to act on them together. The bar offers only what
 fits every picked row: **Close as no reply**, **Close…** with an outcome,

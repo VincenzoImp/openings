@@ -12,7 +12,7 @@ REST API.
 
 1. **Fresh jobs, no duplicates.** From LinkedIn, Indeed and Glassdoor searches
    (no login), company careers pages on 12 hiring platforms, the Hacker News "Who
-   is hiring?" thread and RSS feeds.
+   is hiring?" thread, RSS feeds and job links.
 2. **Your agent prepares.** It shortlists by fit and writes a tailored CV and
    letter for each application.
 3. **You apply, best first.** Ready applications are ranked by priority and
@@ -52,22 +52,27 @@ docker logs openings
 ```
 
 With Compose, use `docker compose logs openings`. Setting `OPENINGS_PASSWORD`
-skips the code. `curl http://127.0.0.1:8080/health` tells you it runs.
+skips the code. `curl -fsS http://127.0.0.1:8080/health` tells you it runs.
 
 ## Connect your agent
 
-In **Settings › API & agents**, create an agent token, then:
+In **Settings › API & agents**, create an agent token and put it in your shell:
+`export OPENINGS_TOKEN=<your agent token>`. Then install the Claude Code plugin,
+with the MCP connection and the skills:
+
+```text
+/plugin marketplace add VincenzoImp/openings-job-search
+/plugin install openings@openings-job-search
+```
+
+Without the plugin, Claude Code connects with:
 
 ```bash
-export OPENINGS_TOKEN=<your agent token>
 claude mcp add --transport http openings http://127.0.0.1:8080/mcp/ \
   --header 'Authorization: Bearer ${OPENINGS_TOKEN}'
 ```
 
-Claude Code can instead install the plugin with the MCP connection and the
-skills: `/plugin marketplace add VincenzoImp/openings-job-search`, then
-`/plugin install openings@openings-job-search`. Codex and other clients:
-[Work with an agent](https://github.com/VincenzoImp/openings-job-search/blob/main/docs/user/agents.md).
+Codex and other clients: [Work with an agent](https://github.com/VincenzoImp/openings-job-search/blob/main/docs/user/agents.md).
 
 ## Tags
 
@@ -77,8 +82,8 @@ skills: `/plugin marketplace add VincenzoImp/openings-job-search`, then
 | `X.Y`, such as `0.28` | The newest patch of that minor release. The Compose file pins it, so `docker compose pull` brings fixes. |
 | `latest` | The newest final release. |
 
-Every tag is a multi-arch image for **linux/amd64** and **linux/arm64**, about
-70 MB. The same image, with the same tags and digest, is mirrored at
+Every tag is a multi-arch image for **linux/amd64** and **linux/arm64**, under
+100 MB. The same image, with the same tags and digest, is mirrored at
 **`ghcr.io/vincenzoimp/openings`**. Images carry an SBOM and build provenance.
 
 ## Container
