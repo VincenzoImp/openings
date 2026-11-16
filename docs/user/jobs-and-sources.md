@@ -50,7 +50,7 @@ Each job carries labels computed without a model:
 
 | Label | Meaning |
 |---|---|
-| Posting language | The language the posting is written in, when it is English, German, French, Italian, Spanish, Portuguese, Dutch, Polish, Swedish, Danish, Norwegian or Finnish. |
+| Posting language | The language the posting is written in, when it is English, German, French, Italian, Spanish, Portuguese, Dutch, Polish, Swedish, Danish, Norwegian, Finnish, Czech or Romanian. |
 | Requires | The languages it requires; one language of a group is enough. A language mentioned only as a plus is not required. |
 | Possible duplicate | It probably repeats an earlier job. |
 | No longer listed | A company careers page stopped listing it. Set only when a check read the whole page; a page that suddenly lists nothing must list nothing at the next check too. |

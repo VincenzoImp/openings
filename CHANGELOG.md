@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Detect Czech and Romanian job postings for language labels and filtering.
+
 ## 0.28.0 — 2026-11-16
 
 Every new job, filtered, prepared and ranked: a demo in one command, skills for every workflow
