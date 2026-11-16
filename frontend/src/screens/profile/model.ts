@@ -251,3 +251,16 @@ export function linkHref(url: string) {
   if (/^(https?:|mailto:)/i.test(value)) return value;
   return `https://${value}`;
 }
+
+/**
+ * What a pasted CV that was not split into roles says: the whole text is
+ * one entry, and the agent can split it.
+ */
+export const KEPT_WHOLE =
+  "Kept as one entry. Your agent can split it into roles and education (“Split my CV into career entries”).";
+
+/** Whether an import preview kept the pasted text whole, as one entry. */
+export const keptWhole = (preview: {
+  entries?: unknown[];
+  warnings?: unknown[];
+}) => preview.entries?.length === 1 && (preview.warnings?.length ?? 0) > 0;

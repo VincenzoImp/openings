@@ -39,6 +39,7 @@ import {
 import { useKindLabels, useSourceTest } from "../sources/queries";
 import { StepFrame } from "./Frame";
 import { LanguagePicker } from "../preferences/LanguagePicker";
+import { KEPT_WHOLE, keptWhole } from "../profile/model";
 import { aboutFrom, otherLines, type About } from "./model";
 
 type Profile = Schema<"Profile">;
@@ -492,12 +493,14 @@ export function CvStep({
     title?: string;
     organization?: string;
   }[];
+  // Text the reader could not split is kept whole, as one entry.
+  const whole = !!preview && keptWhole(preview);
 
   async function importIt() {
     if (!preview) return;
     const done = await save.mutateAsync(preview).catch(() => null);
     if (done) {
-      setImported(entries.length);
+      setImported(whole ? 0 : entries.length);
       setText("");
       read.reset();
     }
@@ -514,7 +517,11 @@ export function CvStep({
       <section className="setup-block" aria-labelledby="setup-paste">
         <h2 id="setup-paste">Paste your CV</h2>
         {imported != null && (
-          <Done>{`Added ${plural(imported, "entry", "entries")} to your Profile.`}</Done>
+          <Done>
+            {imported
+              ? `Added ${plural(imported, "entry", "entries")} to your Profile.`
+              : "Added your CV to your Profile as one entry."}
+          </Done>
         )}
         <form
           className="setup-form"
@@ -541,11 +548,13 @@ export function CvStep({
           {preview && (
             <div className="setup-preview" role="status">
               <p>
-                {entries.length
-                  ? `Found ${plural(entries.length, "entry", "entries")}`
-                  : "No entry found in this text."}
+                {whole
+                  ? KEPT_WHOLE
+                  : entries.length
+                    ? `Found ${plural(entries.length, "entry", "entries")}`
+                    : "No entry found in this text."}
               </p>
-              {entries.length > 0 && (
+              {entries.length > 0 && !whole && (
                 <ul>
                   {entries.slice(0, 5).map((entry, index) => (
                     <li key={index}>
@@ -574,7 +583,9 @@ export function CvStep({
           <div className="setup-actions">
             {preview && entries.length > 0 ? (
               <Button disabled={save.isPending} onClick={importIt}>
-                {`Add ${plural(entries.length, "entry", "entries")}`}
+                {whole
+                  ? "Add it to your Profile"
+                  : `Add ${plural(entries.length, "entry", "entries")}`}
               </Button>
             ) : (
               <Button type="submit" disabled={!text.trim() || read.isPending}>

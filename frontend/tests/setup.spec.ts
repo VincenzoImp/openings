@@ -98,11 +98,15 @@ test("first run: about you, a search and a job, a CV and the example template, t
       "Data Engineer at Example Labs\n2021 to 2024\nBuilt synthetic pipelines for example data.",
     );
   await page.getByRole("button", { name: "Read it" }).click();
-  const add = page.getByRole("button", { name: /^Add \d+ entr/ });
-  await expect(add).toBeVisible();
-  await add.click();
+  // Plain text is kept whole, and the step says so instead of "1 entry".
   await expect(
-    page.getByText(/^Added \d+ entr.* to your Profile\.$/),
+    page.getByText(
+      "Kept as one entry. Your agent can split it into roles and education (“Split my CV into career entries”).",
+    ),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Add it to your Profile" }).click();
+  await expect(
+    page.getByText("Added your CV to your Profile as one entry."),
   ).toBeVisible();
   expect((await call(page, "/career/entries?limit=1")).total).toBeGreaterThan(
     entries,

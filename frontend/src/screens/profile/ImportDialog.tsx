@@ -12,7 +12,7 @@ import { LeaveDialog } from "../../ui/ReadEdit";
 import { useToast } from "../../ui/Toast";
 import { useApiMutation } from "../../query/mutation";
 import { cached, writes, type EntryInput } from "./data";
-import { KINDS, formatDates, type Kind } from "./model";
+import { KEPT_WHOLE, KINDS, formatDates, keptWhole, type Kind } from "./model";
 import { EXAMPLE, parseCv } from "./parse";
 import { Failure } from "./save";
 
@@ -55,7 +55,11 @@ async function inspect(raw: string): Promise<Preview> {
       highlights: entries[index]?.highlights ?? [],
     })),
     version: profile?.version ?? 0,
-    notes: entries.length ? [] : (result.warnings as string[]),
+    notes: entries.length
+      ? []
+      : keptWhole(result)
+        ? [KEPT_WHOLE]
+        : (result.warnings as string[]),
   };
 }
 
