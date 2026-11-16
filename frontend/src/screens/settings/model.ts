@@ -45,7 +45,7 @@ export const ACCESS: Record<TokenKind, { label: string; detail: string }> = {
   agent: {
     label: "Agent",
     detail:
-      "Works in the job search. Cannot change your password, manage tokens, restore or export.",
+      "Works in the job search. Cannot change your password, manage tokens or restore a backup.",
   },
   owner: {
     label: "Full access",

@@ -253,8 +253,8 @@ export interface paths {
     get?: never;
     put?: never;
     /**
-     * Reserve a backup download; take one before any permanent bulk clean-up.
-     * @description A two-minute GET grant (curl line given). An agent's copy holds no credentials.
+     * Reserve a download; take a backup before any permanent bulk clean-up.
+     * @description backup: the SQLite file with files; export: the JSON records. A two-minute GET grant (curl line given); an agent's copy holds no credentials.
      */
     post: operations["workspace_backup"];
     delete?: never;
@@ -766,9 +766,7 @@ export interface paths {
     };
     /**
      * Export
-     * @description Download the workspace records as JSON, without file bytes or credentials (owner only).
-     *
-     *     Owner only: an agent token is refused with 403 forbidden; not an MCP tool.
+     * @description Download the workspace records as JSON, without file bytes or credentials.
      */
     get: operations["export_download"];
     put?: never;
@@ -789,10 +787,8 @@ export interface paths {
     get?: never;
     put?: never;
     /**
-     * Reserve a records export (owner only).
+     * Reserve a records export.
      * @description A two-minute GET grant for the JSON records, without file bytes or credentials.
-     *
-     *     Owner only: an agent token is refused with 403 forbidden; not an MCP tool.
      */
     post: operations["workspace_export"];
     delete?: never;
@@ -6278,7 +6274,9 @@ export interface operations {
   };
   workspace_backup: {
     parameters: {
-      query?: never;
+      query?: {
+        kind?: "backup" | "export";
+      };
       header?: never;
       path?: never;
       cookie?: never;
@@ -8276,15 +8274,6 @@ export interface operations {
       };
       /** @description forbidden */
       403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Error"];
-        };
-      };
-      /** @description conflict */
-      409: {
         headers: {
           [name: string]: unknown;
         };

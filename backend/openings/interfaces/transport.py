@@ -31,7 +31,7 @@ TRANSPORT_ONLY = (
     ("GET", "/backup", "Streams a SQLite backup, with a session, a token or a grant."),
     ("POST", "/backup/restore", "Owner only: receives a raw SQLite upload that replaces data."),
     ("GET", "/backups/{name}", "Owner only: streams a kept backup file."),
-    ("GET", "/export", "Owner only: streams the JSON records, with a session, a token or a grant."),
+    ("GET", "/export", "Streams the JSON records, with a session, a token or a grant."),
     ("GET", "/examples", "Lists the shipped example files, not workspace records."),
     ("GET", "/examples/{name}", "Downloads a shipped example file."),
     ("PUT", "/transfers", "Receives raw file bytes under an upload grant (files_upload)."),
@@ -169,15 +169,9 @@ def register_transport(app, router, public_url):
         _, path = backups.find(workspace.db, name)
         return FileResponse(path, media_type="application/vnd.sqlite3", filename=path.name)
 
-    @router.get(
-        API_PREFIX + "/export",
-        tags=["owner"],
-        operation_id="export_download",
-        openapi_extra={"x-openings-access": "owner"},
-    )
+    @router.get(API_PREFIX + "/export", tags=["workspace"], operation_id="export_download")
     def export():
-        """Download the workspace records as JSON, without file bytes or credentials (owner only)."""
-        require_owner("export the records")
+        """Download the workspace records as JSON, without file bytes or credentials."""
         return RecordsResponse(export_records(workspace.db))
 
     @router.get(API_PREFIX + "/examples", tags=["workspace"], operation_id="examples_list")
