@@ -38,13 +38,18 @@ test("first run: about you, a search and a job, a CV and the example template, t
   const roles = unique("Synthetic data engineer");
   await page.getByLabel("Roles you're after").fill(roles);
   await page.getByLabel("Where").fill("Zurich or remote");
-  const before = (await call(page, "/preferences")).settings.spoken_languages;
-  const french = page.getByRole("button", { name: "French" });
-  await french.click();
-  await expect(french).toHaveAttribute(
-    "aria-pressed",
-    String(!before.includes("fr")),
-  );
+  // Any language can be recorded: one outside the list, by its name.
+  const spoken = page.getByRole("group", { name: "Languages you speak" });
+  await spoken.getByLabel("Add a language").selectOption("other");
+  const other = spoken.getByLabel("Other language");
+  await other.fill("Klingon");
+  await other.press("Enter");
+  await expect(spoken.getByText(/No language goes by that name/)).toBeVisible();
+  await other.fill("Yoruba");
+  await other.press("Enter");
+  await expect(
+    spoken.getByRole("button", { name: "Remove Yoruba" }),
+  ).toBeVisible();
   await fitsViewport(page);
   await next(page).click();
   await expect(page).toHaveURL(/#setup\?step=jobs$/);
@@ -57,9 +62,7 @@ test("first run: about you, a search and a job, a CV and the example template, t
     .items.map((item: { text: string }) => item.text);
   expect(looking).toContain(`Roles: ${roles}`);
   expect(looking).toContain("Where: Zurich or remote");
-  expect(stored.settings.spoken_languages.includes("fr")).toBe(
-    !before.includes("fr"),
-  );
+  expect(stored.settings.spoken_languages).toContain("yo");
 
   // Step 2: the search starts from step 1; "Save and continue" saves it and
   // adds one job by its link.

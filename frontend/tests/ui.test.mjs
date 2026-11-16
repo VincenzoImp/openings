@@ -168,9 +168,6 @@ test("font sizes, weights and radii come from the tokens", () => {
 test("screens use the shared toolbar, and icons go through Icon", () => {
   for (const file of files(SRC)) {
     if (!file.endsWith(".tsx") || file.endsWith("Icon.tsx")) continue;
-    // Setup is being rebuilt in its own branch (one direct ArrowRight in
-    // Steps.tsx); it joins this guard once that lands.
-    if (file.includes("/screens/setup/")) continue;
     const text = readFileSync(file, "utf8");
     if (file.includes("/screens/"))
       assert.doesNotMatch(text, /className="ui-toolbar\b/, file);

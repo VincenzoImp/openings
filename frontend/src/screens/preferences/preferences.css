@@ -250,28 +250,7 @@
     letter-spacing: 0;
   }
   .pref-langs-edit {
-    display: flex;
-    flex-direction: column;
-    gap: var(--s-3);
     margin-top: var(--s-2);
-  }
-  .pref-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--s-1-5);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-  .pref-langs-add {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--s-2);
-    align-items: center;
-  }
-  .pref-langs-add .ui-select {
-    width: 220px;
-    max-width: 100%;
   }
 
   /* The Jobs filter, as a quiet link row. */

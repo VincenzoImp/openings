@@ -1,13 +1,15 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { ArrowRight, EyeOff, Pencil, Plus, X } from "lucide-react";
-import { Button, Chip, Tag, Select, Icon, useToast } from "../../ui";
+import { Button, Tag, Icon, useToast } from "../../ui";
+import { REQUIREMENT_LIMIT, languageName } from "../../ui/languages";
 import { isConflict } from "../../query/mutation";
 import {
   useSaveSettings,
   useUnspokenNewJobs,
   type Settings,
 } from "../../query/preferences";
-import { LANGUAGES, hiddenLine, languageName, replyDays } from "./model";
+import { LanguagePicker } from "./LanguagePicker";
+import { hiddenLine, replyDays } from "./model";
 
 /** Say what failed in a settings write; a conflict has already reloaded. */
 function useFailure() {
@@ -34,9 +36,6 @@ export function Languages({ settings }: { settings: Settings }) {
   const fail = useFailure();
   const spoken = settings.spoken_languages;
   const effect = useUnspokenNewJobs(spoken.length > 0);
-  const others = Object.keys(LANGUAGES).filter(
-    (code) => !spoken.includes(code),
-  );
   const edit = useRef<HTMLButtonElement>(null);
   const wasEditing = useRef(false);
   useEffect(() => {
@@ -67,39 +66,11 @@ export function Languages({ settings }: { settings: Settings }) {
       </div>
       {editing ? (
         <div className="pref-langs-edit">
-          {spoken.length > 0 && (
-            <ul className="pref-chips" aria-label="Languages I speak">
-              {spoken.map((code) => (
-                <li key={code}>
-                  <Chip
-                    removeLabel={`Remove ${languageName(code)}`}
-                    disabled={save.isPending}
-                    onRemove={() =>
-                      change(spoken.filter((other) => other !== code))
-                    }
-                  >
-                    {languageName(code)}
-                  </Chip>
-                </li>
-              ))}
-            </ul>
-          )}
-          <div className="pref-langs-add">
-            <Select
-              aria-label="Add a language"
-              value=""
-              disabled={save.isPending}
-              onChange={(event) => {
-                if (event.target.value) change([...spoken, event.target.value]);
-              }}
-            >
-              <option value="">Add a language…</option>
-              {others.map((code) => (
-                <option key={code} value={code}>
-                  {languageName(code)}
-                </option>
-              ))}
-            </Select>
+          <LanguagePicker
+            value={spoken}
+            disabled={save.isPending}
+            onChange={change}
+          >
             <Button
               variant="secondary"
               size="sm"
@@ -107,7 +78,7 @@ export function Languages({ settings }: { settings: Settings }) {
             >
               Done
             </Button>
-          </div>
+          </LanguagePicker>
         </div>
       ) : spoken.length ? (
         <p className="pref-langs">
@@ -137,6 +108,7 @@ export function Languages({ settings }: { settings: Settings }) {
           <Icon icon={ArrowRight} className="pref-filter-go" />
         </a>
       )}
+      {spoken.length > 0 && <p className="pref-muted">{REQUIREMENT_LIMIT}</p>}
     </div>
   );
 }

@@ -11,6 +11,7 @@ import {
   formatDay,
   isoDay,
 } from "../../ui/format.ts";
+import { REQUIREMENT_LANGUAGES, languageName } from "../../ui/languages.ts";
 
 export { jobLink } from "./link.ts";
 
@@ -146,28 +147,7 @@ export function listQuery(view: View, limit: number): ListQuery {
 
 /* ------------------------------------------------------------- languages */
 
-export const LANGUAGES: Record<string, string> = {
-  en: "English",
-  de: "German",
-  fr: "French",
-  it: "Italian",
-  es: "Spanish",
-  nl: "Dutch",
-  pt: "Portuguese",
-  pl: "Polish",
-  sv: "Swedish",
-  da: "Danish",
-  no: "Norwegian",
-  fi: "Finnish",
-  cs: "Czech",
-  ru: "Russian",
-  ja: "Japanese",
-  zh: "Chinese",
-  ar: "Arabic",
-  tr: "Turkish",
-  ko: "Korean",
-};
-export const languageName = (code: string) => LANGUAGES[code] || code;
+export { REQUIREMENT_LANGUAGES, languageName };
 /** The languages a posting's own language is recognised in. */
 export const POSTING_LANGUAGES = [
   "en",

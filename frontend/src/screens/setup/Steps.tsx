@@ -3,7 +3,6 @@ import {
   ArrowRight,
   Bookmark,
   Bot,
-  Check,
   CircleCheck,
   Inbox,
   Send,
@@ -39,7 +38,8 @@ import {
 } from "../sources/model";
 import { useKindLabels, useSourceTest } from "../sources/queries";
 import { StepFrame } from "./Frame";
-import { LANGUAGES, aboutFrom, otherLines, type About } from "./model";
+import { LanguagePicker } from "../preferences/LanguagePicker";
+import { aboutFrom, otherLines, type About } from "./model";
 
 type Profile = Schema<"Profile">;
 type Preferences = Schema<"Preferences">;
@@ -71,14 +71,7 @@ export function AboutStep({
   const nameField = useRef<HTMLInputElement>(null);
   const save = useSaveAbout();
   const set = (patch: Partial<About>) => setAbout({ ...about, ...patch });
-  const spoken = new Set(about.languages);
   const others = otherLines(preferences);
-  const offered = [
-    ...LANGUAGES,
-    ...about.languages
-      .filter((code) => !LANGUAGES.some(([known]) => known === code))
-      .map((code) => [code, code.toUpperCase()] as [string, string]),
-  ];
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -155,26 +148,10 @@ export function AboutStep({
         </Field>
         <fieldset className="setup-languages">
           <legend>Languages you speak</legend>
-          <div className="setup-chips">
-            {offered.map(([code, name]) => (
-              <button
-                key={code}
-                type="button"
-                className="setup-chip"
-                aria-pressed={spoken.has(code)}
-                onClick={() =>
-                  set({
-                    languages: spoken.has(code)
-                      ? about.languages.filter((other) => other !== code)
-                      : [...about.languages, code],
-                  })
-                }
-              >
-                {spoken.has(code) && <Icon icon={Check} size="sm" />}
-                {name}
-              </button>
-            ))}
-          </div>
+          <LanguagePicker
+            value={about.languages}
+            onChange={(languages) => set({ languages })}
+          />
         </fieldset>
         {save.error && (
           <p className="setup-error" role="alert">
@@ -673,7 +650,7 @@ export function DoneStep({
           </p>
           <a className="setup-link" href={href("settings")}>
             Set it up in Settings
-            <ArrowRight aria-hidden="true" size={14} strokeWidth={1.75} />
+            <Icon icon={ArrowRight} size="sm" />
           </a>
         </div>
       </aside>

@@ -1,0 +1,32 @@
+@layer screens {
+  /* The languages someone speaks: Setup › About you and Preferences. */
+  .lang-picker {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-3);
+  }
+  .lang-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-1-5);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .lang-add {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2);
+    align-items: center;
+  }
+  .lang-add .ui-select {
+    width: 220px;
+    max-width: 100%;
+  }
+  .lang-other {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    max-width: 360px;
+  }
+}

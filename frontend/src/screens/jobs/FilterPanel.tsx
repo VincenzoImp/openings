@@ -6,8 +6,8 @@ import { Icon } from "../../ui/Icon";
 import { useFacets } from "./data";
 import {
   DISMISSED_BY,
-  LANGUAGES,
   POSTING_LANGUAGES,
+  REQUIREMENT_LANGUAGES,
   SIGNALS,
   SORTS,
   chipsOf,
@@ -108,9 +108,9 @@ export function FilterPanel({
         label: languageName(code),
       }));
     if (of === "requires")
-      return Object.entries(LANGUAGES).map(([value, label]) => ({
-        value,
-        label,
+      return REQUIREMENT_LANGUAGES.map((code) => ({
+        value: code,
+        label: languageName(code),
       }));
     if (of === "signal")
       return Object.entries(SIGNALS).map(([value, label]) => ({

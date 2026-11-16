@@ -143,27 +143,3 @@ export function hiddenLine(hidden: number, total: number) {
   const jobs = total === 1 ? "new job" : "new jobs";
   return `Hides ${hidden} of your ${total} ${jobs} in Jobs`;
 }
-
-/** The languages Preferences offers, by ISO 639-1 code. */
-export const LANGUAGES: Record<string, string> = {
-  en: "English",
-  de: "German",
-  fr: "French",
-  it: "Italian",
-  es: "Spanish",
-  nl: "Dutch",
-  pt: "Portuguese",
-  pl: "Polish",
-  sv: "Swedish",
-  da: "Danish",
-  no: "Norwegian",
-  fi: "Finnish",
-  cs: "Czech",
-  ru: "Russian",
-  ja: "Japanese",
-  zh: "Chinese",
-  ar: "Arabic",
-  tr: "Turkish",
-  ko: "Korean",
-};
-export const languageName = (code: string) => LANGUAGES[code] || code;
