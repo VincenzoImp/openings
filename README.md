@@ -48,7 +48,7 @@ You set these up once, by hand or with your agent.
 
 ![A template on Preview](docs/images/templates.png)
 
-**Sources.** LinkedIn, Indeed and Glassdoor searches (no login), careers pages on 12 hiring platforms, Hacker News "Who is hiring?", RSS feeds and job links. Each shows found · ever shortlisted · applied, to tune over time.
+**Sources.** LinkedIn, Indeed and Glassdoor searches (no login), careers pages on 12 hiring platforms, Hacker News, RSS feeds and job links. Each shows found · ever shortlisted · applied, to tune over time.
 
 ![Sources and their counts](docs/images/sources.png)
 
@@ -56,7 +56,7 @@ You set these up once, by hand or with your agent.
 
 **Today** shows what is ready to send, what needs attention and what waits for a reply. Openings tracks replies, follow-ups and deadlines, and your agent briefs you before each interview, with a debrief saved after it.
 
-![Applications grouped by what needs action](docs/images/applications.png)
+![An application with its interview brief](docs/images/brief.png)
 
 ## Quick start
 
@@ -196,12 +196,20 @@ career-ops and Openings work well together. More tools, with sources: [Openings 
 
 ## Screenshots
 
-The demo workspace, fictional data.
+<details open><summary>The demo workspace, fictional data</summary>
 
-![Jobs › New beside the selected job](docs/images/jobs.png)
-![A Ready application with its CV and letter](docs/images/ready.png)
-![Settings › API & agents](docs/images/agents.png)
+![Profile with starred highlights](docs/images/profile.png)
+![Preferences, in your own words](docs/images/preferences.png)
+![A template's Preview](docs/images/templates.png)
+![Sources and their counts](docs/images/sources.png)
+![A dismissal quoting your Preferences](docs/images/dismissed.png)
+![A Ready application's PDFs](docs/images/ready.png)
+![An interview brief](docs/images/brief.png)
+![Today, best first](docs/images/today.png)
+![Stats, Example data](docs/images/stats.png)
 <img alt="Jobs on a phone" src="docs/images/jobs-mobile.png" width="320">
+
+</details>
 
 ## FAQ
 
