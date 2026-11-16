@@ -501,6 +501,11 @@ const SCREENS: Screen[] = [
     name: "jobs-dismissed",
     route: "jobs?section=dismissed&dismissed_by=agent",
     docs: "dismissed",
+    // The dismissal whose reason quotes a line of the Preferences.
+    open: async (page) => {
+      await page.getByText("Staff Backend Engineer").first().click();
+      await expect(page.getByText(/remote within Europe/).first()).toBeVisible();
+    },
   },
   { name: "jobs-all", route: "jobs?section=all" },
   { name: "jobs-empty", route: "jobs?q=no%20job%20has%20this%20title" },

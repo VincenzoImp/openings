@@ -24,13 +24,13 @@
 2. **Your agent decides and prepares.** Your agent reads each job by your rules, dismisses with a reason and writes a CV and letter for the rest.
 3. **You apply, best first.** Ready is ranked by priority, then deadline. You send each one yourself.
 
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/flow-dark.svg"><img alt="You set it up: Profile, Preferences, Templates and Sources. Openings brings in fresh jobs. Your agent decides and prepares. You apply, best first. By hand, REST or MCP" src="docs/images/flow.svg"></picture>
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/flow-dark.svg"><img alt="Set up Profile, Preferences, Templates and Sources; fresh jobs arrive; your agent prepares; you apply, best first" src="docs/images/flow.svg"></picture>
 
 Change a line in your Preferences, and your agent's next decisions change with it:
 
 | Preferences › What I'm looking for | Jobs › Dismissed |
 |---|---|
-| "…or remote within Europe." | "Dismissed by Claude Code · Office in Oslo; you look for remote within Europe." |
+| "…or remote within Europe." | "Dismissed by Claude Code · On site in London five days a week; you look for … remote within Europe." |
 
 ## What Openings holds
 
