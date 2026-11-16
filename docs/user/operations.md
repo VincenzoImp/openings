@@ -165,6 +165,12 @@ shows the size, free space and retention.
 
 ## Container details
 
+The image is `vincenzoimp/openings` on Docker Hub for linux/amd64 and arm64:
+`X.Y.Z` is one release, `X.Y` the newest patch of a minor and `latest` the newest
+release. From 0.28.0 the same image, with the same tags and digest, is at
+`ghcr.io/vincenzoimp/openings`, for when Docker Hub's anonymous pull limit gets in
+the way; to use it, set `OPENINGS_IMAGE=ghcr.io/vincenzoimp/openings:X.Y.Z` in `.env`.
+
 The single `openings` container has a Compose budget of 0.5 CPU and 512 MiB; leave
 room for the host. The `workspace` volume holds `/data/openings.sqlite`, its
 journals and every uploaded file. The core runs as UID/GID 10001, so a
