@@ -194,6 +194,14 @@ test("without LaTeX: a PDF CV and letter uploaded on the page make it Ready", as
   await expect(
     page.locator(".apg-salary").filter({ hasText: "CHF 98,000 a year" }),
   ).toBeAttached();
+  // The Ready row of the list says it too.
+  await go(page, "applications?stage=ready");
+  await expect(
+    page
+      .locator(`[data-row-id="${app.id}"]`)
+      .locator("xpath=ancestor::li[1]")
+      .getByText("Salary CHF 98,000 a year"),
+  ).toBeAttached();
 });
 
 test("a shortlisted page says what is missing once, with one upload each and a requirement field on intent", async ({
@@ -211,7 +219,7 @@ test("a shortlisted page says what is missing once, with one upload each and a r
     page.getByRole("button", { name: "Upload PDF of the CV" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Upload PDF of the Letter" }),
+    page.getByRole("button", { name: "Upload PDF of the letter" }),
   ).toBeVisible();
   // The whole title is on the page at every width.
   await expect(
