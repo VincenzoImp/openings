@@ -1,9 +1,9 @@
 ---
 name: review-applications
 title: Rank and review what is Ready
-summary: Have your open applications ranked by priority, given a salary range with its basis, checked for employers you apply to too often, and fixed everywhere at once.
+summary: Your agent ranks your open applications by priority, gives each a salary range with its basis and flags employers you apply to too often.
 example: Rank my Ready applications and tell me what to send first.
-description: Review the Openings application queue - "what should I send first?", "set priorities", "add a salary expectation", "too many applications at X", "check everything Ready", "fix this in every letter". Ranks, sets a sending order, recommends a salary with its basis, flags employer concentration and runs document fix passes.
+description: Review the Openings application queue, as in "what should I send first?", "set priorities", "add a salary expectation", "too many applications at X", "check everything Ready", "fix this in every letter". Ranks, sets a sending order, recommends a salary with its basis, flags employer concentration and runs document fix passes.
 ---
 
 # Rank and review what is Ready
