@@ -14,7 +14,7 @@ body:
     attributes:
       label: Openings version
       description: Shown in Settings, by `GET /api/v1/capabilities`, or the image tag you run.
-      placeholder: "0.28.0"
+      placeholder: "X.Y.Z (Settings › Advanced)"
     validations:
       required: true
   - type: dropdown
@@ -48,7 +48,7 @@ body:
       description: The smallest sequence that shows the problem, with synthetic data.
       placeholder: |
         1. Open Applications
-        2. Choose the Ready chip
+        2. Choose the Ready tab
         3. ...
     validations:
       required: true

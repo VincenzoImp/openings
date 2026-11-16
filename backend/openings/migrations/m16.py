@@ -30,10 +30,10 @@ of a new one and the original is never written.
 schema-15 backup): the source file is only read.
 
 This module is frozen with its release: it imports only the standard library and
-holds every statement it needs. Until 0.28 is released, the issues of that release
-extend it ("edit the unreleased migration"): a table or column that leaves the
-schema is refused by ``_plan`` until the migration says where its values go, and a
-value that must not change gets an ``INVARIANTS`` entry.
+holds every statement it needs. Frozen since 0.28.0; the next schema change adds
+m17. A table or column that leaves the schema is refused by ``_plan`` until the
+migration says where its values go, and a value that must not change gets an
+``INVARIANTS`` entry.
 """
 
 import json

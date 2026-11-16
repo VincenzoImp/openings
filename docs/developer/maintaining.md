@@ -47,11 +47,10 @@ synthetic seed.
 
 ### Cadence
 
-- In launch week, at most one release a day; afterwards at most one a week,
-  unless a bug blocks a user. Batch the rest in the next release.
-- 0.28.0 may change the schema once, as a single migration verified on a copy of
-  the maintainer's own workspace. No 0.28.x release changes the schema.
-- The next schema change is 1.0.0, which tests chained upgrades from 0.28.
+- At most one release a week, unless a bug blocks a user. Batch the rest in the
+  next release.
+- No 0.28.x release changes the schema. The next schema change is 1.0.0, which
+  tests chained upgrades from 0.28.
 
 ## Traffic archive
 
@@ -105,7 +104,7 @@ Dependabot proposes updates weekly, each version at least seven days old
 
 ## Static analysis
 
-`codeql.yml` analyses the Python and TypeScript on pull requests, on `main` and
+`codeql.yml` analyzes the Python and TypeScript on pull requests, on `main` and
 weekly; its findings are code scanning alerts. `zizmor.yml` audits the workflows
 and the Dependabot configuration on every change under `.github/` and fails on
 any finding. Neither is a required check. Pin every action by commit SHA with

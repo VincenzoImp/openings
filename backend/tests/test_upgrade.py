@@ -110,6 +110,20 @@ def upgraded(tmp_path_factory):
     return path, files.pre_upgrade, before, original, beside
 
 
+def test_the_released_current_schema_fixture_opens_as_it_is(tmp_path):
+    # The next migration upgrades from this file (maintaining.md); it must be the
+    # current schema already, opened without an upgrade.
+    current = FIXTURE.with_name(f"workspace-{SCHEMA_VERSION}.sql.gz")
+    path = tmp_path / "openings.sqlite"
+    with closing(sqlite3.connect(path)) as conn:
+        conn.executescript(gzip.decompress(current.read_bytes()).decode())
+    Database(path)
+    Database(tmp_path / "fresh.sqlite")
+    assert not m16.files(path).pre_upgrade.exists()
+    assert structure(path) == structure(tmp_path / "fresh.sqlite")
+    assert query(path, "PRAGMA integrity_check") == [("ok",)]
+
+
 def test_an_upgraded_workspace_is_a_new_one_holding_every_row_of_the_original(tmp_path, upgraded):
     path, pre_upgrade, before, original, beside = upgraded
     Database(tmp_path / "fresh.sqlite")

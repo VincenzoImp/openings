@@ -7,7 +7,7 @@ workspace or a live installation.
 The automated tests cover what stays put (layout fit, axe, keys of Jobs and
 gestures). This pass catches what they don't: what a person sees, reads and
 expects. File each defect as its own issue in the release's milestone, labelled
-`bug` or `ui` (plus `product` when the behaviour needs a decision). Give repro
+`bug` or `ui` (plus `product` when the behavior needs a decision). Give repro
 steps, the expected and the actual result, and a screenshot of the demo
 workspace. Add a Playwright test when it is cheap. A test for a defect that is
 not fixed yet uses `test.fail` and names its issue (see `frontend/tests/qa.spec.ts`).
@@ -140,9 +140,4 @@ At each width and theme, check that:
 
 ## Last pass
 
-2026-11, release 0.28.0 (#317). New findings: #421 (Applications stage tabs
-hidden at 768–1280 px), #422 (list keys on Applications need a focused row),
-#423 (language lists), #424 (phone top and bottom bars), #425 (wording,
-accessible names and wrapping). Seen again and already filed: #415 (stage words in
-search), #416 (left-aligned documents at wide widths), #417 (the Ready page and
-the Templates top bar on a phone). Screenshots: `frontend/tests/qa/shots/`.
+2026-11, 0.28.0 (#317): findings #415-417, #421-425, all fixed.
