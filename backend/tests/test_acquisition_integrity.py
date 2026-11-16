@@ -109,8 +109,7 @@ def test_greenhouse_filters_metadata_before_bounded_detail_requests(collection, 
 
     def fetch(url, **kwargs):
         calls.append(url)
-        assert "content=true" not in url
-        if url.endswith("/jobs"):
+        if url.endswith("/jobs?content=true"):
             return json.dumps(
                 {
                     "jobs": [
@@ -127,7 +126,7 @@ def test_greenhouse_filters_metadata_before_bounded_detail_requests(collection, 
     task = discovery.claim_task("owner", "collect")
     discovery.run_task(task, "owner")
     assert calls == [
-        "https://boards-api.greenhouse.io/v1/boards/example/jobs",
+        "https://boards-api.greenhouse.io/v1/boards/example/jobs?content=true",
         "https://boards-api.greenhouse.io/v1/boards/example/offices",
         "https://boards-api.greenhouse.io/v1/boards/example/jobs/501",
     ]

@@ -37,6 +37,15 @@ class SourcePreview(Input):
     filters: Filters = Field(default_factory=Filters)
 
 
+class SourceTest(SourcePreview):
+    """A preview from the dashboard's Test: the listing first, then the posting text."""
+
+    details: bool = Field(
+        default=True,
+        description="false: the board's listing only, without fetching each posting's text.",
+    )
+
+
 class SourceCreate(SourcePreview):
     enabled: bool = False
     schedule: Schedule = Field(default_factory=IntervalSchedule)

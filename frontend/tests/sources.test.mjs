@@ -273,3 +273,47 @@ test("Settings: sections, sizes, access, snippets and request limits", () => {
     [5, 0, 2.5, null, null, null, null],
   );
 });
+
+test("a running check counts what it fetched of what the board lists", () => {
+  const status = (counts) =>
+    sources.sourceStatus(
+      source({ last_run: { state: "running", counts } }),
+      NOW,
+    );
+  assert.equal(
+    status({ listed: 254, received: 63 }).text,
+    "Checking now… · fetched 63 of 254",
+  );
+  assert.equal(status({ received: 4 }).text, "Checking now…");
+});
+
+test("a Test says what it is doing, then what it found", () => {
+  const heading = sources.testHeading;
+  assert.equal(heading({ phase: "listing", total: 0, shown: 0 }), "Testing…");
+  assert.equal(
+    heading({ phase: "details", total: 3, shown: 3, listed: 254 }),
+    "254 jobs listed · fetching the text of the first 3…",
+  );
+  assert.equal(
+    heading({ phase: "done", total: 3, shown: 3, listed: 254 }),
+    "254 jobs found · the first 3",
+  );
+  assert.equal(heading({ phase: "done", total: 2, shown: 2 }), "2 jobs found");
+  assert.equal(heading({ phase: "done", total: 0, shown: 0 }), "No jobs found");
+  assert.equal(
+    heading({ phase: "done", total: 0, shown: 0, failed: true }),
+    "Test failed",
+  );
+});
+
+test("a wait's time is shown in the viewer's clock", () => {
+  const until = new Date(2026, 10, 14, 15, 5).toISOString();
+  assert.equal(
+    sources.localReason(
+      "LinkedIn refused this request from your network; Openings waits until 14:05 UTC and tries again.",
+      until,
+    ),
+    "LinkedIn refused this request from your network; Openings waits until 15:05 and tries again.",
+  );
+  assert.equal(sources.localReason("No wait.", undefined), "No wait.");
+});

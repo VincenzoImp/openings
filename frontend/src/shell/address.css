@@ -1,0 +1,6 @@
+/* The notice that the public URL does not name this address (AddressNotice). */
+@layer screens {
+  .shell-address {
+    padding: var(--s-3) var(--s-4) 0;
+  }
+}

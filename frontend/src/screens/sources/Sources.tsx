@@ -189,17 +189,18 @@ export default function SourcesScreen() {
             <>
               <Button
                 variant="primary"
-                onClick={() => open({ kind: "search" })}
+                onClick={() => open({ kind: "company" })}
               >
-                Add a search
+                Follow a company's careers page
               </Button>
-              <Button onClick={() => open({ kind: "company" })}>
-                Add a company careers page
+              <Button onClick={() => open({ kind: "search" })}>
+                Add a search
               </Button>
             </>
           }
         >
-          Add a search to get new jobs every few hours.
+          A careers page is read directly and checked at once. A search asks
+          LinkedIn; with a country, also Indeed and Glassdoor.
         </EmptyState>
       ) : (
         <>

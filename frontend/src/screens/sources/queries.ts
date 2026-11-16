@@ -1,4 +1,5 @@
 // The reads and writes of the Sources screen, over the generated client.
+import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, call, type Schema } from "../../api/client";
 import { useApiMutation, useVersionedMutation } from "../../query/mutation";
@@ -161,9 +162,78 @@ export function useUpdateSource(onReload?: () => void) {
 export function usePreview() {
   return useApiMutation({
     touches: ["providers"],
-    mutationFn: (body: Schema<"SourcePreview">) =>
+    mutationFn: (body: Schema<"SourceTest">) =>
       call(api.POST("/api/v1/sources/preview", { body })),
   });
+}
+
+export type TestResult = Schema<"SourcePreviewResult"> & {
+  kind?: string;
+  url?: string;
+  automatic_collection?: boolean;
+};
+export type TestPhase = "idle" | "listing" | "details" | "done";
+
+const hasText = (item: Record<string, unknown>) =>
+  typeof item.posting === "string" && item.posting.trim() !== "";
+
+/**
+ * Test a source in two steps: the board's listing first (its titles show at
+ * once), then the posting text of the first few. A search or a feed answers
+ * in one step. Both go through the shared request gate; nothing is saved.
+ */
+export function useSourceTest() {
+  const preview = usePreview();
+  const asked = useRef(0);
+  const [state, setState] = useState<{
+    phase: TestPhase;
+    result: TestResult | null;
+    error: string;
+  }>({ phase: "idle", result: null, error: "" });
+
+  async function run(body: Omit<Schema<"SourceTest">, "details">) {
+    const question = ++asked.current;
+    const current = () => asked.current === question;
+    const twoSteps = body.kind !== "jobspy" && body.kind !== "rss";
+    setState({ phase: "listing", result: null, error: "" });
+    try {
+      let result = (await preview.mutateAsync({
+        ...body,
+        details: !twoSteps,
+      })) as TestResult;
+      if (!current()) return;
+      const waiting = result.items.some((item) => !hasText(item));
+      if (twoSteps && result.items.length && waiting) {
+        setState({ phase: "details", result, error: "" });
+        const listed = result;
+        result = (await preview.mutateAsync({
+          ...body,
+          details: true,
+        })) as TestResult;
+        if (!current()) return;
+        // A later refusal keeps the titles the listing gave.
+        if (!result.items.length) result = { ...result, items: listed.items };
+      }
+      setState({ phase: "done", result, error: "" });
+    } catch (error) {
+      if (current())
+        setState((before) => ({
+          phase: "done",
+          result: before.result,
+          error: error instanceof Error ? error.message : "The test failed.",
+        }));
+    }
+  }
+
+  return {
+    ...state,
+    pending: state.phase === "listing" || state.phase === "details",
+    run,
+    reset: () => {
+      asked.current += 1;
+      setState({ phase: "idle", result: null, error: "" });
+    },
+  };
 }
 
 /** Pause or resume every automatic check. */

@@ -10,6 +10,8 @@ import "./auth.css";
 /** The browser session: whether an owner exists and is signed in. */
 export interface Session {
   configured: boolean;
+  /** A new installation asks for the one-time code printed to its log. */
+  setup_code?: boolean;
   authenticated: boolean;
   csrf_token?: string;
   /** A disposable demo workspace (`openings demo`). */
@@ -60,9 +62,11 @@ export function AuthError({
 /** Sign in, or choose the owner password of a new installation. */
 export function Auth({
   configured,
+  setupCode = false,
   onSuccess,
 }: {
   configured: boolean;
+  setupCode?: boolean;
   onSuccess: (session: Session) => void;
 }) {
   const [error, setError] = useState<string | null>(null),
@@ -78,10 +82,14 @@ export function Auth({
     }
     setPending(true);
     try {
-      const body = { password };
+      const code = String(form.get("setup_code") || "").trim();
       const session = configured
-        ? await call(api.POST("/api/v1/auth/login", { body }))
-        : await call(api.POST("/api/v1/auth/setup", { body }));
+        ? await call(api.POST("/api/v1/auth/login", { body: { password } }))
+        : await call(
+            api.POST("/api/v1/auth/setup", {
+              body: { password, setup_code: code || null },
+            }),
+          );
       onSuccess(session as Session);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to sign in.");
@@ -99,6 +107,23 @@ export function Auth({
       )}
       <form className="auth-form" onSubmit={submit}>
         {error && <AuthError message={error} />}
+        {!configured && setupCode && (
+          <Field
+            label="Setup code"
+            hint="Printed in the server's log when it starts: run docker compose logs openings (or docker logs openings) and look for “Setup code”."
+          >
+            <Input
+              name="setup_code"
+              required
+              autoFocus
+              autoComplete="off"
+              autoCapitalize="characters"
+              spellCheck={false}
+              placeholder="XXXX-XXXX"
+              maxLength={50}
+            />
+          </Field>
+        )}
         <Field
           label={configured ? "Password" : "Choose a password"}
           hint={configured ? undefined : "At least 10 characters."}
@@ -108,7 +133,7 @@ export function Auth({
             type="password"
             minLength={configured ? 1 : 10}
             required
-            autoFocus
+            autoFocus={configured || !setupCode}
             autoComplete={configured ? "current-password" : "new-password"}
           />
         </Field>

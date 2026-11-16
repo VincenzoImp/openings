@@ -24,12 +24,12 @@ def test_company_details_continue_without_relisting_or_refetching_completed_bodi
     }
 
     def request(url):
-        if not url.endswith(("/jobs", "/offices")):
+        if not url.endswith(("/jobs?content=true", "/offices")):
             if not remaining[0]:
                 raise ProviderDeferred("greenhouse", "collection_batch")
             remaining[0] -= 1
         requests.append(url)
-        if url.endswith("/jobs"):
+        if url.endswith("/jobs?content=true"):
             return json.dumps(
                 {
                     "jobs": [
@@ -58,7 +58,11 @@ def test_empty_description_retries_are_finite_and_keep_a_partial_result():
 
     def request(url):
         calls.append(url)
-        return b'{"jobs":[{"id":1,"title":"Engineer"}]}' if url.endswith("/jobs") else b"{}"
+        return (
+            b'{"jobs":[{"id":1,"title":"Engineer"}]}'
+            if url.endswith("/jobs?content=true")
+            else b"{}"
+        )
 
     source = {
         "name": "Example",

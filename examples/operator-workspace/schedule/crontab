@@ -1,0 +1,7 @@
+# Linux cron: add these lines with `crontab -e`. Your crontab is readable only by you.
+# Use one Agent token named for this schedule, and replace /home/you/job-search with
+# the agent folder. The run starts at 08:00, after the sources' morning check;
+# flock skips a run while the previous one still works.
+PATH=/home/you/.local/bin:/usr/local/bin:/usr/bin:/bin
+OPENINGS_TOKEN=REPLACE_WITH_THE_SCHEDULE_TOKEN
+0 8 * * * flock -n /tmp/openings-job-search.lock /home/you/job-search/schedule/run-job-search.sh

@@ -1,12 +1,14 @@
 """PDF-only CV and letter revisions: grants from the create, completeness and PDF text."""
 
+import asyncio
 import hashlib
 
 import httpx
 import pytest
 
 from document_fixtures import PDF, SOURCE, TEXT, pdf_revision, tex, text_pdf
-from openings.documents import DocumentCreate
+from openings.documents import DocumentCreate, files
+from openings.documents.pdf import pdf_text
 
 
 def sha(data):
@@ -65,6 +67,33 @@ def test_a_pdf_only_revision_is_complete_with_text_read_from_the_pdf(setup):
     read = documents.get_document(blank["id"])
     assert read["complete"] is True and (read["text"], read["text_from"]) == (None, None)
     assert workspace.get_application(application["id"])["ready"] is True
+
+
+def test_an_uploaded_pdf_is_read_off_the_event_loop(setup, monkeypatch):
+    """A slow or hostile PDF never stalls the requests the server is answering meanwhile."""
+    client, _, documents, application = setup
+    data = text_pdf("Alex Example")
+    seen = []
+
+    def reading(value):
+        try:
+            asyncio.get_running_loop()
+            seen.append("event loop")
+        except RuntimeError:
+            seen.append("worker thread")
+        return pdf_text(value)
+
+    monkeypatch.setattr(files, "pdf_text", reading)
+    letter = documents.create_document(
+        DocumentCreate(
+            application_id=application["id"],
+            kind="letter",
+            pdf={"name": "letter.pdf", "size": len(data)},
+        )
+    )
+    assert put(client, letter["uploads"]["pdf"], data).status_code == 200
+    assert seen == ["worker thread"]
+    assert documents.get_document(letter["id"])["text"] == "Alex Example"
 
 
 def test_grants_are_absolute_on_the_public_origin_behind_a_reverse_proxy(setup, monkeypatch):

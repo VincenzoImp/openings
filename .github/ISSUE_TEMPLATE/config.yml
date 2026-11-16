@@ -1,5 +1,8 @@
 blank_issues_enabled: false
 contact_links:
+  - name: Ask a question
+    url: https://github.com/VincenzoImp/openings-job-search/discussions
+    about: Questions about installing or using Openings, and ideas to talk through, go to Discussions.
   - name: Report a security vulnerability
     url: https://github.com/VincenzoImp/openings-job-search/security/advisories/new
     about: Report vulnerabilities privately as described in SECURITY.md, never in a public issue.

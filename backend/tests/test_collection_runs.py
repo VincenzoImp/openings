@@ -1,7 +1,7 @@
 """Collection runs: saved settings, schedules, resumable tasks, refreshes and failures."""
 
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from pydantic import ValidationError
@@ -15,6 +15,7 @@ from openings.discovery import (
     SourceCreate,
     SourcePatch,
 )
+from openings.discovery.models import SourcesSave
 from openings.errors import DomainError
 from openings.scheduling import next_due, schedule_adapter
 
@@ -32,6 +33,57 @@ def run_next(service):
     assert task
     service.run_task(task, "worker")
     return service.get_task(task["id"])
+
+
+def queued(service, source_id=None):
+    return service.list_tasks(state="queued", source_id=source_id)["items"]
+
+
+def test_a_new_or_enabled_source_checks_at_once_and_a_paused_one_waits(collection):
+    _, service = collection
+    paused = make_source(service)
+    assert queued(service) == [] and service.list_runs()["total"] == 0
+    enabled = make_source(service, enabled=True)
+    [task] = queued(service)
+    assert task["source_id"] == enabled["id"] and not task["payload"]["manual"]
+    soon = datetime.fromisoformat(enabled["next_run_at"]) - datetime.now(UTC)
+    assert soon.total_seconds() < 60
+    # Its next scheduled check is one interval after this first one.
+    assert enabled["last_scheduled_at"] == service.list_runs()["items"][0]["planned_at"]
+
+    resumed = service.update_source(
+        paused["id"], SourcePatch(expected_version=paused["version"], enabled=True)
+    )
+    assert [task["source_id"] for task in queued(service, paused["id"])] == [paused["id"]]
+    assert datetime.fromisoformat(resumed["next_run_at"]) - datetime.now(UTC) < timedelta(minutes=1)
+    # Saving an enabled source again queues nothing more.
+    service.update_source(
+        resumed["id"], SourcePatch(expected_version=resumed["version"], name="Renamed")
+    )
+    assert len(queued(service)) == 2
+
+
+def test_a_batch_of_new_sources_queues_one_gated_check_each(collection, monkeypatch):
+    _, service = collection
+    items = [
+        {"name": f"Board {n}", "kind": "greenhouse", "config": {"board": f"b{n}"}, "enabled": True}
+        for n in range(50)
+    ]
+    assert service.save_sources(SourcesSave.model_validate({"items": items}))["failed"] == 0
+    tasks = queued(service)
+    assert len(tasks) == 50 and {task["payload"]["provider"] for task in tasks} == {"greenhouse"}
+    # Each runs through the provider's persisted gate, as any scheduled check.
+    gates = []
+    real = service.http_budget
+    monkeypatch.setattr(
+        service,
+        "http_budget",
+        lambda provider, **kw: gates.append(provider) or real(provider, **kw),
+    )
+    patch_discovery(monkeypatch, "fetch_postings", lambda source: [])
+    task = service.claim_task("worker", "collect")
+    service.run_task(task, "worker")
+    assert gates == ["greenhouse"]
 
 
 def test_daily_slots_coalesce_and_handle_clock_changes():
@@ -244,18 +296,17 @@ def test_a_source_that_no_longer_validates_is_reported_and_the_others_still_run(
         SourceCreate(
             name="Example search",
             kind="jobspy",
-            enabled=True,
             config={"query": "data", "providers": ["linkedin"]},
         )
     )
-    feed = make_source(service, enabled=True)
+    feed = make_source(service)
     old = "2000-01-01T00:00:00+00:00"
     with workspace.db.transaction() as connection:
         connection.execute(
             "UPDATE sources SET config=? WHERE id=?",
             (encode({"providers": ["linkedin"]}), broken["id"]),
         )
-        connection.execute("UPDATE sources SET last_scheduled_at=?", (old,))
+        connection.execute("UPDATE sources SET enabled=1,last_scheduled_at=?", (old,))
     service.schedule_due()
     assert [run["source_id"] for run in service.list_runs()["items"]] == [feed["id"]]
     reported = service.get_source(broken["id"])

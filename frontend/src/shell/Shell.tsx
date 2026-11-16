@@ -24,6 +24,7 @@ import {
   type NavItem,
 } from "../ui/Shell";
 import { ToastProvider } from "../ui/Toast";
+import { AddressNotice } from "./AddressNotice";
 import { ShellContext, type ShellApi } from "./context";
 import { DemoBanner } from "./DemoBanner";
 import { BOTTOM, NAV, type NavDef } from "./nav";
@@ -259,6 +260,7 @@ export function Shell({
             />
           }
         >
+          <AddressNotice />
           <Screen key={screenKey} id={route.id} />
         </AppFrame>
         <Suspense fallback={null}>

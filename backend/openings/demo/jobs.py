@@ -493,6 +493,9 @@ class DemoJobs:
     def history(self):
         """Collection history: each source ran this morning, the search also yesterday."""
         with self.workspace.db.transaction() as conn:
+            # It replaces the first checks the new sources queued when they were added.
+            conn.execute("DELETE FROM tasks WHERE kind='collect'")
+            conn.execute("DELETE FROM collection_runs")
             for source, name, received, created, hours in (
                 ("search", "Backend roles, Amsterdam", 24, 3, 28),
                 ("search", "Backend roles, Amsterdam", 27, 5, 4),

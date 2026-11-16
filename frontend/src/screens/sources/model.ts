@@ -205,8 +205,16 @@ export function sourceStatus(
   now = new Date(),
 ): SourceStatus {
   const run = source.last_run ?? null;
-  if (run && isActive(run.state))
-    return { text: "Checking now…", running: true };
+  if (run && isActive(run.state)) {
+    const counts = (run.counts ?? {}) as Record<string, unknown>;
+    const listed = number(counts.listed);
+    return {
+      text: listed
+        ? `Checking now… · fetched ${Math.min(number(counts.received), listed)} of ${listed}`
+        : "Checking now…",
+      running: true,
+    };
+  }
   if (!source.automatic_collection)
     return {
       text: "Can't be checked automatically: the site gives no posting text",
@@ -400,3 +408,42 @@ export const POSTED_WITHIN: [number, string][] = [
   [336, "14 days"],
   [720, "30 days"],
 ];
+
+/**
+ * A reason the server gives for a wait ("… waits until 14:05 UTC …"), with
+ * the time in the viewer's own clock when the wait's moment is known.
+ */
+export function localReason(message: string, until?: unknown) {
+  if (typeof until !== "string" || !until) return message;
+  const local = clock(until);
+  return local ? message.replace(/\b\d{2}:\d{2} UTC\b/, local) : message;
+}
+
+/** What a Test is doing or found: its heading. */
+export function testHeading({
+  phase,
+  total,
+  shown,
+  listed,
+  failed,
+}: {
+  /** "listing" until the board answers, "details" while the text arrives. */
+  phase: "listing" | "details" | "done";
+  total: number;
+  shown: number;
+  listed?: number | null;
+  failed?: boolean;
+}) {
+  const count = listed ?? total;
+  const jobs = `${count} ${count === 1 ? "job" : "jobs"}`;
+  if (phase === "listing") return "Testing…";
+  if (phase === "details")
+    return `${jobs} listed · fetching the text of the first ${shown}…`;
+  if (failed) return "Test failed";
+  if (!total && !count) return "No jobs found";
+  return shown < count ? `${jobs} found · the first ${shown}` : `${jobs} found`;
+}
+
+/** The advice under an empty or refused search: a careers page is read directly. */
+export const CAREERS_ADVICE =
+  "Job sites can answer with nothing or refuse requests from your network. A company's careers page is read directly: follow one instead.";

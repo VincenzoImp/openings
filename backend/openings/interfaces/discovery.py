@@ -9,8 +9,8 @@ from ..discovery import (
     SourceBulk,
     SourceCreate,
     SourcePatch,
-    SourcePreview,
     SourceRun,
+    SourceTest,
 )
 from ..discovery.models import (
     CollectionQuery,
@@ -125,7 +125,7 @@ def sources_run(ws: WS, body: SourceRunInput) -> SourcePreviewResult | Task:
 
 
 @operation("POST /sources/preview", open_world=True, tags=["sources"], mcp="sources_run")
-def sources_preview(ws: WS, body: SourcePreview) -> SourcePreviewResult:
+def sources_preview(ws: WS, body: SourceTest) -> SourcePreviewResult:
     """Preview a source without storing jobs, through the provider gate."""
     return ws.discovery.preview_source(body)
 

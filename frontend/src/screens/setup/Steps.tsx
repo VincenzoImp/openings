@@ -16,17 +16,28 @@ import { Field, Input, Textarea } from "../../ui/Field";
 import { plural } from "../../ui/format";
 import { Icon, type LucideIcon } from "../../ui/Icon";
 import {
+  boardSource,
+  searchSource,
   useExampleTemplate,
   useImport,
   usePreviewImport,
   useSaveAbout,
+  useSaveBoard,
   useSaveSearch,
-  useTestSearch,
+  type Board,
   type ImportPreview,
   type Search,
 } from "./data";
 import { CountrySelect } from "../sources/CountrySelect";
-import { countryIn } from "../sources/model";
+import {
+  CAREERS_ADVICE,
+  capitalize,
+  countryIn,
+  detectBoard,
+  localReason,
+  testHeading,
+} from "../sources/model";
+import { useKindLabels, useSourceTest } from "../sources/queries";
 import { StepFrame } from "./Frame";
 import { LANGUAGES, aboutFrom, otherLines, type About } from "./model";
 
@@ -180,9 +191,76 @@ type Found = { title?: unknown; company?: unknown; location?: unknown };
 const isLink = (value: string) => /^https?:\/\/\S+\.\S+/.test(value.trim());
 
 /**
- * Step 2: a search that runs on its own (Test shows what it finds first),
- * and one job by its link. "Save and continue" saves whatever is filled in;
- * with nothing filled in, Continue moves on.
+ * What a Test found, in a few lines: its heading, the first titles and what
+ * each site answered, in words. After an empty or refused search, it offers a
+ * careers page instead.
+ */
+function TestPreview({
+  test,
+  onCareers,
+}: {
+  test: ReturnType<typeof useSourceTest>;
+  onCareers?: () => void;
+}) {
+  const preview = test.result;
+  if (test.phase === "idle") return null;
+  const found = (preview?.items ?? []) as Found[];
+  const diagnostics = preview?.diagnostics ?? [];
+  const refused = diagnostics.some(
+    (item) => item.state === "deferred" || item.state === "error",
+  );
+  const reasons = diagnostics
+    .map((item) =>
+      localReason(String(item.message ?? item.error ?? ""), item.next_run_at),
+    )
+    .filter(Boolean);
+  const empty = !test.pending && !found.length;
+  return (
+    <div className="setup-preview" role="status" aria-busy={test.pending}>
+      <p>
+        {testHeading({
+          phase: test.phase,
+          total: preview?.total ?? 0,
+          shown: Math.min(found.length, 3),
+          listed: preview?.listed,
+          failed: !!test.error && !preview,
+        })}
+      </p>
+      {found.length > 0 && (
+        <ul>
+          {found.slice(0, 3).map((job, index) => (
+            <li key={index}>
+              <span>{String(job.title || "Untitled role")}</span>
+              {job.company ? (
+                <span className="setup-muted">{String(job.company)}</span>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
+      {test.error && <p className="setup-error">{test.error}</p>}
+      {reasons.slice(0, 2).map((reason) => (
+        <p key={reason} className="setup-muted">
+          {reason}
+        </p>
+      ))}
+      {onCareers && !test.pending && (empty || refused || test.error) && (
+        <p className="setup-advice">
+          <span>{CAREERS_ADVICE}</span>
+          <Button size="sm" onClick={onCareers}>
+            Follow a careers page
+          </Button>
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Step 2: a company's careers page first (read directly, the reliable
+ * source), a search of the job sites second, and one job by its link. Test
+ * shows what each finds first. "Save and continue" saves whatever is filled
+ * in; with nothing filled in, Continue moves on.
  */
 export function JobsStep({
   preferences,
@@ -194,34 +272,46 @@ export function JobsStep({
   onBack?: () => void;
 }) {
   const start = aboutFrom({}, preferences);
+  const [board, setBoard] = useState<Board>({ url: "", titles: start.roles });
   const [search, setSearch] = useState<Search>({
     query: start.roles,
     location: start.where,
     country: countryIn(start.where),
   });
   const [link, setLink] = useState("");
+  const [followed, setFollowed] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
   const [added, setAdded] = useState<string | null>(null);
-  const test = useTestSearch();
+  const careersField = useRef<HTMLInputElement>(null);
+  const labels = useKindLabels();
+  const boardTest = useSourceTest();
+  const searchTest = useSourceTest();
+  const follow = useSaveBoard();
   const save = useSaveSearch();
   const add = useAddJob();
+  const setBoardField = (patch: Partial<Board>) => {
+    setBoard({ ...board, ...patch });
+    boardTest.reset();
+  };
   const set = (patch: Partial<Search>) => {
     setSearch({ ...search, ...patch });
-    test.reset();
+    searchTest.reset();
   };
-  const preview = test.data;
-  const found = (preview?.items ?? []) as Found[];
-  const problems = (preview?.diagnostics ?? [])
-    .map((item) => String(item.message ?? item.error ?? ""))
-    .filter(Boolean);
+  const detected = detectBoard(board.url);
 
+  const toFollow = !followed && board.url.trim() !== "";
   const toSave = !saved && search.query.trim() !== "";
   const toAdd = link.trim() !== "";
-  const busy = save.isPending || add.isPending;
+  const busy = follow.isPending || save.isPending || add.isPending;
   async function saveAndContinue(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
-    if (toAdd && !isLink(link)) return;
+    if ((toAdd && !isLink(link)) || (toFollow && !isLink(board.url))) return;
     let ok = true;
+    if (toFollow) {
+      const source = await follow.mutateAsync(board).catch(() => null);
+      if (source) setFollowed(source.name);
+      else ok = false;
+    }
     if (toSave) {
       const source = await save.mutateAsync(search).catch(() => null);
       if (source) setSaved(source.name);
@@ -244,11 +334,15 @@ export function JobsStep({
     }
     if (ok) onNext();
   }
-  const pending = toSave || toAdd;
+  const toCareers = () => {
+    careersField.current?.scrollIntoView?.({ block: "center" });
+    careersField.current?.focus();
+  };
+  const pending = toFollow || toSave || toAdd;
   return (
     <StepFrame
       title="Find jobs"
-      lead="Save a search that runs on its own, or add one job you found."
+      lead="Follow a company's careers page or save a search; both are then checked on their own."
       primary={{
         label: pending ? "Save and continue" : "Continue",
         form: "setup-jobs",
@@ -264,12 +358,73 @@ export function JobsStep({
         noValidate
         onSubmit={saveAndContinue}
       >
-        <section className="setup-block" aria-labelledby="setup-search">
-          <h2 id="setup-search">A search</h2>
-          {saved ? (
-            <Done>{`Saved the search “${saved}”.`}</Done>
+        <section className="setup-block" aria-labelledby="setup-careers">
+          <h2 id="setup-careers">Follow a company's careers page</h2>
+          {followed ? (
+            <Done>{`Following “${followed}”. Checking it now.`}</Done>
           ) : (
             <div className="setup-form">
+              <Field
+                label="Careers page address"
+                optional
+                error={
+                  follow.error?.message ??
+                  (toFollow && board.url.trim().length > 8 && !isLink(board.url)
+                    ? "Paste the careers page's address, starting with https://."
+                    : undefined)
+                }
+                hint={
+                  detected
+                    ? `Detected: ${labels[detected.kind] ?? capitalize(detected.kind)}${detected.board ? ` · ${detected.board}` : ""}`
+                    : "Greenhouse, Lever, Ashby, Workable, Personio and other job boards are read directly."
+                }
+              >
+                <Input
+                  ref={careersField}
+                  type="url"
+                  inputMode="url"
+                  autoComplete="off"
+                  placeholder="https://boards.greenhouse.io/example"
+                  value={board.url}
+                  onChange={(event) =>
+                    setBoardField({ url: event.target.value })
+                  }
+                />
+              </Field>
+              <Field
+                label="Title must include"
+                optional
+                hint="Words separated by commas; any one is enough."
+              >
+                <Input
+                  value={board.titles}
+                  maxLength={300}
+                  onChange={(event) =>
+                    setBoardField({ titles: event.target.value })
+                  }
+                />
+              </Field>
+              <TestPreview test={boardTest} />
+              <div className="setup-actions">
+                <Button
+                  disabled={!isLink(board.url) || boardTest.pending}
+                  onClick={() => void boardTest.run(boardSource(board))}
+                >
+                  {boardTest.pending ? "Testing…" : "Test"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </section>
+        <section className="setup-block" aria-labelledby="setup-search">
+          <h2 id="setup-search">Or search job sites</h2>
+          {saved ? (
+            <Done>{`Saved the search “${saved}”. Checking it now.`}</Done>
+          ) : (
+            <div className="setup-form">
+              <p className="setup-muted">
+                Searches LinkedIn; with a country, also Indeed and Glassdoor.
+              </p>
               <Field label="Keywords">
                 <Input
                   value={search.query}
@@ -296,45 +451,18 @@ export function JobsStep({
                   />
                 </Field>
               </div>
-              {preview && (
-                <div className="setup-preview" role="status">
-                  <p>
-                    {found.length
-                      ? `First results: ${plural(preview.total, "job")}`
-                      : "No job found with these words yet."}
-                  </p>
-                  {found.length > 0 && (
-                    <ul>
-                      {found.slice(0, 3).map((job, index) => (
-                        <li key={index}>
-                          <span>{String(job.title || "Untitled role")}</span>
-                          {job.company ? (
-                            <span className="setup-muted">
-                              {String(job.company)}
-                            </span>
-                          ) : null}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  {problems.slice(0, 2).map((problem) => (
-                    <p key={problem} className="setup-muted">
-                      {problem}
-                    </p>
-                  ))}
-                </div>
-              )}
-              {(test.error || save.error) && (
+              <TestPreview test={searchTest} onCareers={toCareers} />
+              {save.error && (
                 <p className="setup-error" role="alert">
-                  {(test.error || save.error)!.message}
+                  {save.error.message}
                 </p>
               )}
               <div className="setup-actions">
                 <Button
-                  disabled={!search.query.trim() || test.isPending}
-                  onClick={() => test.mutate(search)}
+                  disabled={!search.query.trim() || searchTest.pending}
+                  onClick={() => void searchTest.run(searchSource(search))}
                 >
-                  {test.isPending ? "Testing…" : "Test"}
+                  {searchTest.pending ? "Testing…" : "Test"}
                 </Button>
               </div>
             </div>

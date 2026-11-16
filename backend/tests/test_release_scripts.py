@@ -1,9 +1,11 @@
-"""The maintainer scripts: one project description everywhere, and the traffic archive
+"""The maintainer scripts: one project description everywhere, Docker Hub texts within
+Docker Hub's limits, and the traffic archive
 (recorded API fixtures only, never a live call)."""
 
 import datetime
 import importlib.util
 import json
+import re
 import shutil
 from pathlib import Path
 
@@ -22,6 +24,7 @@ def load(name):
 
 
 check_package = load("check_package")
+bump_version = load("bump_version")
 traffic_archive = load("traffic_archive")
 
 
@@ -51,6 +54,66 @@ def test_a_missing_description_fails(tmp_path):
     target.write_text(target.read_text().replace("image.description=", "image.summary="))
     with pytest.raises(SystemExit, match="expected one description"):
         check_package.check_descriptions(root)
+
+
+def copy_docker_hub(tmp_path):
+    for path in (check_package.HUB_OVERVIEW, check_package.HUB_WORKFLOW):
+        (tmp_path / path).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(ROOT / path, tmp_path / path)
+    return tmp_path
+
+
+def test_the_docker_hub_texts_fit():
+    size, short = check_package.check_docker_hub()
+    assert 0 < size <= 25_000 and 0 < len(short) <= 100
+
+
+def test_a_docker_hub_overview_over_25000_bytes_fails(tmp_path):
+    root = copy_docker_hub(tmp_path)
+    (root / check_package.HUB_OVERVIEW).write_text("x" * 25_001)
+    with pytest.raises(SystemExit, match="over 25000"):
+        check_package.check_docker_hub(root)
+    (root / check_package.HUB_OVERVIEW).write_text("x" * 25_000)
+    check_package.check_docker_hub(root)
+
+
+@pytest.mark.parametrize(("short", "error"), [("x" * 101, "101 characters"), ("", "0 characters")])
+def test_a_docker_hub_short_description_outside_1_to_100_characters_fails(tmp_path, short, error):
+    root = copy_docker_hub(tmp_path)
+    workflow = root / check_package.HUB_WORKFLOW
+    text = workflow.read_text()
+    text = re.sub(check_package.HUB_SHORT_PATTERN, f"          short-description: '{short}'", text)
+    workflow.write_text(text)
+    with pytest.raises(SystemExit, match=error):
+        check_package.check_docker_hub(root)
+
+
+def test_the_docker_hub_overview_is_synced_from_final_releases_only():
+    workflow = (ROOT / check_package.HUB_WORKFLOW).read_text()
+    job = workflow.split("\n  hub-description:\n", 1)[1].split("\n\n  release:\n", 1)[0]
+    assert "needs.version.outputs.prerelease == 'false'" in job
+    assert re.search(r"peter-evans/dockerhub-description@[0-9a-f]{40} # v", job)
+    assert "readme-filepath: docs/dockerhub.md" in job
+    assert "secrets.DOCKERHUB_DESCRIPTION_TOKEN" in job
+
+
+def copy_versions(tmp_path, monkeypatch):
+    for path in {path for path, _ in bump_version.LOCATIONS}:
+        (tmp_path / path).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(ROOT / path, tmp_path / path)
+    monkeypatch.setattr(bump_version, "ROOT", tmp_path)
+    return tmp_path
+
+
+def test_compose_pins_the_moving_minor_and_the_plugin_the_release(tmp_path, monkeypatch):
+    assert bump_version.check() == 0
+    root = copy_versions(tmp_path, monkeypatch)
+    assert bump_version.bump("4.5.6") == 0
+    assert "docker.io/vincenzoimp/openings:4.5}" in (root / "docker-compose.yml").read_text()
+    assert json.loads((root / ".claude-plugin/plugin.json").read_text())["version"] == "4.5.6"
+    compose = root / "docker-compose.yml"
+    compose.write_text(compose.read_text().replace("openings:4.5}", "openings:4.4}"))
+    assert bump_version.check() == 1
 
 
 def fixtures(responses, calls):

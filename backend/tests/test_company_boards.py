@@ -3,6 +3,7 @@
 Every payload is synthetic and mirrors the public shape of its vendor's answer.
 """
 
+import html
 import json
 
 import httpx
@@ -10,7 +11,7 @@ import pytest
 
 from discovery_fixtures import mock_http
 from openings.collectors import company
-from openings.collectors.policy import ProviderPatch, provider_for_url
+from openings.collectors.policy import ProviderDeferred, ProviderPatch, provider_for_url
 from openings.discovery import Filters, SourceCreate, feeds
 from openings.discovery.network import MAX_FEED_BYTES, MAX_LISTING_BYTES
 from openings.discovery.resolution import detect_source
@@ -671,3 +672,199 @@ def test_a_large_listing_is_read_and_a_larger_one_is_named(collection, monkeypat
     assert task["state"] == "failed"
     assert task["result"]["attempt_history"][-1]["reason"] == "source_too_large"
     assert "'example'" in task["error"] and "64 MB" in task["error"]
+
+
+# #355 -----------------------------------------------------------------------
+
+
+def greenhouse_jobs(count, content=True):
+    """A synthetic board; the listing escapes each description as Greenhouse does."""
+    return {
+        "jobs": [
+            {
+                "id": 9000 + index,
+                "title": f"Engineer {index}",
+                "location": {"name": "Remote"},
+                "absolute_url": f"https://boards.greenhouse.io/example/jobs/{9000 + index}",
+                **(
+                    {
+                        "content": html.escape(f"<p>Build service {index} &amp; run it.</p>"),
+                        "departments": [{"id": 7, "name": "Engineering"}],
+                    }
+                    if content
+                    else {}
+                ),
+            }
+            for index in range(count)
+        ]
+    }
+
+
+def test_a_greenhouse_board_reads_every_description_in_one_listing(collection, monkeypatch):
+    workspace, service = collection
+    calls = []
+
+    def send(request):
+        calls.append(str(request.url))
+        if request.url.path.endswith("/offices"):
+            return httpx.Response(200, json={"offices": []})
+        return httpx.Response(200, json=greenhouse_jobs(254))
+
+    mock_http(monkeypatch, send)
+    source = service.create_source(
+        SourceCreate(
+            name="Example", kind="greenhouse", config={"board": "example", "max_results": 300}
+        )
+    )
+    assert run(service, source)["state"] == "succeeded"
+    assert len(calls) <= 3 and not any("/jobs/" in url for url in calls)
+    assert workspace.list_jobs()["total"] == 254
+
+    # The text equals what one detail request a job reads.
+    bulk, _, _ = collect("greenhouse", [("/jobs", greenhouse_jobs(3)), ("/offices", {})])
+    details = [
+        (f"/jobs/{row['id']}", {key: row[key] for key in ("content", "departments")})
+        for row in greenhouse_jobs(3)["jobs"]
+    ]
+    single, _, calls = collect(
+        "greenhouse", [*details, ("/jobs", greenhouse_jobs(3, content=False)), ("/offices", {})]
+    )
+    assert sum("/jobs/" in url for url in calls) == 3
+    assert [row["posting"] for row in bulk] == [row["posting"] for row in single]
+    assert bulk[0]["posting"] == "Build service 0 & run it."
+    assert bulk[0]["metadata"]["departments"] == ["Engineering"]
+
+
+def test_a_greenhouse_row_without_text_stays_pending_in_the_checkpoint():
+    listing = greenhouse_jobs(3)
+    listing["jobs"][1]["content"] = ""
+    checkpoint, calls = {}, []
+
+    def request(url, **kwargs):
+        calls.append(url)
+        if "/jobs/" in url:
+            raise ProviderDeferred("greenhouse", "collection_batch")
+        return json.dumps(listing if "/jobs" in url else {}).encode()
+
+    source = {
+        "name": "Example",
+        "kind": "greenhouse",
+        "config": {"board": "example"},
+        "checkpoint": checkpoint,
+    }
+    rows = company.collect(source, request, feeds.html_text)
+    assert calls[-1].endswith("/jobs/9001") and len(calls) == 3
+    assert checkpoint["pending_details"] == 1 and not checkpoint["complete"]
+    assert [row["metadata"]["description_status"] for row in rows] == [
+        "complete",
+        "pending",
+        "complete",
+    ]
+
+
+def test_a_greenhouse_board_too_large_for_one_listing_reads_details():
+    too_large = DomainError(422, "source_too_large", "Too large.", {"maximum_bytes": 1})
+    rows, _, calls = collect(
+        "greenhouse",
+        [
+            ("/jobs/9000", {"content": TEXT}),
+            ("/jobs?content=true", too_large),
+            ("/jobs", greenhouse_jobs(1, content=False)),
+            ("/offices", {}),
+        ],
+    )
+    assert calls[:2] == [
+        "https://boards-api.greenhouse.io/v1/boards/example/jobs?content=true",
+        "https://boards-api.greenhouse.io/v1/boards/example/jobs",
+    ]
+    assert rows[0]["posting"] and calls[-1].endswith("/jobs/9000")
+
+
+# #388 -----------------------------------------------------------------------
+
+
+def test_greenhouse_labels_drop_placeholder_and_repeated_offices():
+    def office(id, name, location, job, parent=None):
+        return {
+            "id": id,
+            "name": name,
+            "location": location,
+            "parent_id": parent,
+            "departments": [{"id": 7, "name": "Engineering", "jobs": [{"id": job}]}],
+        }
+
+    listing = greenhouse_jobs(3)
+    listing["jobs"][0]["location"] = {"name": "Remote, Poland"}
+    listing["jobs"][1]["location"] = {"name": "No Office"}
+    listing["jobs"][2]["location"] = {"name": "Hybrid"}
+    offices = {
+        "offices": [
+            office(1, "No Office", None, 9000),
+            office(2, "Poland", "Poland", 9000),
+            office(3, "Turkey", "Istanbul, Turkey", 9000),
+            office(4, "Berlin", "Berlin, Germany", 9001),
+            # The region and its city both list the role: the city names it.
+            office(5, "EMEA", None, 9002),
+            office(6, "Zurich", "Zurich, Switzerland", 9002, parent=5),
+            office(7, "Zurich HQ", "Zurich", 9002, parent=5),
+        ]
+    }
+    rows, _, _ = collect("greenhouse", [("/jobs", listing), ("/offices", offices)])
+    assert [row["location"] for row in rows] == [
+        "Remote, Poland · Istanbul, Turkey",
+        "Berlin, Germany",
+        "Hybrid · Zurich, Switzerland",
+    ]
+    assert company.places(" Paris ", "N/A", "Paris", "New York", "York") == (
+        "Paris · New York · York"
+    )
+
+
+# #367 -----------------------------------------------------------------------
+
+BILLION_LAUGHS = b"""<?xml version="1.0"?>
+<!DOCTYPE lolz [
+  <!ENTITY lol "lol">
+  <!ENTITY lol2 "&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;">
+  <!ENTITY lol3 "&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;">
+  <!ENTITY lol4 "&lol3;&lol3;&lol3;&lol3;&lol3;&lol3;&lol3;&lol3;&lol3;&lol3;">
+]>
+<rss><channel><item><guid>1</guid><title>&lol4;</title></item></channel></rss>"""
+EXTERNAL_ENTITY = b"""<?xml version="1.0"?>
+<!DOCTYPE workzag-jobs [<!ENTITY secret SYSTEM "file:///etc/hostname">]>
+<workzag-jobs><position><id>1</id><name>&secret;</name></position></workzag-jobs>"""
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        BILLION_LAUGHS,
+        EXTERNAL_ENTITY,
+        b'<?xml version="1.0"?><!DOCTYPE rss SYSTEM "https://example.org/rss.dtd"><rss/>',
+    ],
+)
+@pytest.mark.parametrize("kind", ["rss", "personio"])
+def test_xml_declarations_are_refused_with_a_typed_error(monkeypatch, kind, body):
+    monkeypatch.setattr(feeds, "fetch_bytes", lambda *args, **kwargs: body)
+    with pytest.raises(DomainError) as refused:
+        feeds.fetch_postings(
+            {
+                "kind": kind,
+                "name": "Example",
+                "config": {"url": "https://example.org/feed", "board": "example"},
+            }
+        )
+    assert refused.value.code == "source_xml_declarations" and refused.value.status == 422
+
+
+def test_plain_xml_with_character_references_still_parses():
+    # A declaration in another encoding is refused as well.
+    utf16 = BILLION_LAUGHS.replace(b'"1.0"?>', b'"1.0" encoding="UTF-16"?>')
+    with pytest.raises(DomainError) as refused:
+        company.xml(utf16.decode().encode("utf-16"))
+    assert refused.value.code == "source_xml_declarations"
+    root = company.xml(b"<rss><title>R&amp;D &#8212; &lt;Example&gt;</title></rss>")
+    assert root.findtext("title") == "R&D — <Example>"
+    with pytest.raises(DomainError) as invalid:
+        company.xml(b"<rss><title>&undefined;</title></rss>")
+    assert invalid.value.code == "source_format"

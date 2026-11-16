@@ -770,6 +770,9 @@ class SourcePreviewResult(Out):
     items: list[Json]
     total: int
     preview_limit: int
+    listed: int | None = Field(
+        default=None, description="Matching jobs the board lists, when it says."
+    )
     diagnostics: list[Json] = []
 
 

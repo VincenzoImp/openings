@@ -49,8 +49,15 @@ cd openings-job-search
 docker compose up -d
 ```
 
-Open **http://127.0.0.1:8080**, choose an owner password, and the setup guide
+Open **http://127.0.0.1:8080**, enter the setup code from `docker compose logs openings`,
+choose an owner password, and the setup guide
 takes it from there. `curl http://127.0.0.1:8080/health` tells you it runs.
+Port 8080 taken? `OPENINGS_PORT=18080 docker compose up -d`.
+
+**On a server or NAS**, publish the port and name the address you open, in `.env`:
+`OPENINGS_BIND=0.0.0.0` and `OPENINGS_PUBLIC_URL=http://nas.local:8080`. Agents and
+upload links use that address; [Operations](docs/user/operations.md#reach-it-from-other-devices)
+has the details.
 [Getting started](docs/user/getting-started.md) walks through your first
 application; [Operations](docs/user/operations.md) covers updates and backups.
 
