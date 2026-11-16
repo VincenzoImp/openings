@@ -657,8 +657,8 @@ export interface paths {
       cookie?: never;
     };
     /**
-     * List document revisions by application and kind; q searches their text.
-     * @description List document revisions by application and kind; q searches their text.
+     * Search revisions across applications, newest first.
+     * @description Each says whether it is complete (its PDF stored).
      */
     get: operations["documents_list"];
     put?: never;
@@ -7842,10 +7842,15 @@ export interface operations {
     parameters: {
       query?: {
         application_id?: string;
+        /** @description Only revisions no other replaces. */
+        current?: boolean;
+        /** @description cv, letter, answers or other. */
         kind?: string;
         limit?: number;
         offset?: number;
+        /** @description A phrase in the title, note or readable text. */
         q?: string;
+        /** @description false adds text, content and files. */
         summary?: boolean;
       };
       header?: never;

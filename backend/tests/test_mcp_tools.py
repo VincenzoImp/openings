@@ -5,6 +5,7 @@ import asyncio
 import json
 from datetime import UTC, datetime, timedelta
 
+from document_fixtures import source_revision
 from openings.discovery.models import SourceCreate
 from openings.interfaces import OPERATIONS
 from openings.outcomes import today
@@ -312,6 +313,40 @@ def test_jobs_list_tells_two_searches_on_one_site_apart(app, mcp):
         "/api/v1/jobs", params={"source_id": first["id"]}, headers=mcp.token["headers"]
     ).json()
     assert {item["id"] for item in rest["items"]} == {job["id"] for job in found[first["id"]]}
+
+
+async def test_documents_list_searches_revision_text_over_mcp(app, mcp):
+    """A fix pass finds every letter that says something without downloading PDFs."""
+    assert "documents_list" in {tool.name for tool in await app.state.mcp.list_tools()}
+    first, second = jobs(app, 2)
+    documents, put = app.state.documents, mcp.client.put
+    workspace = app.state.workspace
+    applications = [workspace.create_application({"job_id": job["id"]}) for job in (first, second)]
+    replaced = source_revision(
+        documents, put, applications[0]["id"], "letter", "I admire your synthetic mission."
+    )
+    current = source_revision(
+        documents,
+        put,
+        applications[0]["id"],
+        "letter",
+        "I admire your synthetic mission and its tooling.",
+        previous_id=replaced["id"],
+    )
+    source_revision(documents, put, applications[1]["id"], "cv", "Built synthetic services.")
+    found = ok(mcp.call("documents_list", {"q": "your synthetic mission"}))
+    assert {item["id"] for item in found["items"]} == {replaced["id"], current["id"]}
+    found = ok(mcp.call("documents_list", {"q": "your synthetic mission", "current": True}))
+    assert [(item["id"], item["complete"]) for item in found["items"]] == [(current["id"], True)]
+    full = ok(mcp.call("documents_list", {"kind": "cv", "summary": False}))
+    assert full["items"][0]["text"] == "Built synthetic services."
+    # The REST route answers as before.
+    rest = mcp.client.get(
+        "/api/v1/documents",
+        params={"application_id": applications[0]["id"]},
+        headers=mcp.token["headers"],
+    ).json()
+    assert rest["total"] == 2 and "text" not in rest["items"][0]
 
 
 def test_career_and_highlights_are_saved_in_batches_with_versions(app, mcp):
