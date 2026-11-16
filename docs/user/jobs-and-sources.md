@@ -76,7 +76,7 @@ jobs.
 
 **Sources** lists each source with what it searches,
 how its last check went ("Checked 2h ago · 4 new", or in red "Last check failed:
-… · Details") and what its jobs became. A paused source is greyed. On hover,
+… · Details") and what its jobs became. A paused source is grayed. On hover,
 **Check now** and `…` (Edit, Pause or Resume, Duplicate, Delete permanently…).
 The top line sets how often every source is checked and has **Check all now**;
 its `…` pauses every automatic check. **Recent checks**, collapsed at the
@@ -118,19 +118,24 @@ relevance, round age filters and sometimes return incomplete results.
 ### Company careers pages and feeds
 
 Paste the careers page or feed URL; the form names the detected service, and
-**Test** confirms it. The result limit is 100 matching jobs per check (1 to 2000,
-`max_results` over REST and MCP). **Title must include** keeps matching titles and
-**Title must not include** skips terms such as `sales`; any matching term is
-enough. Over REST and MCP, `filters.locations` also keeps matching places, and
-unknown locations stay visible for review. A search's **Skip companies**
-(`filters.exclude_companies`) leaves out aggregators and agencies that re-post
-other companies' jobs, matching whole words of the company name. Lever pages have
-a region (`global` or `eu`). A Workday board lists at most about 2,000 roles; to
-follow one region of a large board, filter the board on its own site (for
-example by location) and paste that URL: its facets (such as
-`?locationHierarchy1=…`) are kept in `config.facets`, so only those roles are
-read. Careers pages and feeds can hold undated jobs, so **Posted within** does not
-apply to them.
+**Test** confirms it.
+
+- **Result limit:** 100 matching jobs per check (1 to 2000, `max_results` over
+  REST and MCP).
+- **Titles:** **Title must include** keeps matching titles and **Title must not
+  include** skips terms such as `sales`; any matching term is enough.
+- **Places:** over REST and MCP, `filters.locations` also keeps matching places,
+  and unknown locations stay visible for review.
+- **Companies:** a search's **Skip companies** (`filters.exclude_companies`)
+  leaves out aggregators and agencies that re-post other companies' jobs,
+  matching whole words of the company name.
+- **Lever** pages have a region (`global` or `eu`).
+- **Workday:** a board lists at most about 2,000 roles; to follow one region of a
+  large board, filter the board on its own site (for example by location) and
+  paste that URL: its facets (such as `?locationHierarchy1=…`) are kept in
+  `config.facets`, so only those roles are read.
+- **Dates:** careers pages and feeds can hold undated jobs, so **Posted within**
+  does not apply to them.
 
 **HN Who is hiring** (`hnhiring`) needs no address: each check reads the newest
 thread through the HN Algolia API. Every top-level comment is one job; replies
@@ -170,22 +175,23 @@ narrow or pause.
 
 ### Request limits
 
-**Settings › Advanced** shows each job site your sources use, whether it is
-paused, and the minimum time between two requests to it (5 seconds by default),
-saved when you leave the field. Every request respects it: tests, job links,
-scheduled and manual checks, redirects and detail pages. When a site answers
-"too many requests" (HTTP 429), Openings pauses requests to it until the time the
-site names; the pause survives restarts. REST and MCP can lift it early with
-`clear_cooldown`.
-A refusal reads, for example, "LinkedIn refused this request from your network;
-Openings waits until 14:30 UTC and tries again. Careers pages are not affected."
-Servers in a data centre or at a VPS provider are refused far more often than a home
-connection; there, follow company careers pages first. See
-[Troubleshooting](operations.md#a-job-site-refused-requests).
-A login page is reported as blocked. A careers page that does not exist (HTTP 404,
-or a redirect to the job site's home page) fails at once and names its board; check
-its URL. A portal can still block requests or change its pages; paste the posting
-when a page cannot be read.
+- **Spacing:** **Settings › Advanced** shows each job site your sources use,
+  whether it is paused, and the minimum time between two requests to it (5
+  seconds by default), saved when you leave the field. Every request respects it:
+  tests, job links, scheduled and manual checks, redirects and detail pages.
+- **429 pause:** when a site answers "too many requests" (HTTP 429), Openings
+  pauses requests to it until the time the site names; the pause survives
+  restarts. REST and MCP can lift it early with `clear_cooldown`.
+- **Refusals:** one reads, for example, "LinkedIn refused this request from your
+  network; Openings waits until 14:30 UTC and tries again. Careers pages are not
+  affected." Servers in a data center or at a VPS provider are refused far more
+  often than a home connection; there, follow company careers pages first. See
+  [Troubleshooting](operations.md#a-job-site-refused-requests). A login page is
+  reported as blocked.
+- **Dead pages:** a careers page that does not exist (HTTP 404, or a redirect to
+  the job site's home page) fails at once and names its board; check its URL. A
+  portal can still block requests or change its pages; paste the posting when a
+  page cannot be read.
 
 ![Sources with the schedule line, source rows and their status](../images/sources.png)
 

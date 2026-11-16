@@ -1,7 +1,7 @@
 # Openings brand
 
 The brand is the product. `frontend/src/ui/tokens.css` is the single source of
-colour, type, spacing and radii; [tokens.md](tokens.md) is its table for both
+color, type, spacing and radii; [tokens.md](tokens.md) is its table for both
 themes, generated from it. Every image here is drawn from those tokens or is a
 screenshot of the real dashboard, so a product change flows into the next
 regeneration. This page holds what tokens cannot express.
@@ -11,7 +11,7 @@ regeneration. This page holds what tokens cannot express.
 | File | What it is |
 |---|---|
 | [mark.svg](mark.svg), [mark-dark.svg](mark-dark.svg) | The Doorway mark: the tile is a wall, the mark the light through an opening at its foot. Tile in `--primary`, opening in `--on-primary` |
-| [mark-outline.svg](mark-outline.svg) | The same in one colour (`currentColor`), for any surface |
+| [mark-outline.svg](mark-outline.svg) | The same in one color (`currentColor`), for any surface |
 | [wordmark.svg](wordmark.svg), [wordmark-dark.svg](wordmark-dark.svg) | "Openings" in Inter 600, outlined to paths, in `--text` |
 | [wordmark-mark.svg](wordmark-mark.svg), [wordmark-mark-dark.svg](wordmark-mark-dark.svg) | The wordmark with the mark |
 | [tokens.md](tokens.md) | Every token, light and dark. Generated: do not edit |
@@ -29,7 +29,7 @@ node frontend/scripts/social-preview.mjs      # the social preview, from the Rea
 ```
 
 `backend/tests/test_brand.py` fails when `tokens.md` is out of date, when an SVG
-here or in `docs/images/` uses a colour that is not a token value, when diagram
+here or in `docs/images/` uses a color that is not a token value, when diagram
 text is under 14 px at 1200 px wide, or when the funnel's counts differ from the
 demo seed.
 
@@ -79,16 +79,13 @@ Product facts only. No personal usage or outcome numbers anywhere.
   standing rule. Daily verified backups exist, and the last three are kept.
 - No AI inside, no API key, no account, no telemetry. You bring your own agent
   (Claude Code, Codex, any MCP client).
-- One container, one SQLite file, amd64 and arm64, an image of about 70 MB.
+- One container, one SQLite file, amd64 and arm64, an image under 100 MB.
 - It collects from LinkedIn, Indeed and Glassdoor searches (guest endpoints, no
   login), company careers pages on 12 platforms that collect automatically (13
   adapters; Breezy is preview-only), the Hacker News "Who is hiring?" thread,
   RSS, and job links.
-
-**True once 0.28.0 ships:**
-
 - `docker run … demo` (#331).
-- "Go through my new jobs" runs triage → prepare → priority and deadline → report
+- "Run my job search" runs triage → prepare → priority and deadline → report
   (#359).
 - A priority and a salary range per application, with an evidence note (#360,
   #348).

@@ -64,7 +64,7 @@ under **Jobs**. Nothing is kept when the demo stops.
    ```
 
    **Other clients**: Settings › API & agents shows the JSON configuration.
-4. Check it: `claude mcp list` shows `openings: … ✔ Connected`.
+4. Check it: `claude mcp list` shows `openings ✔ Connected`.
 
 ![Settings, API & agents: the four steps, the tokens and the client configuration](../images/agents.png)
 
@@ -208,9 +208,8 @@ no token and no agent can do that through it. You apply on the employer's site.
 
 ### Attribution and undo
 
-Every change records its author: **you**, the agent token by name, or **job
-sources**; see [Review what it did](#review-what-it-did). Non-destructive changes
-can be undone: a dismissed job returns to New, a closed application reopens, an
+[Review what it did](#review-what-it-did) shows who made each change.
+Non-destructive changes can be undone: a dismissed job returns to New, a closed application reopens, an
 applied one returns to Shortlisted while it has no reply, a paused source resumes,
 and a wrong reply is corrected. A permanent delete is undone only by restoring a
 backup. The server writes a verified backup about once a day and keeps the newest
