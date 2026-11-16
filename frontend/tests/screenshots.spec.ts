@@ -184,7 +184,7 @@ const localOrigin = (page: Page) =>
     const info = await response.json();
     await route.fulfill({
       response,
-      json: { ...info, origin: "http://localhost:8080" },
+      json: { ...info, origin: "http://127.0.0.1:8080" },
     });
   });
 const SOURCES_AND_SETTINGS: Screen[] = [

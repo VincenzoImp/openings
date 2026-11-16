@@ -7,8 +7,9 @@
 <text x="44" y="156" font-size="24" font-weight="600" fill="#18181b" text-anchor="start" letter-spacing="-0.4">Fresh jobs, no duplicates</text>
 <text x="44" y="180" font-size="14" font-weight="500" fill="#52525b" text-anchor="start">from your searches and watched companies</text>
 <text x="44" y="232" font-size="15" font-weight="400" fill="#52525b" text-anchor="start">LinkedIn, Indeed and Glassdoor searches,</text>
-<text x="44" y="254" font-size="15" font-weight="400" fill="#52525b" text-anchor="start">careers pages on 12 hiring platforms, RSS</text>
-<text x="44" y="276" font-size="15" font-weight="400" fill="#52525b" text-anchor="start">and job links, into Jobs › New.</text>
+<text x="44" y="254" font-size="15" font-weight="400" fill="#52525b" text-anchor="start">careers pages on 12 hiring platforms,</text>
+<text x="44" y="276" font-size="15" font-weight="400" fill="#52525b" text-anchor="start">HN Who is hiring, RSS and job links,</text>
+<text x="44" y="298" font-size="15" font-weight="400" fill="#52525b" text-anchor="start">into Jobs › New.</text>
 <path d="M386 145H414M407 139L414 145L407 151" fill="none" stroke="#66666f" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
 <text x="600" y="40" font-size="16" font-weight="500" fill="#2148b8" text-anchor="middle">Your agent over MCP, or you by hand</text>
 <path d="M420 66V58H780V66" fill="none" stroke="#2b59d9" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -33,5 +34,5 @@
 <rect x="22" y="348" width="16" height="16" rx="4" fill="#eef3ff" stroke="#2b59d9" stroke-width="1.5"/>
 <text x="50" y="361" font-size="15" font-weight="400" fill="#52525b" text-anchor="start">Every step works by hand in the dashboard, from scripts with the REST API, or with your agent over MCP.</text>
 <rect x="22" y="384" width="16" height="16" rx="4" fill="#18181b" stroke="none" stroke-width="0"/>
-<text x="50" y="397" font-size="15" font-weight="400" fill="#52525b" text-anchor="start">Nothing in Openings can submit an application or contact an employer.</text>
+<text x="50" y="397" font-size="15" font-weight="400" fill="#52525b" text-anchor="start">Nothing in Openings can submit an application to an employer or contact one.</text>
 </svg>
