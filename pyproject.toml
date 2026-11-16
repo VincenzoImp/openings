@@ -1,6 +1,6 @@
 [project]
 name = "openings"
-version = "0.28.0"
+version = "0.28.1"
 description = "Self-hosted job-search app. Set up your career, rules, templates and sources once; your own AI agent (Claude Code, Codex, any MCP client) works it by your rules. You apply."
 readme = "README.md"
 requires-python = ">=3.14"

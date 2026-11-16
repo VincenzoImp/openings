@@ -21,7 +21,7 @@ COPY backend/ ./backend/
 RUN --mount=type=cache,target=/root/.cache/uv uv sync --locked --no-dev --no-editable
 
 FROM python:3.14-slim-bookworm@sha256:3fe1a0b6c2d6b2ebb572906cdabeca75aeb558c0c17db5ffefbcf8094871c32b AS runtime
-ARG VERSION=0.28.0
+ARG VERSION=0.28.1
 ARG VCS_REF=unknown
 ARG BUILD_DATE=unknown
 # The description equals pyproject.toml's (scripts/check_package.py checks it).

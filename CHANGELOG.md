@@ -2,6 +2,36 @@
 
 ## Unreleased
 
+## 0.28.1 — 2026-11-16
+
+Set up your job search once: Ready ranked best first, Apply in one click, and a voiced walkthrough
+
+No schema change. Upgrade in place from 0.28.0.
+
+**Ready, best first**
+
+- Ready is ranked by priority, then deadline, everywhere: Today, the Ready tab, Most urgent first, the send queue and the server's order for REST and MCP. Each Ready row shows its rank and "Priority n", and the application head names the scale.
+- The Ready page's employer button reads **Apply**; it opens the employer's site in a new tab.
+- On a phone, an application's CV and letter in Text mode use the full width, and in Chrome the PDFs fill their pane with no dark viewer margin.
+
+**The demo**
+
+- The demo's letters follow its own writing rules, its CV matches the approved highlights, its templates show a sample PDF, its interview has the agent's brief, and every agent dismissal names the Preference it applies.
+
+**Your agent**
+
+- Dismissal reasons quote the Preference they apply, in its own words. Skill summaries say what your agent does, in one sentence each. Settings shows the same `codex mcp add` line as the docs.
+
+**Docs and visuals**
+
+- The README, the guides, the Docker Hub page and the brand register are rewritten around "Set up your job search once. Your AI agent works it by your rules. You just apply.": what Openings holds, how a day goes, what stays yours, the skills table and an open screenshot gallery.
+- The README GIF is cut from a voiced walkthrough video; the diagrams, social preview and screenshots are regenerated with the real PDFs.
+- Screenshots and the video are captured in a browser that renders PDFs, and fail without one.
+
+**Fixes**
+
+- A template's header counts its files. A template's `rules` accept a `statements` key. Stale 0.28.0 notes, old repository links and British spellings are gone.
+
 ## 0.28.0 — 2026-11-16
 
 Every new job, filtered, prepared and ranked: a demo in one command, skills for every workflow

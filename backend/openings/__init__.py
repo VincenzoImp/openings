@@ -1,3 +1,3 @@
 """Openings: a portable job-search workspace."""
 
-__version__ = "0.28.0"
+__version__ = "0.28.1"
