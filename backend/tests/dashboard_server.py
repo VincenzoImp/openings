@@ -12,7 +12,7 @@ workspace:
         "Synthetic workspace at http://127.0.0.1:<port>" once it listens.
 
 With --demo either step seeds instead the curated workspace of one fictional
-person's job search (demo_workspace.py) for the screenshots, and with --empty a
+person's job search (openings.demo) for the screenshots, and with --empty a
 first run: only the owner password is set.
 
 Without --snapshot the server seeds a temporary workspace first. Only this
@@ -39,7 +39,6 @@ from pathlib import Path
 import uvicorn
 from fastapi.testclient import TestClient
 
-from demo_workspace import seed_demo
 from jobs_fixtures import seed_jobs
 from large_fixtures import seed_large
 from openings import backups
@@ -47,6 +46,7 @@ from openings.actors import OWNER, acting_as
 from openings.app import create_app
 from openings.auth import COOKIE
 from openings.career import EntryCreate, HighlightCreate, ProfileUpdate, TemplateCreate
+from openings.demo import seed_demo
 from today_fixtures import seed_today
 
 RESET_PATH = "/__e2e__/reset"
@@ -314,7 +314,7 @@ def seed_other(path, demo):
     with TestClient(app) as client:
         client.post("/api/v1/auth/setup", json={"password": PASSWORD})
         if demo:
-            seed_demo(app, client)
+            seed_demo(app)
         cookie = client.post("/api/v1/auth/login", json={"password": PASSWORD}).cookies[COOKIE]
     if demo:
         workspace = app.state.workspace

@@ -4,9 +4,6 @@ Each is listed in ``TRANSPORT_ONLY`` with the reason it is not an operation
 (``test_parity.py`` checks the list against the served routes).
 """
 
-import os
-from pathlib import Path
-
 from fastapi import Request
 from fastapi.responses import FileResponse, JSONResponse
 from starlette.background import BackgroundTask
@@ -14,6 +11,7 @@ from starlette.background import BackgroundTask
 from .. import __version__, backups
 from ..actors import current_actor, require_owner
 from ..auth import COOKIE, MAX_AGE
+from ..common import examples_dir
 from ..db import SCHEMA_VERSION
 from ..errors import DomainError
 from ..operations import backup_file_for, restore_upload
@@ -44,11 +42,6 @@ TRANSPORT_ONLY = (
 EXAMPLES = ("career.json", "preferences.json", "cv.tex", "letter.tex")
 # Documented with the Error model by openapi.py.
 NOT_FOUND = {404: {"description": "not_found"}}
-
-
-def _examples():
-    default = Path(__file__).resolve().parents[3] / "examples"
-    return Path(os.environ.get("OPENINGS_EXAMPLES", default))
 
 
 def register_transport(app, router, public_url):
@@ -183,7 +176,7 @@ def register_transport(app, router, public_url):
     @router.get(API_PREFIX + "/examples", tags=["workspace"], operation_id="examples_list")
     def examples():
         """List the shipped example files."""
-        directory = _examples()
+        directory = examples_dir()
         return {
             "items": [
                 {"name": name, "url": "/api/v1/examples/" + name}
@@ -201,7 +194,7 @@ def register_transport(app, router, public_url):
     )
     def example_file(name: str):
         """Download a shipped example file."""
-        path = _examples() / name
+        path = examples_dir() / name
         if name not in EXAMPLES or not path.is_file():
             raise DomainError(404, "not_found", "Example not found.")
         return FileResponse(path, filename=name)

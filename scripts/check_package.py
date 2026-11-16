@@ -30,6 +30,11 @@ def main():
             "openings/schema.sql",
             "openings/_vendor/jobspy/LICENSE",
             "openings/_vendor/jobspy/PROVENANCE.md",
+            # The demo workspace's CV and letter (openings.demo).
+            "openings/demo/demo-cv.pdf",
+            "openings/demo/demo-cv.tex",
+            "openings/demo/demo-letter.pdf",
+            "openings/demo/demo-letter.tex",
         ):
             assert name in package.namelist(), f"Missing package resource: {name}"
     with tempfile.TemporaryDirectory(prefix="openings-installed-") as directory:
@@ -68,16 +73,28 @@ with TestClient(app) as client:
     assert capabilities['version'] == version('openings') == openings.__version__
     assert capabilities['operations']
     assert client.get('/health').json()['status'] == 'ok'
-    print(json.dumps({'installed_version': version('openings'),
-                      'operation_count': len(capabilities['operations']),
-                      'capabilities_status': response.status_code,
-                      'package_origin': str(Path(openings.__file__).resolve().relative_to(Path.cwd().resolve()))}))
+# The demo workspace seeds from the installed package data.
+from openings.demo import seed_demo
+demo = create_app(Path.cwd() / 'demo.sqlite', start_worker=False)
+demo.state.auth.setup('synthetic-package-password')
+seed_demo(demo)
+files = demo.state.workspace.db.one("SELECT count(*) AS n FROM files")['n']
+assert files
+print(json.dumps({'installed_version': version('openings'),
+                  'operation_count': len(capabilities['operations']),
+                  'capabilities_status': response.status_code,
+                  'demo_files': files,
+                  'package_origin': str(Path(openings.__file__).resolve().relative_to(Path.cwd().resolve()))}))
 """
         completed = subprocess.run(
             [sys.executable, "-c", probe],
             check=False,
             cwd=directory,
-            env={**os.environ, "PYTHONPATH": str(target)},
+            env={
+                **os.environ,
+                "PYTHONPATH": str(target),
+                "OPENINGS_EXAMPLES": str(repository / "examples"),
+            },
             text=True,
             capture_output=True,
         )
