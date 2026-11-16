@@ -23,6 +23,8 @@ from .readiness import READY_SQL
 JOB_SOURCE_SQL = (
     "coalesce(json_extract(j.metadata,'$.source'),json_extract(j.metadata,'$.ats'),'manual')"
 )
+# The jobs a saved source observed: one of their postings came from it (postings_source).
+SAVED_SOURCE_SQL = "j.id IN (SELECT job_id FROM postings WHERE source_id=?)"
 # The fields a facet lists the values of, by facet.
 FACETS = {
     "companies": ("company", "j.company"),
@@ -164,6 +166,7 @@ class JobReads:
         unspoken=None,
         batch_id=None,
         since=None,
+        source_id=None,
     ):
         conditions, args = [], []
         if signal:
@@ -224,6 +227,9 @@ class JobReads:
         if source:
             conditions.append(JOB_SOURCE_SQL + "=?")
             args.append(source)
+        if source_id:
+            conditions.append(SAVED_SOURCE_SQL)
+            args.append(source_id)
         if remote is not None:
             conditions.append("json_extract(j.metadata,'$.is_remote')=?")
             args.append(int(remote))
@@ -269,6 +275,7 @@ class JobReads:
         batch_id=None,
         dismissed_since=None,
         url=None,
+        source_id=None,
     ):
         if url:
             # The archived jobs posted at a URL (its identities), as resolve_jobs finds them.
@@ -299,6 +306,7 @@ class JobReads:
                 "dismissed_by": dismissed_by,
                 "batch_id": batch_id,
                 "since": dismissed_since,
+                "source_id": source_id,
             }
             where, args = self._job_filters(**filters, **signal_filters)
             base = " FROM jobs j"
@@ -343,6 +351,7 @@ class JobReads:
                     dismissed_by=dismissed_by,
                     batch_id=batch_id,
                     since=dismissed_since,
+                    source_id=source_id,
                     **{**signal_filters, "unspoken": None},
                 )
             if include_counts:

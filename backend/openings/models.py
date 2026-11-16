@@ -470,6 +470,9 @@ class JobQuery(Input):
         max_length=300,
         description="The source a job summary names: a board or ATS (such as greenhouse), or manual.",
     )
+    source_id: str | None = Field(
+        default=None, max_length=100, description="Jobs this saved source found."
+    )
     remote: bool | None = Field(default=None, description="Remote (true) or on site (false).")
     complete: bool | None = Field(
         default=None,

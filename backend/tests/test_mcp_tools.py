@@ -5,6 +5,7 @@ import asyncio
 import json
 from datetime import UTC, datetime, timedelta
 
+from openings.discovery.models import SourceCreate
 from openings.interfaces import OPERATIONS
 from openings.outcomes import today
 
@@ -273,6 +274,44 @@ async def test_answers_and_questions_replace_the_whole_value_as_described(app, m
     tools = {tool.name: tool for tool in await app.state.mcp.list_tools()}
     fields = tools["applications_update"].input_schema["properties"]["items"]["items"]
     assert fields["properties"]["answers"]["description"].startswith("Replaces all answers")
+
+
+def test_jobs_list_tells_two_searches_on_one_site_apart(app, mcp):
+    """source is the site; source_id is the saved source that found the job."""
+    workspace = app.state.workspace
+    first, second = (
+        workspace.discovery.create_source(
+            SourceCreate(
+                name=name, kind="jobspy", config={"query": name, "providers": ["linkedin"]}
+            )
+        )
+        for name in ("Data engineer", "Platform engineer")
+    )
+    found = {}
+    for source in (first, second):
+        for n in range(2):
+            job = workspace.ingest_job(
+                {
+                    "title": f"{source['name']} {n}",
+                    "company": "Example",
+                    "posting": f"Synthetic {source['name']} {n}.",
+                    "url": f"https://jobs.example.com/{source['id']}/{n}",
+                    "metadata": {"source": "linkedin"},
+                    "source_id": source["id"],
+                }
+            )
+            found.setdefault(source["id"], []).append(job)
+    for jobs_of_source in found.values():
+        job = jobs_of_source[0]
+        workspace.set_triage(job["id"], "dismissed", job["version"], "Too senior.")
+    site = ok(mcp.call("jobs_list", {"source": "linkedin", "triage": "dismissed"}))
+    assert site["total"] == 2
+    listed = ok(mcp.call("jobs_list", {"source_id": first["id"], "triage": "dismissed"}))
+    assert [item["id"] for item in listed["items"]] == [found[first["id"]][0]["id"]]
+    rest = mcp.client.get(
+        "/api/v1/jobs", params={"source_id": first["id"]}, headers=mcp.token["headers"]
+    ).json()
+    assert {item["id"] for item in rest["items"]} == {job["id"] for job in found[first["id"]]}
 
 
 def test_career_and_highlights_are_saved_in_batches_with_versions(app, mcp):

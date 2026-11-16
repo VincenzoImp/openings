@@ -8665,6 +8665,8 @@ export interface operations {
         sort?: "newest" | "oldest" | "company" | "title" | "dismissed";
         /** @description The source a job summary names: a board or ATS (such as greenhouse), or manual. */
         source?: string | null;
+        /** @description Jobs this saved source found. */
+        source_id?: string | null;
         /** @description new, shortlisted, dismissed or active (not dismissed). */
         triage?: ("new" | "shortlisted" | "dismissed" | "active") | null;
         /** @description Jobs posted at this URL (board and redirect variants too). */
