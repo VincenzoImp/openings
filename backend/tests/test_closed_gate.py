@@ -55,6 +55,7 @@ def test_a_closed_gate_contacts_no_job_site(app, client, monkeypatch):
         {"source_id": source["id"], "preview": True},
         {"preview": True, "kind": "rss", "url": "https://feed.example.org/jobs.rss"},
         {"preview": True, "kind": "greenhouse", "config": {"board": "example"}},
+        {"preview": True, "kind": "hnhiring"},
     ):
         assert code(client.post("/api/v1/sources/run", json=body)) == "providers_closed"
     preview = {"kind": "jobspy", "config": SEARCH}

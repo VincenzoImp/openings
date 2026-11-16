@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 from .. import events
-from ..collectors import company as company_collectors, jobspy as jobspy_collector
+from ..collectors import (
+    company as company_collectors,
+    hnhiring as hnhiring_collector,
+    jobspy as jobspy_collector,
+)
 from ..collectors.catalog import COMPANY_ADAPTERS
 from ..collectors.policy import ProviderDeferred
 from ..common import batch_result, check_version, decode_record, encode, missing, new_id, now
@@ -197,21 +201,15 @@ class SourceOperations:
         for kind in SourceKind.__args__:
             if kind == "auto":
                 continue
-            cls = (
-                jobspy_collector.JobSpyConfig
-                if kind == "jobspy"
-                else RSSConfig
-                if kind == "rss"
-                else company_collectors.config_model(kind)
-            )
+            cls, label = {
+                "jobspy": (jobspy_collector.JobSpyConfig, "Saved portal search"),
+                "rss": (RSSConfig, "RSS / Atom feed"),
+                "hnhiring": (hnhiring_collector.HNHiringConfig, "HN Who is hiring"),
+            }.get(kind) or (company_collectors.config_model(kind), kind.title())
             items.append(
                 {
                     "kind": kind,
-                    "label": "Saved portal search"
-                    if kind == "jobspy"
-                    else "RSS / Atom feed"
-                    if kind == "rss"
-                    else kind.title(),
+                    "label": label,
                     "config_schema": cls.model_json_schema(),
                     "capabilities": {
                         "automatic_collection": automatic_collection_supported(kind),
@@ -225,7 +223,7 @@ class SourceOperations:
                         "description_mode": "portal"
                         if kind == "jobspy"
                         else "inline"
-                        if kind == "rss"
+                        if kind in ("rss", "hnhiring")
                         else COMPANY_ADAPTERS[kind].description_mode,
                     },
                 }
@@ -256,7 +254,8 @@ class SourceOperations:
         details = getattr(value, "details", True)
         self.providers.require_open()
         resolved = self._resolve_source(value.model_dump(exclude={"details"}))
-        source = {**resolved, "name": value.name or resolved["config"].get("board", "RSS source")}
+        default = "HN Who is hiring" if resolved["kind"] == "hnhiring" else "RSS source"
+        source = {**resolved, "name": value.name or resolved["config"].get("board", default)}
         config = {
             key: val for key, val in source["config"].items() if key not in ("url", "filters")
         }
@@ -270,10 +269,13 @@ class SourceOperations:
             adapter = COMPANY_ADAPTERS.get(source["kind"])
             count = source["config"].get("max_results", 100)
             count = min(count, 3) if preview else count
-            requests = 1 + (count if adapter and adapter.description_mode == "separate" else 0)
+            listing = 2 if source["kind"] == "hnhiring" else 1  # the thread, then its comments
+            requests = listing + (
+                count if adapter and adapter.description_mode == "separate" else 0
+            )
             return {
                 "total": requests,
-                "providers": [{"id": providers[0], "min": 1, "max": requests}],
+                "providers": [{"id": providers[0], "min": listing, "max": requests}],
                 "note": "Listing pagination, redirects and retries may add requests; cached text can reduce detail fetches.",
             }
 
