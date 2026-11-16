@@ -1,9 +1,9 @@
 ---
 name: maintain-career
 title: Keep your Profile and career entries current
-summary: Give your agent a CV or tell it what changed, and have your Profile, career entries, highlights and templates updated.
+summary: Give your agent a CV or tell it what changed, and have your Profile, career entries, highlights, templates and Preferences kept current.
 example: Update my profile from this CV.
-description: Maintain the owner's Openings Profile, career entries, highlights and CV/letter templates - "update my profile from this CV", "add my new job", "improve my highlights", "fix my CV template". Reconciles new material into the existing record without inventing anything.
+description: Maintain the owner's Openings Profile, career entries, highlights, CV/letter templates and Preferences - "update my profile from this CV", "add my new job", "improve my highlights", "fix my CV template", "learn from my corrections". Reconciles new material into the record without inventing anything.
 ---
 
 # Keep your Profile and career entries current
@@ -50,8 +50,9 @@ Then:
   approved unless the owner approved that exact wording in chat. Mark ★ always
   include only on request. Remove duplicates, keeping the better one.
 
-Facts about eligibility, availability or salary belong in Facts about me:
-offer to record them there.
+Career kinds fact, skill and language hold what the documents may cite (a
+certification, a language level). What employers ask about the owner (work
+permit, notice, salary) goes to Facts about me: offer to record it there.
 
 ## Improve highlights
 
@@ -61,19 +62,31 @@ that claims more than its entry supports.
 
 ## Templates
 
-For "fix my CV template": read it with `templates_get`, change the TeX, compile
-it locally with sample content from the record, check the PDF (pages, layout,
-links), then `templates_save` with its version. Keep writing rules in
-Preferences and limits in the template.
+For "fix my CV template": read it with `templates_get` and download its files
+(class, fonts, images) with `files_download`. Change the TeX, compile it
+locally with sample content from the record using the engine its rules name
+(tectonic unless they say otherwise), check the PDF (pages, layout, links),
+then `templates_save` with its version. Upload a new template file with
+`files_upload` (owner type template). Keep writing rules in Preferences and
+limits in the template.
+
+## Learn from corrections
+
+On request, or weekly in a run: read `workspace_context` with feedback_since a
+month back, and `changes_list` with actor owner. Find recurring corrections,
+such as dismissals restored for one reason or priorities raised for a kind of
+role, and propose each as a Preference line in the owner's words. Record it
+with `preferences_update` only on their yes, keeping the other items.
 
 ## After a change
 
 Shortlisted applications whose documents would now be clearly better can be
-redone with [prepare-applications](../prepare-applications/SKILL.md): name
-them and offer it; do not redo them unasked.
+redone as [prepare-applications](../prepare-applications/SKILL.md) "Redo after
+a change" says: name them and offer it, or run it without asking when Working
+with me says so.
 
 ## Report back
 
-In chat: Profile fields changed; entries added and updated, by title; new
-highlights and how many await approval; conflicts and questions still open;
-applications that could benefit.
+Profile fields changed; entries added and updated, by title; new highlights
+and how many await approval; template changes; Preference lines proposed;
+conflicts and questions still open; applications that could benefit.

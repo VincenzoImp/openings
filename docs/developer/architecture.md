@@ -106,7 +106,7 @@ the owner's corrections of agent work since the token's last read.
   Shortlisting starts the application in the same transaction; starting one
   shortlists its job. Each job has at most one non-Closed application, enforced by
   the service and a partial unique index. Closing needs an outcome. Mark applied is
-  the owner's act, never automatic. Forget removes job-owned records.
+  never automatic: the owner's word or standing rule. Forget removes job-owned records.
 - **Ready** is computed in one SQL expression and one function
   (`workspace/readiness.py`): Shortlisted, every required document (`cv`, `letter`)
   has a complete current revision, no blocking requirement is open.
