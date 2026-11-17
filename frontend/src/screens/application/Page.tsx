@@ -106,7 +106,7 @@ function Header({
       )}
     />
   );
-  // Ready has its own "Apply on employer's site" beside the PDFs.
+  // Ready has its own "Apply" (on the employer's site) beside the PDFs.
   const posting =
     job.url && stageOf(app) !== "ready" ? (
       <a
@@ -148,7 +148,7 @@ function Header({
             </li>
           )}
         {app.priority != null && (
-          <li>
+          <li title={`Priority ${app.priority} of 5 (1 is highest)`}>
             <PriorityGlyph priority={app.priority} />
             Priority {app.priority}
           </li>

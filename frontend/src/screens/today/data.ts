@@ -39,7 +39,7 @@ function useApplications(query: Query, poll = false) {
 /** Everything Today shows. */
 export function useToday() {
   const ready = useApplications(
-    { stage: "ready", sort: "deadline", limit: 5 },
+    { stage: "ready", sort: "priority", limit: 5 },
     true,
   );
   const shortlisted = useApplications({

@@ -1,9 +1,9 @@
 ---
 name: prepare-applications
 title: Prepare CVs and letters
-summary: Have a tailored CV and cover letter written, compiled and checked for each shortlisted job until it is Ready, and redone after a template change.
-example: Prepare a CV and cover letter for every job on my shortlist.
-description: Prepare the CV and cover letter of Openings applications from the owner's career entries, templates and Writing rules - "prepare every shortlisted job", "prepare the application for X", "redo the letter for Y", "redo them with my new template". Compiles PDFs locally, uploads them and leaves each application Ready for the owner to apply.
+summary: Your agent writes, compiles and checks a tailored CV and letter for each shortlisted job until the application is Ready.
+example: Prepare a CV and letter for every job on my shortlist.
+description: Prepare the CV and letter (cover letter) of Openings applications from the owner's career entries, templates and Writing rules, as in "prepare every shortlisted job", "prepare the application for X", "redo the letter for Y", "redo them with my new template". Compiles PDFs locally, uploads them and leaves each application Ready for the owner to apply.
 ---
 
 # Prepare CVs and letters

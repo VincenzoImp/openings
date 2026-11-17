@@ -1,9 +1,9 @@
 ---
 name: setup-openings
 title: Set up your workspace
-summary: Get connected, then have your career entries, Preferences, templates and first sources set up from your CV and a short interview.
+summary: Your agent checks the connection, then records your career entries, Preferences, templates and first sources from your CV and a short interview.
 example: Set up my Openings workspace from my CV.
-description: Set up a new or empty Openings workspace for its owner - "set up my Openings workspace", "get me started". Checks the connection, uploads and TeX, builds the Profile and career entries from a CV, records Preferences and standing instructions from a short interview, creates templates, adds first sources and runs a first triage.
+description: Set up a new or empty Openings workspace for its owner, as in "set up my Openings workspace", "get me started". Checks the connection, uploads and TeX, builds the Profile and career entries from a CV, records Preferences and standing instructions from a short interview, creates templates, adds first sources and runs a first triage.
 ---
 
 # Set up your workspace

@@ -1,5 +1,6 @@
 import { defineConfig } from "@playwright/test";
-import type { Options } from "./tests/fixtures";
+import { CAPTURE_CHANNEL } from "./scripts/capture.mjs";
+import type { Options, WorkerOptions } from "./tests/fixtures";
 
 // The global setup seeds one synthetic workspace; every worker serves its own
 // copy and restores it before each test (tests/server.ts, tests/fixtures.ts),
@@ -8,12 +9,18 @@ import type { Options } from "./tests/fixtures";
 const CI = !!process.env.CI;
 const PERFORMANCE = "performance.spec.ts";
 const SCREENSHOTS = "screenshots.spec.ts";
-const REEL = "reel.spec.ts";
 const VIDEO = "video.spec.ts";
 const desktop = { width: 1440, height: 1000 };
 const mobile = { width: 390, height: 844 };
+// The captures show the application's PDFs, so they run in a browser with a
+// PDF viewer and fail without one (scripts/capture.mjs).
+const capture = {
+  browserName: "chromium" as const,
+  channel: CAPTURE_CHANNEL,
+  pdfViewer: true,
+};
 
-export default defineConfig<Options>({
+export default defineConfig<Options, WorkerOptions>({
   testDir: "./tests",
   testMatch: "*.spec.ts",
   fullyParallel: true,
@@ -27,22 +34,22 @@ export default defineConfig<Options>({
   projects: [
     {
       name: "chromium",
-      testIgnore: [PERFORMANCE, SCREENSHOTS, REEL, VIDEO],
+      testIgnore: [PERFORMANCE, SCREENSHOTS, VIDEO],
       use: { browserName: "chromium", viewport: desktop },
     },
     {
       name: "chromium-mobile",
-      testIgnore: [PERFORMANCE, SCREENSHOTS, REEL, VIDEO],
+      testIgnore: [PERFORMANCE, SCREENSHOTS, VIDEO],
       use: { browserName: "chromium", viewport: mobile },
     },
     {
       name: "webkit",
-      testIgnore: [PERFORMANCE, SCREENSHOTS, REEL, VIDEO],
+      testIgnore: [PERFORMANCE, SCREENSHOTS, VIDEO],
       use: { browserName: "webkit", viewport: desktop },
     },
     {
       name: "webkit-mobile",
-      testIgnore: [PERFORMANCE, SCREENSHOTS, REEL, VIDEO],
+      testIgnore: [PERFORMANCE, SCREENSHOTS, VIDEO],
       use: { browserName: "webkit", viewport: mobile },
     },
     // The performance budget starts its own large workspace (25,000 jobs).
@@ -57,19 +64,14 @@ export default defineConfig<Options>({
     {
       name: "screenshots",
       testMatch: SCREENSHOTS,
-      use: { browserName: "chromium", signedIn: false },
+      use: { ...capture, signedIn: false },
     },
-    // The README's demo reel (`npm run reel`), never run in CI.
-    {
-      name: "reel",
-      testMatch: REEL,
-      use: { browserName: "chromium" },
-    },
-    // Dashboard footage for a video, against a running demo (video.spec.ts).
+    // Dashboard footage for the walkthrough video and the README GIF, against
+    // a running demo (video.spec.ts), never run in CI.
     {
       name: "video",
       testMatch: VIDEO,
-      use: { browserName: "chromium" },
+      use: capture,
     },
   ],
 });

@@ -1,18 +1,21 @@
 # Contributing
 
-Thanks for helping. Small fixes can go straight to a pull request; open an issue
-first for larger changes. Read the [architecture](docs/developer/architecture.md)
-and the relevant [user guide](docs/README.md) before changing behavior. Code, UI
-and docs are in American English; examples and fixtures are synthetic.
-Participation follows the [code of conduct](CODE_OF_CONDUCT.md); report
-vulnerabilities privately as in [SECURITY.md](SECURITY.md).
-New here? Pick a
-[good first issue](https://github.com/VincenzoImp/openings-job-search/labels/good%20first%20issue):
-each names the files to read and when it is done.
+Run Openings from source, keep its invariants and check a change here. Small fixes
+can go straight to a pull request; open an issue first for larger changes. Read the
+[architecture](docs/developer/architecture.md) and the relevant
+[user guide](docs/README.md) before changing behavior.
+
+- **Words:** code, UI and docs are in American English, and examples and fixtures
+  are synthetic. User-facing text follows the grammar rule and tone rules of the
+  [brand register](docs/brand/README.md#message).
+- **Conduct:** participation follows the [code of conduct](CODE_OF_CONDUCT.md);
+  report vulnerabilities privately as [SECURITY.md](SECURITY.md) describes.
+- **First issue:** pick a [good first issue](https://github.com/VincenzoImp/openings-job-search/labels/good%20first%20issue),
+  which names the files to read and when it is done.
 
 ## Run locally
 
-Python 3.14+, Node 26 and [uv](https://docs.astral.sh/uv/):
+You need Python 3.14+, Node 26 and [uv](https://docs.astral.sh/uv/):
 
 ```bash
 uv sync --locked --python 3.14
@@ -21,9 +24,9 @@ uv run openings --database data/development.sqlite   # http://127.0.0.1:8080
 npm --prefix frontend run dev                        # hot reload; proxies /api and /mcp/
 ```
 
-To run your own image, `docker build -t openings:dev .`, then set
-`OPENINGS_IMAGE=openings:dev` in `.env` and `docker compose up -d`. Never commit
-databases, credentials, personal documents or machine-specific files.
+To run your own image, build it with `docker build -t openings:dev .`, set
+`OPENINGS_IMAGE=openings:dev` in `.env` and run `docker compose up -d`. Never
+commit databases, credentials, personal documents or machine-specific files.
 
 ## Invariants
 
@@ -61,14 +64,14 @@ npm --prefix frontend run format:check && npm --prefix frontend test
   api:gen` and commit `frontend/src/api/schema.d.ts`.
 - **MCP budget:** `test_mcp_budget.py` caps the tool list; add a tool last.
 - **Docs:** `test_docs.py` caps `docs/user` at 12,500 words and checks links,
-  vocabulary and the routes and tools they name. Screenshots:
-  `npm --prefix frontend run screenshots -- --docs`; the demo GIFs:
-  `npm --prefix frontend run reel` and `-- --dark`.
+  vocabulary and the routes and tools they name. Regenerate the screenshots with
+  `npm --prefix frontend run screenshots -- --docs`; the demo GIF comes from
+  the video render ([maintaining](docs/developer/maintaining.md#demo-reel)).
 - **Schema:** change `schema.sql`, the unreleased migration and its tests together.
 
 ## Changelog
 
-Record user-visible changes under `## Unreleased` in [CHANGELOG.md](CHANGELOG.md):
-behavior, not implementation, with any schema change and its upgrade and restore
-consequences. Releases and repository settings are in
+Record user-visible changes under `## Unreleased` in [CHANGELOG.md](CHANGELOG.md).
+Describe behavior, not implementation, and name any schema change with its upgrade
+and restore consequences. Releases and repository settings are in
 [Maintaining](docs/developer/maintaining.md).

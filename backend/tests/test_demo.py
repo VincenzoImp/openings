@@ -147,5 +147,14 @@ def test_the_demo_seeds_a_new_workspace_with_dates_relative_to_now(app):
     age = datetime.now(UTC) - datetime.fromisoformat(oldest)
     assert timedelta(days=30) < age < timedelta(days=90)
     # Every CV and letter is a complete revision built from its stored TeX source.
-    pdfs = workspace.db.all("SELECT source_sha256 FROM files WHERE media_type='application/pdf'")
+    pdfs = workspace.db.all(
+        "SELECT source_sha256 FROM files WHERE media_type='application/pdf' "
+        "AND document_id IS NOT NULL"
+    )
     assert pdfs and all(row["source_sha256"] for row in pdfs)
+    # Each template has one sample PDF for its Preview.
+    templates = app.state.career.list_templates()["items"]
+    assert {template["name"] for template in templates} == {"Main CV", "Cover letter", "Compact CV"}
+    for template in templates:
+        files = app.state.documents.list_files(owner_type="template", owner_id=template["id"])
+        assert [file["media_type"] for file in files["items"]] == ["application/pdf"]

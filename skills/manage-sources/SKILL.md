@@ -1,9 +1,9 @@
 ---
 name: manage-sources
 title: Manage job sources
-summary: Have searches, company boards and feeds added, previewed, tuned or paused so new jobs fit what you want.
+summary: Your agent adds, previews, tunes and pauses your searches, company boards and feeds so new jobs fit what you want.
 example: Follow Northstar Labs' job board and add a search for data engineer jobs in Berlin.
-description: Add, tune, pause and review Openings job sources - "add a search for...", "follow company X", "why so much noise from Y?", "which sources work?", "which companies should I follow?". Previews every change before saving and measures sources by what they bring.
+description: Add, tune, pause and review Openings job sources, as in "add a search for...", "follow company X", "why so much noise from Y?", "which sources work?", "which companies should I follow?". Previews every change before saving and measures each source by what it brings.
 ---
 
 # Manage job sources

@@ -88,26 +88,40 @@ class Drawing:
         )
 
 
+# The four steps of a day: who acts, the step, a caption and the body. Only the
+# agent's step is in the accent; your own last step is filled.
 STEPS = (
     (
-        "Openings, on your schedule",
-        "Fresh jobs, no duplicates",
-        "from your searches and watched companies",
+        "You, once",
+        "You set it up",
+        "in your own words",
         [
-            "LinkedIn, Indeed and Glassdoor searches,",
-            "careers pages on 12 hiring platforms,",
-            "HN Who is hiring, RSS and job links,",
-            "into Jobs › New.",
+            "Profile: your career",
+            "Preferences: your rules",
+            "Templates: CV and letter",
+            "Sources: what you watch",
         ],
     ),
     (
-        "Your agent over MCP, or you by hand",
-        "Your agent prepares",
-        "Claude Code, Codex or any MCP client",
+        "Openings",
+        "Fresh jobs",
+        "on each source's schedule",
         [
-            "Shortlists by your Preferences, with a",
-            "reason for each dismissal, and tailors",
-            "each CV and letter until it is Ready.",
+            "LinkedIn, Indeed, Glassdoor,",
+            "12 hiring platforms, HN,",
+            "RSS and job links.",
+            "Repeats are left out.",
+        ],
+    ),
+    (
+        "Your agent, over MCP",
+        "Your agent decides and prepares",
+        "Claude Code, Codex, any client",
+        [
+            "Reads each job by your rules,",
+            "dismisses with a reason,",
+            "writes the CV and letter",
+            "as PDFs, and ranks them.",
         ],
     ),
     (
@@ -115,53 +129,76 @@ STEPS = (
         "You apply, best first",
         "on the employer's site",
         [
-            "Ready is ranked by priority and deadline.",
-            "Apply with everything prepared, then",
-            "track the reply.",
+            "Ready is ranked by priority,",
+            "then deadline. Openings",
+            "tracks the replies and",
+            "follow-ups.",
         ],
     ),
 )
+COLUMN, GAP = 260, 40
 
 
 def flow(palette):
     d = Drawing(
-        440,
-        "Fresh jobs, no duplicates; your agent prepares; you apply, best first. "
-        "Openings collects jobs into Jobs › New, your agent shortlists and tailors each "
-        "CV and letter over MCP, and you apply on the employer's site, ranked by priority "
-        "and deadline.",
+        500,
+        "You set it up once: Profile, Preferences, Templates and Sources. Openings brings in "
+        "fresh jobs, with repeats left out. Your agent decides and prepares over MCP: it reads "
+        "each job by your rules, dismisses with a reason, writes the CV and letter as PDFs and "
+        "ranks them. You apply, best first, on the employer's site. Every step works by hand, "
+        "over REST or over MCP. Nothing in Openings can submit an application to an employer.",
         palette,
     )
     for index, (who, title, caption, body) in enumerate(STEPS):
-        x, last = 20 + index * 400, index == 2
-        ink = "text" if last else "accent-text"
-        d.text(x + 180, 40, who, size=16, weight=MEDIUM, colour=ink, anchor="middle")
-        d.path(f"M{x} 66V58H{x + 360}V66", stroke="text" if last else "accent", width=1.5)
-        if last:
-            d.rect(x, 92, 360, 106, fill="primary", radius=12)
+        x = 20 + index * (COLUMN + GAP)
+        agent, last = index == 2, index == 3
+        ink = "accent-text" if agent else "text-2"
+        d.text(x + COLUMN / 2, 40, who, size=16, weight=MEDIUM, colour=ink, anchor="middle")
+        d.path(
+            f"M{x} 66V58H{x + COLUMN}V66", stroke="accent" if agent else "border-strong", width=1.5
+        )
+        if agent:
+            d.rect(x, 92, COLUMN, 120, fill="accent-soft", stroke="accent", radius=12)
+        elif last:
+            d.rect(x, 92, COLUMN, 120, fill="primary", radius=12)
         else:
-            d.rect(x, 92, 360, 106, fill="accent-soft", stroke="accent", radius=12)
+            d.rect(x, 92, COLUMN, 120, fill="surface", stroke="border-strong", radius=12)
         sub = "on-primary" if last else "text-2"
-        d.text(x + 24, 124, str(index + 1), size=14, weight=MEDIUM, colour=sub)
-        d.text(x + 24, 156, title, size=24, weight=SEMIBOLD, colour=sub if last else "text")
-        d.text(x + 24, 180, caption, size=14, weight=MEDIUM, colour=sub)
-        d.text(x + 24, 232, body, size=15, colour="text-2", lead=22)
-        if not last:
-            d.arrow(x + 366, x + 394, 145)
-    d.path(f"M20 320H{WIDTH - 20}", stroke="border", width=1)
-    d.rect(22, 348, 16, 16, fill="accent-soft", stroke="accent", radius=4)
+        heading = "on-primary" if last else "text"
+        d.text(x + 20, 122, str(index + 1), size=14, weight=MEDIUM, colour=sub)
+        lines = (
+            [title]
+            if len(title) < 22
+            else title.rsplit(" ", 2)[0:1] + [" ".join(title.split()[-2:])]
+        )
+        d.text(
+            x + 20,
+            150 if len(lines) == 1 else 146,
+            lines,
+            size=20,
+            weight=SEMIBOLD,
+            colour=heading,
+            lead=24,
+        )
+        d.text(x + 20, 196, caption, size=14, weight=MEDIUM, colour=sub)
+        d.text(x + 20, 246, body, size=15, colour="text-2", lead=22)
+        if index < 3:
+            d.arrow(x + COLUMN + 6, x + COLUMN + GAP - 6, 152)
+    d.path(f"M20 336V346H{WIDTH - 20}V336", stroke="border-strong", width=1.5)
+    d.text(WIDTH / 2, 378, "By hand · REST · MCP", size=18, weight=SEMIBOLD, anchor="middle")
     d.text(
-        50,
-        361,
-        "Every step works by hand in the dashboard, from scripts with the REST API, "
-        "or with your agent over MCP.",
+        WIDTH / 2,
+        404,
+        "Every step works by hand in the dashboard, from scripts over REST, or through your agent over MCP.",
         size=15,
         colour="text-2",
+        anchor="middle",
     )
-    d.rect(22, 384, 16, 16, fill="primary", radius=4)
+    d.path(f"M20 436H{WIDTH - 20}", stroke="border", width=1)
+    d.rect(22, 460, 16, 16, fill="primary", radius=4)
     d.text(
         50,
-        397,
+        473,
         "Nothing in Openings can submit an application to an employer or contact one.",
         size=15,
         colour="text-2",
@@ -169,81 +206,90 @@ def flow(palette):
     return d
 
 
+HOLDS = (
+    ("Your career", ["experience and highlights;", "★ always in your CV"]),
+    ("Your rules", ["Preferences, in your", "own words"]),
+    ("Your templates", ["your own TeX, its Limits,", "a default per kind"]),
+    ("Your sources", ["the searches and companies", "you watch"]),
+)
 AGENT = (
     (
-        "Triages with reasons",
-        ["goes through Jobs › New by your Preferences,", "with a reason for every dismissal"],
+        "Decides with reasons",
+        ["reads Jobs › New by your Preferences,", "with a reason for every dismissal"],
     ),
     (
         "Writes and compiles",
-        ["the tailored CV and letter from your career", "record, as PDFs, until it is Ready"],
+        ["the tailored CV and letter from your", "templates, as PDFs, until it is Ready"],
     ),
     (
-        "Sets priority, deadline and salary range",
-        ["so Ready reads best first; a range only", "with a note of its evidence"],
+        "Ranks what is Ready",
+        ["a priority, a deadline and a salary", "range with its basis"],
     ),
-    ("Records what you tell it", ["replies, interviews and outcomes"]),
+    ("Briefs you before an interview", ["and records the replies you tell it"]),
     (
         "Reports back",
-        ["what is Ready, what needs you, what it changed;", "every write is attributed"],
+        ["what is Ready and what needs you;", "Openings attributes every write"],
     ),
 )
 YOU = (
-    ("Say what you want", ["Preferences and standing rules,", "in your own words"]),
-    ("Apply on the employer's site", ["best first, with everything prepared"]),
-    ("Decide what it may do on its own", ["when to act, when to ask first,", "and how to undo"]),
+    ("Set it up once", ["Profile, Preferences, Templates", "and Sources"]),
+    ("Approve and correct", ["highlights, dismissals and", "what your agent may do alone"]),
+    ("Apply on the employer's site", ["best first, with everything", "prepared"]),
     ("Own the data", ["one SQLite file on your machine,", "with daily verified backups"]),
 )
 
 
+def column(d, x, y, items, mark):
+    for title, body in items:
+        mark(x + 2, y - 6)
+        d.text(x + 32, y, title, size=17, weight=MEDIUM)
+        d.text(x + 32, y + 25, body, size=15, colour="text-2", lead=22)
+        y += 38 + 22 * len(body)
+
+
 def agent_vs_you(palette):
     d = Drawing(
-        664,
-        "Your agent and you. Your agent, over MCP: triages with reasons, writes and "
-        "compiles, sets priority, deadline and salary range, records what you tell it and "
-        "reports back. You: say what you want, apply on the employer's site, decide what "
-        "it may do on its own, own the data. Nothing in Openings can submit an application "
-        "to an employer.",
+        694,
+        "What Openings holds: your career, rules, templates and sources. What your agent does "
+        "over MCP: decides with reasons, writes and compiles the CV and letter, ranks what is "
+        "Ready, briefs you before an interview and reports back. What stays yours: set it up "
+        "once, approve and correct, apply on the employer's site, own the data. Nothing in "
+        "Openings can submit an application to an employer.",
         palette,
     )
-    d.rect(20, 20, 680, 500, fill="accent-soft", stroke="accent", radius=12)
-    d.text(52, 66, "Your agent, over MCP", size=26, weight=SEMIBOLD)
+    d.rect(20, 20, 300, 530, fill="bg-subtle", stroke="border-strong", radius=12)
+    d.text(44, 66, "What Openings holds", size=22, weight=SEMIBOLD)
+    d.text(44, 94, "your career, rules, templates", size=15, weight=MEDIUM, colour="text-2")
+    d.text(44, 116, "and sources", size=15, weight=MEDIUM, colour="text-2")
+    column(d, 42, 166, HOLDS, lambda x, y: d.rect(x, y - 7, 12, 12, fill="text-3", radius=3))
+    d.rect(340, 20, 460, 530, fill="accent-soft", stroke="accent", radius=12)
+    d.text(364, 66, "Your agent, over MCP", size=22, weight=SEMIBOLD)
     d.text(
-        52,
+        364,
         94,
-        "Claude Code, Codex or any MCP client. No AI runs inside Openings.",
+        "Claude Code, Codex or any MCP client.",
         size=15,
         weight=MEDIUM,
         colour="accent-text",
     )
-    y = 140
-    for title, body in AGENT:
-        d.check(54, y - 6)
-        d.text(84, y, title, size=17, weight=MEDIUM)
-        d.text(84, y + 25, body, size=15, colour="text-2", lead=22)
-        y += 38 + 22 * len(body)
-    d.rect(724, 20, 456, 500, fill="surface", stroke="text", radius=12)
-    d.text(756, 66, "You", size=26, weight=SEMIBOLD)
-    d.text(
-        756, 94, "The part worth your time. The rest works by hand too.", size=15, colour="text-2"
-    )
-    y = 140
-    for title, body in YOU:
-        d.dot(762, y - 6)
-        d.text(784, y, title, size=17, weight=MEDIUM)
-        d.text(784, y + 25, body, size=15, colour="text-2", lead=22)
-        y += 38 + 22 * len(body)
-    d.rect(20, 544, WIDTH - 40, 100, fill="bg-subtle", stroke="border", radius=12)
+    d.text(364, 116, "No AI runs inside Openings.", size=15, weight=MEDIUM, colour="accent-text")
+    column(d, 362, 166, AGENT, lambda x, y: d.check(x, y, "accent"))
+    d.rect(820, 20, 360, 530, fill="surface", stroke="text", radius=12)
+    d.text(844, 66, "You", size=22, weight=SEMIBOLD)
+    d.text(844, 94, "The part worth your time.", size=15, colour="text-2")
+    d.text(844, 116, "Every step works by hand too.", size=15, colour="text-2")
+    column(d, 842, 166, YOU, lambda x, y: d.dot(x + 4, y, "text"))
+    d.rect(20, 574, WIDTH - 40, 100, fill="bg-subtle", stroke="border", radius=12)
     d.text(
         52,
-        580,
-        "Nothing in Openings can submit an application to an employer.",
+        610,
+        "Nothing in Openings can submit to an employer.",
         size=18,
         weight=SEMIBOLD,
     )
     d.text(
         52,
-        608,
+        638,
         [
             "No operation sends anything to an employer, whether you or your agent calls it.",
             "Non-destructive changes can be undone, and permanent deletes happen only when you ask.",

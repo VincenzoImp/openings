@@ -4,6 +4,37 @@
 
 - Detect Czech and Romanian job postings for language labels and filtering.
 
+## 0.28.1 — 2026-11-16
+
+Set up your job search once: Ready ranked best first, Apply in one click, and a voiced walkthrough
+
+No schema change. Upgrade in place from 0.28.0.
+
+**Ready, best first**
+
+- Ready is ranked by priority, then deadline, everywhere: Today, the Ready tab, Most urgent first, the send queue and the server's order for REST and MCP. Each Ready row shows its rank and "Priority n", and the application head names the scale.
+- The Ready page's employer button reads **Apply**; it opens the employer's site in a new tab.
+- On a phone, an application's CV and letter in Text mode use the full width, and in Chrome the PDFs fill their pane with no dark viewer margin.
+
+**The demo**
+
+- The demo's letters follow its own writing rules, its CV matches the approved highlights, its templates show a sample PDF, its interview has the agent's brief, and every agent dismissal names the Preference it applies.
+
+**Your agent**
+
+- Dismissal reasons quote the Preference they apply, in its own words. Skill summaries say what your agent does, in one sentence each. Settings shows the same `codex mcp add` line as the docs.
+
+**Docs and visuals**
+
+- The README, the guides, the Docker Hub page and the brand register are rewritten around "Set up your job search once. Your AI agent works it by your rules. You just apply.": what Openings holds, how a day goes, what stays yours, the skills table and an open screenshot gallery.
+- The README GIF is cut from a voiced walkthrough video; the diagrams, social preview and screenshots are regenerated with the real PDFs.
+- Screenshots and the video are captured in a browser that renders PDFs, and fail without one.
+
+**Fixes**
+
+- Focus stays in the field you chose: a profile block that opens as you tap a field, or a dialog that just closed, no longer moves your typing elsewhere.
+- A template's header counts its files. A template's `rules` accept a `statements` key. Stale 0.28.0 notes, old repository links and British spellings are gone.
+
 ## 0.28.0 — 2026-11-16
 
 Every new job, filtered, prepared and ranked: a demo in one command, skills for every workflow
@@ -237,7 +268,7 @@ No schema change: the workspace stays at schema 14.
 
 ## 0.23.0 — 2026-11-13
 
-The end of the redesign: a setup guide for new workspaces, parity enforced in CI, and the deprecated names and fields removed. **Read [Upgrading to 0.23](https://github.com/VincenzoImp/openings/blob/v0.23.0/docs/user/upgrading-0.23.md) before upgrading scripts or agents.**
+The end of the redesign: a setup guide for new workspaces, parity enforced in CI, and the deprecated names and fields removed. **Read [Upgrading to 0.23](https://github.com/VincenzoImp/openings-job-search/blob/v0.23.0/docs/user/upgrading-0.23.md) before upgrading scripts or agents.**
 
 - **Setup guide:** a new workspace opens on a guide that connects your agent (token and client configuration), shows your record being built (Profile, Policy, searches, entries, claims, templates) with the agent's questions, and lets you fill in the Profile basics, Eligibility facts, the no-reply period and a first search yourself. Skip it, continue it from Today, or open it again from Settings › Workspace.
 - **Breaking: removed what 0.19 to 0.22 deprecated.** The 30 MCP tool names from before 0.22 and the flat list arguments are gone; every MCP tool now refuses an argument it does not take (`422 validation`) instead of ignoring it.
@@ -253,7 +284,7 @@ The end of the redesign: a setup guide for new workspaces, parity enforced in CI
 
 ## 0.22.0 — 2026-11-13
 
-The breaking group of the redesign: one timeline, documents that are their source, and one name per operation. **Read [Upgrading to 0.22](https://github.com/VincenzoImp/openings/blob/v0.22.0/docs/user/upgrading-0.22.md) before upgrading scripts or agents.**
+The breaking group of the redesign: one timeline, documents that are their source, and one name per operation. **Read [Upgrading to 0.22](https://github.com/VincenzoImp/openings-job-search/blob/v0.22.0/docs/user/upgrading-0.22.md) before upgrading scripts or agents.**
 
 - **One timeline** for each job and application: notes and attributed changes in one list, pinned note first, with scope and filters by kind, who, scope and period (`GET /jobs/{id}/timeline`, `GET /applications/{id}/timeline`, MCP `timeline_get`). Notes record their run and can be pinned, one per job and per application (`POST /notes/{id}/pin`, `notes_pin`).
 - **The application note becomes the pinned note.** The `note` field is deprecated: it is still read and written through the pinned note until 0.23; reads return `pinned_note`.
@@ -413,7 +444,7 @@ No schema version change: the derived `context_inputs` table is created automati
 - Add an [operator workspace template](examples/operator-workspace/README.md): operating mandate, MCP configuration for six clients from one URL, a launcher that checks the token and sets `OPENINGS_URL`, and a script that fetches the server's skills.
 - `setup-openings` checks for a LaTeX compiler on the agent's machine and offers a synthetic trial with the bundled examples.
 - Settings → Agent access shows copy-ready MCP configuration for Claude Code, Codex and JSON clients, and lists the available skills.
-- Add the [agent-operated job search](https://github.com/VincenzoImp/openings/blob/v0.14.0/docs/user/agent-operated.md) guide: the agent runs and improves the search; the owner applies to prepared Drafts and records Applied.
+- Add the [agent-operated job search](https://github.com/VincenzoImp/openings-job-search/blob/v0.14.0/docs/user/agent-operated.md) guide: the agent runs and improves the search; the owner applies to prepared Drafts and records Applied.
 - Career claims and Prepare Shortlist present the strongest truthful case and never volunteer gaps in application documents.
 
 No database change: workspace schema remains 6.

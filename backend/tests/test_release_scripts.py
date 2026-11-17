@@ -36,14 +36,14 @@ def copy_descriptions(tmp_path):
 
 
 def test_the_description_is_the_same_everywhere():
-    assert "You just apply." in check_package.check_descriptions()
+    assert "works it by your rules. You apply." in check_package.check_descriptions()
 
 
 @pytest.mark.parametrize("path", [path for path, _ in check_package.DESCRIPTIONS])
 def test_a_differing_description_fails(tmp_path, path):
     root = copy_descriptions(tmp_path)
     target = root / path
-    target.write_text(target.read_text().replace("one SQLite file", "one database"))
+    target.write_text(target.read_text().replace("your own AI agent", "an AI agent"))
     with pytest.raises(SystemExit, match="differs"):
         check_package.check_descriptions(root)
 

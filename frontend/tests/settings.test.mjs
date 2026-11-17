@@ -30,7 +30,7 @@ test("claude mcp add names the address and a single-quoted header", () => {
 test("Codex reads the token from its variable", () => {
   assert.equal(
     settings.connectSnippet("codex", "http://127.0.0.1:18080"),
-    '# ~/.codex/config.toml\n[mcp_servers.openings]\nurl = "http://127.0.0.1:18080/mcp/"\nbearer_token_env_var = "OPENINGS_TOKEN"',
+    "codex mcp add openings --url http://127.0.0.1:18080/mcp/ \\\n  --bearer-token-env-var OPENINGS_TOKEN",
   );
 });
 

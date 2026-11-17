@@ -202,12 +202,12 @@ test("API & agents: three steps, an Agent token by default, copy, revoke", async
   await clients.getByRole("tab", { name: "JSON" }).click();
   await expect(snippet).toContainText('"Bearer ${OPENINGS_TOKEN}"');
   await clients.getByRole("tab", { name: "Codex" }).click();
-  await expect(snippet).toContainText("bearer_token_env_var");
+  await expect(snippet).toContainText("--bearer-token-env-var OPENINGS_TOKEN");
   await page.getByRole("button", { name: "Copy mcp configuration" }).click();
   await expect(toast(page)).toContainText("Configuration copied");
   if (clipboard) {
     expect(await page.evaluate(() => navigator.clipboard.readText())).toContain(
-      "[mcp_servers.openings]",
+      "codex mcp add openings --url",
     );
   }
   const fits = await snippet.evaluate(

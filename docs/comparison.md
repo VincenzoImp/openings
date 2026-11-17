@@ -8,7 +8,7 @@ are welcome as an issue.
 
 ## At a glance
 
-| | Self-hosted | Account | AI inside | Agent via MCP | Collects from company ATS boards | One-key triage | Auto-apply | Licence |
+| | Self-hosted | Account | AI inside | Agent via MCP | Collects from company job boards | One-key triage | Auto-apply | License |
 |---|---|---|---|---|---|---|---|---|
 | **Openings** | Yes: one container, one SQLite file | No; an owner password | None: bring your own agent | The whole workspace | 12 platforms | Yes, every decision undoable | No: nothing in it can submit to an employer | MIT |
 | A spreadsheet | Your choice | Your choice | No | No | No | No | No | — |

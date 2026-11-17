@@ -5,7 +5,8 @@ who lives in Amsterdam and looks for backend and data roles in Europe or remote,
 with the example Preferences, three templates, four collection sources and an
 agent token named "Claude Code"; the jobs and applications are in jobs.py. The
 CVs and letters are real PDFs built with Tectonic from the TeX files beside this
-module (the layout of examples/cv.tex and letter.tex), stored with those sources.
+module (the layout of examples/cv.tex and letter.tex), stored with those sources;
+the templates carry the same PDFs as their samples.
 
 Everything goes through the services, except the dates: each block's records
 are dated back with raw SQL (marker.py), so the screens always look current.
@@ -13,14 +14,16 @@ That runs only on a file that carries the demo marker, which ``mark_demo``
 writes on a new, empty workspace and nothing else writes.
 """
 
+import asyncio
 import json
 
 from ..actors import OWNER, acting_as, token_actor
 from ..career import EntryCreate, HighlightCreate, ProfileUpdate, TemplateCreate
 from ..common import encode, examples_dir, new_id
 from ..discovery.models import RSSConfig, SourceCreate
+from ..documents import UploadReservation
 from . import marker
-from .jobs import DemoJobs
+from .jobs import FILES, DemoJobs, Upload
 from .marker import mark_demo
 
 CV_GUIDANCE = (
@@ -45,6 +48,7 @@ def seed_demo(app):
     """
     workspace, career = app.state.workspace, app.state.career
     discovery, preferences = app.state.discovery, app.state.preferences
+    documents = app.state.documents
 
     def moment(**delta):
         return marker.moment(workspace.db, **delta)
@@ -120,7 +124,7 @@ def seed_demo(app):
             ),
             (
                 "Backend engineer",
-                "Added request tracing to the core endpoints of the platform.",
+                "Ran the team's first load tests before a customer launch.",
                 False,
                 False,
             ),
@@ -145,14 +149,23 @@ def seed_demo(app):
                     always_include=always,
                 )
             )
-        for name, kind, tex, guidance, rules in (
-            ("Main CV", "cv", cv_tex, CV_GUIDANCE, {"max_pages": 1, "engine": "tectonic"}),
+        # Each template with a sample PDF for its Preview: one of the demo's own documents.
+        for name, kind, tex, guidance, rules, sample in (
+            (
+                "Main CV",
+                "cv",
+                cv_tex,
+                CV_GUIDANCE,
+                {"max_pages": 1, "engine": "tectonic"},
+                "demo-cv",
+            ),
             (
                 "Cover letter",
                 "letter",
                 letter_tex,
                 LETTER_GUIDANCE,
                 {"max_pages": 1, "engine": "tectonic", "date_format": "D MMMM YYYY"},
+                "demo-letter",
             ),
             (
                 "Compact CV",
@@ -160,11 +173,24 @@ def seed_demo(app):
                 cv_tex.replace("margin=1.7cm", "margin=1.2cm"),
                 COMPACT_GUIDANCE,
                 {"max_pages": 1, "max_bullets": 4, "max_bullet_chars": 110, "engine": "tectonic"},
+                "demo-cv",
             ),
         ):
-            career.create_template(
+            template = career.create_template(
                 TemplateCreate(name=name, kind=kind, tex=tex, guidance=guidance, rules=rules)
             )
+            data = (FILES / f"{sample}.pdf").read_bytes()
+            with acting_as(OWNER):
+                grant = documents.reserve_upload(
+                    UploadReservation(
+                        owner_type="template",
+                        owner_id=template["id"],
+                        name="sample.pdf",
+                        media_type="application/pdf",
+                        size=len(data),
+                    )
+                )
+                asyncio.run(documents.upload(Upload(grant, data)))
         example = json.loads((examples / "preferences.json").read_text())
         with acting_as(OWNER):
             for section, items in example["sections"].items():

@@ -1,9 +1,9 @@
 ---
 name: prepare-interview
 title: Prepare for an interview
-summary: Get a brief on the role, stories from your own record, likely questions and questions to ask, saved on the application, and a debrief after.
+summary: Your agent saves an interview brief on the application, with stories from your record and likely questions, then a debrief after the interview.
 example: I have an interview with Northstar Labs on Monday, help me prepare.
-description: Prepare the owner for an interview or recruiter call on an Openings application, and follow it up - "prepare me for the interview with X", "here is how the interview went". Builds a brief from the posting, what the employer received and the career entries, and saves it as a note.
+description: Prepare the owner for an interview or recruiter call on an Openings application, and follow it up, as in "prepare me for the interview with X", "here is how the interview went". Builds a brief from the posting, what the employer received and the career entries, and saves it as a note.
 ---
 
 # Prepare for an interview

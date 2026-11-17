@@ -1,7 +1,7 @@
 # Architecture
 
-Openings is a FastAPI application, a React dashboard and one SQLite file. The core
-runs no model, browser or TeX: an external agent generates, compiles and uploads.
+Find each part of Openings here: a FastAPI app, a React dashboard and one SQLite file.
+The core runs no model, browser or TeX; an external agent writes, compiles and uploads.
 
 ## Layers
 
@@ -33,8 +33,8 @@ flowchart LR
 | `frontend/src` | Dashboard calling REST through a client generated from OpenAPI |
 | `skills/` | Agent skills (Agent Skills format), served read-only |
 
-Services never import FastAPI routing or MCP registration; `interfaces/` binds
-them. No module exceeds about 800 lines.
+Services never import FastAPI routing or MCP registration; `interfaces/` binds them.
+No module exceeds about 800 lines.
 
 ## Data model
 
@@ -56,8 +56,8 @@ erDiagram
 
 Other tables: `events`, `posting_details`, `settings`, `preference_sections`,
 `api_tokens`, `templates`, `providers`, `collection_runs`, `tasks`, `transfer_grants`,
-`idempotency_keys`. `knowledge` and `claims` hold career entries and highlights.
-SQLite uses WAL and SHA-256-deduplicated blobs.
+`idempotency_keys`. `knowledge` and `claims` hold career entries and highlights. SQLite
+uses WAL and SHA-256-deduplicated blobs.
 
 ## Operations
 
@@ -70,10 +70,10 @@ def jobs_update(ws: WS, job_id: str, body: JobPatch) -> JobSummary:
     return ws.update_job(job_id, body)
 ```
 
-- **REST:** FastAPI reads the function. The name is the `operationId`; the docstring
-  is the summary and description; the return annotation is the response model.
-- **MCP:** the tool has the function's name, description (at most 250 characters)
-  and flat arguments; unknown arguments are refused, schemas and results compacted.
+- **REST:** FastAPI reads the function. The name is the `operationId`; the docstring is
+  the summary and description; the return annotation is the response model.
+- **MCP:** the tool has the function's name, description (at most 250 characters) and
+  flat arguments; unknown arguments are refused, schemas and results compacted.
   `mcp="<tool>"` keeps an operation off MCP and names its tool, which a call gets back
   as `rest_only` with `details.use` (otherwise `owner_only` or `unknown_tool`).
 - **Access:** `READ`, `WRITE`, `DESTRUCTIVE` set annotations and documented errors.
@@ -81,21 +81,22 @@ def jobs_update(ws: WS, job_id: str, body: JobPatch) -> JobSummary:
   only. `GET /api/v1/capabilities` lists each operation's name, route and access.
 - **Transport routes** (sign-in, backup, restore, export, file transfers, `/health`,
   `/mcp/`) are written by hand and listed in `TRANSPORT_ONLY` with a reason.
-- **Conventions:** tools are `<resource>_<verb>`. A batch write takes `items`,
-  applies each on its own and returns a `BatchResult`. Updates and deletes name
-  `expected_version` (a stale one's 409 names `details.current_version`); creates
-  take an `idempotency_key`. Every request or tool call has one `batch_id`.
+- **Conventions:** tools are `<resource>_<verb>`. A batch write takes `items`, applies
+  each on its own and returns a `BatchResult`. Updates and deletes name
+  `expected_version` (a stale one's 409 names `details.current_version`); creates take
+  an `idempotency_key`. Every request or tool call has one `batch_id`.
 
-Parity runs one way: every dashboard action is a REST operation, and every
-operation that is not owner-only is an MCP tool or names one. REST is the superset.
-`openapi.py` completes the document (tags, `bearerAuth`, the `Error` model,
-examples); the dashboard's types are generated from it (`npm --prefix frontend run
-api:gen`; CI fails on a stale `schema.d.ts`). `test_mcp_budget.py` caps the
-agent's tool list. On initialize the server sends `instructions`
-(`mcp_server.INSTRUCTIONS`): start with `workspace_context`, load the skill for the
-task, and the hard limits. `workspace_context` returns the workspace, counts,
-settings, profile, Preferences, a career summary, templates, skills and `feedback`:
-the owner's corrections of agent work since the token's last read.
+Parity runs one way: every dashboard action is a REST operation, and every operation
+that is not owner-only is an MCP tool or names one. REST is the superset. `openapi.py`
+completes the document (tags, `bearerAuth`, the `Error` model, examples), and the
+dashboard's types are generated from it (`npm --prefix frontend run api:gen`; CI fails
+on a stale `schema.d.ts`).
+
+On initialize the MCP server sends `instructions` (`mcp_server.INSTRUCTIONS`): start
+with `workspace_context`, load the skill for the task, and the hard limits.
+`workspace_context` returns the workspace, counts, settings, profile, Preferences, a
+career summary, templates, skills and `feedback`, the owner's corrections of agent work
+since the token's last read.
 
 ## Invariants
 
@@ -103,20 +104,20 @@ the owner's corrections of agent work since the token's last read.
   Conflicting identities need an explicit merge; similarity never merges. Duplicate
   candidates are read-only suggestions.
 - **Triage and applications:** triage is `new`, `shortlisted` or `dismissed`.
-  Shortlisting starts the application in the same transaction; starting one
-  shortlists its job. Each job has at most one non-Closed application, enforced by
-  the service and a partial unique index. Closing needs an outcome. Mark applied is
-  never automatic: the owner's word or standing rule. Forget removes job-owned records.
+  Shortlisting starts the application in the same transaction; starting one shortlists
+  its job. Each job has at most one non-Closed application, enforced by the service
+  and a partial unique index. Closing needs an outcome. Mark applied is never
+  automatic: the owner's word or standing rule. Forget removes job-owned records.
 - **Ready** is computed in one SQL expression and one function
   (`workspace/readiness.py`): Shortlisted, every required document (`cv`, `letter`)
   has a complete current revision, no blocking requirement is open.
-- **Documents:** a CV or letter revision is a required PDF and an optional TeX
-  source. It is incomplete until its PDF is stored, then complete and immutable.
-  With a source, the PDF names its SHA-256 and a mismatch is refused. Readable text
-  comes from the source (`documents/text.py`) or the PDF (pypdf), never a TeX runtime.
+- **Documents:** a CV or letter revision is a required PDF and an optional TeX source.
+  It is incomplete until its PDF is stored, then complete and immutable. With a
+  source, the PDF names its SHA-256 and a mismatch is refused. Readable text comes
+  from the source (`documents/text.py`) or the PDF (pypdf), never a TeX runtime.
 - **Preferences:** five free-text sections, replaced whole under a version; only
-  `no_reply_days` and `spoken_languages` are typed. Labels describe and filter; nothing
-  dismisses a job automatically.
+  `no_reply_days` and `spoken_languages` are typed. Labels describe and filter;
+  nothing dismisses a job automatically.
 - **Attribution and concurrency:** each write records an actor label (`owner`,
   `agent:<token name>`, `system`) and the batch, never content. Typed inputs,
   versions, idempotency keys and short transactions; one process per workspace.
@@ -124,8 +125,8 @@ the owner's corrections of agent work since the token's last read.
 ## Provider gate
 
 Every provider request goes through the persisted gate (`discovery/service.py`,
-`collectors/pinning.py`): previews, URL imports, runs, redirects and detail fetches. It
-stores spacing and cooldowns, honors 429 and `Retry-After`, pins resolved addresses
+`collectors/pinning.py`): previews, URL imports, runs, redirects and detail fetches. The
+gate stores spacing and cooldowns, honors 429 and `Retry-After`, pins resolved addresses
 against DNS rebinding and never uses an unguarded HTTP client. Incomplete automatic
 candidates stay in the run's checkpoint until usable text exists.
 
@@ -133,18 +134,17 @@ candidates stay in the run's checkpoint until usable text exists.
 
 `schema.sql` is the whole layout and runs once, on a new file. The one migration in
 `migrations/` (`MIGRATIONS` has one key, `SCHEMA_VERSION - 1`) upgrades a workspace of
-the previous schema; older ones are refused with the release to open first. It is
-frozen with its release, imports only the standard library and builds a new file from
-`schema.sql`, copying data in one transaction (a release that removes records writes
-them to a JSON archive beside the database), verifies the result and keeps the original. `test_upgrade.py`
-upgrades a real fixture (`backend/tests/fixtures/workspace-<schema>.sql.gz`, written by
-`scripts/release_fixture.py`) and compares it to a new file. Until its release ships,
-edit the migration instead of adding one.
+the previous schema, and older ones are refused with the release to open first. Frozen
+with its release and using only the standard library, the migration builds a new file
+from `schema.sql`, copies data in one transaction, verifies it and keeps the original;
+removed records go to a JSON archive. `test_upgrade.py` upgrades a fixture
+(`backend/tests/fixtures/workspace-<schema>.sql.gz`, from `scripts/release_fixture.py`)
+and compares it to a new file; until its release ships, edit the migration instead.
 
 ## Backups and tests
 
 The worker writes a daily verified `VACUUM INTO` copy, rotated by `OPENINGS_BACKUP_KEEP`
-and skipped when room is short; an agent's backup drops credentials, and restore keeps
-the destination's authentication. Guards: `test_parity.py`, `test_mcp_budget.py`,
+and skipped when room is short. An agent's backup drops credentials, and restore keeps
+the destination's authentication. The guards are `test_parity.py`, `test_mcp_budget.py`,
 `test_openapi.py`, `test_migration_policy.py`, `test_upgrade.py` and `test_docs.py`
 (docs size, links, vocabulary, and the routes and tools they name).
