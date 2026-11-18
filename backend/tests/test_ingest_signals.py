@@ -20,7 +20,7 @@ from openings.workspace import Workspace
 FIXTURE = json.loads((Path(__file__).with_name("language_fixture.json")).read_text())["items"]
 AGENT = token_actor("agent-token", "Synthetic agent", "agent")
 # Every language whose postings are recognised.
-READ = ("en", "de", "fr", "it", "es", "pt", "nl", "pl", "sv", "da", "no", "fi")
+READ = ("en", "de", "fr", "it", "es", "pt", "nl", "pl", "sv", "da", "no", "fi", "cs", "ro")
 
 # What the detectors must reach on the labelled fixture. Measured when written:
 # language 89/89 correct where a language was given (89 of 90 labelled postings),
@@ -343,3 +343,9 @@ def test_a_board_that_stops_listing_a_posting_marks_it_and_dismisses_nothing(
     run()
     assert not workspace.get_job(after["Engineer 3"]["id"])["signals"]["no_longer_listed"]
     assert workspace.list_jobs(signal="no_longer_listed")["total"] == 1
+
+
+def test_czech_and_romanian_postings():
+    for item in FIXTURE:
+        if item["language"] in {"cs", "ro"}:
+            assert posting_language(item["posting"])[0] == item["language"], item["id"]

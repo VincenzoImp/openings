@@ -2,7 +2,8 @@
 
 Both are deterministic: fixed word lists and phrase rules in English, German,
 French, Italian, Spanish, Portuguese, Dutch, Polish, Swedish, Danish, Norwegian and
-Finnish, without a model, a dictionary download or the network.
+Finnish for requirements, plus Czech and Romanian for posting detection, without
+a model, a dictionary download or the network.
 
 **Posting language.** Very frequent function words of each language are counted
 in the first words of the text; a word that several languages share counts for
@@ -25,7 +26,7 @@ import re
 import unicodedata
 
 # Bump when the rules change: stored signals of another format are computed again.
-FORMAT = 2
+FORMAT = 3
 
 # The posting's first words are enough to tell its language.
 _LANGUAGE_WORDS = 1500
@@ -95,6 +96,15 @@ _FUNCTION_WORDS = {
         "var vart vare dere ikke ogsa fra etter mellom nar sa samt ved bli blir mye noe noen "
         "hva hvor innen gjennom arbeid erfaring stilling tilbyr soker ansvar oppgaver "
         "utvikler utviklere kundene arbeidsmiljo jobbe"
+    ),
+    "cs": (
+        "ve pro se si jsou jsme budete vas vase nas nase nebo pri ktere ktery ktera "
+        "tento tato take muzete hledame nabizime zkusenosti znalost prace tymu pozice "
+        "pozadujeme vyhodou"
+    ),
+    "ro": (
+        "si pentru este sunt suntem vei nostru noastra tale avem cautam oferim "
+        "experienta cunostinte echipa lucru responsabilitati cerinte avantaj"
     ),
     "fi": (
         "ja on ei tai etta se kanssa sinulla meilla sinun meidan olet olemme haemme "

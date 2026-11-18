@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Detect Czech and Romanian job postings for language labels and filtering.
+
 ## 0.28.1 — 2026-11-16
 
 Set up your job search once: Ready ranked best first, Apply in one click, and a voiced walkthrough
