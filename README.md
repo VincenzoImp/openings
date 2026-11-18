@@ -14,7 +14,7 @@
 
 <img alt="Openings on the demo workspace: a Ready application with its PDFs, a Preferences line, Claude Code running the search, a dismissal that quotes the rule, Ready ranked best first, Mark applied" src="docs/images/demo.gif">
 
-<p align="center"><!-- video-link --><a href="https://github.com/VincenzoImp/openings-job-search/releases/download/v0.28.1/openings-walkthrough.mp4">▶ Watch the walkthrough, with voice</a></p>
+<p align="center"><!-- video-link --><a href="https://www.youtube.com/watch?v=AJzw5OIvWTw">▶ Watch the walkthrough on YouTube, with voice</a></p>
 
 ## How a day goes
 
