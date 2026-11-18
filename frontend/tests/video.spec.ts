@@ -7,7 +7,8 @@ import { Reel, settled, type Rect } from "./reel";
 // in CI), from a running demo workspace (`openings demo`) that a real agent
 // session has worked on. Each shot is one beat of the video's script, recorded
 // on its own (OPENINGS_REEL_DIR/<shot>/: frames, frames.json, track.json) at
-// three times the pixels, so the video's close-ups stay sharp. The video draws
+// three device pixels per page pixel ($OPENINGS_VIDEO_SCALE), so the phone
+// layout and the video's close-ups stay sharp. The video draws
 // the cursor, clicks, key chips, captions and underlines itself from each
 // shot's track; a shot's anchors are the DOM rectangles it aims at.
 //
@@ -20,6 +21,8 @@ import { Reel, settled, type Rect } from "./reel";
 // the agent and runs the phases: `npx playwright test --project=video`.
 // The "after" phase also writes checks.json: the Ready order, the PDFs on
 // screen, the dismissal that quotes a Preference and the words it shares.
+// Its shot Z is one frame for the video's opening card and covers: the
+// rank-1 Ready application in a tall desktop window, whatever the device.
 const OUT = process.env.OPENINGS_REEL_DIR;
 const PHASE = process.env.OPENINGS_VIDEO_PHASE ?? "";
 const URL = process.env.OPENINGS_VIDEO_URL ?? "";
@@ -28,7 +31,9 @@ const MOBILE = process.env.OPENINGS_VIDEO_DEVICE === "mobile";
 const SIZE = MOBILE
   ? { width: 390, height: 585 }
   : { width: 1440, height: 810 };
-const SCALE = 3;
+const SCALE = Number(process.env.OPENINGS_VIDEO_SCALE ?? 3);
+/** The window of shot Z: the desktop layout, tall enough for a whole CV. */
+const TALL = { width: 1440, height: 1300 };
 /** A cursor move, in ms of reel time. */
 const MOVE = 600;
 
@@ -53,7 +58,7 @@ test.use({
 });
 
 // The browser's own tooltip for a `title` (the Apply link, the ★ mark) is
-// not part of a screencast: the capture draws it in the product's tooltip
+// not part of a screenshot: the capture draws it in the product's tooltip
 // style instead.
 const TOOLTIPS = `
   .apg-check-links a[title], .pf-star-mark[title] { position: relative; }
@@ -168,7 +173,7 @@ const rectOf = async (target: Locator): Promise<Rect> => {
   return box;
 };
 
-test("video footage", async ({ page, session }) => {
+test("video footage", async ({ page, session, browser }) => {
   test.skip(
     !OUT || !URL || !SESSION,
     "Run through the video capture, which sets the demo and the output.",
@@ -208,7 +213,6 @@ test("video footage", async ({ page, session }) => {
     const reel = new Reel(page, join(OUT!, id), {
       size: SIZE,
       scale: SCALE,
-      quality: 96,
       cursor: { x: SIZE.width - 60, y: SIZE.height - 40 },
     });
     await reel.record();
@@ -401,8 +405,50 @@ test("video footage", async ({ page, session }) => {
       await reel.pause(3600);
       await reel.click(page.getByRole("tab", { name: "Letter" }).first());
       await settled(page);
+      await reel.snap();
     }
   });
+
+  // Z: the same application in a tall desktop window, one frame: its title
+  // and state, and its CV and letter whole.
+  const tall = await browser.newContext({
+    viewport: TALL,
+    deviceScaleFactor: SCALE,
+    bypassCSP: true,
+    locale: "en-GB",
+    timezoneId: "Europe/Amsterdam",
+    colorScheme: "light",
+  });
+  const sheet = await tall.newPage();
+  await open(sheet, session);
+  await sheet.goto(URL + "/" + ready[0].href);
+  await settled(sheet);
+  const still = new Reel(sheet, join(OUT!, "Z"), {
+    size: TALL,
+    scale: SCALE,
+    cursor: { x: TALL.width - 60, y: TALL.height - 40 },
+  });
+  await still.record();
+  const rects = (selector: string) =>
+    sheet
+      .locator(selector)
+      .filter({ visible: true })
+      .evaluateAll((elements) =>
+        elements.map((element) => {
+          const { x, y, width, height } = element.getBoundingClientRect();
+          return { x, y, width, height };
+        }),
+      );
+  still.anchor("title", await rects(".apg-head h1"));
+  still.anchor("meta", await rects(".apg-meta > li"));
+  still.anchor("panes", [
+    ...(await rects('.apg-pane[data-pane="cv"]')),
+    ...(await rects('.apg-pane[data-pane="letter"]')),
+  ]);
+  still.anchor("pdfs", await rects(".ap-well:has(> .ap-pdf)"));
+  still.track.text = await sheet.locator("body").innerText();
+  await still.stop();
+  await tall.close();
 
   // G: Apply on the employer's site (never clicked here), then Mark applied.
   if (MOBILE) {
@@ -426,6 +472,7 @@ test("video footage", async ({ page, session }) => {
       await reel.click(markApplied, undefined, MOVE);
     }
     await expect(page.getByText(/^Marked applied/)).toBeVisible();
+    await reel.snap();
     reel.anchor("toast", [
       await rectOf(page.getByText(/^Marked applied/).first()),
     ]);
@@ -444,6 +491,7 @@ test("video footage", async ({ page, session }) => {
     await reel.pause(600);
     await reel.click(approve, undefined, MOVE);
     await page.waitForTimeout(400);
+    await reel.snap();
     if (!MOBILE) {
       await reel.pause(900);
       const star = main
